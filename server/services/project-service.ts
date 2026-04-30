@@ -1,6 +1,7 @@
 import { logger } from "../logger";
 import {
   approveBrandProfileVersion,
+  createImageJobWithAssets,
   createOrUpdateContentJobWithAssets,
   createProjectWithSeeds,
   deleteProjectById,
@@ -10,9 +11,11 @@ import {
   listProjects,
   saveBrandProfileDraft,
   saveLatestContentJobAssets,
+  selectImageAssetForContentAsset,
   updateLatestContentJobStatus,
 } from "../repositories/project-repository";
 import { buildContextDraft } from "./context-draft-service";
+import { buildImageVariants } from "./image-studio-service";
 import { buildReviewSummary } from "./review-service";
 import { analyzeSourceFiles } from "./source-analysis-service";
 import { buildStudioSeed } from "./studio-seed-service";
@@ -30,6 +33,13 @@ export class ProjectContentNotFoundError extends Error {
   constructor(projectId: string) {
     super(`프로젝트 콘텐츠를 찾을 수 없습니다: ${projectId}`);
     this.name = "ProjectContentNotFoundError";
+  }
+}
+
+export class ProjectImageNotFoundError extends Error {
+  constructor(projectId: string) {
+    super(`프로젝트 이미지 자산을 찾을 수 없습니다: ${projectId}`);
+    this.name = "ProjectImageNotFoundError";
   }
 }
 
@@ -129,6 +139,26 @@ function serializeProjectDetail(record: NonNullable<Awaited<ReturnType<typeof ge
             version: asset.version,
             createdAt: asset.createdAt,
             updatedAt: asset.updatedAt,
+            imageJobs: asset.imageJobs.map((job) => ({
+              id: job.id,
+              channelPreset: job.channelPreset,
+              prompt: job.prompt,
+              status: job.status,
+              createdAt: job.createdAt,
+              updatedAt: job.updatedAt,
+              imageAssets: job.imageAssets.map((imageAsset) => ({
+                id: imageAsset.id,
+                role: imageAsset.role,
+                originalPath: imageAsset.originalPath,
+                composedPath: imageAsset.composedPath,
+                width: imageAsset.width,
+                height: imageAsset.height,
+                selected: imageAsset.selected,
+                version: imageAsset.version,
+                createdAt: imageAsset.createdAt,
+                updatedAt: imageAsset.updatedAt,
+              })),
+            })),
           })),
         }
       : null,
@@ -238,6 +268,21 @@ export async function getProjectStudioSeed(projectId: string) {
     bannedTerms: record.brandProfile.bannedTerms,
     assets,
   });
+  const assetImages =
+    record.latestContentJob?.assets.map((asset) => ({
+      channel: asset.channel as "blog" | "instagram" | "facebook",
+      prompt: asset.imageJobs[0]?.prompt ?? null,
+      variants: asset.imageJobs.flatMap((job) =>
+        job.imageAssets.map((imageAsset) => ({
+          id: imageAsset.id,
+          role: imageAsset.role,
+          url: imageAsset.composedPath || imageAsset.originalPath || "",
+          width: imageAsset.width,
+          height: imageAsset.height,
+          selected: imageAsset.selected,
+        })),
+      ),
+    })) ?? [];
 
   return {
     project: {
@@ -269,6 +314,7 @@ export async function getProjectStudioSeed(projectId: string) {
           ? record.latestContentJob.objective
           : seed.objective,
       assets,
+      images: assetImages,
     },
     review,
     analysisMode: "client-source-metadata-and-excerpt",
@@ -466,4 +512,67 @@ export async function markProjectReadyForPublish(projectId: string) {
     status: updated.status,
     updatedAt: updated.updatedAt.toISOString(),
   };
+}
+
+export async function generateProjectImages(params: {
+  projectId: string;
+  channel: "blog" | "instagram" | "facebook";
+  prompt?: string;
+}) {
+  const record = await getProjectDetail(params.projectId);
+
+  if (!record || !record.brandProfile || !record.latestContentJob) {
+    throw new ProjectNotFoundError(params.projectId);
+  }
+
+  const asset = record.latestContentJob.assets.find((item) => item.channel === params.channel);
+
+  if (!asset) {
+    throw new ProjectImageNotFoundError(params.projectId);
+  }
+
+  const bundle = buildImageVariants(record.project.name, {
+    channel: params.channel,
+    title: asset.title || record.latestContentJob.topic,
+    body: asset.body,
+    cta: asset.cta || record.brandProfile.cta || "자세히 보기",
+  }, params.prompt);
+
+  await createImageJobWithAssets({
+    contentAssetId: asset.id,
+    channelPreset: `${params.channel}-${bundle.preset.width}x${bundle.preset.height}`,
+    prompt: bundle.prompt,
+    imageAssets: bundle.images,
+  });
+
+  return getProjectStudioSeed(params.projectId);
+}
+
+export async function selectProjectImage(params: {
+  projectId: string;
+  channel: "blog" | "instagram" | "facebook";
+  imageAssetId: string;
+}) {
+  const record = await getProjectDetail(params.projectId);
+
+  if (!record || !record.latestContentJob) {
+    throw new ProjectNotFoundError(params.projectId);
+  }
+
+  const asset = record.latestContentJob.assets.find((item) => item.channel === params.channel);
+
+  if (!asset) {
+    throw new ProjectImageNotFoundError(params.projectId);
+  }
+
+  const selected = await selectImageAssetForContentAsset({
+    contentAssetId: asset.id,
+    imageAssetId: params.imageAssetId,
+  });
+
+  if (!selected) {
+    throw new ProjectImageNotFoundError(params.projectId);
+  }
+
+  return getProjectStudioSeed(params.projectId);
 }

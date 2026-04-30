@@ -1,5 +1,20 @@
 export type ChannelKey = "blog" | "instagram" | "facebook";
 
+export type ImageStudioVariant = {
+  id: string;
+  label: string;
+  prompt: string;
+  accent?: string;
+  url?: string;
+  selected?: boolean;
+};
+
+export type ImageStudioState = {
+  prompt: string;
+  variants: ImageStudioVariant[];
+  selectedVariantId?: string | null;
+};
+
 export type SourceFileDraft = {
   name: string;
   relativePath?: string;
@@ -134,6 +149,18 @@ export type StudioDetail = {
       title: string;
       body: string;
       cta: string;
+    }>;
+    images: Array<{
+      channel: ChannelKey;
+      prompt?: string | null;
+      variants: Array<{
+        id: string;
+        role: string;
+        url: string;
+        width?: number | null;
+        height?: number | null;
+        selected: boolean;
+      }>;
     }>;
   };
   review: {

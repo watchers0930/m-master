@@ -41,6 +41,26 @@ export type ProjectDetailRecord = {
       version: number;
       createdAt: Date;
       updatedAt: Date;
+      imageJobs: Array<{
+        id: string;
+        channelPreset: string;
+        prompt: string;
+        status: string;
+        createdAt: Date;
+        updatedAt: Date;
+        imageAssets: Array<{
+          id: string;
+          role: string;
+          originalPath: string | null;
+          composedPath: string | null;
+          width: number | null;
+          height: number | null;
+          selected: boolean;
+          version: number;
+          createdAt: Date;
+          updatedAt: Date;
+        }>;
+      }>;
     }>;
   } | null;
 };
@@ -148,6 +168,16 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
       include: {
         assets: {
           orderBy: [{ createdAt: "asc" }],
+          include: {
+            imageJobs: {
+              orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+              include: {
+                imageAssets: {
+                  orderBy: [{ createdAt: "asc" }],
+                },
+              },
+            },
+          },
         },
       },
     }),
@@ -525,5 +555,86 @@ export async function updateLatestContentJobStatus(projectId: string, status: st
   return prisma.contentJob.update({
     where: { id: latestContentJob.id },
     data: { status },
+  });
+}
+
+export async function createImageJobWithAssets(params: {
+  contentAssetId: string;
+  channelPreset: string;
+  prompt: string;
+  imageAssets: Array<{
+    role: string;
+    originalPath?: string;
+    composedPath?: string;
+    width?: number;
+    height?: number;
+    selected?: boolean;
+  }>;
+}) {
+  return prisma.imageJob.create({
+    data: {
+      contentAssetId: params.contentAssetId,
+      channelPreset: params.channelPreset,
+      prompt: params.prompt,
+      status: "generated",
+      imageAssets: {
+        create: params.imageAssets.map((asset) => ({
+          role: asset.role,
+          originalPath: asset.originalPath,
+          composedPath: asset.composedPath,
+          width: asset.width,
+          height: asset.height,
+          selected: asset.selected ?? false,
+        })),
+      },
+    },
+    include: {
+      imageAssets: {
+        orderBy: [{ createdAt: "asc" }],
+      },
+    },
+  });
+}
+
+export async function selectImageAssetForContentAsset(params: {
+  contentAssetId: string;
+  imageAssetId: string;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const imageJobIds = (
+      await tx.imageJob.findMany({
+        where: { contentAssetId: params.contentAssetId },
+        select: { id: true },
+      })
+    ).map((job) => job.id);
+
+    if (imageJobIds.length === 0) {
+      return null;
+    }
+
+    const asset = await tx.imageAsset.findFirst({
+      where: {
+        id: params.imageAssetId,
+        imageJobId: { in: imageJobIds },
+      },
+    });
+
+    if (!asset) {
+      return null;
+    }
+
+    await tx.imageAsset.updateMany({
+      where: {
+        imageJobId: { in: imageJobIds },
+      },
+      data: {
+        selected: false,
+      },
+    });
+
+    return tx.imageAsset.update({
+      where: { id: params.imageAssetId },
+      data: { selected: true },
+    });
   });
 }

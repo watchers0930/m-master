@@ -9,6 +9,8 @@ import type {
   ChannelKey,
   EditableBrandProfileField,
   ExportBundle,
+  ImageStudioState,
+  ImageStudioVariant,
   ProjectActivityItem,
   ProjectDetail,
   ProjectListItem,
@@ -100,6 +102,41 @@ function createEmptyAsset(channel: ChannelKey): StudioAsset {
   };
 }
 
+function createEmptyImageStudio(): Record<ChannelKey, ImageStudioState> {
+  return {
+    blog: { prompt: "", variants: [], selectedVariantId: null },
+    instagram: { prompt: "", variants: [], selectedVariantId: null },
+    facebook: { prompt: "", variants: [], selectedVariantId: null },
+  };
+}
+
+function toImageStudios(studio: StudioDetail | null): Record<ChannelKey, ImageStudioState> {
+  const empty = createEmptyImageStudio();
+
+  if (!studio) {
+    return empty;
+  }
+
+  for (const imageGroup of studio.draft.images) {
+    const variants: ImageStudioVariant[] = imageGroup.variants.map((variant, index) => ({
+      id: variant.id,
+      label: `Variation ${index + 1}`,
+      prompt: imageGroup.prompt || "",
+      url: variant.url,
+      selected: variant.selected,
+      accent: "#0071e3",
+    }));
+
+    empty[imageGroup.channel] = {
+      prompt: imageGroup.prompt || "",
+      variants,
+      selectedVariantId: imageGroup.variants.find((variant) => variant.selected)?.id ?? variants[0]?.id ?? null,
+    };
+  }
+
+  return empty;
+}
+
 export function DashboardShell() {
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [activeProject, setActiveProject] = useState<ProjectDetail | null>(null);
@@ -108,6 +145,7 @@ export function DashboardShell() {
   const [activeChannel, setActiveChannel] = useState<ChannelKey>("blog");
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [history, setHistory] = useState<ProjectActivityItem[]>([]);
+  const [imageStudios, setImageStudios] = useState<Record<ChannelKey, ImageStudioState>>(createEmptyImageStudio());
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("");
   const [workingPath, setWorkingPath] = useState("");
@@ -116,8 +154,10 @@ export function DashboardShell() {
   const [loading, setLoading] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [publishBusy, setPublishBusy] = useState(false);
+  const [imageBusy, setImageBusy] = useState(false);
 
   const folderSupported = typeof window !== "undefined" && typeof window.showDirectoryPicker === "function";
+  const currentImageStudio = imageStudios[activeChannel];
 
   async function loadProjects() {
     const response = await fetch("/api/projects", { cache: "no-store" });
@@ -164,6 +204,7 @@ export function DashboardShell() {
     setStudio(nextStudio);
     setSelectedTopicId(matchedTopic?.id ?? null);
     setHistory(historyPayload.data.history);
+    setImageStudios(toImageStudios(nextStudio));
   }
 
   function downloadFile(filename: string, content: string, type = "text/markdown;charset=utf-8") {
@@ -510,6 +551,93 @@ export function DashboardShell() {
     });
   }
 
+  function updateImageStudio(channel: ChannelKey, updater: (current: ImageStudioState) => ImageStudioState) {
+    setImageStudios((currentStudios) => ({
+      ...currentStudios,
+      [channel]: updater(currentStudios[channel]),
+    }));
+  }
+
+  function handleImagePromptChange(value: string) {
+    updateImageStudio(activeChannel, (currentStudio) => ({
+      ...currentStudio,
+      prompt: value,
+    }));
+  }
+
+  async function handleGenerateImages() {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setImageBusy(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/images`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channel: activeChannel,
+          prompt: currentImageStudio.prompt,
+        }),
+      });
+      const payload = await parseJson<ApiResponse<{ studio: StudioDetail }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      setStudio(payload.data.studio);
+      setImageStudios(toImageStudios(payload.data.studio));
+      await loadProject(activeProject.project.id);
+    } catch (imageError) {
+      setError(imageError instanceof Error ? imageError.message : "이미지 생성에 실패했습니다.");
+    } finally {
+      setImageBusy(false);
+    }
+  }
+
+  function handleSelectImageVariant(variantId: string) {
+    updateImageStudio(activeChannel, (currentStudio) => ({
+      ...currentStudio,
+      selectedVariantId: variantId,
+    }));
+  }
+
+  async function handleApplyImageVariant(variantId: string) {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setImageBusy(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/images`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channel: activeChannel,
+          imageAssetId: variantId,
+        }),
+      });
+      const payload = await parseJson<ApiResponse<{ studio: StudioDetail }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      setStudio(payload.data.studio);
+      setImageStudios(toImageStudios(payload.data.studio));
+      await loadProject(activeProject.project.id);
+    } catch (selectError) {
+      setError(selectError instanceof Error ? selectError.message : "이미지 선택 적용에 실패했습니다.");
+    } finally {
+      setImageBusy(false);
+    }
+  }
+
   async function handleSaveContent() {
     if (!activeProject?.project.id || !studio) {
       return;
@@ -702,7 +830,9 @@ export function DashboardShell() {
             <ContentStudio
               detail={activeProject}
               studio={studio}
+              imageStudio={currentImageStudio}
               history={history}
+              imageBusy={imageBusy}
               exportBusy={exportBusy}
               publishBusy={publishBusy}
               activeChannel={activeChannel}
@@ -711,6 +841,10 @@ export function DashboardShell() {
               onChannelChange={setActiveChannel}
               onTopicSelect={handleTopicSelect}
               onAssetChange={handleAssetChange}
+              onImagePromptChange={handleImagePromptChange}
+              onGenerateImages={handleGenerateImages}
+              onSelectImageVariant={handleSelectImageVariant}
+              onApplyImageVariant={handleApplyImageVariant}
               onSaveContent={handleSaveContent}
               onGenerateContent={handleGenerateContent}
               onExportChannel={handleExportChannel}

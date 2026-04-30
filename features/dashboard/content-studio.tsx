@@ -1,7 +1,15 @@
+import { EmptyStatePanel } from "@/components/ui/empty-state-panel";
+import { ImageVariantCard } from "@/components/ui/image-variant-card";
 import { InputField } from "@/components/ui/input-field";
 import { SectionCard } from "@/components/ui/section-card";
 import { StatusPill } from "@/components/ui/status-pill";
-import type { ChannelKey, ProjectActivityItem, ProjectDetail, StudioDetail } from "@/features/dashboard/types";
+import type {
+  ChannelKey,
+  ImageStudioState,
+  ProjectActivityItem,
+  ProjectDetail,
+  StudioDetail,
+} from "@/features/dashboard/types";
 
 function compactText(value?: string | null, maxLength = 120) {
   const normalized = (value || "").replace(/\s+/g, " ").trim();
@@ -15,7 +23,9 @@ function compactText(value?: string | null, maxLength = 120) {
 type ContentStudioProps = {
   detail?: ProjectDetail | null;
   studio?: StudioDetail | null;
+  imageStudio: ImageStudioState;
   history: ProjectActivityItem[];
+  imageBusy?: boolean;
   exportBusy?: boolean;
   publishBusy?: boolean;
   activeChannel: ChannelKey;
@@ -24,6 +34,10 @@ type ContentStudioProps = {
   onChannelChange: (channel: ChannelKey) => void;
   onTopicSelect: (topicId: string) => void;
   onAssetChange: (channel: ChannelKey, field: "title" | "body" | "cta", value: string) => void;
+  onImagePromptChange: (value: string) => void;
+  onGenerateImages: () => void;
+  onSelectImageVariant: (variantId: string) => void;
+  onApplyImageVariant: (variantId: string) => void;
   onSaveContent: () => Promise<void>;
   onGenerateContent: () => Promise<void>;
   onExportChannel: (channel: ChannelKey) => Promise<void>;
@@ -40,7 +54,9 @@ const channelLabels = {
 export function ContentStudio({
   detail,
   studio,
+  imageStudio,
   history,
+  imageBusy = false,
   exportBusy = false,
   publishBusy = false,
   activeChannel,
@@ -49,6 +65,10 @@ export function ContentStudio({
   onChannelChange,
   onTopicSelect,
   onAssetChange,
+  onImagePromptChange,
+  onGenerateImages,
+  onSelectImageVariant,
+  onApplyImageVariant,
   onSaveContent,
   onGenerateContent,
   onExportChannel,
@@ -56,6 +76,7 @@ export function ContentStudio({
   onPreparePublish,
 }: ContentStudioProps) {
   const activeAsset = studio?.draft.assets.find((asset) => asset.channel === activeChannel);
+  const hasImageVariants = imageStudio.variants.length > 0;
 
   return (
     <div className="stack">
@@ -82,7 +103,7 @@ export function ContentStudio({
             ))}
           </div>
         ) : (
-          <div className="empty-state">추천 주제가 아직 없습니다.</div>
+          <EmptyStatePanel title="추천 주제가 아직 없습니다." description="프로젝트 분석이 끝나면 우선순위 주제가 여기에 쌓입니다." />
         )}
       </SectionCard>
 
@@ -158,8 +179,59 @@ export function ContentStudio({
             </div>
           </>
         ) : (
-          <div className="empty-state">프로젝트를 선택하면 콘텐츠 스튜디오 초안이 표시됩니다.</div>
+          <EmptyStatePanel
+            title="콘텐츠 스튜디오 초안이 없습니다."
+            description="프로젝트를 선택하면 채널별 초안과 편집 패널이 이 영역에 표시됩니다."
+          />
         )}
+      </SectionCard>
+
+      <SectionCard
+        title="이미지 스튜디오"
+        description="선택 채널에 맞는 이미지 프롬프트를 입력하고 3개의 변형 시안을 비교해 대표 시안을 고릅니다."
+        badge="Image"
+        tone="soft"
+      >
+        <div className="image-studio-stack">
+          <div className="image-studio-toolbar">
+            <InputField
+              id={`image-prompt-${activeChannel}`}
+              label={`${channelLabels[activeChannel]} 이미지 프롬프트`}
+              value={imageStudio.prompt}
+              onChange={onImagePromptChange}
+              placeholder={`${channelLabels[activeChannel]}용 이미지 콘셉트, 구도, 분위기를 입력하세요.`}
+              multiline
+              rows={4}
+              hint="생성 버튼은 상위 콜백만 호출합니다. 실제 생성 연결은 상위 레이어에서 붙이면 됩니다."
+            />
+            <div className="image-studio-actions">
+              <StatusPill active>{channelLabels[activeChannel]}</StatusPill>
+              <button className="button primary" disabled={imageBusy} type="button" onClick={onGenerateImages}>
+                {imageBusy ? "시안 생성 중" : "변형 3종 생성"}
+              </button>
+            </div>
+          </div>
+
+          {hasImageVariants ? (
+            <div className="image-variant-grid">
+              {imageStudio.variants.map((variant) => (
+                <ImageVariantCard
+                  key={variant.id}
+                  active={imageStudio.selectedVariantId === variant.id}
+                  variant={variant}
+                  onSelect={onSelectImageVariant}
+                  onApply={onApplyImageVariant}
+                  busy={imageBusy}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyStatePanel
+              title="생성된 이미지 시안이 없습니다."
+              description="프롬프트를 입력한 뒤 생성 버튼을 누르면 채널별 썸네일 3개가 여기에 표시됩니다."
+            />
+          )}
+        </div>
       </SectionCard>
 
       <SectionCard
@@ -204,7 +276,10 @@ export function ContentStudio({
             </div>
           </>
         ) : (
-          <div className="empty-state">검수 패널은 프로젝트 생성 후 자동으로 채워집니다.</div>
+          <EmptyStatePanel
+            title="검수 패널 데이터가 없습니다."
+            description="프로젝트 생성 후 브랜드/형식 검수 결과가 자동으로 이 영역에 채워집니다."
+          />
         )}
       </SectionCard>
 
@@ -241,7 +316,10 @@ export function ContentStudio({
                 </div>
               ))
             ) : (
-              <div className="empty-state">아직 기록된 작업 이력이 없습니다.</div>
+              <EmptyStatePanel
+                title="아직 기록된 작업 이력이 없습니다."
+                description="저장, 생성, 발행 준비 작업이 발생하면 최근 이력이 운영 패널에 쌓입니다."
+              />
             )}
           </div>
         </div>
