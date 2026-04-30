@@ -37,11 +37,11 @@ button {
 
 .app-shell {
   min-height: 100vh;
-  padding: 32px;
+  padding: 20px;
 }
 
 .app-frame {
-  max-width: 1480px;
+  width: min(90vw, 1720px);
   margin: 0 auto;
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
@@ -243,6 +243,8 @@ button {
   border: 1px solid var(--line);
   background: var(--white);
   color: var(--graphite);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .button.primary {
@@ -281,6 +283,23 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.button-row,
+.button-cluster {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+}
+
+.button-row {
+  overflow-x: auto;
+}
+
+.button-row::-webkit-scrollbar,
+.button-cluster::-webkit-scrollbar {
+  display: none;
 }
 
 .file-chip,
@@ -380,6 +399,10 @@ button {
 @media (max-width: 720px) {
   .app-shell {
     padding: 16px;
+  }
+
+  .app-frame {
+    width: 100%;
   }
 
   .main-area,

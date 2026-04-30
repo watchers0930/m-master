@@ -61,7 +61,7 @@ export function ContentStudio({
                 <strong style={{ display: "block", fontSize: 18, marginBottom: 6 }}>{studio.draft.topic}</strong>
                 <span className="fine-print">{studio.draft.objective}</span>
               </div>
-              <div className="row">
+              <div className="button-cluster">
                 <StatusPill active>{studio.project.status}</StatusPill>
                 <button className="button ghost" type="button" onClick={() => void onGenerateContent()}>
                   선택 주제로 초안 생성

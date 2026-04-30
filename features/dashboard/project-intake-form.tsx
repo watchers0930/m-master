@@ -104,7 +104,7 @@ export function ProjectIntakeForm(props: ProjectIntakeFormProps) {
 
         {error ? <p className="error-text">{error}</p> : null}
 
-        <div className="row">
+        <div className="button-row">
           <button className="button" disabled={loading} type="button" onClick={() => void onPreview()}>
             {loading ? "초안 생성 중" : "컨텍스트 미리보기"}
           </button>
