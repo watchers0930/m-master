@@ -1,10 +1,13 @@
 import { logger } from "../logger";
 import {
   approveBrandProfileVersion,
-  createContentJobWithAssets,
+  createOrUpdateContentJobWithAssets,
   createProjectWithSeeds,
+  deleteProjectById,
   getProjectDetail,
   listProjects,
+  saveBrandProfileDraft,
+  saveLatestContentJobAssets,
 } from "../repositories/project-repository";
 import { buildContextDraft } from "./context-draft-service";
 import { buildReviewSummary } from "./review-service";
@@ -34,9 +37,7 @@ function isLegacyContentShape(params: {
   );
 }
 
-function serializeProjectListItem(
-  item: Awaited<ReturnType<typeof listProjects>>[number],
-) {
+function serializeProjectListItem(item: Awaited<ReturnType<typeof listProjects>>[number]) {
   const latestProfile = item.brandProfiles[0] ?? null;
 
   return {
@@ -165,6 +166,17 @@ export async function getProjectList() {
   return projects.map(serializeProjectListItem);
 }
 
+export async function deleteProject(projectId: string) {
+  const record = await getProjectDetail(projectId);
+
+  if (!record) {
+    throw new ProjectNotFoundError(projectId);
+  }
+
+  await deleteProjectById(projectId);
+  return { id: projectId };
+}
+
 export async function getProjectById(projectId: string) {
   const record = await getProjectDetail(projectId);
 
@@ -282,9 +294,28 @@ export async function approveProjectContext(params: {
   return getProjectById(params.projectId);
 }
 
+export async function saveProjectContextDraft(params: {
+  projectId: string;
+  summary: string;
+  audience?: string;
+  tone?: string;
+  cta?: string;
+  bannedTerms?: string;
+}) {
+  const record = await getProjectDetail(params.projectId);
+
+  if (!record) {
+    throw new ProjectNotFoundError(params.projectId);
+  }
+
+  await saveBrandProfileDraft(params);
+  return getProjectById(params.projectId);
+}
+
 export async function generateProjectContent(params: {
   projectId: string;
-  topic: string;
+  topic?: string;
+  topicId?: string;
   objective?: string;
 }) {
   const record = await getProjectDetail(params.projectId);
@@ -293,23 +324,58 @@ export async function generateProjectContent(params: {
     throw new ProjectNotFoundError(params.projectId);
   }
 
-  const normalizedTopic = normalizeTopicTitle(params.topic, record.project.name);
+  const selectedTopic =
+    (params.topicId
+      ? record.topics.find((topic) => topic.id === params.topicId)?.title
+      : undefined) ||
+    params.topic ||
+    record.topics[0]?.title;
+
+  if (!selectedTopic) {
+    throw new Error("콘텐츠 생성에 사용할 주제가 없습니다.");
+  }
+
+  const normalizedTopic = normalizeTopicTitle(selectedTopic, record.project.name);
   const seed = buildStudioSeed({
     projectName: record.project.name,
     profile: record.brandProfile,
-    topics: [
-      {
-        title: normalizedTopic,
-        score: 10,
-      },
-    ],
+    topics: [{ title: normalizedTopic, score: 10 }],
   });
 
-  await createContentJobWithAssets({
+  await createOrUpdateContentJobWithAssets({
     projectId: params.projectId,
     topic: normalizedTopic,
     objective: params.objective || seed.objective,
     assets: seed.assets,
+  });
+
+  return getProjectStudioSeed(params.projectId);
+}
+
+export async function saveProjectContentDraft(params: {
+  projectId: string;
+  topic: string;
+  objective?: string;
+  assets: Array<{
+    channel: "blog" | "instagram" | "facebook";
+    title?: string;
+    body: string;
+    cta?: string;
+  }>;
+}) {
+  const record = await getProjectDetail(params.projectId);
+
+  if (!record || !record.brandProfile) {
+    throw new ProjectNotFoundError(params.projectId);
+  }
+
+  const normalizedTopic = normalizeTopicTitle(params.topic, record.project.name);
+
+  await saveLatestContentJobAssets({
+    projectId: params.projectId,
+    topic: normalizedTopic,
+    objective: params.objective,
+    assets: params.assets,
   });
 
   return getProjectStudioSeed(params.projectId);

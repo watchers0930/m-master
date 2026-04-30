@@ -1,6 +1,7 @@
+import { InputField } from "@/components/ui/input-field";
 import { SectionCard } from "@/components/ui/section-card";
 import { StatusPill } from "@/components/ui/status-pill";
-import type { ProjectDetail, StudioDetail } from "@/features/dashboard/types";
+import type { ChannelKey, ProjectDetail, StudioDetail } from "@/features/dashboard/types";
 
 function compactText(value?: string | null, maxLength = 120) {
   const normalized = (value || "").replace(/\s+/g, " ").trim();
@@ -14,8 +15,13 @@ function compactText(value?: string | null, maxLength = 120) {
 type ContentStudioProps = {
   detail?: ProjectDetail | null;
   studio?: StudioDetail | null;
-  activeChannel: "blog" | "instagram" | "facebook";
-  onChannelChange: (channel: "blog" | "instagram" | "facebook") => void;
+  activeChannel: ChannelKey;
+  selectedTopicId?: string | null;
+  loading?: boolean;
+  onChannelChange: (channel: ChannelKey) => void;
+  onTopicSelect: (topicId: string) => void;
+  onAssetChange: (channel: ChannelKey, field: "title" | "body" | "cta", value: string) => void;
+  onSaveContent: () => Promise<void>;
   onGenerateContent: () => Promise<void>;
 };
 
@@ -29,7 +35,12 @@ export function ContentStudio({
   detail,
   studio,
   activeChannel,
+  selectedTopicId,
+  loading = false,
   onChannelChange,
+  onTopicSelect,
+  onAssetChange,
+  onSaveContent,
   onGenerateContent,
 }: ContentStudioProps) {
   const activeAsset = studio?.draft.assets.find((asset) => asset.channel === activeChannel);
@@ -44,13 +55,18 @@ export function ContentStudio({
         {detail?.topics.length ? (
           <div className="topic-chip-wrap">
             {detail.topics.map((topic) => (
-              <div className="topic-chip" key={topic.id}>
+              <button
+                className={`topic-chip selectable ${selectedTopicId === topic.id ? "active" : ""}`}
+                key={topic.id}
+                type="button"
+                onClick={() => onTopicSelect(topic.id)}
+              >
                 <strong>{topic.title}</strong>
                 <span className="fine-print">
                   {topic.intentType || "general"} · {topic.score?.toFixed(1) ?? "-"}
                 </span>
                 <span className="fine-print">{compactText(topic.rationale, 120) || "추천 이유 없음"}</span>
-              </div>
+              </button>
             ))}
           </div>
         ) : (
@@ -67,13 +83,18 @@ export function ContentStudio({
           <>
             <div className="row" style={{ justifyContent: "space-between", marginBottom: 16 }}>
               <div>
-                <strong style={{ display: "block", fontSize: 18, marginBottom: 6 }}>{studio.draft.topic}</strong>
+                <strong style={{ display: "block", fontSize: 18, marginBottom: 6 }}>
+                  {studio.draft.topic || "선택된 주제가 없습니다."}
+                </strong>
                 <span className="fine-print">{studio.draft.objective}</span>
               </div>
               <div className="button-cluster">
                 <StatusPill active>{studio.project.status}</StatusPill>
-                <button className="button ghost" type="button" onClick={() => void onGenerateContent()}>
-                  선택 주제로 초안 생성
+                <button className="button" disabled={loading} type="button" onClick={() => void onSaveContent()}>
+                  {loading ? "저장 중" : "초안 저장"}
+                </button>
+                <button className="button ghost" disabled={loading} type="button" onClick={() => void onGenerateContent()}>
+                  {loading ? "초안 생성 중" : "선택 주제로 초안 생성"}
                 </button>
               </div>
             </div>
@@ -89,12 +110,39 @@ export function ContentStudio({
                 </button>
               ))}
             </div>
-            <div className="content-editor">
-              <strong style={{ display: "block", fontSize: 16, marginBottom: 10 }}>
-                {activeAsset?.title || "채널 초안 없음"}
-              </strong>
-              {activeAsset?.body || "초안이 아직 준비되지 않았습니다."}
-              {activeAsset?.cta ? `\n\nCTA\n${activeAsset.cta}` : ""}
+            <div className="content-editor-grid">
+              <InputField
+                id={`studio-title-${activeChannel}`}
+                label={`${channelLabels[activeChannel]} 제목`}
+                value={activeAsset?.title || ""}
+                onChange={(value) => onAssetChange(activeChannel, "title", value)}
+                placeholder="채널 제목을 직접 다듬으세요."
+              />
+              <InputField
+                id={`studio-body-${activeChannel}`}
+                label={`${channelLabels[activeChannel]} 본문`}
+                value={activeAsset?.body || ""}
+                onChange={(value) => onAssetChange(activeChannel, "body", value)}
+                placeholder="본문 초안을 직접 편집하세요."
+                multiline
+                rows={12}
+              />
+              <InputField
+                id={`studio-cta-${activeChannel}`}
+                label={`${channelLabels[activeChannel]} CTA`}
+                value={activeAsset?.cta || ""}
+                onChange={(value) => onAssetChange(activeChannel, "cta", value)}
+                placeholder="이 채널에서 쓸 CTA를 입력하세요."
+                multiline
+                rows={4}
+              />
+              <div className="content-editor preview">
+                <strong style={{ display: "block", fontSize: 16, marginBottom: 10 }}>
+                  {activeAsset?.title || "채널 초안 없음"}
+                </strong>
+                {activeAsset?.body || "초안이 아직 준비되지 않았습니다."}
+                {activeAsset?.cta ? `\n\nCTA\n${activeAsset.cta}` : ""}
+              </div>
             </div>
           </>
         ) : (

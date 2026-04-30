@@ -277,6 +277,18 @@ button {
   color: var(--graphite);
 }
 
+.text-area {
+  width: 100%;
+  min-height: 120px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--white);
+  color: var(--graphite);
+  line-height: 1.6;
+  resize: vertical;
+}
+
 .file-chip-wrap,
 .topic-chip-wrap,
 .content-tabs {
@@ -290,22 +302,18 @@ button {
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .button-row {
-  overflow-x: auto;
-}
-
-.button-row::-webkit-scrollbar,
-.button-cluster::-webkit-scrollbar {
-  display: none;
+  overflow-x: visible;
 }
 
 .file-chip,
 .topic-chip,
 .insight-item,
 .review-item,
+.project-item-shell,
 .project-item,
 .kpi-item {
   border-radius: 18px;
@@ -317,6 +325,7 @@ button {
 .topic-chip,
 .insight-item,
 .review-item,
+.project-item-shell,
 .project-item {
   padding: 14px 16px;
 }
@@ -332,6 +341,67 @@ button {
 
 .topic-chip {
   min-width: 220px;
+}
+
+.topic-chip.selectable {
+  display: flex;
+  flex: 1 1 240px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 14px 16px;
+  text-align: left;
+}
+
+.topic-chip.active,
+.project-item-shell.active {
+  border-color: var(--soft-blue-line);
+  background: var(--soft-blue);
+}
+
+.project-item-shell {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-item {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.project-item-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.project-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.button.danger {
+  border-color: rgba(180, 35, 24, 0.16);
+  color: #b42318;
+  background: rgba(180, 35, 24, 0.06);
+}
+
+.editor-grid,
+.content-editor-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.field-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .content-tab {
@@ -351,6 +421,10 @@ button {
   white-space: pre-wrap;
   font-size: 14px;
   line-height: 1.7;
+}
+
+.content-editor.preview {
+  min-height: 240px;
 }
 
 .kpi-grid {
@@ -419,7 +493,19 @@ button {
     align-items: flex-start;
   }
 
+  .field-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
   .kpi-grid {
     grid-template-columns: 1fr;
+  }
+
+  .project-item-shell {
+    flex-direction: column;
+  }
+
+  .project-item-actions {
+    width: 100%;
   }
 }

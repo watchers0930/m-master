@@ -6,10 +6,13 @@ import { ContentStudio } from "@/features/dashboard/content-studio";
 import { ProjectIntakeForm } from "@/features/dashboard/project-intake-form";
 import { ProjectOverview } from "@/features/dashboard/project-overview";
 import type {
+  ChannelKey,
+  EditableBrandProfileField,
   ProjectDetail,
   ProjectListItem,
   ProjectPreview,
   SourceFileDraft,
+  StudioAsset,
   StudioDetail,
 } from "@/features/dashboard/types";
 
@@ -86,12 +89,22 @@ async function parseJson<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+function createEmptyAsset(channel: ChannelKey): StudioAsset {
+  return {
+    channel,
+    title: "",
+    body: "",
+    cta: "",
+  };
+}
+
 export function DashboardShell() {
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [activeProject, setActiveProject] = useState<ProjectDetail | null>(null);
   const [preview, setPreview] = useState<ProjectPreview | null>(null);
   const [studio, setStudio] = useState<StudioDetail | null>(null);
-  const [activeChannel, setActiveChannel] = useState<"blog" | "instagram" | "facebook">("blog");
+  const [activeChannel, setActiveChannel] = useState<ChannelKey>("blog");
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("");
   const [workingPath, setWorkingPath] = useState("");
@@ -132,8 +145,13 @@ export function DashboardShell() {
       throw new Error(studioPayload.error.message);
     }
 
-    setActiveProject(detailPayload.data.project);
-    setStudio(studioPayload.data.studio);
+    const nextProject = detailPayload.data.project;
+    const nextStudio = studioPayload.data.studio;
+    const matchedTopic = nextProject.topics.find((topic) => topic.title === nextStudio.draft.topic) || nextProject.topics[0];
+
+    setActiveProject(nextProject);
+    setStudio(nextStudio);
+    setSelectedTopicId(matchedTopic?.id ?? null);
   }
 
   async function requestPreview() {
@@ -264,6 +282,7 @@ export function DashboardShell() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          mode: "approve",
           summary: activeProject.brandProfile.summary,
           audience: activeProject.brandProfile.audience,
           tone: activeProject.brandProfile.tone,
@@ -287,12 +306,53 @@ export function DashboardShell() {
     }
   }
 
+  async function handleSaveContext() {
+    if (!activeProject?.brandProfile) {
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/brand-profile`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "draft",
+          summary: activeProject.brandProfile.summary,
+          audience: activeProject.brandProfile.audience,
+          tone: activeProject.brandProfile.tone,
+          cta: activeProject.brandProfile.cta,
+          bannedTerms: activeProject.brandProfile.bannedTerms,
+        }),
+      });
+
+      const payload = await parseJson<ApiResponse<{ project: ProjectDetail }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      setActiveProject(payload.data.project);
+      await loadProject(activeProject.project.id);
+      await loadProjects();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "컨텍스트 임시 저장에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleGenerateContent() {
     if (!activeProject?.project.id) {
       return;
     }
 
-    const topic = studio?.draft.topic || activeProject.topics[0]?.title;
+    const topic =
+      activeProject.topics.find((item) => item.id === selectedTopicId)?.title ||
+      studio?.draft.topic ||
+      activeProject.topics[0]?.title;
     if (!topic) {
       setError("콘텐츠 생성에 사용할 주제가 없습니다.");
       return;
@@ -321,6 +381,150 @@ export function DashboardShell() {
       await loadProject(activeProject.project.id);
     } catch (generationError) {
       setError(generationError instanceof Error ? generationError.message : "콘텐츠 초안 생성에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDeleteProject(projectId: string) {
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, { method: "DELETE" });
+      const payload = await parseJson<ApiResponse<{ deleted: { id: string } }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      const responseList = await fetch("/api/projects", { cache: "no-store" });
+      const listPayload = await parseJson<ApiResponse<{ projects: ProjectListItem[] }>>(responseList);
+
+      if (!listPayload.ok) {
+        throw new Error(listPayload.error.message);
+      }
+
+      setProjects(listPayload.data.projects);
+
+      const nextProjectId =
+        activeProject?.project.id === projectId
+          ? listPayload.data.projects[0]?.id ?? null
+          : activeProject?.project.id ?? null;
+
+      if (!nextProjectId) {
+        setActiveProject(null);
+        setStudio(null);
+        setSelectedTopicId(null);
+      } else {
+        await loadProject(nextProjectId);
+      }
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "프로젝트 삭제에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleBrandProfileChange(field: EditableBrandProfileField, value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject?.brandProfile) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        brandProfile: {
+          ...currentProject.brandProfile,
+          [field]: value,
+        },
+      };
+    });
+  }
+
+  function handleTopicSelect(topicId: string) {
+    const nextTopic = activeProject?.topics.find((topic) => topic.id === topicId);
+
+    if (!nextTopic) {
+      return;
+    }
+
+    setSelectedTopicId(topicId);
+    setStudio((currentStudio) => {
+      if (!currentStudio) {
+        return currentStudio;
+      }
+
+      return {
+        ...currentStudio,
+        draft: {
+          ...currentStudio.draft,
+          topic: nextTopic.title,
+        },
+      };
+    });
+  }
+
+  function handleAssetChange(channel: ChannelKey, field: "title" | "body" | "cta", value: string) {
+    setStudio((currentStudio) => {
+      if (!currentStudio) {
+        return currentStudio;
+      }
+
+      const assetExists = currentStudio.draft.assets.some((asset) => asset.channel === channel);
+      const nextAssets = assetExists
+        ? currentStudio.draft.assets.map((asset) =>
+            asset.channel === channel ? { ...asset, [field]: value } : asset,
+          )
+        : [...currentStudio.draft.assets, { ...createEmptyAsset(channel), [field]: value }];
+
+      return {
+        ...currentStudio,
+        draft: {
+          ...currentStudio.draft,
+          assets: nextAssets,
+        },
+      };
+    });
+  }
+
+  async function handleSaveContent() {
+    if (!activeProject?.project.id || !studio) {
+      return;
+    }
+
+    const selectedTopic = activeProject.topics.find((topic) => topic.id === selectedTopicId)?.title;
+    const topic = selectedTopic || studio.draft.topic;
+
+    if (!topic) {
+      setError("저장할 주제가 없습니다.");
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/content-jobs`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic,
+          objective: studio.draft.objective,
+          assets: studio.draft.assets,
+        }),
+      });
+
+      const payload = await parseJson<ApiResponse<{ studio: StudioDetail }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      setStudio(payload.data.studio);
+      await loadProject(activeProject.project.id);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "콘텐츠 초안 저장에 실패했습니다.");
     } finally {
       setLoading(false);
     }
@@ -382,7 +586,11 @@ export function DashboardShell() {
               <ProjectOverview
                 projects={projects}
                 activeProject={activeProject}
+                loading={loading}
                 onSelectProject={loadProject}
+                onDeleteProject={handleDeleteProject}
+                onBrandProfileChange={handleBrandProfileChange}
+                onSaveContext={handleSaveContext}
                 onApproveContext={handleApproveContext}
               />
             </div>
@@ -390,7 +598,12 @@ export function DashboardShell() {
               detail={activeProject}
               studio={studio}
               activeChannel={activeChannel}
+              selectedTopicId={selectedTopicId}
+              loading={loading}
               onChannelChange={setActiveChannel}
+              onTopicSelect={handleTopicSelect}
+              onAssetChange={handleAssetChange}
+              onSaveContent={handleSaveContent}
               onGenerateContent={handleGenerateContent}
             />
           </div>

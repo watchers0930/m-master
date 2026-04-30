@@ -47,7 +47,7 @@ export type ProjectDetailRecord = {
 
 const projectSummaryInclude = {
   brandProfiles: {
-    orderBy: [{ approved: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ version: "desc" }, { createdAt: "desc" }],
     take: 1,
   },
   topics: {
@@ -136,7 +136,7 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
   const [brandProfile, topics, latestContentJob] = await Promise.all([
     prisma.brandProfile.findFirst({
       where: { projectId },
-      orderBy: [{ approved: "desc" }, { createdAt: "desc" }],
+      orderBy: [{ version: "desc" }, { createdAt: "desc" }],
     }),
     prisma.topicCandidate.findMany({
       where: { projectId },
@@ -144,7 +144,7 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
     }),
     prisma.contentJob.findFirst({
       where: { projectId },
-      orderBy: [{ createdAt: "desc" }],
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
       include: {
         assets: {
           orderBy: [{ createdAt: "asc" }],
@@ -159,6 +159,57 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
     topics,
     latestContentJob,
   };
+}
+
+export async function deleteProjectById(projectId: string) {
+  return prisma.project.delete({
+    where: { id: projectId },
+  });
+}
+
+export async function saveBrandProfileDraft(params: {
+  projectId: string;
+  summary: string;
+  audience?: string;
+  tone?: string;
+  cta?: string;
+  bannedTerms?: string;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const latestProfile = await tx.brandProfile.findFirst({
+      where: { projectId: params.projectId },
+      orderBy: [{ version: "desc" }, { createdAt: "desc" }],
+    });
+
+    if (latestProfile && !latestProfile.approved) {
+      return tx.brandProfile.update({
+        where: { id: latestProfile.id },
+        data: {
+          summary: params.summary,
+          audience: params.audience,
+          tone: params.tone,
+          cta: params.cta,
+          bannedTerms: params.bannedTerms,
+          approved: false,
+          approvedAt: null,
+        },
+      });
+    }
+
+    return tx.brandProfile.create({
+      data: {
+        projectId: params.projectId,
+        version: (latestProfile?.version ?? 0) + 1,
+        summary: params.summary,
+        audience: params.audience,
+        tone: params.tone,
+        cta: params.cta,
+        bannedTerms: params.bannedTerms,
+        approved: false,
+        approvedAt: null,
+      },
+    });
+  });
 }
 
 export async function approveBrandProfileVersion(params: {
@@ -180,16 +231,30 @@ export async function approveBrandProfileVersion(params: {
       },
     });
 
-    const latestVersion =
-      (await tx.brandProfile.aggregate({
-        where: { projectId: params.projectId },
-        _max: { version: true },
-      }))._max.version ?? 0;
+    const latestProfile = await tx.brandProfile.findFirst({
+      where: { projectId: params.projectId },
+      orderBy: [{ version: "desc" }, { createdAt: "desc" }],
+    });
+
+    if (latestProfile && !latestProfile.approved) {
+      return tx.brandProfile.update({
+        where: { id: latestProfile.id },
+        data: {
+          summary: params.summary,
+          audience: params.audience,
+          tone: params.tone,
+          cta: params.cta,
+          bannedTerms: params.bannedTerms,
+          approved: true,
+          approvedAt: new Date(),
+        },
+      });
+    }
 
     return tx.brandProfile.create({
       data: {
         projectId: params.projectId,
-        version: latestVersion + 1,
+        version: (latestProfile?.version ?? 0) + 1,
         summary: params.summary,
         audience: params.audience,
         tone: params.tone,
@@ -202,7 +267,7 @@ export async function approveBrandProfileVersion(params: {
   });
 }
 
-export async function createContentJobWithAssets(params: {
+export async function createOrUpdateContentJobWithAssets(params: {
   projectId: string;
   topic: string;
   objective?: string;
@@ -213,25 +278,217 @@ export async function createContentJobWithAssets(params: {
     cta?: string;
   }>;
 }) {
-  return prisma.contentJob.create({
-    data: {
-      projectId: params.projectId,
-      topic: params.topic,
-      objective: params.objective,
-      status: "generated",
-      assets: {
-        create: params.assets.map((asset) => ({
-          channel: asset.channel,
-          title: asset.title,
-          body: asset.body,
-          cta: asset.cta,
-        })),
+  return prisma.$transaction(async (tx) => {
+    const latestJob = await tx.contentJob.findFirst({
+      where: { projectId: params.projectId },
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+      include: {
+        assets: true,
       },
-    },
-    include: {
-      assets: {
-        orderBy: [{ createdAt: "asc" }],
+    });
+
+    if (latestJob && latestJob.topic === params.topic) {
+      await tx.contentJob.update({
+        where: { id: latestJob.id },
+        data: {
+          objective: params.objective,
+          status: "generated",
+        },
+      });
+
+      for (const asset of params.assets) {
+        const existingAsset = latestJob.assets.find((item) => item.channel === asset.channel);
+
+        if (existingAsset) {
+          await tx.contentAsset.update({
+            where: { id: existingAsset.id },
+            data: {
+              title: asset.title,
+              body: asset.body,
+              cta: asset.cta,
+              version: existingAsset.version + 1,
+            },
+          });
+          continue;
+        }
+
+        await tx.contentAsset.create({
+          data: {
+            contentJobId: latestJob.id,
+            channel: asset.channel,
+            title: asset.title,
+            body: asset.body,
+            cta: asset.cta,
+          },
+        });
+      }
+
+      return tx.contentJob.findUniqueOrThrow({
+        where: { id: latestJob.id },
+        include: {
+          assets: {
+            orderBy: [{ createdAt: "asc" }],
+          },
+        },
+      });
+    }
+
+    return tx.contentJob.create({
+      data: {
+        projectId: params.projectId,
+        topic: params.topic,
+        objective: params.objective,
+        status: "generated",
+        assets: {
+          create: params.assets.map((asset) => ({
+            channel: asset.channel,
+            title: asset.title,
+            body: asset.body,
+            cta: asset.cta,
+          })),
+        },
       },
-    },
+      include: {
+        assets: {
+          orderBy: [{ createdAt: "asc" }],
+        },
+      },
+    });
+  });
+}
+
+export async function updateContentAssetDraft(params: {
+  projectId: string;
+  contentJobId: string;
+  assetId: string;
+  title?: string;
+  body: string;
+  cta?: string;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const asset = await tx.contentAsset.findFirst({
+      where: {
+        id: params.assetId,
+        contentJobId: params.contentJobId,
+        contentJob: {
+          projectId: params.projectId,
+        },
+      },
+    });
+
+    if (!asset) {
+      return null;
+    }
+
+    await tx.contentJob.update({
+      where: { id: params.contentJobId },
+      data: {
+        status: "editing",
+      },
+    });
+
+    return tx.contentAsset.update({
+      where: { id: params.assetId },
+      data: {
+        title: params.title,
+        body: params.body,
+        cta: params.cta,
+        version: asset.version + 1,
+      },
+    });
+  });
+}
+
+export async function saveLatestContentJobAssets(params: {
+  projectId: string;
+  topic: string;
+  objective?: string;
+  assets: Array<{
+    channel: string;
+    title?: string;
+    body: string;
+    cta?: string;
+  }>;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const latestContentJob = await tx.contentJob.findFirst({
+      where: { projectId: params.projectId },
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+      include: {
+        assets: true,
+      },
+    });
+
+    if (!latestContentJob) {
+      return tx.contentJob.create({
+        data: {
+          projectId: params.projectId,
+          topic: params.topic,
+          objective: params.objective,
+          status: "draft",
+          assets: {
+            create: params.assets.map((asset) => ({
+              channel: asset.channel,
+              title: asset.title,
+              body: asset.body,
+              cta: asset.cta,
+            })),
+          },
+        },
+        include: {
+          assets: {
+            orderBy: [{ createdAt: "asc" }],
+          },
+        },
+      });
+    }
+
+    await tx.contentJob.update({
+      where: { id: latestContentJob.id },
+      data: {
+        topic: params.topic,
+        objective: params.objective,
+        status: "draft",
+      },
+    });
+
+    const latestAssetVersions = new Map(
+      latestContentJob.assets.map((asset) => [asset.channel, asset.version]),
+    );
+
+    for (const asset of params.assets) {
+      const existing = latestContentJob.assets.find((item) => item.channel === asset.channel);
+
+      if (existing) {
+        await tx.contentAsset.update({
+          where: { id: existing.id },
+          data: {
+            title: asset.title,
+            body: asset.body,
+            cta: asset.cta,
+            version: (latestAssetVersions.get(asset.channel) ?? existing.version) + 1,
+          },
+        });
+      } else {
+        await tx.contentAsset.create({
+          data: {
+            contentJobId: latestContentJob.id,
+            channel: asset.channel,
+            title: asset.title,
+            body: asset.body,
+            cta: asset.cta,
+          },
+        });
+      }
+    }
+
+    return tx.contentJob.findUniqueOrThrow({
+      where: { id: latestContentJob.id },
+      include: {
+        assets: {
+          orderBy: [{ createdAt: "asc" }],
+        },
+      },
+    });
   });
 }

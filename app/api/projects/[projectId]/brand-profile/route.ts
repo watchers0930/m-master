@@ -1,6 +1,8 @@
 import { jsonError, jsonOk } from "@/lib/api-response";
 import { logger } from "@/server/logger";
-import { approveProjectContext, ProjectNotFoundError } from "@/server/services/project-service";
+import { approveProjectContext, ProjectNotFoundError, saveProjectContextDraft } from "@/server/services/project-service";
+import { parseBrandProfileInput } from "@/server/validators/brand-profile-validator";
+import { ProjectValidationError } from "@/server/validators/project-validator";
 
 type RouteContext = {
   params: Promise<{
@@ -12,29 +14,22 @@ export async function PATCH(request: Request, context: RouteContext) {
   const { projectId } = await context.params;
 
   try {
-    const body = (await request.json()) as {
-      summary?: string;
-      audience?: string;
-      tone?: string;
-      cta?: string;
-      bannedTerms?: string;
-    };
-
-    if (!body.summary?.trim()) {
-      return jsonError("서비스 요약은 필수입니다.", 400);
-    }
-
+    const input = await parseBrandProfileInput(request);
     const project = await approveProjectContext({
       projectId,
-      summary: body.summary.trim(),
-      audience: body.audience?.trim(),
-      tone: body.tone?.trim(),
-      cta: body.cta?.trim(),
-      bannedTerms: body.bannedTerms?.trim(),
+      summary: input.summary,
+      audience: input.audience,
+      tone: input.tone,
+      cta: input.cta,
+      bannedTerms: input.bannedTerms,
     });
 
     return jsonOk({ project });
   } catch (error) {
+    if (error instanceof ProjectValidationError) {
+      return jsonError(error.message, 400);
+    }
+
     if (error instanceof ProjectNotFoundError) {
       return jsonError(error.message, 404);
     }
@@ -45,5 +40,38 @@ export async function PATCH(request: Request, context: RouteContext) {
     });
 
     return jsonError("컨텍스트 승인 저장에 실패했습니다.", 500);
+  }
+}
+
+export async function PUT(request: Request, context: RouteContext) {
+  const { projectId } = await context.params;
+
+  try {
+    const input = await parseBrandProfileInput(request);
+    const project = await saveProjectContextDraft({
+      projectId,
+      summary: input.summary,
+      audience: input.audience,
+      tone: input.tone,
+      cta: input.cta,
+      bannedTerms: input.bannedTerms,
+    });
+
+    return jsonOk({ project });
+  } catch (error) {
+    if (error instanceof ProjectValidationError) {
+      return jsonError(error.message, 400);
+    }
+
+    if (error instanceof ProjectNotFoundError) {
+      return jsonError(error.message, 404);
+    }
+
+    logger.error("projects.brand_profile.draft.failed", {
+      projectId,
+      error: error instanceof Error ? error.message : "unknown_error",
+    });
+
+    return jsonError("컨텍스트 임시 저장에 실패했습니다.", 500);
   }
 }

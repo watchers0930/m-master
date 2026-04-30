@@ -1,3 +1,5 @@
+export type ChannelKey = "blog" | "instagram" | "facebook";
+
 export type SourceFileDraft = {
   name: string;
   relativePath?: string;
@@ -32,6 +34,8 @@ export type ProjectListItem = {
     score?: number | null;
   }>;
 };
+
+export type EditableBrandProfileField = "summary" | "audience" | "tone" | "cta" | "bannedTerms";
 
 export type ProjectDetail = {
   project: {
@@ -126,7 +130,7 @@ export type StudioDetail = {
     topic: string;
     objective: string;
     assets: Array<{
-      channel: "blog" | "instagram" | "facebook";
+      channel: ChannelKey;
       title: string;
       body: string;
       cta: string;
@@ -148,3 +152,5 @@ export type StudioDetail = {
     status: "ready" | "needs-edit";
   };
 };
+
+export type StudioAsset = StudioDetail["draft"]["assets"][number];
