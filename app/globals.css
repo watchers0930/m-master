@@ -393,9 +393,15 @@ button {
 }
 
 .editor-grid,
-.content-editor-grid {
+.content-editor-grid,
+.ops-grid,
+.ops-actions {
   display: grid;
   gap: 14px;
+}
+
+.ops-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .field-grid-2 {
@@ -494,6 +500,10 @@ button {
   }
 
   .field-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .ops-actions {
     grid-template-columns: 1fr;
   }
 

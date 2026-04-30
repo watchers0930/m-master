@@ -1,7 +1,7 @@
 import { InputField } from "@/components/ui/input-field";
 import { SectionCard } from "@/components/ui/section-card";
 import { StatusPill } from "@/components/ui/status-pill";
-import type { ChannelKey, ProjectDetail, StudioDetail } from "@/features/dashboard/types";
+import type { ChannelKey, ProjectActivityItem, ProjectDetail, StudioDetail } from "@/features/dashboard/types";
 
 function compactText(value?: string | null, maxLength = 120) {
   const normalized = (value || "").replace(/\s+/g, " ").trim();
@@ -15,6 +15,9 @@ function compactText(value?: string | null, maxLength = 120) {
 type ContentStudioProps = {
   detail?: ProjectDetail | null;
   studio?: StudioDetail | null;
+  history: ProjectActivityItem[];
+  exportBusy?: boolean;
+  publishBusy?: boolean;
   activeChannel: ChannelKey;
   selectedTopicId?: string | null;
   loading?: boolean;
@@ -23,6 +26,9 @@ type ContentStudioProps = {
   onAssetChange: (channel: ChannelKey, field: "title" | "body" | "cta", value: string) => void;
   onSaveContent: () => Promise<void>;
   onGenerateContent: () => Promise<void>;
+  onExportChannel: (channel: ChannelKey) => Promise<void>;
+  onExportAll: () => Promise<void>;
+  onPreparePublish: () => Promise<void>;
 };
 
 const channelLabels = {
@@ -34,6 +40,9 @@ const channelLabels = {
 export function ContentStudio({
   detail,
   studio,
+  history,
+  exportBusy = false,
+  publishBusy = false,
   activeChannel,
   selectedTopicId,
   loading = false,
@@ -42,6 +51,9 @@ export function ContentStudio({
   onAssetChange,
   onSaveContent,
   onGenerateContent,
+  onExportChannel,
+  onExportAll,
+  onPreparePublish,
 }: ContentStudioProps) {
   const activeAsset = studio?.draft.assets.find((asset) => asset.channel === activeChannel);
 
@@ -194,6 +206,45 @@ export function ContentStudio({
         ) : (
           <div className="empty-state">검수 패널은 프로젝트 생성 후 자동으로 채워집니다.</div>
         )}
+      </SectionCard>
+
+      <SectionCard
+        title="운영 패널"
+        description="채널별 초안을 파일로 내보내고, 현재 저장본을 발행 준비 상태로 전환합니다."
+        badge="Ops"
+      >
+        <div className="ops-grid">
+          <div className="ops-actions">
+            <button className="button" disabled={exportBusy} type="button" onClick={() => void onExportChannel("blog")}>
+              블로그 내보내기
+            </button>
+            <button className="button" disabled={exportBusy} type="button" onClick={() => void onExportChannel("instagram")}>
+              인스타 내보내기
+            </button>
+            <button className="button" disabled={exportBusy} type="button" onClick={() => void onExportChannel("facebook")}>
+              페이스북 내보내기
+            </button>
+            <button className="button ghost" disabled={exportBusy} type="button" onClick={() => void onExportAll()}>
+              전체 JSON 내보내기
+            </button>
+            <button className="button primary" disabled={publishBusy} type="button" onClick={() => void onPreparePublish()}>
+              {publishBusy ? "발행 준비 중" : "발행 준비"}
+            </button>
+          </div>
+          <div className="review-list">
+            {history.length > 0 ? (
+              history.slice(0, 6).map((item) => (
+                <div className="review-item" key={item.id}>
+                  <strong>{item.title}</strong>
+                  <p className="fine-print">{item.description}</p>
+                  <p className="fine-print">{new Date(item.timestamp).toLocaleString("ko-KR")}</p>
+                </div>
+              ))
+            ) : (
+              <div className="empty-state">아직 기록된 작업 이력이 없습니다.</div>
+            )}
+          </div>
+        </div>
       </SectionCard>
     </div>
   );

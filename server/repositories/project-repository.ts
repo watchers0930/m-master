@@ -492,3 +492,38 @@ export async function saveLatestContentJobAssets(params: {
     });
   });
 }
+
+export async function listProjectBrandProfiles(projectId: string) {
+  return prisma.brandProfile.findMany({
+    where: { projectId },
+    orderBy: [{ version: "desc" }, { createdAt: "desc" }],
+  });
+}
+
+export async function listProjectContentJobs(projectId: string) {
+  return prisma.contentJob.findMany({
+    where: { projectId },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    include: {
+      assets: {
+        orderBy: [{ createdAt: "asc" }],
+      },
+    },
+  });
+}
+
+export async function updateLatestContentJobStatus(projectId: string, status: string) {
+  const latestContentJob = await prisma.contentJob.findFirst({
+    where: { projectId },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+  });
+
+  if (!latestContentJob) {
+    return null;
+  }
+
+  return prisma.contentJob.update({
+    where: { id: latestContentJob.id },
+    data: { status },
+  });
+}

@@ -5,9 +5,12 @@ import {
   createProjectWithSeeds,
   deleteProjectById,
   getProjectDetail,
+  listProjectBrandProfiles,
+  listProjectContentJobs,
   listProjects,
   saveBrandProfileDraft,
   saveLatestContentJobAssets,
+  updateLatestContentJobStatus,
 } from "../repositories/project-repository";
 import { buildContextDraft } from "./context-draft-service";
 import { buildReviewSummary } from "./review-service";
@@ -20,6 +23,13 @@ export class ProjectNotFoundError extends Error {
   constructor(projectId: string) {
     super(`프로젝트를 찾을 수 없습니다: ${projectId}`);
     this.name = "ProjectNotFoundError";
+  }
+}
+
+export class ProjectContentNotFoundError extends Error {
+  constructor(projectId: string) {
+    super(`프로젝트 콘텐츠를 찾을 수 없습니다: ${projectId}`);
+    this.name = "ProjectContentNotFoundError";
   }
 }
 
@@ -379,4 +389,81 @@ export async function saveProjectContentDraft(params: {
   });
 
   return getProjectStudioSeed(params.projectId);
+}
+
+export async function getProjectActivity(projectId: string) {
+  const record = await getProjectDetail(projectId);
+
+  if (!record) {
+    throw new ProjectNotFoundError(projectId);
+  }
+
+  const [brandProfiles, contentJobs] = await Promise.all([
+    listProjectBrandProfiles(projectId),
+    listProjectContentJobs(projectId),
+  ]);
+
+  const brandEvents = brandProfiles.map((profile) => ({
+    id: `brand-${profile.id}`,
+    kind: profile.approved ? "brand-approved" : "brand-draft",
+    title: profile.approved ? `컨텍스트 승인 v${profile.version}` : `컨텍스트 임시 저장 v${profile.version}`,
+    description: profile.summary.slice(0, 160),
+    timestamp: profile.updatedAt.toISOString(),
+  }));
+
+  const contentEvents = contentJobs.map((job) => ({
+    id: `content-${job.id}`,
+    kind: job.status === "ready_to_publish" ? "publish-ready" : "content-saved",
+    title:
+      job.status === "ready_to_publish"
+        ? `${job.topic} 발행 준비 완료`
+        : `${job.topic} 콘텐츠 저장`,
+    description: `${job.assets.length}개 채널 초안 · 상태 ${job.status}`,
+    timestamp: job.updatedAt.toISOString(),
+  }));
+
+  return [...brandEvents, ...contentEvents].sort((left, right) => right.timestamp.localeCompare(left.timestamp));
+}
+
+export async function exportProjectContent(projectId: string) {
+  const studio = await getProjectStudioSeed(projectId);
+
+  if (!studio.draft.assets.length) {
+    throw new ProjectContentNotFoundError(projectId);
+  }
+
+  const slug = studio.project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project";
+  const channels = studio.draft.assets.map((asset) => ({
+    channel: asset.channel,
+    filename: `${slug}-${asset.channel}.md`,
+    title: asset.title,
+    content: [`# ${asset.title}`, "", asset.body, "", "CTA", asset.cta].join("\n"),
+  }));
+
+  return {
+    generatedAt: new Date().toISOString(),
+    jsonFilename: `${slug}-export.json`,
+    channels,
+  };
+}
+
+export async function markProjectReadyForPublish(projectId: string) {
+  const record = await getProjectDetail(projectId);
+
+  if (!record) {
+    throw new ProjectNotFoundError(projectId);
+  }
+
+  const updated = await updateLatestContentJobStatus(projectId, "ready_to_publish");
+
+  if (!updated) {
+    throw new ProjectContentNotFoundError(projectId);
+  }
+
+  return {
+    projectId,
+    contentJobId: updated.id,
+    status: updated.status,
+    updatedAt: updated.updatedAt.toISOString(),
+  };
 }

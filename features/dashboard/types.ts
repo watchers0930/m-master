@@ -154,3 +154,22 @@ export type StudioDetail = {
 };
 
 export type StudioAsset = StudioDetail["draft"]["assets"][number];
+
+export type ProjectActivityItem = {
+  id: string;
+  kind: "brand-draft" | "brand-approved" | "content-saved" | "publish-ready";
+  title: string;
+  description: string;
+  timestamp: string;
+};
+
+export type ExportBundle = {
+  generatedAt: string;
+  jsonFilename: string;
+  channels: Array<{
+    channel: ChannelKey;
+    filename: string;
+    title: string;
+    content: string;
+  }>;
+};

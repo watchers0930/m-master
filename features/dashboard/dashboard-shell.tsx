@@ -8,6 +8,8 @@ import { ProjectOverview } from "@/features/dashboard/project-overview";
 import type {
   ChannelKey,
   EditableBrandProfileField,
+  ExportBundle,
+  ProjectActivityItem,
   ProjectDetail,
   ProjectListItem,
   ProjectPreview,
@@ -105,12 +107,15 @@ export function DashboardShell() {
   const [studio, setStudio] = useState<StudioDetail | null>(null);
   const [activeChannel, setActiveChannel] = useState<ChannelKey>("blog");
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [history, setHistory] = useState<ProjectActivityItem[]>([]);
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("");
   const [workingPath, setWorkingPath] = useState("");
   const [files, setFiles] = useState<SourceFileDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [publishBusy, setPublishBusy] = useState(false);
 
   const folderSupported = typeof window !== "undefined" && typeof window.showDirectoryPicker === "function";
 
@@ -129,13 +134,15 @@ export function DashboardShell() {
   }
 
   async function loadProject(projectId: string) {
-    const [detailResponse, studioResponse] = await Promise.all([
+    const [detailResponse, studioResponse, historyResponse] = await Promise.all([
       fetch(`/api/projects/${projectId}`, { cache: "no-store" }),
       fetch(`/api/projects/${projectId}/studio`, { cache: "no-store" }),
+      fetch(`/api/projects/${projectId}/history`, { cache: "no-store" }),
     ]);
 
     const detailPayload = await parseJson<ApiResponse<{ project: ProjectDetail }>>(detailResponse);
     const studioPayload = await parseJson<ApiResponse<{ studio: StudioDetail }>>(studioResponse);
+    const historyPayload = await parseJson<ApiResponse<{ history: ProjectActivityItem[] }>>(historyResponse);
 
     if (!detailPayload.ok) {
       throw new Error(detailPayload.error.message);
@@ -145,6 +152,10 @@ export function DashboardShell() {
       throw new Error(studioPayload.error.message);
     }
 
+    if (!historyPayload.ok) {
+      throw new Error(historyPayload.error.message);
+    }
+
     const nextProject = detailPayload.data.project;
     const nextStudio = studioPayload.data.studio;
     const matchedTopic = nextProject.topics.find((topic) => topic.title === nextStudio.draft.topic) || nextProject.topics[0];
@@ -152,6 +163,17 @@ export function DashboardShell() {
     setActiveProject(nextProject);
     setStudio(nextStudio);
     setSelectedTopicId(matchedTopic?.id ?? null);
+    setHistory(historyPayload.data.history);
+  }
+
+  function downloadFile(filename: string, content: string, type = "text/markdown;charset=utf-8") {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
   async function requestPreview() {
@@ -530,6 +552,89 @@ export function DashboardShell() {
     }
   }
 
+  async function handleExportChannel(channel: ChannelKey) {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setExportBusy(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/export`, {
+        cache: "no-store",
+      });
+      const payload = await parseJson<ApiResponse<{ bundle: ExportBundle }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      const asset = payload.data.bundle.channels.find((item) => item.channel === channel);
+      if (!asset) {
+        throw new Error("내보낼 채널 초안을 찾지 못했습니다.");
+      }
+
+      downloadFile(asset.filename, asset.content);
+    } catch (exportError) {
+      setError(exportError instanceof Error ? exportError.message : "채널 내보내기에 실패했습니다.");
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
+  async function handleExportAll() {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setExportBusy(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/export`, {
+        cache: "no-store",
+      });
+      const payload = await parseJson<ApiResponse<{ bundle: ExportBundle }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      downloadFile(payload.data.bundle.jsonFilename, JSON.stringify(payload.data.bundle, null, 2), "application/json;charset=utf-8");
+    } catch (exportError) {
+      setError(exportError instanceof Error ? exportError.message : "전체 내보내기에 실패했습니다.");
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
+  async function handlePreparePublish() {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setPublishBusy(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/publish`, {
+        method: "POST",
+      });
+      const payload = await parseJson<ApiResponse<{ publish: { status: string } }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      await loadProject(activeProject.project.id);
+    } catch (publishError) {
+      setError(publishError instanceof Error ? publishError.message : "발행 준비 처리에 실패했습니다.");
+    } finally {
+      setPublishBusy(false);
+    }
+  }
+
   return (
     <main className="app-shell">
       <div className="app-frame">
@@ -597,6 +702,9 @@ export function DashboardShell() {
             <ContentStudio
               detail={activeProject}
               studio={studio}
+              history={history}
+              exportBusy={exportBusy}
+              publishBusy={publishBusy}
               activeChannel={activeChannel}
               selectedTopicId={selectedTopicId}
               loading={loading}
@@ -605,6 +713,9 @@ export function DashboardShell() {
               onAssetChange={handleAssetChange}
               onSaveContent={handleSaveContent}
               onGenerateContent={handleGenerateContent}
+              onExportChannel={handleExportChannel}
+              onExportAll={handleExportAll}
+              onPreparePublish={handlePreparePublish}
             />
           </div>
         </section>
