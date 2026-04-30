@@ -531,7 +531,7 @@ export async function generateProjectImages(params: {
     throw new ProjectImageNotFoundError(params.projectId);
   }
 
-  const bundle = buildImageVariants(record.project.name, {
+  const bundle = await buildImageVariants(record.project.name, {
     channel: params.channel,
     title: asset.title || record.latestContentJob.topic,
     body: asset.body,

@@ -37,3 +37,9 @@ Context-aware marketing platform.
 - Prisma uses:
   - `DATABASE_URL` for application queries
   - `DIRECT_URL` for schema operations
+
+## Image generation
+
+- `OPENAI_API_KEY`: enables GPT image generation for the image studio
+- `OPENAI_IMAGE_MODEL`: optional override, defaults to `gpt-image-1.5`
+- if the API key is missing or the OpenAI request fails, the app falls back to the built-in SVG generator
