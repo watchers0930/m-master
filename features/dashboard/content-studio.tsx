@@ -188,7 +188,7 @@ export function ContentStudio({
 
       <SectionCard
         title="이미지 스튜디오"
-        description="선택 채널에 맞는 이미지 프롬프트를 입력하고 3개의 변형 시안을 비교해 대표 시안을 고릅니다."
+        description="선택 채널에 맞는 이미지 프롬프트를 입력하고 저비용 기본 시안을 먼저 생성한 뒤 필요할 때만 추가 확장하는 영역입니다."
         badge="Image"
         tone="soft"
       >
@@ -207,7 +207,7 @@ export function ContentStudio({
             <div className="image-studio-actions">
               <StatusPill active>{channelLabels[activeChannel]}</StatusPill>
               <button className="button primary" disabled={imageBusy} type="button" onClick={onGenerateImages}>
-                {imageBusy ? "시안 생성 중" : "변형 3종 생성"}
+                {imageBusy ? "시안 생성 중" : "기본 시안 생성"}
               </button>
             </div>
           </div>
@@ -228,7 +228,7 @@ export function ContentStudio({
           ) : (
             <EmptyStatePanel
               title="생성된 이미지 시안이 없습니다."
-              description="프롬프트를 입력한 뒤 생성 버튼을 누르면 채널별 썸네일 3개가 여기에 표시됩니다."
+              description="프롬프트를 입력한 뒤 생성 버튼을 누르면 채널별 기본 시안이 여기에 표시됩니다."
             />
           )}
         </div>

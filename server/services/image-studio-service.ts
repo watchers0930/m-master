@@ -22,8 +22,10 @@ const PRESET_MAP: Record<ImageChannel, { width: number; height: number; label: s
   facebook: { width: 1200, height: 630, label: "Facebook Link" },
 };
 
-const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1.5";
+const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1-mini";
 const OPENAI_API_URL = "https://api.openai.com/v1/images/generations";
+const OPENAI_IMAGE_QUALITY = "low";
+const OPENAI_VARIANT_COUNT = 1;
 const VARIANT_DIRECTIONS = [
   "제품 핵심 메시지를 정면으로 전달하는 선명한 히어로형 구도",
   "신뢰감 있는 카드형 정보 구조와 여백 중심의 에디토리얼 구도",
@@ -140,7 +142,7 @@ async function generateOpenAiVariant(params: {
       model: OPENAI_IMAGE_MODEL,
       prompt: params.prompt,
       size: toOpenAiSize(params.channel),
-      quality: "medium",
+      quality: OPENAI_IMAGE_QUALITY,
       background: "opaque",
       output_format: "png",
     }),
@@ -182,7 +184,7 @@ async function buildOpenAiImageVariants(projectName: string, asset: AssetSeed, p
   const prompt = promptOverride?.trim() || buildImagePrompt(projectName, asset);
 
   const images = await Promise.all(
-    VARIANT_DIRECTIONS.map((direction, index) =>
+    VARIANT_DIRECTIONS.slice(0, OPENAI_VARIANT_COUNT).map((direction, index) =>
       generateOpenAiVariant({
         prompt: `${prompt} ${direction}. 텍스트는 이미지에 직접 넣지 말고, 배경 비주얼과 분위기만 만든다.`,
         channel: asset.channel,

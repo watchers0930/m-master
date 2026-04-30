@@ -41,5 +41,6 @@ Context-aware marketing platform.
 ## Image generation
 
 - `OPENAI_API_KEY`: enables GPT image generation for the image studio
-- `OPENAI_IMAGE_MODEL`: optional override, defaults to `gpt-image-1.5`
+- `OPENAI_IMAGE_MODEL`: optional override, defaults to `gpt-image-1-mini`
+- cost-optimized default: `low` quality and `1` variant per request
 - if the API key is missing or the OpenAI request fails, the app falls back to the built-in SVG generator
