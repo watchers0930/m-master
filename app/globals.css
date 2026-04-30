@@ -149,7 +149,8 @@ button {
 }
 
 .wizard-nav-item .fine-print {
-  font-size: 10px;
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .nav-pill {
