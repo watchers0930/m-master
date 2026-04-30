@@ -2,6 +2,15 @@ import { SectionCard } from "@/components/ui/section-card";
 import { StatusPill } from "@/components/ui/status-pill";
 import type { ProjectDetail, ProjectListItem } from "@/features/dashboard/types";
 
+function compactText(value?: string | null, maxLength = 180) {
+  const normalized = (value || "").replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return "초안 없음";
+  }
+
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength).trim()}...` : normalized;
+}
+
 type ProjectOverviewProps = {
   projects: ProjectListItem[];
   activeProject?: ProjectDetail | null;
@@ -41,12 +50,12 @@ export function ProjectOverview({ projects, activeProject, onSelectProject, onAp
         <div className="insight-list">
           <div className="insight-item">
             <strong>요약</strong>
-            <p className="fine-print">{activeProject.brandProfile.summary}</p>
+            <p className="fine-print">{compactText(activeProject.brandProfile.summary, 220)}</p>
           </div>
           <div className="insight-item">
             <strong>톤 및 CTA</strong>
-            <p className="fine-print">{activeProject.brandProfile.tone || "톤 초안 없음"}</p>
-            <p className="fine-print">{activeProject.brandProfile.cta || "CTA 초안 없음"}</p>
+            <p className="fine-print">{compactText(activeProject.brandProfile.tone, 130)}</p>
+            <p className="fine-print">{compactText(activeProject.brandProfile.cta, 130)}</p>
           </div>
           {activeProject.sourceAnalysis ? (
             <div className="insight-item">

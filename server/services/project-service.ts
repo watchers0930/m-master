@@ -10,7 +10,7 @@ import { buildContextDraft } from "./context-draft-service";
 import { buildReviewSummary } from "./review-service";
 import { analyzeSourceFiles } from "./source-analysis-service";
 import { buildStudioSeed } from "./studio-seed-service";
-import { buildTopicRecommendations } from "./topic-recommendation-service";
+import { buildTopicRecommendations, normalizeTopicTitle } from "./topic-recommendation-service";
 import type { CreateProjectInput } from "../validators/project-validator";
 
 export class ProjectNotFoundError extends Error {
@@ -18,6 +18,20 @@ export class ProjectNotFoundError extends Error {
     super(`프로젝트를 찾을 수 없습니다: ${projectId}`);
     this.name = "ProjectNotFoundError";
   }
+}
+
+function isLegacyContentShape(params: {
+  topic: string;
+  assets: Array<{ body: string }>;
+}) {
+  const joinedBody = params.assets.map((asset) => asset.body).join("\n");
+
+  return (
+    /(?:api|ts|admin|post).*,/.test(params.topic.toLowerCase()) ||
+    params.topic.includes("------") ||
+    joinedBody.includes("작업 폴더 경로는") ||
+    joinedBody.length > 2400
+  );
 }
 
 function serializeProjectListItem(
@@ -46,7 +60,7 @@ function serializeProjectListItem(
     contentJobCount: item._count.contentJobs,
     topTopics: item.topics.slice(0, 3).map((topic) => ({
       id: topic.id,
-      title: topic.title,
+      title: normalizeTopicTitle(topic.title, item.name),
       intentType: topic.intentType,
       score: topic.score,
     })),
@@ -81,7 +95,7 @@ function serializeProjectDetail(record: NonNullable<Awaited<ReturnType<typeof ge
       : null,
     topics: record.topics.map((topic) => ({
       id: topic.id,
-      title: topic.title,
+      title: normalizeTopicTitle(topic.title, record.project.name),
       intentType: topic.intentType,
       score: topic.score,
       rationale: topic.rationale,
@@ -171,16 +185,31 @@ export async function getProjectStudioSeed(projectId: string) {
   }
 
   const persistedAssets = record.latestContentJob?.assets ?? [];
-  const seed = buildStudioSeed(record.brandProfile, record.topics);
-  const assets =
-    persistedAssets.length > 0
-      ? persistedAssets.map((asset) => ({
-          channel: asset.channel as "blog" | "instagram" | "facebook",
-          title: asset.title ?? "",
-          body: asset.body,
-          cta: asset.cta ?? "",
-        }))
-      : seed.assets;
+  const seed = buildStudioSeed({
+    projectName: record.project.name,
+    profile: record.brandProfile,
+    topics: record.topics,
+  });
+  const normalizedLatestTopic = normalizeTopicTitle(record.latestContentJob?.topic ?? seed.topic, record.project.name);
+  const persistedAssetPayload = persistedAssets.map((asset) => ({
+    channel: asset.channel as "blog" | "instagram" | "facebook",
+    title: asset.title ?? "",
+    body: asset.body,
+    cta: asset.cta ?? "",
+  }));
+  const usePersistedAssets =
+    persistedAssetPayload.length > 0 &&
+    !isLegacyContentShape({
+      topic: record.latestContentJob?.topic ?? "",
+      assets: persistedAssetPayload,
+    });
+  const assets = usePersistedAssets
+    ? persistedAssetPayload
+    : buildStudioSeed({
+        projectName: record.project.name,
+        profile: record.brandProfile,
+        topics: [{ title: normalizedLatestTopic, score: 10 }],
+      }).assets;
   const review = buildReviewSummary({
     summary: record.brandProfile.summary,
     cta: record.brandProfile.cta,
@@ -207,13 +236,16 @@ export async function getProjectStudioSeed(projectId: string) {
     },
     topics: record.topics.map((topic) => ({
       id: topic.id,
-      title: topic.title,
+      title: normalizeTopicTitle(topic.title, record.project.name),
       intentType: topic.intentType,
       score: topic.score,
     })),
     draft: {
-      topic: record.latestContentJob?.topic ?? seed.topic,
-      objective: record.latestContentJob?.objective ?? seed.objective,
+      topic: normalizedLatestTopic,
+      objective:
+        usePersistedAssets && record.latestContentJob?.objective
+          ? record.latestContentJob.objective
+          : seed.objective,
       assets,
     },
     review,
@@ -261,16 +293,21 @@ export async function generateProjectContent(params: {
     throw new ProjectNotFoundError(params.projectId);
   }
 
-  const seed = buildStudioSeed(record.brandProfile, [
-    {
-      title: params.topic,
-      score: 10,
-    },
-  ]);
+  const normalizedTopic = normalizeTopicTitle(params.topic, record.project.name);
+  const seed = buildStudioSeed({
+    projectName: record.project.name,
+    profile: record.brandProfile,
+    topics: [
+      {
+        title: normalizedTopic,
+        score: 10,
+      },
+    ],
+  });
 
   await createContentJobWithAssets({
     projectId: params.projectId,
-    topic: params.topic,
+    topic: normalizedTopic,
     objective: params.objective || seed.objective,
     assets: seed.assets,
   });

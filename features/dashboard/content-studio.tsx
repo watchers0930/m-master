@@ -2,6 +2,15 @@ import { SectionCard } from "@/components/ui/section-card";
 import { StatusPill } from "@/components/ui/status-pill";
 import type { ProjectDetail, StudioDetail } from "@/features/dashboard/types";
 
+function compactText(value?: string | null, maxLength = 120) {
+  const normalized = (value || "").replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return "";
+  }
+
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength).trim()}...` : normalized;
+}
+
 type ContentStudioProps = {
   detail?: ProjectDetail | null;
   studio?: StudioDetail | null;
@@ -40,7 +49,7 @@ export function ContentStudio({
                 <span className="fine-print">
                   {topic.intentType || "general"} · {topic.score?.toFixed(1) ?? "-"}
                 </span>
-                <span className="fine-print">{topic.rationale || "추천 이유 없음"}</span>
+                <span className="fine-print">{compactText(topic.rationale, 120) || "추천 이유 없음"}</span>
               </div>
             ))}
           </div>

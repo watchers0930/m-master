@@ -36,26 +36,20 @@ function createBannedTerms(): string {
 
 function summarizeSources(sourceAnalysis: SourceAnalysis): string {
   if (sourceAnalysis.totalFiles === 0) {
-    return "선택된 문서가 아직 없어 기본 브랜드 입력과 도메인 중심으로 초안을 구성한다.";
+    return "선택된 문서가 아직 없어 기본 입력과 도메인 중심으로 초안을 구성한다.";
   }
 
   const files = sourceAnalysis.topSourceFiles
-    .slice(0, 4)
+    .slice(0, 3)
     .map((file) => file.name)
     .join(", ");
-  const fileTypes = sourceAnalysis.fileTypeBreakdown
-    .slice(0, 3)
-    .map((entry) => `${entry.key} ${entry.count}건`)
-    .join(", ");
-  const excerptSummary = sourceAnalysis.excerptDigest
-    ? `대표 문서 내용으로는 "${sourceAnalysis.excerptDigest.slice(0, 180)}" 같은 문맥이 확인된다.`
-    : "대표 문서 본문은 아직 추출되지 않았지만 파일 메타데이터를 분석 기준으로 사용한다.";
+  const fileTypes = sourceAnalysis.fileTypeBreakdown.slice(0, 2).map((entry) => `${entry.key} ${entry.count}건`).join(", ");
   const keywordSummary =
     sourceAnalysis.keywordHints.length > 0
       ? `핵심 키워드는 ${sourceAnalysis.keywordHints.join(", ")}다.`
       : "핵심 키워드는 아직 추가 추출이 필요하다.";
 
-  return `${sourceAnalysis.totalFiles}개의 문서를 분석 대상으로 받았고, 주요 파일은 ${files}이다. 주요 형식은 ${fileTypes || "unknown"}다. ${excerptSummary} ${keywordSummary}`;
+  return `${sourceAnalysis.totalFiles}개 문서를 분석했고 주요 파일은 ${files}이다. 형식은 ${fileTypes || "unknown"} 중심이다. ${keywordSummary}`;
 }
 
 export function buildContextDraft(
@@ -71,7 +65,7 @@ export function buildContextDraft(
   const sourceHint = summarizeSources(sourceAnalysis);
 
   return {
-    summary: `${input.name}는 ${domainHint} 컨텍스트 중심 마케팅 운영 프로젝트다. 블로그를 마스터 자산으로 두고 인스타그램과 페이스북으로 파생하는 원소스 멀티유즈 구조를 우선 설계한다. ${pathHint} ${sourceHint}`,
+    summary: `${input.name}는 ${domainHint} 컨텍스트 중심 마케팅 운영 프로젝트다. 블로그를 마스터 자산으로 두고 인스타그램과 페이스북으로 파생하는 원소스 멀티유즈 구조를 우선 설계한다. ${sourceHint} ${pathHint}`,
     audience: `${createAudienceHint(input.name, input.domain)} 문서를 빠르게 이해하고 바로 콘텐츠로 전환하려는 실무 맥락을 포함한다.`,
     tone: createTone(input.name),
     cta: createCta(input.name, input.domain),
