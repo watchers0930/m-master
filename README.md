@@ -7,11 +7,22 @@ Context-aware marketing platform.
 - `test` branch: all routine development goes here
 - `production` branch: production deployment branch, update only by explicit promotion
 
+## GitHub Actions deployment
+
+- pushes to `test` deploy to the Vercel preview target and rebind `tm-master.vercel.app`
+- pushes to `production` deploy to the Vercel production target and rebind `m-master.vercel.app`
+- Vercel Git auto-deploy should stay disabled to avoid duplicate deployments
+
+### Required repository secret
+
+- `VERCEL_TOKEN`: token that can deploy and manage aliases for the `watchers0930s-projects/m-master` Vercel project
+
 ## Vercel strategy
 
-- Git pushes to `test` should create preview deployments
-- Git pushes to `production` should create production deployments
-- Local CLI direct deploys should be avoided after Git integration is completed
+- GitHub Actions is the deployment entry point
+- local CLI direct deploys should be avoided except for emergency maintenance
+- `tm-master.vercel.app` is the fixed test domain
+- `m-master.vercel.app` is the fixed production domain
 
 ## Database
 
