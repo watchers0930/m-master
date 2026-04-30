@@ -1,6 +1,13 @@
 import { logger } from "../logger";
-import { createProjectWithSeeds, getProjectDetail, listProjects } from "../repositories/project-repository";
+import {
+  approveBrandProfileVersion,
+  createContentJobWithAssets,
+  createProjectWithSeeds,
+  getProjectDetail,
+  listProjects,
+} from "../repositories/project-repository";
 import { buildContextDraft } from "./context-draft-service";
+import { buildReviewSummary } from "./review-service";
 import { analyzeSourceFiles } from "./source-analysis-service";
 import { buildStudioSeed } from "./studio-seed-service";
 import { buildTopicRecommendations } from "./topic-recommendation-service";
@@ -80,6 +87,26 @@ function serializeProjectDetail(record: NonNullable<Awaited<ReturnType<typeof ge
       rationale: topic.rationale,
       createdAt: topic.createdAt,
     })),
+    latestContentJob: record.latestContentJob
+      ? {
+          id: record.latestContentJob.id,
+          topic: record.latestContentJob.topic,
+          objective: record.latestContentJob.objective,
+          status: record.latestContentJob.status,
+          createdAt: record.latestContentJob.createdAt,
+          updatedAt: record.latestContentJob.updatedAt,
+          assets: record.latestContentJob.assets.map((asset) => ({
+            id: asset.id,
+            channel: asset.channel,
+            title: asset.title,
+            body: asset.body,
+            cta: asset.cta,
+            version: asset.version,
+            createdAt: asset.createdAt,
+            updatedAt: asset.updatedAt,
+          })),
+        }
+      : null,
   };
 }
 
@@ -143,7 +170,23 @@ export async function getProjectStudioSeed(projectId: string) {
     throw new ProjectNotFoundError(projectId);
   }
 
-  const studioSeed = buildStudioSeed(record.brandProfile, record.topics);
+  const persistedAssets = record.latestContentJob?.assets ?? [];
+  const seed = buildStudioSeed(record.brandProfile, record.topics);
+  const assets =
+    persistedAssets.length > 0
+      ? persistedAssets.map((asset) => ({
+          channel: asset.channel as "blog" | "instagram" | "facebook",
+          title: asset.title ?? "",
+          body: asset.body,
+          cta: asset.cta ?? "",
+        }))
+      : seed.assets;
+  const review = buildReviewSummary({
+    summary: record.brandProfile.summary,
+    cta: record.brandProfile.cta,
+    bannedTerms: record.brandProfile.bannedTerms,
+    assets,
+  });
 
   return {
     project: {
@@ -168,7 +211,12 @@ export async function getProjectStudioSeed(projectId: string) {
       intentType: topic.intentType,
       score: topic.score,
     })),
-    draft: studioSeed,
+    draft: {
+      topic: record.latestContentJob?.topic ?? seed.topic,
+      objective: record.latestContentJob?.objective ?? seed.objective,
+      assets,
+    },
+    review,
     analysisMode: "client-source-metadata-and-excerpt",
   };
 }
@@ -188,4 +236,44 @@ export function previewProjectContext(input: CreateProjectInput) {
     topics,
     sourceAnalysis,
   };
+}
+
+export async function approveProjectContext(params: {
+  projectId: string;
+  summary: string;
+  audience?: string;
+  tone?: string;
+  cta?: string;
+  bannedTerms?: string;
+}) {
+  await approveBrandProfileVersion(params);
+  return getProjectById(params.projectId);
+}
+
+export async function generateProjectContent(params: {
+  projectId: string;
+  topic: string;
+  objective?: string;
+}) {
+  const record = await getProjectDetail(params.projectId);
+
+  if (!record || !record.brandProfile) {
+    throw new ProjectNotFoundError(params.projectId);
+  }
+
+  const seed = buildStudioSeed(record.brandProfile, [
+    {
+      title: params.topic,
+      score: 10,
+    },
+  ]);
+
+  await createContentJobWithAssets({
+    projectId: params.projectId,
+    topic: params.topic,
+    objective: params.objective || seed.objective,
+    assets: seed.assets,
+  });
+
+  return getProjectStudioSeed(params.projectId);
 }

@@ -25,6 +25,24 @@ export type ProjectDetailRecord = {
     rationale: string | null;
     createdAt: Date;
   }>;
+  latestContentJob: {
+    id: string;
+    topic: string;
+    objective: string | null;
+    status: string;
+    createdAt: Date;
+    updatedAt: Date;
+    assets: Array<{
+      id: string;
+      channel: string;
+      title: string | null;
+      body: string;
+      cta: string | null;
+      version: number;
+      createdAt: Date;
+      updatedAt: Date;
+    }>;
+  } | null;
 };
 
 const projectSummaryInclude = {
@@ -115,7 +133,7 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
     return null;
   }
 
-  const [brandProfile, topics] = await Promise.all([
+  const [brandProfile, topics, latestContentJob] = await Promise.all([
     prisma.brandProfile.findFirst({
       where: { projectId },
       orderBy: [{ approved: "desc" }, { createdAt: "desc" }],
@@ -124,11 +142,96 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
       where: { projectId },
       orderBy: [{ score: "desc" }, { createdAt: "asc" }],
     }),
+    prisma.contentJob.findFirst({
+      where: { projectId },
+      orderBy: [{ createdAt: "desc" }],
+      include: {
+        assets: {
+          orderBy: [{ createdAt: "asc" }],
+        },
+      },
+    }),
   ]);
 
   return {
     project,
     brandProfile,
     topics,
+    latestContentJob,
   };
+}
+
+export async function approveBrandProfileVersion(params: {
+  projectId: string;
+  summary: string;
+  audience?: string;
+  tone?: string;
+  cta?: string;
+  bannedTerms?: string;
+}) {
+  return prisma.$transaction(async (tx) => {
+    await tx.brandProfile.updateMany({
+      where: {
+        projectId: params.projectId,
+        approved: true,
+      },
+      data: {
+        approved: false,
+      },
+    });
+
+    const latestVersion =
+      (await tx.brandProfile.aggregate({
+        where: { projectId: params.projectId },
+        _max: { version: true },
+      }))._max.version ?? 0;
+
+    return tx.brandProfile.create({
+      data: {
+        projectId: params.projectId,
+        version: latestVersion + 1,
+        summary: params.summary,
+        audience: params.audience,
+        tone: params.tone,
+        cta: params.cta,
+        bannedTerms: params.bannedTerms,
+        approved: true,
+        approvedAt: new Date(),
+      },
+    });
+  });
+}
+
+export async function createContentJobWithAssets(params: {
+  projectId: string;
+  topic: string;
+  objective?: string;
+  assets: Array<{
+    channel: string;
+    title?: string;
+    body: string;
+    cta?: string;
+  }>;
+}) {
+  return prisma.contentJob.create({
+    data: {
+      projectId: params.projectId,
+      topic: params.topic,
+      objective: params.objective,
+      status: "generated",
+      assets: {
+        create: params.assets.map((asset) => ({
+          channel: asset.channel,
+          title: asset.title,
+          body: asset.body,
+          cta: asset.cta,
+        })),
+      },
+    },
+    include: {
+      assets: {
+        orderBy: [{ createdAt: "asc" }],
+      },
+    },
+  });
 }

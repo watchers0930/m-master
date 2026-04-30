@@ -7,6 +7,7 @@ type ContentStudioProps = {
   studio?: StudioDetail | null;
   activeChannel: "blog" | "instagram" | "facebook";
   onChannelChange: (channel: "blog" | "instagram" | "facebook") => void;
+  onGenerateContent: () => Promise<void>;
 };
 
 const channelLabels = {
@@ -15,7 +16,13 @@ const channelLabels = {
   facebook: "페이스북",
 } as const;
 
-export function ContentStudio({ detail, studio, activeChannel, onChannelChange }: ContentStudioProps) {
+export function ContentStudio({
+  detail,
+  studio,
+  activeChannel,
+  onChannelChange,
+  onGenerateContent,
+}: ContentStudioProps) {
   const activeAsset = studio?.draft.assets.find((asset) => asset.channel === activeChannel);
 
   return (
@@ -54,7 +61,12 @@ export function ContentStudio({ detail, studio, activeChannel, onChannelChange }
                 <strong style={{ display: "block", fontSize: 18, marginBottom: 6 }}>{studio.draft.topic}</strong>
                 <span className="fine-print">{studio.draft.objective}</span>
               </div>
-              <StatusPill active>{studio.project.status}</StatusPill>
+              <div className="row">
+                <StatusPill active>{studio.project.status}</StatusPill>
+                <button className="button ghost" type="button" onClick={() => void onGenerateContent()}>
+                  선택 주제로 초안 생성
+                </button>
+              </div>
             </div>
             <div className="content-tabs">
               {(Object.keys(channelLabels) as Array<keyof typeof channelLabels>).map((channel) => (
@@ -90,33 +102,36 @@ export function ContentStudio({ detail, studio, activeChannel, onChannelChange }
           <>
             <div className="kpi-grid">
               <div className="kpi-item">
-                <strong>89</strong>
+                <strong>{studio.review.scores.brandAlignment}</strong>
                 <span className="fine-print">브랜드 일치도</span>
               </div>
               <div className="kpi-item">
-                <strong>92</strong>
+                <strong>{studio.review.scores.formatFit}</strong>
                 <span className="fine-print">채널 적합도</span>
               </div>
               <div className="kpi-item">
-                <strong>3</strong>
-                <span className="fine-print">수정 제안</span>
+                <strong>{studio.review.scores.ctaClarity}</strong>
+                <span className="fine-print">CTA 명확성</span>
               </div>
             </div>
             <div className="review-list" style={{ marginTop: 16 }}>
               <div className="review-item">
-                <strong>CTA 기준</strong>
-                <p className="fine-print">{studio.brandProfile.cta || "CTA 초안 없음"}</p>
+                <strong>리스크 점수</strong>
+                <p className="fine-print">{studio.review.scores.riskControl}</p>
               </div>
-              <div className="review-item">
-                <strong>금지 표현</strong>
-                <p className="fine-print">{studio.brandProfile.bannedTerms || "금지 표현 없음"}</p>
-              </div>
-              <div className="review-item">
-                <strong>수정 제안</strong>
-                <p className="fine-print">
-                  도입부를 더 짧게 압축하고, 페이스북 초안은 마지막 문단에 클릭 유도 CTA를 한 번 더 배치하는 편이 좋습니다.
-                </p>
-              </div>
+              {studio.review.findings.length > 0 ? (
+                studio.review.findings.map((finding, index) => (
+                  <div className="review-item" key={`${finding.channel}-${finding.type}-${index}`}>
+                    <strong>{`${finding.channel} · ${finding.type}`}</strong>
+                    <p className="fine-print">{finding.message}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="review-item">
+                  <strong>검수 결과</strong>
+                  <p className="fine-print">현재 초안은 내보내기 전 기본 검수 기준을 통과했습니다.</p>
+                </div>
+              )}
             </div>
           </>
         ) : (

@@ -132,4 +132,19 @@ export type StudioDetail = {
       cta: string;
     }>;
   };
+  review: {
+    scores: {
+      brandAlignment: number;
+      formatFit: number;
+      ctaClarity: number;
+      riskControl: number;
+    };
+    findings: Array<{
+      channel: string;
+      type: "brand" | "format" | "cta" | "risk";
+      severity: "info" | "warning";
+      message: string;
+    }>;
+    status: "ready" | "needs-edit";
+  };
 };

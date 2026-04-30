@@ -6,9 +6,10 @@ type ProjectOverviewProps = {
   projects: ProjectListItem[];
   activeProject?: ProjectDetail | null;
   onSelectProject: (projectId: string) => Promise<void>;
+  onApproveContext: () => Promise<void>;
 };
 
-export function ProjectOverview({ projects, activeProject, onSelectProject }: ProjectOverviewProps) {
+export function ProjectOverview({ projects, activeProject, onSelectProject, onApproveContext }: ProjectOverviewProps) {
   return (
     <SectionCard
       title="컨텍스트 승인 패널"
@@ -66,6 +67,9 @@ export function ProjectOverview({ projects, activeProject, onSelectProject }: Pr
               {activeProject.brandProfile.approved ? "승인됨" : "검토 필요"}
             </StatusPill>
             <StatusPill>{`Version ${activeProject.brandProfile.version}`}</StatusPill>
+            <button className="button ghost" type="button" onClick={() => void onApproveContext()}>
+              컨텍스트 승인 저장
+            </button>
           </div>
         </div>
       ) : null}

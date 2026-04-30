@@ -251,6 +251,81 @@ export function DashboardShell() {
     }
   }
 
+  async function handleApproveContext() {
+    if (!activeProject?.brandProfile) {
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/brand-profile`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          summary: activeProject.brandProfile.summary,
+          audience: activeProject.brandProfile.audience,
+          tone: activeProject.brandProfile.tone,
+          cta: activeProject.brandProfile.cta,
+          bannedTerms: activeProject.brandProfile.bannedTerms,
+        }),
+      });
+
+      const payload = await parseJson<ApiResponse<{ project: ProjectDetail }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      setActiveProject(payload.data.project);
+      await loadProjects();
+    } catch (approveError) {
+      setError(approveError instanceof Error ? approveError.message : "컨텍스트 승인 저장에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGenerateContent() {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    const topic = studio?.draft.topic || activeProject.topics[0]?.title;
+    if (!topic) {
+      setError("콘텐츠 생성에 사용할 주제가 없습니다.");
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/content-jobs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic,
+          objective: studio?.draft.objective,
+        }),
+      });
+
+      const payload = await parseJson<ApiResponse<{ studio: StudioDetail }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      setStudio(payload.data.studio);
+      await loadProject(activeProject.project.id);
+    } catch (generationError) {
+      setError(generationError instanceof Error ? generationError.message : "콘텐츠 초안 생성에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <main className="app-shell">
       <div className="app-frame">
@@ -308,6 +383,7 @@ export function DashboardShell() {
                 projects={projects}
                 activeProject={activeProject}
                 onSelectProject={loadProject}
+                onApproveContext={handleApproveContext}
               />
             </div>
             <ContentStudio
@@ -315,6 +391,7 @@ export function DashboardShell() {
               studio={studio}
               activeChannel={activeChannel}
               onChannelChange={setActiveChannel}
+              onGenerateContent={handleGenerateContent}
             />
           </div>
         </section>
