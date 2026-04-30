@@ -44,7 +44,7 @@ button {
   width: min(90vw, 1720px);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr);
+  grid-template-columns: 420px minmax(0, 1fr);
   border: 1px solid var(--line);
   border-radius: 28px;
   overflow: hidden;
