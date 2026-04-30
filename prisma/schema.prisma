@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Project {
+  id          String         @id @default(cuid())
+  name        String
+  domain      String?
+  workingPath String?
+  status      String         @default("active")
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  brandProfiles BrandProfile[]
+  topics      TopicCandidate[]
+  contentJobs ContentJob[]
+}
+
+model BrandProfile {
+  id           String   @id @default(cuid())
+  projectId    String
+  version      Int      @default(1)
+  summary      String   @db.Text
+  audience     String?  @db.Text
+  tone         String?
+  cta          String?  @db.Text
+  bannedTerms  String?  @db.Text
+  approved     Boolean  @default(false)
+  approvedAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, approved])
+}
+
+model TopicCandidate {
+  id         String   @id @default(cuid())
+  projectId  String
+  title      String
+  intentType String?
+  score      Float?
+  rationale  String?  @db.Text
+  createdAt  DateTime @default(now())
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model ContentJob {
+  id         String         @id @default(cuid())
+  projectId  String
+  topic      String
+  objective  String?
+  status     String         @default("pending")
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  project    Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assets     ContentAsset[]
+
+  @@index([projectId, status])
+}
+
+model ContentAsset {
+  id            String        @id @default(cuid())
+  contentJobId  String
+  channel       String
+  title         String?
+  body          String        @db.Text
+  cta           String?       @db.Text
+  version       Int           @default(1)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  contentJob    ContentJob    @relation(fields: [contentJobId], references: [id], onDelete: Cascade)
+  imageJobs     ImageJob[]
+
+  @@index([contentJobId, channel])
+}
+
+model ImageJob {
+  id             String       @id @default(cuid())
+  contentAssetId String
+  channelPreset  String
+  prompt         String       @db.Text
+  status         String       @default("pending")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  contentAsset   ContentAsset @relation(fields: [contentAssetId], references: [id], onDelete: Cascade)
+  imageAssets    ImageAsset[]
+
+  @@index([contentAssetId, status])
+}
+
+model ImageAsset {
+  id            String    @id @default(cuid())
+  imageJobId     String
+  role           String
+  originalPath   String?
+  composedPath   String?
+  width          Int?
+  height         Int?
+  selected       Boolean   @default(false)
+  version        Int       @default(1)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  imageJob       ImageJob  @relation(fields: [imageJobId], references: [id], onDelete: Cascade)
+
+  @@index([imageJobId, selected])
+}
