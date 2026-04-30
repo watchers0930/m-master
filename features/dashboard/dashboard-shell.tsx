@@ -138,6 +138,7 @@ function toImageStudios(studio: StudioDetail | null): Record<ChannelKey, ImageSt
 }
 
 export function DashboardShell() {
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5 | 6>(1);
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [activeProject, setActiveProject] = useState<ProjectDetail | null>(null);
   const [preview, setPreview] = useState<ProjectPreview | null>(null);
@@ -158,6 +159,30 @@ export function DashboardShell() {
 
   const folderSupported = typeof window !== "undefined" && typeof window.showDirectoryPicker === "function";
   const currentImageStudio = imageStudios[activeChannel];
+  const stepAvailability = {
+    1: true,
+    2: Boolean(activeProject),
+    3: Boolean(activeProject?.topics.length),
+    4: Boolean(activeProject && studio),
+    5: Boolean(activeProject && studio),
+    6: Boolean(activeProject && studio),
+  } as const;
+  const stepMeta = [
+    { step: 1 as const, title: "프로젝트 생성", description: "폴더와 도메인을 연결합니다." },
+    { step: 2 as const, title: "컨텍스트 승인", description: "AI가 읽은 브랜드 초안을 다듬습니다." },
+    { step: 3 as const, title: "주제 선택", description: "이번 콘텐츠의 기준 주제를 고릅니다." },
+    { step: 4 as const, title: "콘텐츠 편집", description: "채널별 텍스트 초안을 생성하고 수정합니다." },
+    { step: 5 as const, title: "이미지 생성", description: "선택 채널용 이미지를 만듭니다." },
+    { step: 6 as const, title: "검수 및 내보내기", description: "검수 후 내보내기와 발행 준비를 진행합니다." },
+  ];
+
+  function goToStep(step: 1 | 2 | 3 | 4 | 5 | 6) {
+    if (!stepAvailability[step]) {
+      return;
+    }
+
+    setCurrentStep(step);
+  }
 
   async function loadProjects() {
     const response = await fetch("/api/projects", { cache: "no-store" });
@@ -325,6 +350,7 @@ export function DashboardShell() {
 
       await loadProjects();
       await loadProject(payload.data.project.project.id);
+      setCurrentStep(2);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "프로젝트를 생성하지 못했습니다.");
     } finally {
@@ -362,6 +388,7 @@ export function DashboardShell() {
 
       setActiveProject(payload.data.project);
       await loadProjects();
+      setCurrentStep(3);
     } catch (approveError) {
       setError(approveError instanceof Error ? approveError.message : "컨텍스트 승인 저장에 실패했습니다.");
     } finally {
@@ -442,6 +469,7 @@ export function DashboardShell() {
 
       setStudio(payload.data.studio);
       await loadProject(activeProject.project.id);
+      setCurrentStep(4);
     } catch (generationError) {
       setError(generationError instanceof Error ? generationError.message : "콘텐츠 초안 생성에 실패했습니다.");
     } finally {
@@ -479,8 +507,10 @@ export function DashboardShell() {
         setActiveProject(null);
         setStudio(null);
         setSelectedTopicId(null);
+        setCurrentStep(1);
       } else {
         await loadProject(nextProjectId);
+        setCurrentStep(2);
       }
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "프로젝트 삭제에 실패했습니다.");
@@ -591,6 +621,7 @@ export function DashboardShell() {
       setStudio(payload.data.studio);
       setImageStudios(toImageStudios(payload.data.studio));
       await loadProject(activeProject.project.id);
+      setCurrentStep(6);
     } catch (imageError) {
       setError(imageError instanceof Error ? imageError.message : "이미지 생성에 실패했습니다.");
     } finally {
@@ -763,6 +794,10 @@ export function DashboardShell() {
     }
   }
 
+  const currentStepMeta = stepMeta.find((item) => item.step === currentStep) || stepMeta[0];
+  const previousStep = currentStep > 1 ? ((currentStep - 1) as 1 | 2 | 3 | 4 | 5) : null;
+  const nextStep = currentStep < 6 ? ((currentStep + 1) as 2 | 3 | 4 | 5 | 6) : null;
+
   return (
     <main className="app-shell">
       <div className="app-frame">
@@ -772,15 +807,23 @@ export function DashboardShell() {
             <span className="eyebrow">m-master</span>
             <h1 className="brand-title">Context-aware marketing OS</h1>
             <p className="brand-copy">
-              작업 폴더 문서를 읽고 브랜드 컨텍스트를 만들며, 블로그 중심 멀티채널 초안을 운영하는 MVP입니다.
+              프로젝트 생성부터 검수까지 한 단계씩만 보여주는 순차형 작업 화면입니다.
             </p>
           </div>
-          <nav className="nav-list">
-            <div className="nav-pill active">프로젝트 생성</div>
-            <div className="nav-pill active">컨텍스트 승인</div>
-            <div className="nav-pill active">추천 주제</div>
-            <div className="nav-pill active">콘텐츠 스튜디오</div>
-            <div className="nav-pill active">검수 패널</div>
+          <nav className="wizard-nav">
+            {stepMeta.map((item) => (
+              <button
+                key={item.step}
+                className={`wizard-nav-item ${currentStep === item.step ? "active" : ""}`}
+                disabled={!stepAvailability[item.step]}
+                type="button"
+                onClick={() => goToStep(item.step)}
+              >
+                <span className="wizard-nav-step">{`Step ${item.step}`}</span>
+                <strong>{item.title}</strong>
+                <span className="fine-print">{item.description}</span>
+              </button>
+            ))}
           </nav>
         </aside>
 
@@ -788,19 +831,22 @@ export function DashboardShell() {
           <div className="main-topbar">
             <div>
               <p className="eyebrow" style={{ margin: 0 }}>Web MVP Dashboard</p>
-              <h2 className="hero-title">작업 폴더 분석부터 콘텐츠 초안까지 한 흐름으로</h2>
+              <h2 className="hero-title">{currentStepMeta.title}</h2>
               <p className="hero-copy">
-                브라우저에서 폴더를 선택해 문서를 읽고, 도메인과 함께 브랜드 컨텍스트 초안을 만든 뒤, 블로그 원문과 인스타그램·페이스북 파생 초안을 동시에 확인합니다.
+                {currentStepMeta.description} 지금 단계에 필요한 작업만 먼저 마친 뒤 다음 단계로 이동합니다.
               </p>
             </div>
             <div className="hero-actions">
               <div className="status-pill active">{projects.length} Projects</div>
               <div className="status-pill">{files.length} Files Loaded</div>
+              <div className="status-pill">{`Step ${currentStep}/6`}</div>
             </div>
           </div>
 
-          <div className="dashboard-grid">
-            <div className="stack">
+          <div className="wizard-stage">
+            {error ? <p className="error-text wizard-error">{error}</p> : null}
+
+            {currentStep === 1 ? (
               <ProjectIntakeForm
                 name={name}
                 domain={domain}
@@ -816,6 +862,9 @@ export function DashboardShell() {
                 onPreview={requestPreview}
                 onSubmit={handleSubmit}
               />
+            ) : null}
+
+            {currentStep === 2 ? (
               <ProjectOverview
                 projects={projects}
                 activeProject={activeProject}
@@ -826,31 +875,159 @@ export function DashboardShell() {
                 onSaveContext={handleSaveContext}
                 onApproveContext={handleApproveContext}
               />
+            ) : null}
+
+            {currentStep === 3 ? (
+              <ContentStudio
+                detail={activeProject}
+                studio={studio}
+                imageStudio={currentImageStudio}
+                history={history}
+                imageBusy={imageBusy}
+                exportBusy={exportBusy}
+                publishBusy={publishBusy}
+                activeChannel={activeChannel}
+                selectedTopicId={selectedTopicId}
+                loading={loading}
+                onChannelChange={setActiveChannel}
+                onTopicSelect={handleTopicSelect}
+                onAssetChange={handleAssetChange}
+                onImagePromptChange={handleImagePromptChange}
+                onGenerateImages={handleGenerateImages}
+                onSelectImageVariant={handleSelectImageVariant}
+                onApplyImageVariant={handleApplyImageVariant}
+                onSaveContent={handleSaveContent}
+                onGenerateContent={handleGenerateContent}
+                onExportChannel={handleExportChannel}
+                onExportAll={handleExportAll}
+                onPreparePublish={handlePreparePublish}
+                showTopics
+                showContent={false}
+                showImages={false}
+                showReview={false}
+                showOps={false}
+              />
+            ) : null}
+
+            {currentStep === 4 ? (
+              <ContentStudio
+                detail={activeProject}
+                studio={studio}
+                imageStudio={currentImageStudio}
+                history={history}
+                imageBusy={imageBusy}
+                exportBusy={exportBusy}
+                publishBusy={publishBusy}
+                activeChannel={activeChannel}
+                selectedTopicId={selectedTopicId}
+                loading={loading}
+                onChannelChange={setActiveChannel}
+                onTopicSelect={handleTopicSelect}
+                onAssetChange={handleAssetChange}
+                onImagePromptChange={handleImagePromptChange}
+                onGenerateImages={handleGenerateImages}
+                onSelectImageVariant={handleSelectImageVariant}
+                onApplyImageVariant={handleApplyImageVariant}
+                onSaveContent={handleSaveContent}
+                onGenerateContent={handleGenerateContent}
+                onExportChannel={handleExportChannel}
+                onExportAll={handleExportAll}
+                onPreparePublish={handlePreparePublish}
+                showTopics={false}
+                showContent
+                showImages={false}
+                showReview={false}
+                showOps={false}
+              />
+            ) : null}
+
+            {currentStep === 5 ? (
+              <ContentStudio
+                detail={activeProject}
+                studio={studio}
+                imageStudio={currentImageStudio}
+                history={history}
+                imageBusy={imageBusy}
+                exportBusy={exportBusy}
+                publishBusy={publishBusy}
+                activeChannel={activeChannel}
+                selectedTopicId={selectedTopicId}
+                loading={loading}
+                onChannelChange={setActiveChannel}
+                onTopicSelect={handleTopicSelect}
+                onAssetChange={handleAssetChange}
+                onImagePromptChange={handleImagePromptChange}
+                onGenerateImages={handleGenerateImages}
+                onSelectImageVariant={handleSelectImageVariant}
+                onApplyImageVariant={handleApplyImageVariant}
+                onSaveContent={handleSaveContent}
+                onGenerateContent={handleGenerateContent}
+                onExportChannel={handleExportChannel}
+                onExportAll={handleExportAll}
+                onPreparePublish={handlePreparePublish}
+                showTopics={false}
+                showContent={false}
+                showImages
+                showReview={false}
+                showOps={false}
+              />
+            ) : null}
+
+            {currentStep === 6 ? (
+              <ContentStudio
+                detail={activeProject}
+                studio={studio}
+                imageStudio={currentImageStudio}
+                history={history}
+                imageBusy={imageBusy}
+                exportBusy={exportBusy}
+                publishBusy={publishBusy}
+                activeChannel={activeChannel}
+                selectedTopicId={selectedTopicId}
+                loading={loading}
+                onChannelChange={setActiveChannel}
+                onTopicSelect={handleTopicSelect}
+                onAssetChange={handleAssetChange}
+                onImagePromptChange={handleImagePromptChange}
+                onGenerateImages={handleGenerateImages}
+                onSelectImageVariant={handleSelectImageVariant}
+                onApplyImageVariant={handleApplyImageVariant}
+                onSaveContent={handleSaveContent}
+                onGenerateContent={handleGenerateContent}
+                onExportChannel={handleExportChannel}
+                onExportAll={handleExportAll}
+                onPreparePublish={handlePreparePublish}
+                showTopics={false}
+                showContent={false}
+                showImages={false}
+                showReview
+                showOps
+              />
+            ) : null}
+          </div>
+
+          <div className="wizard-footer">
+            <div className="wizard-footer-copy">
+              <strong>{currentStepMeta.title}</strong>
+              <span className="fine-print">{currentStepMeta.description}</span>
             </div>
-            <ContentStudio
-              detail={activeProject}
-              studio={studio}
-              imageStudio={currentImageStudio}
-              history={history}
-              imageBusy={imageBusy}
-              exportBusy={exportBusy}
-              publishBusy={publishBusy}
-              activeChannel={activeChannel}
-              selectedTopicId={selectedTopicId}
-              loading={loading}
-              onChannelChange={setActiveChannel}
-              onTopicSelect={handleTopicSelect}
-              onAssetChange={handleAssetChange}
-              onImagePromptChange={handleImagePromptChange}
-              onGenerateImages={handleGenerateImages}
-              onSelectImageVariant={handleSelectImageVariant}
-              onApplyImageVariant={handleApplyImageVariant}
-              onSaveContent={handleSaveContent}
-              onGenerateContent={handleGenerateContent}
-              onExportChannel={handleExportChannel}
-              onExportAll={handleExportAll}
-              onPreparePublish={handlePreparePublish}
-            />
+            <div className="button-cluster">
+              {previousStep ? (
+                <button className="button ghost" type="button" onClick={() => goToStep(previousStep)}>
+                  이전 단계
+                </button>
+              ) : null}
+              {nextStep ? (
+                <button
+                  className="button primary"
+                  disabled={!stepAvailability[nextStep]}
+                  type="button"
+                  onClick={() => goToStep(nextStep)}
+                >
+                  다음 단계
+                </button>
+              ) : null}
+            </div>
           </div>
         </section>
       </div>
