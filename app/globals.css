@@ -153,6 +153,11 @@ button {
   line-height: 1.45;
 }
 
+.folder-empty-state {
+  display: grid;
+  gap: 5px;
+}
+
 .nav-pill {
   display: flex;
   align-items: center;

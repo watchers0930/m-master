@@ -80,7 +80,7 @@ export function ProjectIntakeForm(props: ProjectIntakeFormProps) {
               폴더 선택
             </button>
           </div>
-          <div className="insight-item">
+          <div className="insight-item folder-empty-state">
             <strong>{workingPath || "아직 선택된 폴더가 없습니다."}</strong>
             <div className="fine-print">
               {folderSupported
