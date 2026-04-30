@@ -23,6 +23,8 @@
   - 구현 전후 작업 순서
 - `03-code-review-method.md`
   - 위키 방식 코드 확인 기준
+- `04-agent-structure.md`
+  - 에이전트 역할 구조와 협업 방식
 - `analysis/`
   - 조사, 코드 읽기, 구조 판단 기록
 - `features/`
