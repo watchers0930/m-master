@@ -148,6 +148,10 @@ button {
   text-transform: uppercase;
 }
 
+.wizard-nav-item .fine-print {
+  font-size: 10px;
+}
+
 .nav-pill {
   display: flex;
   align-items: center;
