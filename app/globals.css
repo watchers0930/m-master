@@ -94,6 +94,12 @@ button {
   color: var(--text-soft);
 }
 
+.hero-copy,
+.fine-print {
+  font-size: 13px;
+  line-height: 2;
+}
+
 .brand-copy,
 .hero-copy,
 .card-copy {
