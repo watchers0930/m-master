@@ -2,6 +2,7 @@ import { jsonError, jsonOk } from "@/lib/api-response";
 import { logger } from "@/server/logger";
 import {
   generateProjectImages,
+  ProjectContextApprovalRequiredError,
   ProjectImageNotFoundError,
   ProjectNotFoundError,
   selectProjectImage,
@@ -36,6 +37,10 @@ export async function POST(request: Request, context: RouteContext) {
   } catch (error) {
     if (error instanceof ProjectNotFoundError || error instanceof ProjectImageNotFoundError) {
       return jsonError(error.message, 404);
+    }
+
+    if (error instanceof ProjectContextApprovalRequiredError) {
+      return jsonError("컨텍스트 승인이 끝난 프로젝트만 이미지를 생성할 수 있습니다.", 409);
     }
 
     logger.error("projects.images.generate.failed", {
@@ -74,6 +79,10 @@ export async function PATCH(request: Request, context: RouteContext) {
   } catch (error) {
     if (error instanceof ProjectNotFoundError || error instanceof ProjectImageNotFoundError) {
       return jsonError(error.message, 404);
+    }
+
+    if (error instanceof ProjectContextApprovalRequiredError) {
+      return jsonError("컨텍스트 승인이 끝난 프로젝트만 이미지를 선택할 수 있습니다.", 409);
     }
 
     logger.error("projects.images.select.failed", {

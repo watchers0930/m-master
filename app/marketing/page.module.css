@@ -1,0 +1,296 @@
+.page {
+  min-height: 100vh;
+  padding: 48px 24px 96px;
+  background:
+    radial-gradient(circle at top left, rgba(0, 113, 227, 0.14), transparent 34%),
+    linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%);
+  color: var(--graphite);
+}
+
+.hero,
+.section {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 24px;
+  align-items: stretch;
+  padding-top: 24px;
+}
+
+.heroCopy,
+.heroPanel,
+.card,
+.workflowItem,
+.listCard,
+.highlight {
+  border: 1px solid rgba(29, 29, 31, 0.1);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 24px 64px rgba(29, 29, 31, 0.06);
+}
+
+.heroCopy {
+  padding: 36px;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.heroCopy h1,
+.sectionHeading h2,
+.highlight h2 {
+  margin: 0;
+  letter-spacing: -0.04em;
+}
+
+.heroCopy h1 {
+  max-width: 12ch;
+  font-size: clamp(40px, 6vw, 72px);
+  line-height: 0.98;
+}
+
+.lead {
+  max-width: 760px;
+  margin: 20px 0 0;
+  color: var(--text-soft);
+  font-size: 18px;
+  line-height: 1.7;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 28px;
+}
+
+.primaryAction,
+.secondaryAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.primaryAction {
+  background: var(--blue);
+  color: #ffffff;
+}
+
+.secondaryAction {
+  border: 1px solid rgba(29, 29, 31, 0.12);
+  color: var(--graphite);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.heroPanel {
+  padding: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 250, 252, 0.98) 100%),
+    rgba(255, 255, 255, 0.92);
+}
+
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.panelGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.metricCard,
+.storyCard {
+  border: 1px solid rgba(29, 29, 31, 0.1);
+  border-radius: 22px;
+  background: #ffffff;
+}
+
+.metricCard {
+  padding: 18px 16px;
+}
+
+.metricCard span {
+  display: block;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.metricCard strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 22px;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.storyCard {
+  margin-top: 16px;
+  padding: 20px;
+}
+
+.storyLabel {
+  margin: 0 0 10px;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.storyCard p:last-child,
+.card p,
+.workflowItem p,
+.highlight p {
+  margin: 0;
+  color: var(--text-soft);
+  line-height: 1.7;
+}
+
+.section {
+  margin-top: 28px;
+}
+
+.sectionHeading {
+  margin-bottom: 18px;
+}
+
+.sectionHeading h2,
+.highlight h2 {
+  font-size: clamp(28px, 4vw, 46px);
+  line-height: 1.05;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.card {
+  padding: 24px;
+}
+
+.card h3 {
+  margin: 0 0 12px;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+
+.workflow {
+  display: grid;
+  gap: 14px;
+}
+
+.workflowItem {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 18px 22px;
+}
+
+.stepNo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 20px;
+  background: rgba(0, 113, 227, 0.1);
+  color: var(--blue);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 18px;
+}
+
+.stack {
+  display: grid;
+  gap: 12px;
+}
+
+.listCard,
+.highlight {
+  padding: 24px;
+}
+
+.listCard {
+  color: var(--graphite);
+  font-size: 17px;
+  line-height: 1.6;
+}
+
+.highlight {
+  background:
+    radial-gradient(circle at top right, rgba(0, 113, 227, 0.12), transparent 40%),
+    #ffffff;
+}
+
+@media (max-width: 960px) {
+  .hero,
+  .cardGrid,
+  .split {
+    grid-template-columns: 1fr;
+  }
+
+  .panelGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 24px 16px 72px;
+  }
+
+  .heroCopy,
+  .heroPanel,
+  .card,
+  .workflowItem,
+  .listCard,
+  .highlight {
+    border-radius: 22px;
+  }
+
+  .heroCopy {
+    padding: 24px;
+  }
+
+  .heroCopy h1 {
+    max-width: none;
+    font-size: 38px;
+  }
+
+  .lead {
+    font-size: 16px;
+  }
+
+  .workflowItem {
+    grid-template-columns: 1fr;
+  }
+}

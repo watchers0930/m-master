@@ -1,6 +1,11 @@
 import { jsonError, jsonOk } from "@/lib/api-response";
 import { logger } from "@/server/logger";
-import { generateProjectContent, ProjectNotFoundError, saveProjectContentDraft } from "@/server/services/project-service";
+import {
+  generateProjectContent,
+  ProjectContextApprovalRequiredError,
+  ProjectNotFoundError,
+  saveProjectContentDraft,
+} from "@/server/services/project-service";
 import { parseContentJobInput } from "@/server/validators/content-job-validator";
 import { ProjectValidationError } from "@/server/validators/project-validator";
 
@@ -31,6 +36,10 @@ export async function POST(request: Request, context: RouteContext) {
 
     if (error instanceof ProjectNotFoundError) {
       return jsonError(error.message, 404);
+    }
+
+    if (error instanceof ProjectContextApprovalRequiredError) {
+      return jsonError("컨텍스트 승인이 끝난 프로젝트만 콘텐츠를 생성할 수 있습니다.", 409);
     }
 
     logger.error("projects.content_jobs.create.failed", {
@@ -71,6 +80,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (error instanceof ProjectNotFoundError) {
       return jsonError(error.message, 404);
+    }
+
+    if (error instanceof ProjectContextApprovalRequiredError) {
+      return jsonError("컨텍스트 승인이 끝난 프로젝트만 콘텐츠를 저장할 수 있습니다.", 409);
     }
 
     logger.error("projects.content_jobs.save.failed", {

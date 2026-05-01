@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { ContentStudio } from "@/features/dashboard/content-studio";
@@ -159,22 +160,29 @@ export function DashboardShell() {
 
   const folderSupported = typeof window !== "undefined" && typeof window.showDirectoryPicker === "function";
   const currentImageStudio = imageStudios[activeChannel];
+  const contextApproved = Boolean(activeProject?.brandProfile?.approved);
   const stepAvailability = {
     1: true,
     2: Boolean(activeProject),
-    3: Boolean(activeProject?.topics.length),
-    4: Boolean(activeProject && studio),
-    5: Boolean(activeProject && studio),
-    6: Boolean(activeProject && studio),
+    3: Boolean(contextApproved && activeProject?.topics.length),
+    4: Boolean(contextApproved && activeProject && studio),
+    5: Boolean(contextApproved && activeProject && studio),
+    6: Boolean(contextApproved && activeProject && studio),
   } as const;
   const stepMeta = [
     { step: 1 as const, title: "프로젝트 생성", description: "폴더와 도메인을 연결합니다." },
     { step: 2 as const, title: "컨텍스트 승인", description: "AI가 읽은 브랜드 초안을 다듬습니다." },
-    { step: 3 as const, title: "주제 선택", description: "이번 콘텐츠의 기준 주제를 고릅니다." },
-    { step: 4 as const, title: "콘텐츠 편집", description: "채널별 텍스트 초안을 생성하고 수정합니다." },
-    { step: 5 as const, title: "이미지 생성", description: "선택 채널용 이미지를 만듭니다." },
-    { step: 6 as const, title: "검수 및 내보내기", description: "검수 후 내보내기와 발행 준비를 진행합니다." },
+    { step: 3 as const, title: "주제 선택", description: "컨텍스트 승인 후 이번 콘텐츠의 기준 주제를 고릅니다." },
+    { step: 4 as const, title: "콘텐츠 편집", description: "컨텍스트 승인 후 채널별 텍스트 초안을 생성하고 수정합니다." },
+    { step: 5 as const, title: "이미지 생성", description: "컨텍스트 승인 후 선택 채널용 이미지를 만듭니다." },
+    { step: 6 as const, title: "검수 및 내보내기", description: "컨텍스트 승인 후 검수와 발행 준비를 진행합니다." },
   ];
+
+  useEffect(() => {
+    if (!contextApproved && currentStep > 2) {
+      setCurrentStep(2);
+    }
+  }, [contextApproved, currentStep]);
 
   function goToStep(step: 1 | 2 | 3 | 4 | 5 | 6) {
     if (!stepAvailability[step]) {
@@ -837,6 +845,9 @@ export function DashboardShell() {
               </p>
             </div>
             <div className="hero-actions">
+              <Link className="button ghost" href="/marketing">
+                Marketing Page
+              </Link>
               <div className="status-pill active">{projects.length} Projects</div>
               <div className="status-pill">{files.length} Files Loaded</div>
               <div className="status-pill">{`Step ${currentStep}/6`}</div>
@@ -845,6 +856,11 @@ export function DashboardShell() {
 
           <div className="wizard-stage">
             {error ? <p className="error-text wizard-error">{error}</p> : null}
+            {!contextApproved && activeProject ? (
+              <p className="fine-print">
+                컨텍스트 승인 전에는 Step 3-6이 잠깁니다. Step 2에서 브랜드 프로필을 승인해야 콘텐츠 단계로 이동할 수 있습니다.
+              </p>
+            ) : null}
 
             {currentStep === 1 ? (
               <ProjectIntakeForm

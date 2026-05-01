@@ -2,6 +2,7 @@ import { jsonError, jsonOk } from "@/lib/api-response";
 import { logger } from "@/server/logger";
 import {
   exportProjectContent,
+  ProjectContextApprovalRequiredError,
   ProjectContentNotFoundError,
   ProjectNotFoundError,
 } from "@/server/services/project-service";
@@ -21,6 +22,10 @@ export async function GET(_request: Request, context: RouteContext) {
   } catch (error) {
     if (error instanceof ProjectNotFoundError || error instanceof ProjectContentNotFoundError) {
       return jsonError(error.message, 404);
+    }
+
+    if (error instanceof ProjectContextApprovalRequiredError) {
+      return jsonError("컨텍스트 승인이 끝난 프로젝트만 콘텐츠를 내보낼 수 있습니다.", 409);
     }
 
     logger.error("projects.export.failed", {
