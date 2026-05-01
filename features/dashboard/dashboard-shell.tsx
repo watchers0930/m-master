@@ -846,7 +846,7 @@ export function DashboardShell() {
             </div>
             <div className="hero-actions">
               <Link className="button ghost" href="/marketing">
-                Marketing Page
+                마케팅 페이지
               </Link>
               <div className="status-pill active">{projects.length} Projects</div>
               <div className="status-pill">{files.length} Files Loaded</div>
@@ -856,6 +856,11 @@ export function DashboardShell() {
 
           <div className="wizard-stage">
             {error ? <p className="error-text wizard-error">{error}</p> : null}
+            {!activeProject ? (
+              <p className="fine-print">
+                Step 2-6은 프로젝트를 만든 뒤 순서대로 열립니다. 먼저 프로젝트를 생성하고 컨텍스트 승인 단계까지 진행해야 콘텐츠 작업이 시작됩니다.
+              </p>
+            ) : null}
             {!contextApproved && activeProject ? (
               <p className="fine-print">
                 컨텍스트 승인 전에는 Step 3-6이 잠깁니다. Step 2에서 브랜드 프로필을 승인해야 콘텐츠 단계로 이동할 수 있습니다.

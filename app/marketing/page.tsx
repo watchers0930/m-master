@@ -23,6 +23,7 @@ const workflow = [
   "컨텍스트 승인: AI가 추출한 브랜드 프로필을 사용자가 보정",
   "주제 선택: 추천 토픽 중 우선순위를 고정",
   "콘텐츠 편집: 블로그와 SNS 파생 초안을 한 화면에서 수정",
+  "이미지 생성: 선택 채널용 비주얼 시안을 준비",
   "검수 및 내보내기: 채널별 품질을 확인하고 발행 준비",
 ];
 
@@ -80,7 +81,7 @@ export default function MarketingPage() {
           <div className={styles.storyCard}>
             <p className={styles.storyLabel}>Why it matters</p>
             <p>
-              콘텐츠를 잘 쓰는 모델보다 중요한 것은 브랜드를 얼마나 정확히 이해하느냐입니다. `m-master`는 그
+              콘텐츠를 잘 쓰는 모델보다 중요한 것은 브랜드를 얼마나 정확히 이해하느냐입니다. m-master는 그
               이해를 승인 가능한 데이터 구조로 고정한 뒤 채널별 결과물에 재사용합니다.
             </p>
           </div>
@@ -105,7 +106,7 @@ export default function MarketingPage() {
       <section className={styles.section} id="workflow">
         <div className={styles.sectionHeading}>
           <p className={styles.eyebrow}>Workflow</p>
-          <h2>입력, 승인, 생성, 검수를 한 흐름으로 묶은 5단계 운영 구조입니다.</h2>
+          <h2>입력, 승인, 생성, 이미지, 검수를 한 흐름으로 묶은 6단계 운영 구조입니다.</h2>
         </div>
         <div className={styles.workflow}>
           {workflow.map((item, index) => (
