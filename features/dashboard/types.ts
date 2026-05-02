@@ -25,6 +25,15 @@ export type SourceFileDraft = {
   excerpt?: string;
 };
 
+export type SourceAnalysisSummary = {
+  totalFiles: number;
+  filesWithExcerpt: number;
+  fileTypeBreakdown: Array<{ key: string; count: number }>;
+  topSourceFiles: Array<{ name: string; relativePath?: string; excerptLength: number }>;
+  keywordHints: string[];
+  excerptDigest: string;
+};
+
 export type ProjectListItem = {
   id: string;
   name: string;
@@ -83,14 +92,7 @@ export type ProjectDetail = {
     rationale?: string | null;
     createdAt: string;
   }>;
-  sourceAnalysis?: {
-    totalFiles: number;
-    filesWithExcerpt: number;
-    fileTypeBreakdown: Array<{ key: string; count: number }>;
-    topSourceFiles: Array<{ name: string; relativePath?: string; excerptLength: number }>;
-    keywordHints: string[];
-    excerptDigest: string;
-  } | null;
+  sourceAnalysis?: SourceAnalysisSummary | null;
 };
 
 export type ProjectPreview = {
@@ -108,14 +110,7 @@ export type ProjectPreview = {
     score?: number | null;
     rationale?: string | null;
   }>;
-  sourceAnalysis: {
-    totalFiles: number;
-    filesWithExcerpt: number;
-    fileTypeBreakdown: Array<{ key: string; count: number }>;
-    topSourceFiles: Array<{ name: string; relativePath?: string; excerptLength: number }>;
-    keywordHints: string[];
-    excerptDigest: string;
-  };
+  sourceAnalysis: SourceAnalysisSummary;
 };
 
 export type StudioDetail = {

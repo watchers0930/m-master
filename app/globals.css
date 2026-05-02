@@ -245,6 +245,19 @@ button {
   margin: 0;
 }
 
+.step-focus-banner,
+.step-focus-card {
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid var(--soft-blue-line);
+  background: var(--soft-blue);
+}
+
+.step-focus-banner .fine-print,
+.step-focus-card .fine-print {
+  margin: 6px 0 0;
+}
+
 .stack,
 .form-grid,
 .insight-list,
@@ -473,9 +486,38 @@ button {
 .ops-grid,
 .ops-actions,
 .export-preview-header,
-.export-preview-tabs {
+.export-preview-tabs,
+.source-analysis-panel,
+.source-analysis-stats,
+.source-analysis-grid,
+.source-analysis-header {
   display: grid;
   gap: 14px;
+}
+
+.source-analysis-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.source-analysis-grid {
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.8fr);
+}
+
+.source-analysis-header .fine-print {
+  margin: 4px 0 0;
+}
+
+.source-digest {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(248, 250, 252, 0.92);
+  white-space: pre-wrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-soft);
 }
 
 .ops-actions {
@@ -484,10 +526,6 @@ button {
 
 .ops-action-guide {
   grid-column: 1 / -1;
-  padding: 14px 16px;
-  border-radius: 18px;
-  border: 1px solid var(--soft-blue-line);
-  background: var(--soft-blue);
 }
 
 .ops-action-guide strong {
@@ -747,7 +785,9 @@ button {
 
   .image-studio-toolbar,
   .ops-actions,
-  .export-preview-tabs {
+  .export-preview-tabs,
+  .source-analysis-stats,
+  .source-analysis-grid {
     grid-template-columns: 1fr;
   }
 

@@ -1,5 +1,6 @@
 import { InputField } from "@/components/ui/input-field";
 import { SectionCard } from "@/components/ui/section-card";
+import { SourceAnalysisPanel } from "@/components/ui/source-analysis-panel";
 import { StatusPill } from "@/components/ui/status-pill";
 import type {
   EditableBrandProfileField,
@@ -130,18 +131,11 @@ export function ProjectOverview({
             </div>
           </div>
           {activeProject.sourceAnalysis ? (
-            <div className="insight-item">
-              <strong>참조 문서 요약</strong>
-              <p className="fine-print">
-                총 {activeProject.sourceAnalysis.totalFiles}개 파일, excerpt 보유 {activeProject.sourceAnalysis.filesWithExcerpt}개
-              </p>
-              <p className="fine-print">
-                형식 분포: {activeProject.sourceAnalysis.fileTypeBreakdown.map((item) => `${item.key} ${item.count}`).join(", ") || "unknown"}
-              </p>
-              <p className="fine-print">
-                키워드 힌트: {activeProject.sourceAnalysis.keywordHints.join(", ") || "없음"}
-              </p>
-            </div>
+            <SourceAnalysisPanel
+              analysis={activeProject.sourceAnalysis}
+              title="참조 문서 요약"
+              description="컨텍스트 초안이 어떤 파일 excerpt를 근거로 만들어졌는지 확인한 뒤 승인합니다."
+            />
           ) : null}
           <div className="row">
             <StatusPill active={activeProject.brandProfile.approved}>

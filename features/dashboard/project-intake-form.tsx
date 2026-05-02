@@ -3,6 +3,7 @@
 import type { FormEvent } from "react";
 
 import { SectionCard } from "@/components/ui/section-card";
+import { SourceAnalysisPanel } from "@/components/ui/source-analysis-panel";
 import type { ProjectPreview, SourceFileDraft } from "@/features/dashboard/types";
 
 type ProjectIntakeFormProps = {
@@ -120,26 +121,16 @@ export function ProjectIntakeForm(props: ProjectIntakeFormProps) {
               <p className="fine-print">{name || "프로젝트명 없음"} · {domain || "도메인 없음"} · 폴더 {files.length}개 연결</p>
             </div>
             <div className="insight-item">
-              <strong>수집된 소스 요약</strong>
-              <p className="fine-print">
-                총 {preview.sourceAnalysis.totalFiles}개 파일, excerpt 보유 {preview.sourceAnalysis.filesWithExcerpt}개
-              </p>
-              <p className="fine-print">
-                형식 분포: {preview.sourceAnalysis.fileTypeBreakdown.map((item) => `${item.key} ${item.count}`).join(", ") || "없음"}
-              </p>
-            </div>
-            <div className="insight-item">
-              <strong>발견된 키워드</strong>
-              <p className="fine-print">
-                {preview.sourceAnalysis.keywordHints.join(", ") || "키워드 없음"}
-              </p>
-            </div>
-            <div className="insight-item">
               <strong>주제 후보</strong>
               <p className="fine-print">
                 {preview.topics.slice(0, 3).map((topic) => topic.title).join(", ") || "주제 후보 없음"}
               </p>
             </div>
+            <SourceAnalysisPanel
+              analysis={preview.sourceAnalysis}
+              title="수집된 소스 근거"
+              description="저장 전에 어떤 파일과 excerpt가 실제 컨텍스트 초안에 반영되는지 먼저 확인합니다."
+            />
             <div className="insight-item">
               <strong>다음 단계 안내</strong>
               <p className="fine-print">

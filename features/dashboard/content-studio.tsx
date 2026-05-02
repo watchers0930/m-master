@@ -51,6 +51,7 @@ type ContentStudioProps = {
   showImages?: boolean;
   showReview?: boolean;
   showOps?: boolean;
+  onContinueWithTopic?: () => Promise<void>;
 };
 
 const channelLabels = {
@@ -89,6 +90,7 @@ export function ContentStudio({
   showImages = true,
   showReview = true,
   showOps = true,
+  onContinueWithTopic,
 }: ContentStudioProps) {
   const activeAsset = studio?.draft.assets.find((asset) => asset.channel === activeChannel);
   const hasImageVariants = imageStudio.variants.length > 0;
@@ -102,25 +104,45 @@ export function ContentStudio({
       {showTopics ? (
         <SectionCard
           title="추천 주제"
-          description="검색형, 브랜딩형, 전환형 토픽을 우선순위로 제시하고 콘텐츠 스튜디오의 기준 주제를 고정합니다."
+          description="먼저 이번 작업의 기준 주제를 하나만 고르고, 바로 초안 생성을 시작합니다."
           badge="Step 3"
         >
           {detail?.topics.length ? (
-            <div className="topic-chip-wrap">
-              {detail.topics.map((topic) => (
-                <button
-                  className={`topic-chip selectable ${selectedTopicId === topic.id ? "active" : ""}`}
-                  key={topic.id}
-                  type="button"
-                  onClick={() => onTopicSelect(topic.id)}
-                >
-                  <strong>{topic.title}</strong>
-                  <span className="fine-print">
-                    {topic.intentType || "general"} · {topic.score?.toFixed(1) ?? "-"}
-                  </span>
-                  <span className="fine-print">{compactText(topic.rationale, 120) || "추천 이유 없음"}</span>
-                </button>
-              ))}
+            <div className="stack">
+              <div className="step-focus-card">
+                <strong>지금 할 일</strong>
+                <p className="fine-print">
+                  추천 주제 중 하나를 고른 뒤 바로 `이 주제로 초안 만들기`만 누르면 됩니다.
+                </p>
+                <div className="button-row">
+                  <StatusPill active>{detail.topics.find((topic) => topic.id === selectedTopicId)?.title || "주제 선택 필요"}</StatusPill>
+                  <button
+                    className="button primary"
+                    disabled={loading || !selectedTopicId}
+                    type="button"
+                    onClick={() => void onContinueWithTopic?.()}
+                  >
+                    {loading ? "초안 생성 중" : "이 주제로 초안 만들기"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="topic-chip-wrap">
+                {detail.topics.map((topic) => (
+                  <button
+                    className={`topic-chip selectable ${selectedTopicId === topic.id ? "active" : ""}`}
+                    key={topic.id}
+                    type="button"
+                    onClick={() => onTopicSelect(topic.id)}
+                  >
+                    <strong>{topic.title}</strong>
+                    <span className="fine-print">
+                      {topic.intentType || "general"} · {topic.score?.toFixed(1) ?? "-"}
+                    </span>
+                    <span className="fine-print">{compactText(topic.rationale, 120) || "추천 이유 없음"}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
             <EmptyStatePanel title="추천 주제가 아직 없습니다." description="프로젝트 분석이 끝나면 우선순위 주제가 여기에 쌓입니다." />
@@ -131,7 +153,7 @@ export function ContentStudio({
       {showContent ? (
         <SectionCard
           title="콘텐츠 스튜디오"
-          description="블로그 원문과 인스타그램·페이스북 파생 초안을 한 화면에서 비교하고 다듬는 공간입니다."
+          description="한 번에 하나의 채널만 보고 수정합니다. 필요하면 저장하고 다음 채널로 넘어가면 됩니다."
           badge="Step 4"
         >
           {studio ? (
@@ -145,13 +167,19 @@ export function ContentStudio({
                 </div>
                 <div className="button-cluster">
                   <StatusPill active>{studio.project.status}</StatusPill>
-                  <button className="button" disabled={loading} type="button" onClick={() => void onSaveContent()}>
-                    {loading ? "저장 중" : "초안 저장"}
-                  </button>
                   <button className="button ghost" disabled={loading} type="button" onClick={() => void onGenerateContent()}>
-                    {loading ? "초안 생성 중" : "선택 주제로 초안 생성"}
+                    {loading ? "초안 생성 중" : "초안 다시 만들기"}
+                  </button>
+                  <button className="button primary" disabled={loading} type="button" onClick={() => void onSaveContent()}>
+                    {loading ? "저장 중" : "이 채널 내용 저장"}
                   </button>
                 </div>
+              </div>
+              <div className="step-focus-card" style={{ marginBottom: 16 }}>
+                <strong>지금 할 일</strong>
+                <p className="fine-print">
+                  위 채널 탭에서 하나를 고르고 내용만 다듬으세요. 저장은 현재 보이는 초안 기준으로 진행됩니다.
+                </p>
               </div>
               <div className="content-tabs">
                 {(Object.keys(channelLabels) as Array<keyof typeof channelLabels>).map((channel) => (
@@ -313,31 +341,36 @@ export function ContentStudio({
       {showOps ? (
         <SectionCard
           title="운영 패널"
-          description="채널별 초안을 먼저 패널 안에서 확인하고, 필요할 때 내보내거나 발행 준비 상태로 전환합니다."
+          description="먼저 채널 하나만 확인한 뒤, 필요하면 전체 JSON을 확인하고 발행 준비로 넘깁니다."
           badge="Ops"
         >
           <div className="ops-grid">
             <div className="ops-actions">
               <div className="ops-action-guide">
-                <strong>먼저 눌러볼 버튼</strong>
+                <strong>지금 할 일</strong>
                 <p className="fine-print">
-                  보통은 `블로그 미리보기`부터 보고, 필요하면 `인스타 미리보기`, `페이스북 미리보기`, `전체 JSON 보기`
-                  순서로 확인하면 됩니다.
+                  검수할 채널을 하나 고른 뒤 `현재 채널 미리보기`를 먼저 보세요. 구조 확인이 필요할 때만 `전체 JSON 보기`를 쓰면 됩니다.
                 </p>
               </div>
-              <button className="button" disabled={exportBusy} type="button" onClick={() => void onExportChannel("blog")}>
-                블로그 미리보기
-              </button>
-              <button className="button" disabled={exportBusy} type="button" onClick={() => void onExportChannel("instagram")}>
-                인스타 미리보기
-              </button>
-              <button className="button" disabled={exportBusy} type="button" onClick={() => void onExportChannel("facebook")}>
-                페이스북 미리보기
+              <div className="content-tabs">
+                {(Object.keys(channelLabels) as Array<keyof typeof channelLabels>).map((channel) => (
+                  <button
+                    key={channel}
+                    className={`content-tab ${activeChannel === channel ? "active" : ""}`}
+                    type="button"
+                    onClick={() => onChannelChange(channel)}
+                  >
+                    {channelLabels[channel]}
+                  </button>
+                ))}
+              </div>
+              <button className="button primary" disabled={exportBusy} type="button" onClick={() => void onExportChannel(activeChannel)}>
+                {exportBusy ? "미리보기 불러오는 중" : `${channelLabels[activeChannel]} 미리보기`}
               </button>
               <button className="button ghost" disabled={exportBusy} type="button" onClick={() => void onExportAll()}>
                 전체 JSON 보기
               </button>
-              <button className="button primary" disabled={publishBusy} type="button" onClick={() => void onPreparePublish()}>
+              <button className="button" disabled={publishBusy} type="button" onClick={() => void onPreparePublish()}>
                 {publishBusy ? "발행 준비 중" : "발행 준비"}
               </button>
             </div>

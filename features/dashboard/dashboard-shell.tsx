@@ -808,6 +808,14 @@ export function DashboardShell() {
   const currentStepMeta = stepMeta.find((item) => item.step === currentStep) || stepMeta[0];
   const previousStep = currentStep > 1 ? ((currentStep - 1) as 1 | 2 | 3 | 4 | 5) : null;
   const nextStep = currentStep < 6 ? ((currentStep + 1) as 2 | 3 | 4 | 5 | 6) : null;
+  const stepFocusCopy = {
+    1: "프로젝트명과 도메인을 넣고 바로 저장하거나, 필요하면 수집 결과만 먼저 확인합니다.",
+    2: "브랜드 요약만 먼저 다듬고 승인하면 다음 단계가 열립니다.",
+    3: "주제는 하나만 고르고 바로 초안 생성을 시작합니다.",
+    4: "한 번에 한 채널만 수정하고 저장합니다.",
+    5: "이미지는 선택 사항입니다. 필요 없으면 바로 다음 단계로 넘어가도 됩니다.",
+    6: "현재 채널 미리보기를 먼저 보고, 문제가 없으면 발행 준비로 마칩니다.",
+  } as const;
 
   return (
     <main className="app-shell">
@@ -856,6 +864,10 @@ export function DashboardShell() {
 
           <div className="wizard-stage">
             {error ? <p className="error-text wizard-error">{error}</p> : null}
+            <div className="step-focus-banner">
+              <strong>{`Step ${currentStep}에서 할 일`}</strong>
+              <p className="fine-print">{stepFocusCopy[currentStep]}</p>
+            </div>
             {!activeProject ? (
               <p className="fine-print">
                 Step 2-6은 프로젝트를 만든 뒤 순서대로 열립니다. 먼저 프로젝트를 생성하고 컨텍스트 승인 단계까지 진행해야 콘텐츠 작업이 시작됩니다.
@@ -924,6 +936,7 @@ export function DashboardShell() {
                 onExportAll={handleExportAll}
                 onExportPreviewViewChange={handleExportPreviewViewChange}
                 onPreparePublish={handlePreparePublish}
+                onContinueWithTopic={handleGenerateContent}
                 showTopics
                 showContent={false}
                 showImages={false}
@@ -958,6 +971,7 @@ export function DashboardShell() {
                 onExportAll={handleExportAll}
                 onExportPreviewViewChange={handleExportPreviewViewChange}
                 onPreparePublish={handlePreparePublish}
+                onContinueWithTopic={handleGenerateContent}
                 showTopics={false}
                 showContent
                 showImages={false}
@@ -992,6 +1006,7 @@ export function DashboardShell() {
                 onExportAll={handleExportAll}
                 onExportPreviewViewChange={handleExportPreviewViewChange}
                 onPreparePublish={handlePreparePublish}
+                onContinueWithTopic={handleGenerateContent}
                 showTopics={false}
                 showContent={false}
                 showImages
@@ -1026,6 +1041,7 @@ export function DashboardShell() {
                 onExportAll={handleExportAll}
                 onExportPreviewViewChange={handleExportPreviewViewChange}
                 onPreparePublish={handlePreparePublish}
+                onContinueWithTopic={handleGenerateContent}
                 showTopics={false}
                 showContent={false}
                 showImages={false}
