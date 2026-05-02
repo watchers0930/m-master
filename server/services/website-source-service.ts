@@ -8,11 +8,43 @@ type WebsiteSnapshot = {
   fetchedUrl: string;
 };
 
-function stripTags(value: string) {
+const UI_NOISE_WORDS = new Set([
+  "star",
+  "stars",
+  "check",
+  "arrow",
+  "menu",
+  "close",
+  "prev",
+  "next",
+  "play",
+  "pause",
+  "home",
+  "logo",
+  "icon",
+  "icons",
+  "scroll",
+  "more",
+  "view",
+  "learn",
+  "read",
+]);
+
+function preprocessHtml(value: string) {
   return value
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+    .replace(/<svg[\s\S]*?<\/svg>/gi, " ")
+    .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
+    .replace(/<header[\s\S]*?<\/header>/gi, " ")
+    .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
+    .replace(/<aside[\s\S]*?<\/aside>/gi, " ")
+    .replace(/<button[\s\S]*?<\/button>/gi, " ");
+}
+
+function stripTags(value: string) {
+  return value
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")
@@ -22,32 +54,92 @@ function stripTags(value: string) {
     .trim();
 }
 
+function normalizeWebsiteText(value: string) {
+  const normalized = stripTags(value)
+    .replace(/\bhttps?:\/\/\S+/gi, " ")
+    .replace(/\bwww\.\S+/gi, " ")
+    .replace(/[|/\\><]+/g, " ")
+    .replace(/[_-]{2,}/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const tokens = normalized.split(/\s+/).filter((token) => {
+    const lowered = token.toLowerCase();
+
+    if (!lowered) {
+      return false;
+    }
+
+    if (UI_NOISE_WORDS.has(lowered)) {
+      return false;
+    }
+
+    if (/^[a-z]{1,4}$/.test(lowered) && !/[aeiou]/.test(lowered)) {
+      return false;
+    }
+
+    if (/^[^a-z0-9가-힣]+$/i.test(lowered)) {
+      return false;
+    }
+
+    return true;
+  });
+
+  return tokens.join(" ").trim();
+}
+
 function matchTag(html: string, pattern: RegExp) {
   const matched = html.match(pattern);
-  return matched?.[1] ? stripTags(matched[1]) : undefined;
+  return matched?.[1] ? normalizeWebsiteText(matched[1]) : undefined;
 }
 
 function extractHeadings(html: string) {
   const matches = [...html.matchAll(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi)];
 
   return matches
-    .map((match) => stripTags(match[1] || ""))
-    .filter(Boolean)
+    .map((match) => normalizeWebsiteText(match[1] || ""))
+    .filter((heading) => heading.length >= 8)
     .slice(0, 6);
 }
 
+function extractMeaningfulBlocks(html: string) {
+  const matches = [...html.matchAll(/<(p|li|h1|h2|h3)[^>]*>([\s\S]*?)<\/\1>/gi)];
+  const deduped = new Set<string>();
+
+  for (const match of matches) {
+    const cleaned = normalizeWebsiteText(match[2] || "");
+
+    if (cleaned.length < 30) {
+      continue;
+    }
+
+    if (deduped.has(cleaned)) {
+      continue;
+    }
+
+    deduped.add(cleaned);
+
+    if (deduped.size >= 8) {
+      break;
+    }
+  }
+
+  return [...deduped];
+}
+
 function buildWebsiteSnapshot(html: string, fetchedUrl: string): WebsiteSnapshot {
-  const title = matchTag(html, /<title[^>]*>([\s\S]*?)<\/title>/i);
+  const preprocessedHtml = preprocessHtml(html);
+  const title = matchTag(preprocessedHtml, /<title[^>]*>([\s\S]*?)<\/title>/i);
   const description = matchTag(
-    html,
+    preprocessedHtml,
     /<meta[^>]+name=["']description["'][^>]+content=["']([\s\S]*?)["'][^>]*>/i,
   );
   const ogDescription = matchTag(
-    html,
+    preprocessedHtml,
     /<meta[^>]+property=["']og:description["'][^>]+content=["']([\s\S]*?)["'][^>]*>/i,
   );
-  const headings = extractHeadings(html);
-  const bodyExcerpt = stripTags(html).slice(0, 2400);
+  const headings = extractHeadings(preprocessedHtml);
+  const bodyExcerpt = extractMeaningfulBlocks(preprocessedHtml).join(" ").slice(0, 2400);
 
   return {
     title,
