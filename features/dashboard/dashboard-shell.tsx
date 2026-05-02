@@ -1,6 +1,4 @@
 "use client";
-
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { ContentStudio } from "@/features/dashboard/content-studio";
@@ -850,9 +848,6 @@ export function DashboardShell() {
               </p>
             </div>
             <div className="hero-actions">
-              <Link className="button ghost" href="/marketing">
-                마케팅 페이지
-              </Link>
               <div className="status-pill active">{projects.length} Projects</div>
               <div className="status-pill">{files.length} Files Loaded</div>
               <div className="status-pill">{`Step ${currentStep}/6`}</div>
