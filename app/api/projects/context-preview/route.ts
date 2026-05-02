@@ -6,7 +6,7 @@ import { parseCreateProjectInput, ProjectValidationError } from "../../../../ser
 export async function POST(request: Request) {
   try {
     const input = await parseCreateProjectInput(request);
-    const preview = previewProjectContext(input);
+    const preview = await previewProjectContext(input);
 
     return jsonOk({ preview });
   } catch (error) {

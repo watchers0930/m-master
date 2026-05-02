@@ -1,0 +1,142 @@
+import type { SourceFileInput } from "../validators/project-validator";
+
+type WebsiteSnapshot = {
+  title?: string;
+  description?: string;
+  headings: string[];
+  bodyExcerpt: string;
+  fetchedUrl: string;
+};
+
+function stripTags(value: string) {
+  return value
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function matchTag(html: string, pattern: RegExp) {
+  const matched = html.match(pattern);
+  return matched?.[1] ? stripTags(matched[1]) : undefined;
+}
+
+function extractHeadings(html: string) {
+  const matches = [...html.matchAll(/<h[1-3][^>]*>([\s\S]*?)<\/h[1-3]>/gi)];
+
+  return matches
+    .map((match) => stripTags(match[1] || ""))
+    .filter(Boolean)
+    .slice(0, 6);
+}
+
+function buildWebsiteSnapshot(html: string, fetchedUrl: string): WebsiteSnapshot {
+  const title = matchTag(html, /<title[^>]*>([\s\S]*?)<\/title>/i);
+  const description = matchTag(
+    html,
+    /<meta[^>]+name=["']description["'][^>]+content=["']([\s\S]*?)["'][^>]*>/i,
+  );
+  const ogDescription = matchTag(
+    html,
+    /<meta[^>]+property=["']og:description["'][^>]+content=["']([\s\S]*?)["'][^>]*>/i,
+  );
+  const headings = extractHeadings(html);
+  const bodyExcerpt = stripTags(html).slice(0, 2400);
+
+  return {
+    title,
+    description: description || ogDescription,
+    headings,
+    bodyExcerpt,
+    fetchedUrl,
+  };
+}
+
+function toExcerpt(snapshot: WebsiteSnapshot) {
+  const parts = [
+    snapshot.title ? `페이지 제목: ${snapshot.title}` : "",
+    snapshot.description ? `설명: ${snapshot.description}` : "",
+    snapshot.headings.length > 0 ? `주요 섹션: ${snapshot.headings.join(" | ")}` : "",
+    snapshot.bodyExcerpt ? `본문 발췌: ${snapshot.bodyExcerpt}` : "",
+  ].filter(Boolean);
+
+  return parts.join("\n").slice(0, 4000);
+}
+
+async function fetchHtml(url: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        "user-agent":
+          "Mozilla/5.0 (compatible; m-master-context-bot/1.0; +https://tm-master.vercel.app)",
+        accept: "text/html,application/xhtml+xml",
+      },
+      redirect: "follow",
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("text/html")) {
+      return null;
+    }
+
+    const html = await response.text();
+    return {
+      html,
+      fetchedUrl: response.url || url,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function fetchWebsiteSource(domain?: string): Promise<SourceFileInput | null> {
+  if (!domain) {
+    return null;
+  }
+
+  const candidates = [`https://${domain}`, `http://${domain}`];
+
+  for (const candidate of candidates) {
+    try {
+      const result = await fetchHtml(candidate);
+
+      if (!result) {
+        continue;
+      }
+
+      const snapshot = buildWebsiteSnapshot(result.html, result.fetchedUrl);
+      const excerpt = toExcerpt(snapshot);
+
+      if (!excerpt) {
+        continue;
+      }
+
+      return {
+        name: `${domain}-homepage.html`,
+        relativePath: result.fetchedUrl,
+        mimeType: "text/html",
+        extension: "html",
+        size: result.html.length,
+        excerpt,
+      };
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}

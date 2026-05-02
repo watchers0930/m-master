@@ -20,6 +20,7 @@ import { buildReviewSummary } from "./review-service";
 import { analyzeSourceFiles } from "./source-analysis-service";
 import { buildStudioSeed } from "./studio-seed-service";
 import { buildTopicRecommendations, normalizeTopicTitle } from "./topic-recommendation-service";
+import { fetchWebsiteSource } from "./website-source-service";
 import type { CreateProjectInput } from "../validators/project-validator";
 
 export class ProjectNotFoundError extends Error {
@@ -192,24 +193,26 @@ function serializeProjectDetail(record: NonNullable<Awaited<ReturnType<typeof ge
 }
 
 export async function createProject(input: CreateProjectInput) {
+  const enrichedInput = await enrichInputWithWebsiteSource(input);
+
   logger.info("project.create.start", {
-    name: input.name,
-    domain: input.domain,
-    hasWorkingPath: Boolean(input.workingPath),
-    sourceFileCount: input.sourceFiles.length,
+    name: enrichedInput.name,
+    domain: enrichedInput.domain,
+    hasWorkingPath: Boolean(enrichedInput.workingPath),
+    sourceFileCount: enrichedInput.sourceFiles.length,
   });
 
-  const sourceAnalysis = analyzeSourceFiles(input.sourceFiles);
-  const contextDraft = buildContextDraft(input, sourceAnalysis);
+  const sourceAnalysis = analyzeSourceFiles(enrichedInput.sourceFiles);
+  const contextDraft = buildContextDraft(enrichedInput, sourceAnalysis);
   const topics = buildTopicRecommendations({
-    projectName: input.name,
-    domain: input.domain,
+    projectName: enrichedInput.name,
+    domain: enrichedInput.domain,
     contextDraft,
     sourceAnalysis,
   });
 
   const projectId = await createProjectWithSeeds({
-    project: input,
+    project: enrichedInput,
     brandProfile: contextDraft,
     topics,
   });
@@ -347,12 +350,13 @@ export async function getProjectStudioSeed(projectId: string) {
   };
 }
 
-export function previewProjectContext(input: CreateProjectInput) {
-  const sourceAnalysis = analyzeSourceFiles(input.sourceFiles);
-  const contextDraft = buildContextDraft(input, sourceAnalysis);
+export async function previewProjectContext(input: CreateProjectInput) {
+  const enrichedInput = await enrichInputWithWebsiteSource(input);
+  const sourceAnalysis = analyzeSourceFiles(enrichedInput.sourceFiles);
+  const contextDraft = buildContextDraft(enrichedInput, sourceAnalysis);
   const topics = buildTopicRecommendations({
-    projectName: input.name,
-    domain: input.domain,
+    projectName: enrichedInput.name,
+    domain: enrichedInput.domain,
     contextDraft,
     sourceAnalysis,
   });
@@ -361,6 +365,28 @@ export function previewProjectContext(input: CreateProjectInput) {
     contextDraft,
     topics,
     sourceAnalysis,
+  };
+}
+
+async function enrichInputWithWebsiteSource(input: CreateProjectInput): Promise<CreateProjectInput> {
+  const websiteSource = await fetchWebsiteSource(input.domain);
+
+  if (!websiteSource) {
+    logger.info("project.website_source.unavailable", {
+      domain: input.domain,
+      sourceFileCount: input.sourceFiles.length,
+    });
+    return input;
+  }
+
+  logger.info("project.website_source.fetched", {
+    domain: input.domain,
+    fetchedPath: websiteSource.relativePath,
+  });
+
+  return {
+    ...input,
+    sourceFiles: [websiteSource, ...input.sourceFiles].slice(0, 50),
   };
 }
 

@@ -41,7 +41,7 @@ export function ProjectIntakeForm(props: ProjectIntakeFormProps) {
   return (
     <SectionCard
       title="프로젝트 생성"
-      description="프로젝트명, 도메인, 작업 폴더를 연결해 컨텍스트 초안과 추천 주제를 먼저 확인합니다."
+      description="프로젝트명과 도메인만으로도 시작할 수 있고, 작업 폴더를 연결하면 문서 분석까지 함께 반영합니다."
       badge="Step 1"
       tone="soft"
     >
@@ -70,12 +70,12 @@ export function ProjectIntakeForm(props: ProjectIntakeFormProps) {
             value={domain}
             onChange={(event) => onDomainChange(event.target.value)}
           />
-          <p className="fine-print">도메인 정보는 CTA와 핵심 메시지 구조화에 반영됩니다.</p>
+          <p className="fine-print">도메인만 입력해도 사이트를 읽어 브랜드 컨텍스트 초안을 자동 수집합니다.</p>
         </div>
 
         <div className="field-group">
           <div className="row" style={{ justifyContent: "space-between" }}>
-            <label className="field-label">작업 폴더 선택</label>
+            <label className="field-label">작업 폴더 선택 (선택 사항)</label>
             <button className="button ghost" type="button" onClick={() => void onPickFolder()}>
               폴더 선택
             </button>
@@ -84,8 +84,8 @@ export function ProjectIntakeForm(props: ProjectIntakeFormProps) {
             <strong>{workingPath || "아직 선택된 폴더가 없습니다."}</strong>
             <div className="fine-print">
               {folderSupported
-                ? "브라우저가 읽을 수 있는 문서 파일의 메타데이터와 본문 일부를 추출해 초안 분석에 사용합니다."
-                : "현재 브라우저는 폴더 선택 API를 지원하지 않습니다. Chromium 기반 브라우저에서 테스트하는 것이 좋습니다."}
+                ? "문서를 추가로 연결하면 브라우저가 읽을 수 있는 파일 메타데이터와 본문 일부를 추출해 사이트 분석과 함께 사용합니다."
+                : "현재 브라우저는 폴더 선택 API를 지원하지 않습니다. 이 경우에도 도메인만으로 기본 컨텍스트 초안을 만들 수 있습니다."}
             </div>
           </div>
           {files.length > 0 ? (
