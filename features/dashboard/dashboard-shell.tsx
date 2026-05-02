@@ -10,6 +10,7 @@ import type {
   ChannelKey,
   EditableBrandProfileField,
   ExportBundle,
+  ExportPreviewState,
   ImageStudioState,
   ImageStudioVariant,
   ProjectActivityItem,
@@ -155,6 +156,10 @@ export function DashboardShell() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
+  const [exportPreview, setExportPreview] = useState<ExportPreviewState>({
+    bundle: null,
+    activeView: "blog",
+  });
   const [publishBusy, setPublishBusy] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
 
@@ -238,16 +243,10 @@ export function DashboardShell() {
     setSelectedTopicId(matchedTopic?.id ?? null);
     setHistory(historyPayload.data.history);
     setImageStudios(toImageStudios(nextStudio));
-  }
-
-  function downloadFile(filename: string, content: string, type = "text/markdown;charset=utf-8") {
-    const blob = new Blob([content], { type });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = filename;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    setExportPreview({
+      bundle: null,
+      activeView: "blog",
+    });
   }
 
   async function requestPreview() {
@@ -736,15 +735,12 @@ export function DashboardShell() {
       if (!payload.ok) {
         throw new Error(payload.error.message);
       }
-
-      const asset = payload.data.bundle.channels.find((item) => item.channel === channel);
-      if (!asset) {
-        throw new Error("내보낼 채널 초안을 찾지 못했습니다.");
-      }
-
-      downloadFile(asset.filename, asset.content);
+      setExportPreview({
+        bundle: payload.data.bundle,
+        activeView: channel,
+      });
     } catch (exportError) {
-      setError(exportError instanceof Error ? exportError.message : "채널 내보내기에 실패했습니다.");
+      setError(exportError instanceof Error ? exportError.message : "채널 미리보기를 불러오지 못했습니다.");
     } finally {
       setExportBusy(false);
     }
@@ -767,13 +763,22 @@ export function DashboardShell() {
       if (!payload.ok) {
         throw new Error(payload.error.message);
       }
-
-      downloadFile(payload.data.bundle.jsonFilename, JSON.stringify(payload.data.bundle, null, 2), "application/json;charset=utf-8");
+      setExportPreview({
+        bundle: payload.data.bundle,
+        activeView: "json",
+      });
     } catch (exportError) {
-      setError(exportError instanceof Error ? exportError.message : "전체 내보내기에 실패했습니다.");
+      setError(exportError instanceof Error ? exportError.message : "전체 JSON 보기를 불러오지 못했습니다.");
     } finally {
       setExportBusy(false);
     }
+  }
+
+  function handleExportPreviewViewChange(view: ChannelKey | "json") {
+    setExportPreview((current) => ({
+      bundle: current.bundle,
+      activeView: view,
+    }));
   }
 
   async function handlePreparePublish() {
@@ -907,6 +912,7 @@ export function DashboardShell() {
                 imageBusy={imageBusy}
                 exportBusy={exportBusy}
                 publishBusy={publishBusy}
+                exportPreview={exportPreview}
                 activeChannel={activeChannel}
                 selectedTopicId={selectedTopicId}
                 loading={loading}
@@ -921,6 +927,7 @@ export function DashboardShell() {
                 onGenerateContent={handleGenerateContent}
                 onExportChannel={handleExportChannel}
                 onExportAll={handleExportAll}
+                onExportPreviewViewChange={handleExportPreviewViewChange}
                 onPreparePublish={handlePreparePublish}
                 showTopics
                 showContent={false}
@@ -939,6 +946,7 @@ export function DashboardShell() {
                 imageBusy={imageBusy}
                 exportBusy={exportBusy}
                 publishBusy={publishBusy}
+                exportPreview={exportPreview}
                 activeChannel={activeChannel}
                 selectedTopicId={selectedTopicId}
                 loading={loading}
@@ -953,6 +961,7 @@ export function DashboardShell() {
                 onGenerateContent={handleGenerateContent}
                 onExportChannel={handleExportChannel}
                 onExportAll={handleExportAll}
+                onExportPreviewViewChange={handleExportPreviewViewChange}
                 onPreparePublish={handlePreparePublish}
                 showTopics={false}
                 showContent
@@ -971,6 +980,7 @@ export function DashboardShell() {
                 imageBusy={imageBusy}
                 exportBusy={exportBusy}
                 publishBusy={publishBusy}
+                exportPreview={exportPreview}
                 activeChannel={activeChannel}
                 selectedTopicId={selectedTopicId}
                 loading={loading}
@@ -985,6 +995,7 @@ export function DashboardShell() {
                 onGenerateContent={handleGenerateContent}
                 onExportChannel={handleExportChannel}
                 onExportAll={handleExportAll}
+                onExportPreviewViewChange={handleExportPreviewViewChange}
                 onPreparePublish={handlePreparePublish}
                 showTopics={false}
                 showContent={false}
@@ -1003,6 +1014,7 @@ export function DashboardShell() {
                 imageBusy={imageBusy}
                 exportBusy={exportBusy}
                 publishBusy={publishBusy}
+                exportPreview={exportPreview}
                 activeChannel={activeChannel}
                 selectedTopicId={selectedTopicId}
                 loading={loading}
@@ -1017,6 +1029,7 @@ export function DashboardShell() {
                 onGenerateContent={handleGenerateContent}
                 onExportChannel={handleExportChannel}
                 onExportAll={handleExportAll}
+                onExportPreviewViewChange={handleExportPreviewViewChange}
                 onPreparePublish={handlePreparePublish}
                 showTopics={false}
                 showContent={false}

@@ -5,6 +5,7 @@ import { SectionCard } from "@/components/ui/section-card";
 import { StatusPill } from "@/components/ui/status-pill";
 import type {
   ChannelKey,
+  ExportPreviewState,
   ImageStudioState,
   ProjectActivityItem,
   ProjectDetail,
@@ -28,6 +29,7 @@ type ContentStudioProps = {
   imageBusy?: boolean;
   exportBusy?: boolean;
   publishBusy?: boolean;
+  exportPreview: ExportPreviewState;
   activeChannel: ChannelKey;
   selectedTopicId?: string | null;
   loading?: boolean;
@@ -42,6 +44,7 @@ type ContentStudioProps = {
   onGenerateContent: () => Promise<void>;
   onExportChannel: (channel: ChannelKey) => Promise<void>;
   onExportAll: () => Promise<void>;
+  onExportPreviewViewChange: (view: ChannelKey | "json") => void;
   onPreparePublish: () => Promise<void>;
   showTopics?: boolean;
   showContent?: boolean;
@@ -64,6 +67,7 @@ export function ContentStudio({
   imageBusy = false,
   exportBusy = false,
   publishBusy = false,
+  exportPreview,
   activeChannel,
   selectedTopicId,
   loading = false,
@@ -78,6 +82,7 @@ export function ContentStudio({
   onGenerateContent,
   onExportChannel,
   onExportAll,
+  onExportPreviewViewChange,
   onPreparePublish,
   showTopics = true,
   showContent = true,
@@ -87,6 +92,10 @@ export function ContentStudio({
 }: ContentStudioProps) {
   const activeAsset = studio?.draft.assets.find((asset) => asset.channel === activeChannel);
   const hasImageVariants = imageStudio.variants.length > 0;
+  const activeExportChannel =
+    exportPreview.activeView === "json"
+      ? null
+      : exportPreview.bundle?.channels.find((item) => item.channel === exportPreview.activeView) ?? null;
 
   return (
     <div className="stack">
@@ -304,26 +313,100 @@ export function ContentStudio({
       {showOps ? (
         <SectionCard
           title="운영 패널"
-          description="채널별 초안을 파일로 내보내고, 현재 저장본을 발행 준비 상태로 전환합니다."
+          description="채널별 초안을 먼저 패널 안에서 확인하고, 필요할 때 내보내거나 발행 준비 상태로 전환합니다."
           badge="Ops"
         >
           <div className="ops-grid">
             <div className="ops-actions">
+              <div className="ops-action-guide">
+                <strong>먼저 눌러볼 버튼</strong>
+                <p className="fine-print">
+                  보통은 `블로그 미리보기`부터 보고, 필요하면 `인스타 미리보기`, `페이스북 미리보기`, `전체 JSON 보기`
+                  순서로 확인하면 됩니다.
+                </p>
+              </div>
               <button className="button" disabled={exportBusy} type="button" onClick={() => void onExportChannel("blog")}>
-                블로그 내보내기
+                블로그 미리보기
               </button>
               <button className="button" disabled={exportBusy} type="button" onClick={() => void onExportChannel("instagram")}>
-                인스타 내보내기
+                인스타 미리보기
               </button>
               <button className="button" disabled={exportBusy} type="button" onClick={() => void onExportChannel("facebook")}>
-                페이스북 내보내기
+                페이스북 미리보기
               </button>
               <button className="button ghost" disabled={exportBusy} type="button" onClick={() => void onExportAll()}>
-                전체 JSON 내보내기
+                전체 JSON 보기
               </button>
               <button className="button primary" disabled={publishBusy} type="button" onClick={() => void onPreparePublish()}>
                 {publishBusy ? "발행 준비 중" : "발행 준비"}
               </button>
+            </div>
+            <div className="export-preview-card">
+              <div className="export-preview-header">
+                <div>
+                  <strong>내보내기 미리보기</strong>
+                  <p className="fine-print">
+                    채널별 Markdown 또는 전체 JSON을 먼저 확인한 뒤 필요한 경우 별도로 저장할 수 있습니다.
+                  </p>
+                </div>
+                {exportPreview.bundle ? (
+                  <div className="export-preview-tabs">
+                    <button
+                      className={`content-tab ${exportPreview.activeView === "blog" ? "active" : ""}`}
+                      type="button"
+                      onClick={() => onExportPreviewViewChange("blog")}
+                    >
+                      블로그
+                    </button>
+                    <button
+                      className={`content-tab ${exportPreview.activeView === "instagram" ? "active" : ""}`}
+                      type="button"
+                      onClick={() => onExportPreviewViewChange("instagram")}
+                    >
+                      인스타
+                    </button>
+                    <button
+                      className={`content-tab ${exportPreview.activeView === "facebook" ? "active" : ""}`}
+                      type="button"
+                      onClick={() => onExportPreviewViewChange("facebook")}
+                    >
+                      페이스북
+                    </button>
+                    <button
+                      className={`content-tab ${exportPreview.activeView === "json" ? "active" : ""}`}
+                      type="button"
+                      onClick={() => onExportPreviewViewChange("json")}
+                    >
+                      JSON
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+
+              {exportPreview.bundle ? (
+                <>
+                  <div className="export-preview-meta">
+                    <span className="fine-print">
+                      생성 시각 {new Date(exportPreview.bundle.generatedAt).toLocaleString("ko-KR")}
+                    </span>
+                    <span className="fine-print">
+                      {exportPreview.activeView === "json"
+                        ? exportPreview.bundle.jsonFilename
+                        : activeExportChannel?.filename || "선택된 파일 없음"}
+                    </span>
+                  </div>
+                  <div className="export-preview-body">
+                    {exportPreview.activeView === "json"
+                      ? JSON.stringify(exportPreview.bundle, null, 2)
+                      : activeExportChannel?.content || "선택된 내보내기 초안이 없습니다."}
+                  </div>
+                </>
+              ) : (
+                <EmptyStatePanel
+                  title="아직 불러온 내보내기 결과가 없습니다."
+                  description="위 버튼 중 `블로그 미리보기`를 먼저 누르거나, 구조를 보고 싶다면 `전체 JSON 보기`를 누르면 이 영역에 바로 표시됩니다."
+                />
+              )}
             </div>
             <div className="review-list">
               {history.length > 0 ? (

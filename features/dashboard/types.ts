@@ -200,3 +200,8 @@ export type ExportBundle = {
     content: string;
   }>;
 };
+
+export type ExportPreviewState = {
+  bundle: ExportBundle | null;
+  activeView: ChannelKey | "json";
+};
