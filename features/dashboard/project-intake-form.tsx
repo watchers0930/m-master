@@ -41,7 +41,7 @@ export function ProjectIntakeForm(props: ProjectIntakeFormProps) {
   return (
     <SectionCard
       title="프로젝트 생성"
-      description="프로젝트명과 도메인만으로도 시작할 수 있고, 작업 폴더를 연결하면 문서 분석까지 함께 반영합니다."
+      description="프로젝트명과 도메인만으로도 시작할 수 있습니다. 여기서는 입력 소스가 제대로 읽히는지만 먼저 확인하고, 브랜드 초안 편집은 Step 2에서 진행합니다."
       badge="Step 1"
       tone="soft"
     >
@@ -106,7 +106,7 @@ export function ProjectIntakeForm(props: ProjectIntakeFormProps) {
 
         <div className="button-row">
           <button className="button" disabled={loading} type="button" onClick={() => void onPreview()}>
-            {loading ? "초안 생성 중" : "컨텍스트 미리보기"}
+            {loading ? "수집 결과 생성 중" : "수집 결과 보기"}
           </button>
           <button className="button primary" disabled={loading} type="submit">
             {loading ? "생성 중" : "프로젝트 저장"}
@@ -116,20 +116,34 @@ export function ProjectIntakeForm(props: ProjectIntakeFormProps) {
         {preview ? (
           <div className="insight-list">
             <div className="insight-item">
-              <strong>서비스 요약 초안</strong>
-              <p className="fine-print">{preview.brandProfile.summary}</p>
+              <strong>입력 확인</strong>
+              <p className="fine-print">{name || "프로젝트명 없음"} · {domain || "도메인 없음"} · 폴더 {files.length}개 연결</p>
             </div>
             <div className="insight-item">
-              <strong>핵심 타겟</strong>
-              <p className="fine-print">{preview.brandProfile.audience || "타겟 초안 없음"}</p>
-            </div>
-            <div className="insight-item">
-              <strong>문서 분석 요약</strong>
+              <strong>수집된 소스 요약</strong>
               <p className="fine-print">
                 총 {preview.sourceAnalysis.totalFiles}개 파일, excerpt 보유 {preview.sourceAnalysis.filesWithExcerpt}개
               </p>
               <p className="fine-print">
                 형식 분포: {preview.sourceAnalysis.fileTypeBreakdown.map((item) => `${item.key} ${item.count}`).join(", ") || "없음"}
+              </p>
+            </div>
+            <div className="insight-item">
+              <strong>발견된 키워드</strong>
+              <p className="fine-print">
+                {preview.sourceAnalysis.keywordHints.join(", ") || "키워드 없음"}
+              </p>
+            </div>
+            <div className="insight-item">
+              <strong>주제 후보</strong>
+              <p className="fine-print">
+                {preview.topics.slice(0, 3).map((topic) => topic.title).join(", ") || "주제 후보 없음"}
+              </p>
+            </div>
+            <div className="insight-item">
+              <strong>다음 단계 안내</strong>
+              <p className="fine-print">
+                Step 1은 수집 결과만 확인합니다. 브랜드 요약, 타겟, 톤, CTA 수정과 승인은 Step 2에서 진행합니다.
               </p>
             </div>
           </div>
