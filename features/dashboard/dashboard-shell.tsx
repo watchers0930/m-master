@@ -160,10 +160,11 @@ export function DashboardShell() {
   });
   const [publishBusy, setPublishBusy] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
+  const [folderSupported, setFolderSupported] = useState<boolean | null>(null);
 
-  const folderSupported = typeof window !== "undefined" && typeof window.showDirectoryPicker === "function";
   const currentImageStudio = imageStudios[activeChannel];
   const contextApproved = Boolean(activeProject?.brandProfile?.approved);
+  const onboardingMode = !activeProject && projects.length === 0 && currentStep === 1;
   const stepAvailability = {
     1: true,
     2: Boolean(activeProject),
@@ -301,10 +302,14 @@ export function DashboardShell() {
     });
   }, []);
 
+  useEffect(() => {
+    setFolderSupported(typeof window !== "undefined" && typeof window.showDirectoryPicker === "function");
+  }, []);
+
   async function handlePickFolder() {
     setError(null);
 
-    if (!folderSupported || !window.showDirectoryPicker) {
+    if (typeof window === "undefined" || typeof window.showDirectoryPicker !== "function") {
       setError("현재 브라우저는 폴더 선택 API를 지원하지 않습니다.");
       return;
     }
@@ -805,6 +810,19 @@ export function DashboardShell() {
     }
   }
 
+  function handleJumpToReviewTarget(finding: StudioDetail["review"]["findings"][number]) {
+    if (finding.channel === "blog" || finding.channel === "instagram" || finding.channel === "facebook") {
+      setActiveChannel(finding.channel);
+    }
+
+    if (finding.type === "cta" || finding.type === "brand" || finding.type === "format") {
+      setCurrentStep(4);
+      return;
+    }
+
+    setCurrentStep(2);
+  }
+
   const currentStepMeta = stepMeta.find((item) => item.step === currentStep) || stepMeta[0];
   const previousStep = currentStep > 1 ? ((currentStep - 1) as 1 | 2 | 3 | 4 | 5) : null;
   const nextStep = currentStep < 6 ? ((currentStep + 1) as 2 | 3 | 4 | 5 | 6) : null;
@@ -819,8 +837,8 @@ export function DashboardShell() {
 
   return (
     <main className="app-shell">
-      <div className="app-frame">
-        <aside className="sidebar">
+      <div className={`app-frame ${onboardingMode ? "onboarding-mode" : ""}`}>
+        <aside className={`sidebar ${onboardingMode ? "compact" : ""}`}>
           <div className="sidebar-brand">
             <div className="rule" />
             <span className="eyebrow">m-master</span>
@@ -829,21 +847,28 @@ export function DashboardShell() {
               프로젝트 생성부터 검수까지 한 단계씩만 보여주는 순차형 작업 화면입니다.
             </p>
           </div>
-          <nav className="wizard-nav">
-            {stepMeta.map((item) => (
-              <button
-                key={item.step}
-                className={`wizard-nav-item ${currentStep === item.step ? "active" : ""}`}
-                disabled={!stepAvailability[item.step]}
-                type="button"
-                onClick={() => goToStep(item.step)}
-              >
-                <span className="wizard-nav-step">{`Step ${item.step}`}</span>
-                <strong>{item.title}</strong>
-                <span className="fine-print">{item.description}</span>
-              </button>
-            ))}
-          </nav>
+          {onboardingMode ? (
+            <div className="onboarding-copy">
+              <strong>처음에는 이 두 가지만 있으면 됩니다.</strong>
+              <p className="fine-print">프로젝트명과 도메인만 입력하고 저장하세요. 폴더 연결과 미리보기는 필요할 때만 사용하면 됩니다.</p>
+            </div>
+          ) : (
+            <nav className="wizard-nav">
+              {stepMeta.map((item) => (
+                <button
+                  key={item.step}
+                  className={`wizard-nav-item ${currentStep === item.step ? "active" : ""}`}
+                  disabled={!stepAvailability[item.step]}
+                  type="button"
+                  onClick={() => goToStep(item.step)}
+                >
+                  <span className="wizard-nav-step">{`Step ${item.step}`}</span>
+                  <strong>{item.title}</strong>
+                  <span className="fine-print">{item.description}</span>
+                </button>
+              ))}
+            </nav>
+          )}
         </aside>
 
         <section className="main-area">
@@ -855,11 +880,13 @@ export function DashboardShell() {
                 {currentStepMeta.description} 지금 단계에 필요한 작업만 먼저 마친 뒤 다음 단계로 이동합니다.
               </p>
             </div>
-            <div className="hero-actions">
-              <div className="status-pill active">{projects.length} Projects</div>
-              <div className="status-pill">{files.length} Files Loaded</div>
-              <div className="status-pill">{`Step ${currentStep}/6`}</div>
-            </div>
+            {!onboardingMode ? (
+              <div className="hero-actions">
+                <div className="status-pill active">{projects.length} Projects</div>
+                <div className="status-pill">{files.length} Files Loaded</div>
+                <div className="status-pill">{`Step ${currentStep}/6`}</div>
+              </div>
+            ) : null}
           </div>
 
           <div className="wizard-stage">
@@ -937,6 +964,7 @@ export function DashboardShell() {
                 onExportPreviewViewChange={handleExportPreviewViewChange}
                 onPreparePublish={handlePreparePublish}
                 onContinueWithTopic={handleGenerateContent}
+                onJumpToReviewTarget={handleJumpToReviewTarget}
                 showTopics
                 showContent={false}
                 showImages={false}
@@ -972,6 +1000,7 @@ export function DashboardShell() {
                 onExportPreviewViewChange={handleExportPreviewViewChange}
                 onPreparePublish={handlePreparePublish}
                 onContinueWithTopic={handleGenerateContent}
+                onJumpToReviewTarget={handleJumpToReviewTarget}
                 showTopics={false}
                 showContent
                 showImages={false}
@@ -1007,6 +1036,7 @@ export function DashboardShell() {
                 onExportPreviewViewChange={handleExportPreviewViewChange}
                 onPreparePublish={handlePreparePublish}
                 onContinueWithTopic={handleGenerateContent}
+                onJumpToReviewTarget={handleJumpToReviewTarget}
                 showTopics={false}
                 showContent={false}
                 showImages
@@ -1042,6 +1072,7 @@ export function DashboardShell() {
                 onExportPreviewViewChange={handleExportPreviewViewChange}
                 onPreparePublish={handlePreparePublish}
                 onContinueWithTopic={handleGenerateContent}
+                onJumpToReviewTarget={handleJumpToReviewTarget}
                 showTopics={false}
                 showContent={false}
                 showImages={false}
@@ -1051,29 +1082,31 @@ export function DashboardShell() {
             ) : null}
           </div>
 
-          <div className="wizard-footer">
-            <div className="wizard-footer-copy">
-              <strong>{currentStepMeta.title}</strong>
-              <span className="fine-print">{currentStepMeta.description}</span>
+          {!onboardingMode ? (
+            <div className="wizard-footer">
+              <div className="wizard-footer-copy">
+                <strong>{currentStepMeta.title}</strong>
+                <span className="fine-print">{currentStepMeta.description}</span>
+              </div>
+              <div className="button-cluster">
+                {previousStep ? (
+                  <button className="button ghost" type="button" onClick={() => goToStep(previousStep)}>
+                    이전 단계
+                  </button>
+                ) : null}
+                {nextStep ? (
+                  <button
+                    className="button primary"
+                    disabled={!stepAvailability[nextStep]}
+                    type="button"
+                    onClick={() => goToStep(nextStep)}
+                  >
+                    다음 단계
+                  </button>
+                ) : null}
+              </div>
             </div>
-            <div className="button-cluster">
-              {previousStep ? (
-                <button className="button ghost" type="button" onClick={() => goToStep(previousStep)}>
-                  이전 단계
-                </button>
-              ) : null}
-              {nextStep ? (
-                <button
-                  className="button primary"
-                  disabled={!stepAvailability[nextStep]}
-                  type="button"
-                  onClick={() => goToStep(nextStep)}
-                >
-                  다음 단계
-                </button>
-              ) : null}
-            </div>
-          </div>
+          ) : null}
         </section>
       </div>
     </main>

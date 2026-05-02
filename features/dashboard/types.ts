@@ -185,6 +185,8 @@ export type ProjectActivityItem = {
   timestamp: string;
 };
 
+export type ReviewFinding = StudioDetail["review"]["findings"][number];
+
 export type ExportBundle = {
   generatedAt: string;
   jsonFilename: string;

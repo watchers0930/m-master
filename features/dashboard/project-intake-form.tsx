@@ -13,7 +13,7 @@ type ProjectIntakeFormProps = {
   files: SourceFileDraft[];
   preview: ProjectPreview | null;
   loading: boolean;
-  folderSupported: boolean;
+  folderSupported: boolean | null;
   error?: string | null;
   onNameChange: (value: string) => void;
   onDomainChange: (value: string) => void;
@@ -75,47 +75,60 @@ export function ProjectIntakeForm(props: ProjectIntakeFormProps) {
         </div>
 
         <div className="field-group">
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <label className="field-label">작업 폴더 선택 (선택 사항)</label>
-            <button className="button ghost" type="button" onClick={() => void onPickFolder()}>
-              폴더 선택
-            </button>
-          </div>
-          <div className="insight-item folder-empty-state">
-            <strong>{workingPath || "아직 선택된 폴더가 없습니다."}</strong>
-            <div className="fine-print">
-              {folderSupported
-                ? "문서를 추가로 연결하면 브라우저가 읽을 수 있는 파일 메타데이터와 본문 일부를 추출해 사이트 분석과 함께 사용합니다."
-                : "현재 브라우저는 폴더 선택 API를 지원하지 않습니다. 이 경우에도 도메인만으로 기본 컨텍스트 초안을 만들 수 있습니다."}
-            </div>
-          </div>
-          {files.length > 0 ? (
-            <div className="file-chip-wrap">
-              {files.map((file) => (
-                <div className="file-chip" key={`${file.relativePath || file.name}-${file.size ?? 0}`}>
-                  <strong>{file.name}</strong>
-                  <span className="fine-print">
-                    {file.relativePath || "root"} · {file.extension || file.mimeType || "text"}
-                  </span>
+          <details className="inline-details">
+            <summary>작업 폴더 연결은 선택 사항입니다</summary>
+            <div className="inline-details-body">
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <label className="field-label">작업 폴더 선택</label>
+                <button className="button ghost" type="button" onClick={() => void onPickFolder()}>
+                  폴더 선택
+                </button>
+              </div>
+              <div className="insight-item folder-empty-state">
+                <strong>{workingPath || "아직 선택된 폴더가 없습니다."}</strong>
+                <div className="fine-print">
+                  {folderSupported === null
+                    ? "브라우저 지원 여부를 확인한 뒤 여기서 추가 문서를 연결할 수 있습니다."
+                    : folderSupported
+                      ? "문서를 추가로 연결하면 브라우저가 읽을 수 있는 파일 메타데이터와 본문 일부를 추출해 사이트 분석과 함께 사용합니다."
+                      : "현재 브라우저는 폴더 선택 API를 지원하지 않습니다. 이 경우에도 도메인만으로 기본 컨텍스트 초안을 만들 수 있습니다."}
                 </div>
-              ))}
+              </div>
+              {files.length > 0 ? (
+                <div className="file-chip-wrap">
+                  {files.map((file) => (
+                    <div className="file-chip" key={`${file.relativePath || file.name}-${file.size ?? 0}`}>
+                      <strong>{file.name}</strong>
+                      <span className="fine-print">
+                        {file.relativePath || "root"} · {file.extension || file.mimeType || "text"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
-          ) : null}
+          </details>
         </div>
 
         {error ? <p className="error-text">{error}</p> : null}
 
         <div className="button-row">
-          <button className="button" disabled={loading} type="button" onClick={() => void onPreview()}>
-            {loading ? "수집 결과 생성 중" : "수집 결과 보기"}
-          </button>
           <button className="button primary" disabled={loading} type="submit">
             {loading ? "생성 중" : "프로젝트 저장"}
+          </button>
+          <button className="button" disabled={loading} type="button" onClick={() => void onPreview()}>
+            {loading ? "수집 결과 생성 중" : "저장 전 미리 확인"}
           </button>
         </div>
 
         {preview ? (
           <div className="insight-list">
+            <div className="step-focus-card">
+              <strong>이제 확인할 것</strong>
+              <p className="fine-print">
+                소스 근거와 주제 후보만 빠르게 보고 괜찮으면 바로 저장하면 됩니다.
+              </p>
+            </div>
             <div className="insight-item">
               <strong>입력 확인</strong>
               <p className="fine-print">{name || "프로젝트명 없음"} · {domain || "도메인 없음"} · 폴더 {files.length}개 연결</p>

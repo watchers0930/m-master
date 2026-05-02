@@ -9,6 +9,7 @@ import type {
   ImageStudioState,
   ProjectActivityItem,
   ProjectDetail,
+  ReviewFinding,
   StudioDetail,
 } from "@/features/dashboard/types";
 
@@ -52,6 +53,7 @@ type ContentStudioProps = {
   showReview?: boolean;
   showOps?: boolean;
   onContinueWithTopic?: () => Promise<void>;
+  onJumpToReviewTarget?: (finding: ReviewFinding) => void;
 };
 
 const channelLabels = {
@@ -91,6 +93,7 @@ export function ContentStudio({
   showReview = true,
   showOps = true,
   onContinueWithTopic,
+  onJumpToReviewTarget,
 }: ContentStudioProps) {
   const activeAsset = studio?.draft.assets.find((asset) => asset.channel === activeChannel);
   const hasImageVariants = imageStudio.variants.length > 0;
@@ -319,6 +322,9 @@ export function ContentStudio({
                     <div className="review-item" key={`${finding.channel}-${finding.type}-${index}`}>
                       <strong>{`${finding.channel} · ${finding.type}`}</strong>
                       <p className="fine-print">{finding.message}</p>
+                      <button className="button ghost" type="button" onClick={() => onJumpToReviewTarget?.(finding)}>
+                        이 항목 수정하러 가기
+                      </button>
                     </div>
                   ))
                 ) : (

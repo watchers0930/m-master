@@ -41,7 +41,38 @@ const STOP_WORDS = new Set([
   "까지",
   "또는",
   "보다",
+  "api",
+  "admin",
+  "docs",
+  "json",
+  "html",
+  "http",
+  "https",
+  "www",
+  "txt",
+  "md",
+  "ts",
 ]);
+
+function isUsefulKeyword(token: string) {
+  if (STOP_WORDS.has(token)) {
+    return false;
+  }
+
+  if (/^\d+$/.test(token)) {
+    return false;
+  }
+
+  if (/^[a-z]{1,3}$/.test(token)) {
+    return false;
+  }
+
+  if (/(.)\1{2,}/.test(token)) {
+    return false;
+  }
+
+  return token.length >= 2;
+}
 
 function detectFileKey(file: SourceFileInput): string {
   if (file.extension) {
@@ -69,7 +100,7 @@ function collectKeywordHints(files: SourceFileInput[]): string[] {
       .replace(/[^a-z0-9가-힣\s-]/g, " ")
       .split(/\s+/)
       .map((token) => token.trim())
-      .filter((token) => token.length >= 2 && !STOP_WORDS.has(token));
+      .filter(isUsefulKeyword);
 
     for (const token of tokens) {
       scores.set(token, (scores.get(token) ?? 0) + 1);

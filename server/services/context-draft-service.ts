@@ -39,17 +39,13 @@ function summarizeSources(sourceAnalysis: SourceAnalysis): string {
     return "선택된 문서가 아직 없어 기본 입력과 도메인 중심으로 초안을 구성한다.";
   }
 
-  const files = sourceAnalysis.topSourceFiles
-    .slice(0, 3)
-    .map((file) => file.name)
-    .join(", ");
   const fileTypes = sourceAnalysis.fileTypeBreakdown.slice(0, 2).map((entry) => `${entry.key} ${entry.count}건`).join(", ");
-  const keywordSummary =
-    sourceAnalysis.keywordHints.length > 0
-      ? `핵심 키워드는 ${sourceAnalysis.keywordHints.join(", ")}다.`
-      : "핵심 키워드는 아직 추가 추출이 필요하다.";
 
-  return `${sourceAnalysis.totalFiles}개 문서를 분석했고 주요 파일은 ${files}이다. 형식은 ${fileTypes || "unknown"} 중심이다. ${keywordSummary}`;
+  if (sourceAnalysis.keywordHints.length > 0) {
+    return `${sourceAnalysis.totalFiles}개 문서를 분석했고 형식은 ${fileTypes || "unknown"} 중심이다. 반복적으로 드러난 핵심 주제는 ${sourceAnalysis.keywordHints.join(", ")}다.`;
+  }
+
+  return `${sourceAnalysis.totalFiles}개 문서를 분석했고 형식은 ${fileTypes || "unknown"} 중심이다. 문서 구조와 서비스 설명 흐름을 기준으로 초안을 구성한다.`;
 }
 
 export function buildContextDraft(
@@ -60,7 +56,7 @@ export function buildContextDraft(
     ? `${toDisplayDomain(input.domain)}를 기준으로 브랜드와 서비스 문맥을 정리하는`
     : "브랜드 문서와 입력값을 기준으로 서비스 문맥을 정리하는";
   const pathHint = input.workingPath
-    ? `작업 폴더 경로는 ${input.workingPath}로 기록하고 후속 ingestion 시 기준 소스로 활용한다.`
+    ? "연결된 작업 폴더 문서도 함께 참고해 서비스 설명 일관성을 맞춘다."
     : "작업 폴더는 아직 연결되지 않았으며 후속 ingestion 단계에서 소스로 확장한다.";
   const sourceHint = summarizeSources(sourceAnalysis);
 
