@@ -1,6 +1,11 @@
 import { jsonError, jsonOk } from "@/lib/api-response";
 import { logger } from "@/server/logger";
-import { approveProjectContext, ProjectNotFoundError, saveProjectContextDraft } from "@/server/services/project-service";
+import {
+  approveProjectContext,
+  ProjectNotFoundError,
+  regenerateProjectContextDraft,
+  saveProjectContextDraft,
+} from "@/server/services/project-service";
 import { parseBrandProfileInput } from "@/server/validators/brand-profile-validator";
 import { ProjectValidationError } from "@/server/validators/project-validator";
 
@@ -9,6 +14,26 @@ type RouteContext = {
     projectId: string;
   }>;
 };
+
+export async function POST(_request: Request, context: RouteContext) {
+  const { projectId } = await context.params;
+
+  try {
+    const project = await regenerateProjectContextDraft(projectId);
+    return jsonOk({ project });
+  } catch (error) {
+    if (error instanceof ProjectNotFoundError) {
+      return jsonError(error.message, 404);
+    }
+
+    logger.error("projects.brand_profile.regenerate.failed", {
+      projectId,
+      error: error instanceof Error ? error.message : "unknown_error",
+    });
+
+    return jsonError("컨텍스트 재생성에 실패했습니다.", 500);
+  }
+}
 
 export async function PATCH(request: Request, context: RouteContext) {
   const { projectId } = await context.params;

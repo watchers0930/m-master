@@ -10,6 +10,7 @@ type ProjectOverviewProps = {
   loading?: boolean;
   onSelectProject: (projectId: string) => Promise<void>;
   onDeleteProject: (projectId: string) => void;
+  onRegenerateContext: () => Promise<void>;
   onBrandProfileChange: (field: EditableBrandProfileField, value: string) => void;
   onSaveContext: () => Promise<void>;
   onApproveContext: () => Promise<void>;
@@ -21,6 +22,7 @@ export function ProjectOverview({
   loading = false,
   onSelectProject,
   onDeleteProject,
+  onRegenerateContext,
   onBrandProfileChange,
   onSaveContext,
   onApproveContext,
@@ -38,6 +40,11 @@ export function ProjectOverview({
             <p className="fine-print">
               아래 브랜드 요약만 먼저 읽고 필요한 부분만 고친 뒤 승인하세요. 타겟, 톤, CTA, 금지 표현은 필요할 때만 펼치면 됩니다.
             </p>
+            <div className="button-row" style={{ marginTop: 12 }}>
+              <button className="button ghost" disabled={loading} type="button" onClick={() => void onRegenerateContext()}>
+                {loading ? "재생성 중" : "새 규칙으로 컨텍스트 다시 만들기"}
+              </button>
+            </div>
           </div>
 
           <div className="insight-item">
@@ -109,6 +116,9 @@ export function ProjectOverview({
           <details className="inline-details">
             <summary>소스 근거와 다른 프로젝트 보기</summary>
             <div className="inline-details-body stack">
+              <p className="fine-print">
+                재생성은 현재 저장된 프로젝트명과 도메인, 그리고 사이트를 다시 읽은 결과를 기준으로 새 draft를 만듭니다.
+              </p>
               {activeProject.sourceAnalysis ? (
                 <SourceAnalysisPanel
                   analysis={activeProject.sourceAnalysis}

@@ -444,6 +444,35 @@ export function DashboardShell() {
     }
   }
 
+  async function handleRegenerateContext() {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/brand-profile`, {
+        method: "POST",
+      });
+      const payload = await parseJson<ApiResponse<{ project: ProjectDetail }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      setActiveProject(payload.data.project);
+      await loadProject(activeProject.project.id);
+      await loadProjects();
+      setCurrentStep(2);
+    } catch (regenerateError) {
+      setError(regenerateError instanceof Error ? regenerateError.message : "컨텍스트 재생성에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleGenerateContent() {
     if (!activeProject?.project.id) {
       return;
@@ -931,6 +960,7 @@ export function DashboardShell() {
                 loading={loading}
                 onSelectProject={loadProject}
                 onDeleteProject={handleDeleteProject}
+                onRegenerateContext={handleRegenerateContext}
                 onBrandProfileChange={handleBrandProfileChange}
                 onSaveContext={handleSaveContext}
                 onApproveContext={handleApproveContext}

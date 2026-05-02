@@ -9,6 +9,7 @@ import {
   listProjectBrandProfiles,
   listProjectContentJobs,
   listProjects,
+  replaceProjectTopics,
   saveBrandProfileDraft,
   saveLatestContentJobAssets,
   selectImageAssetForContentAsset,
@@ -418,6 +419,47 @@ export async function saveProjectContextDraft(params: {
 
   await saveBrandProfileDraft(params);
   return getProjectById(params.projectId);
+}
+
+export async function regenerateProjectContextDraft(projectId: string) {
+  const record = await getProjectDetail(projectId);
+
+  if (!record) {
+    throw new ProjectNotFoundError(projectId);
+  }
+
+  const baseInput: CreateProjectInput = {
+    name: record.project.name,
+    domain: record.project.domain ?? undefined,
+    workingPath: record.project.workingPath ?? undefined,
+    sourceFiles: [],
+  };
+
+  const enrichedInput = await enrichInputWithWebsiteSource(baseInput);
+  const sourceAnalysis = analyzeSourceFiles(enrichedInput.sourceFiles);
+  const contextDraft = buildContextDraft(enrichedInput, sourceAnalysis);
+  const topics = buildTopicRecommendations({
+    projectName: enrichedInput.name,
+    domain: enrichedInput.domain,
+    contextDraft,
+    sourceAnalysis,
+  });
+
+  await saveBrandProfileDraft({
+    projectId,
+    summary: contextDraft.summary,
+    audience: contextDraft.audience,
+    tone: contextDraft.tone,
+    cta: contextDraft.cta,
+    bannedTerms: contextDraft.bannedTerms,
+  });
+
+  await replaceProjectTopics({
+    projectId,
+    topics,
+  });
+
+  return getProjectById(projectId);
 }
 
 export async function generateProjectContent(params: {

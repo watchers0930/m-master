@@ -297,6 +297,41 @@ export async function approveBrandProfileVersion(params: {
   });
 }
 
+export async function replaceProjectTopics(params: {
+  projectId: string;
+  topics: Array<{
+    title: string;
+    intentType: string;
+    score: number;
+    rationale: string;
+  }>;
+}) {
+  return prisma.$transaction(async (tx) => {
+    await tx.topicCandidate.deleteMany({
+      where: { projectId: params.projectId },
+    });
+
+    if (params.topics.length === 0) {
+      return [];
+    }
+
+    await tx.topicCandidate.createMany({
+      data: params.topics.map((topic) => ({
+        projectId: params.projectId,
+        title: topic.title,
+        intentType: topic.intentType,
+        score: topic.score,
+        rationale: topic.rationale,
+      })),
+    });
+
+    return tx.topicCandidate.findMany({
+      where: { projectId: params.projectId },
+      orderBy: [{ score: "desc" }, { createdAt: "asc" }],
+    });
+  });
+}
+
 export async function createOrUpdateContentJobWithAssets(params: {
   projectId: string;
   topic: string;
