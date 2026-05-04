@@ -9,16 +9,21 @@ datasource db {
 }
 
 model Project {
-  id          String         @id @default(cuid())
-  name        String
-  domain      String?
-  workingPath String?
-  status      String         @default("active")
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  brandProfiles BrandProfile[]
-  topics      TopicCandidate[]
-  contentJobs ContentJob[]
+  id                     String         @id @default(cuid())
+  name                   String
+  domain                 String?
+  workingPath            String?
+  status                 String         @default("active")
+  wordpressSiteUrl       String?
+  wordpressUsername      String?
+  wordpressStatus        String?
+  wordpressCategoryNames String?
+  wordpressTagNames      String?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+  brandProfiles          BrandProfile[]
+  topics                 TopicCandidate[]
+  contentJobs            ContentJob[]
 }
 
 model BrandProfile {
@@ -53,15 +58,19 @@ model TopicCandidate {
 }
 
 model ContentJob {
-  id         String         @id @default(cuid())
-  projectId  String
-  topic      String
-  objective  String?
-  status     String         @default("pending")
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-  project    Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assets     ContentAsset[]
+  id              String         @id @default(cuid())
+  projectId       String
+  topic           String
+  objective       String?
+  status          String         @default("pending")
+  publishProvider String?
+  externalPostId  String?
+  externalPostUrl String?
+  publishedAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  project         Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assets          ContentAsset[]
 
   @@index([projectId, status])
 }
