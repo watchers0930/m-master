@@ -2,6 +2,13 @@
 
 Context-aware marketing platform.
 
+## Core Rules
+
+- 개발 절대규칙: [DEVELOPMENT_RULES.md](/Users/watchers/Desktop/m-master/DEVELOPMENT_RULES.md)
+- 구현 규칙: [IMPLEMENTATION_RULES.md](/Users/watchers/Desktop/m-master/IMPLEMENTATION_RULES.md)
+- 검증 규칙: [VERIFICATION_RULES.md](/Users/watchers/Desktop/m-master/VERIFICATION_RULES.md)
+- 위키 작업 시스템: [wiki/README.md](/Users/watchers/Desktop/m-master/wiki/README.md)
+
 ## Deployment workflow
 
 - `test` branch: all routine development goes here
@@ -30,3 +37,10 @@ Context-aware marketing platform.
 - Prisma uses:
   - `DATABASE_URL` for application queries
   - `DIRECT_URL` for schema operations
+
+## Image generation
+
+- `OPENAI_API_KEY`: enables GPT image generation for the image studio
+- `OPENAI_IMAGE_MODEL`: optional override, defaults to `gpt-image-1-mini`
+- cost-optimized default: `low` quality and `1` variant per request
+- if the API key is missing or the OpenAI request fails, the app falls back to the built-in SVG generator
