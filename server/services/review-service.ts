@@ -54,7 +54,7 @@ export function buildReviewSummary(input: ReviewInput): ReviewSummary {
         channel: asset.channel,
         type: "format",
         severity: "warning",
-        message: "인스타그램 카드형 문장 수가 부족합니다.",
+        message: "인스타그램 형식에 맞는 문장 구성이 충분하지 않습니다.",
       });
     }
 
@@ -64,7 +64,7 @@ export function buildReviewSummary(input: ReviewInput): ReviewSummary {
         channel: asset.channel,
         type: "format",
         severity: "warning",
-        message: "페이스북 링크 포스트 길이가 너무 짧습니다.",
+        message: "페이스북 형식에 비해 본문 길이가 너무 짧습니다.",
       });
     }
 

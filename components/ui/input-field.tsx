@@ -3,6 +3,7 @@ type InputFieldProps = {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  type?: "text" | "password" | "url";
   placeholder?: string;
   hint?: string;
   multiline?: boolean;
@@ -14,6 +15,7 @@ export function InputField({
   label,
   value,
   onChange,
+  type = "text",
   placeholder,
   hint,
   multiline = false,
@@ -36,6 +38,7 @@ export function InputField({
       ) : (
         <input
           id={id}
+          type={type}
           className="text-input"
           placeholder={placeholder}
           value={value}

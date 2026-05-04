@@ -11,7 +11,57 @@ export type TopicDraft = {
 };
 
 function displayDomain(domain?: string): string {
-  return domain ? domain.replace(/^www\./, "") : "브랜드 자산";
+  if (!domain) {
+    return "브랜드 자산";
+  }
+
+  return domain.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "");
+}
+
+function createKeywordTopic(keyword: string, projectName: string): string {
+  const normalized = keyword.replace(/\s+/g, " ").trim();
+
+  if (!normalized) {
+    return `${projectName} 핵심 기능과 사용 흐름 한눈에 보기`;
+  }
+
+  return `${projectName}의 ${normalized} 활용 가이드`;
+}
+
+function buildKeywordPair(keywords: string[]) {
+  const normalized = keywords
+    .map((keyword) => keyword.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  if (normalized.length === 0) {
+    return "";
+  }
+
+  if (normalized.length === 1) {
+    return normalized[0];
+  }
+
+  return `${normalized[0]}와 ${normalized[1]}`;
+}
+
+function createServiceContextTopic(projectName: string, keywords: string[]) {
+  const pair = buildKeywordPair(keywords);
+
+  if (!pair) {
+    return `${projectName}가 해결하는 문제와 실제 활용 장면`;
+  }
+
+  return `${projectName}에서 보는 ${pair} 핵심 맥락`;
+}
+
+function createUserQuestionTopic(projectName: string, domainLabel: string, keywords: string[]) {
+  const primary = keywords[0]?.replace(/\s+/g, " ").trim();
+
+  if (!primary) {
+    return `${projectName}를 처음 이해할 때 먼저 볼 포인트`;
+  }
+
+  return `${primary} 관점에서 ${projectName}를 이해할 때 먼저 볼 포인트`;
 }
 
 export function normalizeTopicTitle(title: string, projectName: string): string {
@@ -43,25 +93,31 @@ export function buildTopicRecommendations(params: {
     params.sourceAnalysis.keywordHints.length > 0
       ? ` 핵심 키워드는 ${params.sourceAnalysis.keywordHints.slice(0, 3).join(", ")}다.`
       : "";
+  const keywords = params.sourceAnalysis.keywordHints.slice(0, 4);
+  const keywordTopic = keywords[0]
+    ? createKeywordTopic(params.sourceAnalysis.keywordHints[0], params.projectName)
+    : `${params.projectName} 핵심 기능과 사용 흐름 한눈에 보기`;
+  const serviceContextTopic = createServiceContextTopic(params.projectName, keywords);
+  const userQuestionTopic = createUserQuestionTopic(params.projectName, domainLabel, keywords);
 
   return [
     {
-      title: `${params.projectName} 핵심 기능과 사용 흐름 한눈에 보기`,
+      title: keywordTopic,
       intentType: "search",
       score: 9.4,
-      rationale: `${sourceHint} 빠르게 이해시키는 입문형 주제로, 검색과 블로그 원문 생성에 가장 안정적이다.${keywordHint}`,
+      rationale: `${sourceHint} 빠르게 이해시키는 입문형 주제로, 사이트에서 가장 자주 드러난 메시지를 그대로 활용하기 좋다.${keywordHint}`,
     },
     {
-      title: `${params.projectName}가 해결하는 문제와 실제 활용 장면`,
+      title: serviceContextTopic,
       intentType: "branding",
       score: 8.9,
-      rationale: `브랜드 가치와 사용 흐름을 함께 설명할 수 있어 블로그 본문과 인스타그램 카드 요약으로 동시에 확장하기 쉽다.`,
+      rationale: `반복적으로 드러난 키워드를 하나의 서비스 맥락으로 묶어 설명하기 좋다. 특히 ${domainLabel} 방문자가 처음 접하는 개념과 실제 활용 장면을 함께 정리하는 데 적합하다.`,
     },
     {
-      title: `${params.projectName} 도입 전 체크리스트`,
+      title: userQuestionTopic,
       intentType: "conversion",
       score: 8.5,
-      rationale: `${params.contextDraft.cta}라는 행동 유도와 연결하기 쉽고, 페이스북 링크형 포스트로도 재활용하기 좋다.`,
+      rationale: `${params.contextDraft.cta}라는 행동 유도와 연결하기 쉽고, 사용자가 실제로 궁금해할 판단 포인트를 정리하는 안내 문서로 활용하기 좋다.`,
     },
   ];
 }

@@ -10,12 +10,16 @@ export type ContextDraft = {
 };
 
 function toDisplayDomain(domain?: string): string {
-  return domain ? domain.replace(/^www\./, "") : "서비스 랜딩 페이지";
+  if (!domain) {
+    return "서비스 랜딩 페이지";
+  }
+
+  return domain.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "");
 }
 
 function createAudienceHint(projectName: string, domain?: string): string {
-  const domainHint = domain ? `${toDisplayDomain(domain)}를 먼저 찾는 잠재 고객` : "서비스 맥락을 먼저 파악해야 하는 잠재 고객";
-  return `${projectName}에 관심은 있지만 정보를 흩어진 문서와 웹페이지에서 찾아야 하는 사용자, 그리고 이를 빠르게 정리해 전달해야 하는 실무 팀. 핵심 대상은 ${domainHint}이다.`;
+  const domainHint = domain ? `${toDisplayDomain(domain)}에서 정보를 찾는 사용자` : "서비스 맥락을 먼저 파악해야 하는 사용자";
+  return `${projectName}에 관심은 있지만 서비스 내용과 활용 장면을 빠르게 이해해야 하는 사용자, 그리고 이를 정확하게 설명해야 하는 실무 팀. 핵심 대상은 ${domainHint}이다.`;
 }
 
 function createTone(projectName: string): string {
@@ -24,10 +28,10 @@ function createTone(projectName: string): string {
 
 function createCta(projectName: string, domain?: string): string {
   if (domain) {
-    return `${projectName} 관련 자세한 내용은 ${toDisplayDomain(domain)}에서 확인하고, 바로 적용 가능한 체크리스트나 상담/문의 흐름으로 이어지게 유도한다.`;
+    return `${projectName} 관련 자세한 내용은 ${toDisplayDomain(domain)}에서 확인하고, 서비스 이해나 문의로 자연스럽게 이어지게 유도한다.`;
   }
 
-  return `${projectName}의 상세 소개 자료 확인, 데모 요청, 문의 등록 같은 다음 행동으로 이어지게 유도한다.`;
+  return `${projectName}의 상세 소개 자료 확인, 기능 이해, 문의 등록 같은 다음 행동으로 이어지게 유도한다.`;
 }
 
 function createBannedTerms(): string {
@@ -48,21 +52,59 @@ function summarizeSources(sourceAnalysis: SourceAnalysis): string {
   return `${sourceAnalysis.totalFiles}개 문서를 분석했고 형식은 ${fileTypes || "unknown"} 중심이다. 문서 구조와 서비스 설명 흐름을 기준으로 초안을 구성한다.`;
 }
 
+function buildKeywordNarrative(sourceAnalysis: SourceAnalysis): string {
+  if (sourceAnalysis.keywordHints.length === 0) {
+    return "사이트에서 반복적으로 드러나는 핵심 메시지를 중심으로 소개 구조를 정리한다.";
+  }
+
+  return `사이트와 자료에서 반복적으로 확인된 핵심 표현은 ${sourceAnalysis.keywordHints.slice(0, 4).join(", ")}이며, 이를 중심으로 서비스 가치와 사용 맥락을 정리한다.`;
+}
+
+function buildDigestNarrative(sourceAnalysis: SourceAnalysis): string {
+  if (!sourceAnalysis.excerptDigest) {
+    return "";
+  }
+
+  return `참고 문구 요약: ${sourceAnalysis.excerptDigest.slice(0, 220)}.`;
+}
+
+function buildSourceScopeHint(input: CreateProjectInput, sourceAnalysis: SourceAnalysis) {
+  const hasOnlyWebsiteHtml =
+    Boolean(input.domain) &&
+    sourceAnalysis.totalFiles === 1 &&
+    sourceAnalysis.fileTypeBreakdown.length === 1 &&
+    sourceAnalysis.fileTypeBreakdown[0]?.key === "html";
+
+  if (hasOnlyWebsiteHtml) {
+    return "현재는 사이트 HTML 1건을 기준으로 문맥을 정리했고, 추가 문서는 아직 반영되지 않았다.";
+  }
+
+  if (input.workingPath && sourceAnalysis.totalFiles > 1) {
+    return "연결된 작업 폴더 문서도 함께 반영해 서비스 설명 일관성을 맞췄다.";
+  }
+
+  if (input.workingPath) {
+    return "작업 폴더는 연결됐지만 현재 초안에는 반영된 문서가 제한적이어서 후속 ingestion 보강이 필요하다.";
+  }
+
+  return "작업 폴더는 아직 연결되지 않았으며 후속 ingestion 단계에서 소스로 확장한다.";
+}
+
 export function buildContextDraft(
   input: CreateProjectInput,
   sourceAnalysis: SourceAnalysis,
 ): ContextDraft {
   const domainHint = input.domain
-    ? `${toDisplayDomain(input.domain)}를 기준으로 브랜드와 서비스 문맥을 정리하는`
-    : "브랜드 문서와 입력값을 기준으로 서비스 문맥을 정리하는";
-  const pathHint = input.workingPath
-    ? "연결된 작업 폴더 문서도 함께 참고해 서비스 설명 일관성을 맞춘다."
-    : "작업 폴더는 아직 연결되지 않았으며 후속 ingestion 단계에서 소스로 확장한다.";
+    ? `${toDisplayDomain(input.domain)}를 기준으로 브랜드와 서비스 문맥을 정리한`
+    : "브랜드 문서와 입력값을 기준으로 서비스 문맥을 정리한";
+  const pathHint = buildSourceScopeHint(input, sourceAnalysis);
   const sourceHint = summarizeSources(sourceAnalysis);
+  const keywordNarrative = buildKeywordNarrative(sourceAnalysis);
+  const digestNarrative = buildDigestNarrative(sourceAnalysis);
 
   return {
-    summary: `${input.name}는 ${domainHint} 컨텍스트 중심 마케팅 운영 프로젝트다. 블로그를 마스터 자산으로 두고 인스타그램과 페이스북으로 파생하는 원소스 멀티유즈 구조를 우선 설계한다. ${sourceHint} ${pathHint}`,
-    audience: `${createAudienceHint(input.name, input.domain)} 문서를 빠르게 이해하고 바로 콘텐츠로 전환하려는 실무 맥락을 포함한다.`,
+    summary: `${input.name}는 ${domainHint} 서비스다. ${sourceHint} ${keywordNarrative} ${digestNarrative} ${pathHint}`,
+    audience: `${createAudienceHint(input.name, input.domain)} 문서와 웹페이지에 흩어진 설명을 한 문맥으로 정리해야 하는 실무 상황을 함께 고려한다.`,
     tone: createTone(input.name),
     cta: createCta(input.name, input.domain),
     bannedTerms: createBannedTerms(),

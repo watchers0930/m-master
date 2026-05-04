@@ -5,6 +5,14 @@ export type CreateProjectInput = {
   sourceFiles: SourceFileInput[];
 };
 
+export type UpdateProjectSettingsInput = {
+  wordpressSiteUrl?: string;
+  wordpressUsername?: string;
+  wordpressStatus?: "draft" | "publish";
+  wordpressCategoryNames?: string;
+  wordpressTagNames?: string;
+};
+
 export type SourceFileInput = {
   name: string;
   relativePath?: string;
@@ -31,18 +39,34 @@ function normalizeOptionalString(value: unknown): string | undefined {
   return normalized.length > 0 ? normalized : undefined;
 }
 
-function normalizeDomain(domain?: string): string | undefined {
+function normalizeWebsiteTarget(domain?: string): string | undefined {
   if (!domain) {
     return undefined;
   }
 
-  const trimmed = domain.trim().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  const trimmed = domain.trim();
+  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 
-  if (!trimmed || !/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(trimmed)) {
-    throw new ProjectValidationError("유효한 도메인을 입력해야 합니다.");
+  let parsed: URL;
+
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new ProjectValidationError("유효한 사이트 주소를 입력해야 합니다.");
   }
 
-  return trimmed.toLowerCase();
+  if (!parsed.hostname || !/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(parsed.hostname)) {
+    throw new ProjectValidationError("유효한 사이트 주소를 입력해야 합니다.");
+  }
+
+  const normalizedPath = parsed.pathname.replace(/\/{2,}/g, "/").replace(/\/+$/, "");
+  const path = normalizedPath && normalizedPath !== "/" ? normalizedPath : "";
+
+  if (path) {
+    return `${parsed.origin.toLowerCase()}${path}`;
+  }
+
+  return parsed.hostname.toLowerCase();
 }
 
 function parseSourceFiles(value: unknown): SourceFileInput[] {
@@ -124,8 +148,37 @@ export async function parseCreateProjectInput(request: Request): Promise<CreateP
 
   return {
     name,
-    domain: normalizeDomain(normalizeOptionalString(inputRecord.domain)),
+    domain: normalizeWebsiteTarget(normalizeOptionalString(inputRecord.domain)),
     workingPath,
     sourceFiles: parseSourceFiles(inputRecord.sourceFiles),
+  };
+}
+
+export async function parseUpdateProjectSettingsInput(request: Request): Promise<UpdateProjectSettingsInput> {
+  let body: unknown;
+
+  try {
+    body = await request.json();
+  } catch {
+    throw new ProjectValidationError("JSON 본문이 필요합니다.");
+  }
+
+  if (!body || typeof body !== "object") {
+    throw new ProjectValidationError("프로젝트 설정 입력값이 올바르지 않습니다.");
+  }
+
+  const inputRecord = body as Record<string, unknown>;
+  const wordpressStatus = normalizeOptionalString(inputRecord.wordpressStatus);
+
+  if (wordpressStatus && wordpressStatus !== "draft" && wordpressStatus !== "publish") {
+    throw new ProjectValidationError("워드프레스 게시 상태는 draft 또는 publish만 허용됩니다.");
+  }
+
+  return {
+    wordpressSiteUrl: normalizeWebsiteTarget(normalizeOptionalString(inputRecord.wordpressSiteUrl)),
+    wordpressUsername: normalizeOptionalString(inputRecord.wordpressUsername)?.slice(0, 120),
+    wordpressStatus: wordpressStatus as "draft" | "publish" | undefined,
+    wordpressCategoryNames: normalizeOptionalString(inputRecord.wordpressCategoryNames)?.slice(0, 300),
+    wordpressTagNames: normalizeOptionalString(inputRecord.wordpressTagNames)?.slice(0, 300),
   };
 }

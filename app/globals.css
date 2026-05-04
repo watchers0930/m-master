@@ -27,7 +27,8 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -257,6 +258,33 @@ button {
 
 .wizard-error {
   margin: 0;
+}
+
+.journey-strip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.journey-node {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.journey-node.active {
+  border-color: var(--soft-blue-line);
+  background: var(--soft-blue);
+  color: var(--blue);
 }
 
 .step-focus-banner,
@@ -832,6 +860,7 @@ button {
   .image-studio-toolbar,
   .ops-actions,
   .export-preview-tabs,
+  .journey-strip,
   .source-analysis-stats,
   .source-analysis-grid {
     grid-template-columns: 1fr;

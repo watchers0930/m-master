@@ -5,7 +5,9 @@ import {
   getProjectById,
   getProjectStudioSeed,
   ProjectNotFoundError,
+  saveProjectSettings,
 } from "../../../../server/services/project-service";
+import { parseUpdateProjectSettingsInput, ProjectValidationError } from "../../../../server/validators/project-validator";
 
 type RouteContext = {
   params: Promise<{
@@ -58,5 +60,33 @@ export async function DELETE(_request: Request, context: RouteContext) {
     });
 
     return jsonError("프로젝트를 삭제하지 못했습니다.", 500);
+  }
+}
+
+export async function PATCH(request: Request, context: RouteContext) {
+  const { projectId } = await context.params;
+
+  try {
+    const input = await parseUpdateProjectSettingsInput(request);
+    const project = await saveProjectSettings({
+      projectId,
+      ...input,
+    });
+    return jsonOk({ project });
+  } catch (error) {
+    if (error instanceof ProjectValidationError) {
+      return jsonError(error.message, 400);
+    }
+
+    if (error instanceof ProjectNotFoundError) {
+      return jsonError(error.message, 404);
+    }
+
+    logger.error("project.update.failed", {
+      projectId,
+      error: error instanceof Error ? error.message : "unknown_error",
+    });
+
+    return jsonError("프로젝트 설정을 저장하지 못했습니다.", 500);
   }
 }

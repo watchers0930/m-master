@@ -1,9 +1,12 @@
 import { EmptyStatePanel } from "@/components/ui/empty-state-panel";
 import { ImageVariantCard } from "@/components/ui/image-variant-card";
 import { InputField } from "@/components/ui/input-field";
+import { PublishPanel } from "@/features/dashboard/publish-panel";
 import { SectionCard } from "@/components/ui/section-card";
 import { StatusPill } from "@/components/ui/status-pill";
 import type {
+  BlogPublishDraft,
+  BlogPublishPackage,
   ChannelKey,
   ExportPreviewState,
   ImageStudioState,
@@ -11,6 +14,8 @@ import type {
   ProjectDetail,
   ReviewFinding,
   StudioDetail,
+  WordPressPublishConfig,
+  WordPressPublishResult,
 } from "@/features/dashboard/types";
 
 function compactText(value?: string | null, maxLength = 120) {
@@ -30,6 +35,13 @@ type ContentStudioProps = {
   imageBusy?: boolean;
   exportBusy?: boolean;
   publishBusy?: boolean;
+  settingsBusy?: boolean;
+  copyBusy?: boolean;
+  copyStatus?: string | null;
+  publishPackage?: BlogPublishPackage | null;
+  publishDraft: BlogPublishDraft;
+  wordpressConfig: WordPressPublishConfig;
+  wordpressResult?: WordPressPublishResult | null;
   exportPreview: ExportPreviewState;
   activeChannel: ChannelKey;
   selectedTopicId?: string | null;
@@ -47,6 +59,11 @@ type ContentStudioProps = {
   onExportAll: () => Promise<void>;
   onExportPreviewViewChange: (view: ChannelKey | "json") => void;
   onPreparePublish: () => Promise<void>;
+  onSaveWordPressDefaults: () => Promise<void>;
+  onCopyExportPreview?: () => Promise<void>;
+  onCopyBlogPublishHtml?: () => Promise<void>;
+  onPublishDraftChange: (field: keyof BlogPublishDraft, value: string) => void;
+  onWordPressConfigChange: (field: keyof WordPressPublishConfig, value: string) => void;
   showTopics?: boolean;
   showContent?: boolean;
   showImages?: boolean;
@@ -70,6 +87,13 @@ export function ContentStudio({
   imageBusy = false,
   exportBusy = false,
   publishBusy = false,
+  settingsBusy = false,
+  copyBusy = false,
+  copyStatus = null,
+  publishPackage = null,
+  publishDraft,
+  wordpressConfig,
+  wordpressResult = null,
   exportPreview,
   activeChannel,
   selectedTopicId,
@@ -87,6 +111,11 @@ export function ContentStudio({
   onExportAll,
   onExportPreviewViewChange,
   onPreparePublish,
+  onSaveWordPressDefaults,
+  onCopyExportPreview,
+  onCopyBlogPublishHtml,
+  onPublishDraftChange,
+  onWordPressConfigChange,
   showTopics = true,
   showContent = true,
   showImages = true,
@@ -106,8 +135,8 @@ export function ContentStudio({
     <div className="stack">
       {showTopics ? (
         <SectionCard
-          title="추천 주제"
-          description="먼저 이번 작업의 기준 주제를 하나만 고르고, 바로 초안 생성을 시작합니다."
+          title="작성 테마 선택"
+          description="이번에 만들 콘텐츠의 기준 테마를 하나 고릅니다. 선택한 테마를 기준으로 블로그, 인스타그램, 페이스북 초안을 생성합니다."
           badge="Step 3"
         >
           {detail?.topics.length ? (
@@ -115,7 +144,7 @@ export function ContentStudio({
               <div className="step-focus-card">
                 <strong>지금 할 일</strong>
                 <p className="fine-print">
-                  추천 주제 중 하나를 고른 뒤 바로 `이 주제로 초안 만들기`만 누르면 됩니다.
+                  테마 하나를 고른 뒤 바로 초안을 생성하세요. 생성되면 채널별 문안이 한 번에 준비됩니다.
                 </p>
                 <div className="button-row">
                   <StatusPill active>{detail.topics.find((topic) => topic.id === selectedTopicId)?.title || "주제 선택 필요"}</StatusPill>
@@ -125,7 +154,7 @@ export function ContentStudio({
                     type="button"
                     onClick={() => void onContinueWithTopic?.()}
                   >
-                    {loading ? "초안 생성 중" : "이 주제로 초안 만들기"}
+                    {loading ? "초안 생성 중" : "이 테마로 콘텐츠 만들기"}
                   </button>
                 </div>
               </div>
@@ -155,8 +184,8 @@ export function ContentStudio({
 
       {showContent ? (
         <SectionCard
-          title="콘텐츠 스튜디오"
-          description="한 번에 하나의 채널만 보고 수정합니다. 필요하면 저장하고 다음 채널로 넘어가면 됩니다."
+          title="채널별 콘텐츠 작성"
+          description="블로그, 인스타그램, 페이스북 초안을 채널별로 다듬습니다. 하나씩 수정해도 되고, 초안 다시 만들기로 전체 채널 문안을 다시 생성할 수도 있습니다."
           badge="Step 4"
         >
           {studio ? (
@@ -171,17 +200,17 @@ export function ContentStudio({
                 <div className="button-cluster">
                   <StatusPill active>{studio.project.status}</StatusPill>
                   <button className="button ghost" disabled={loading} type="button" onClick={() => void onGenerateContent()}>
-                    {loading ? "초안 생성 중" : "초안 다시 만들기"}
+                    {loading ? "초안 생성 중" : "채널 초안 다시 만들기"}
                   </button>
                   <button className="button primary" disabled={loading} type="button" onClick={() => void onSaveContent()}>
-                    {loading ? "저장 중" : "이 채널 내용 저장"}
+                    {loading ? "저장 중" : "채널 내용 저장"}
                   </button>
                 </div>
               </div>
               <div className="step-focus-card" style={{ marginBottom: 16 }}>
                 <strong>지금 할 일</strong>
                 <p className="fine-print">
-                  위 채널 탭에서 하나를 고르고 내용만 다듬으세요. 저장은 현재 보이는 초안 기준으로 진행됩니다.
+                  위 채널 탭에서 하나를 고르고 제목, 본문, CTA를 다듬으세요. 저장은 현재 보이는 채널 기준으로 진행됩니다.
                 </p>
               </div>
               <div className="content-tabs">
@@ -242,9 +271,9 @@ export function ContentStudio({
 
       {showImages ? (
         <SectionCard
-          title="이미지 스튜디오"
-          description="선택 채널에 맞는 이미지 프롬프트를 입력하고 저비용 기본 시안을 먼저 생성한 뒤 필요할 때만 추가 확장하는 영역입니다."
-          badge="Image"
+          title="채널용 이미지 생성"
+          description="선택한 채널에 맞는 이미지 프롬프트를 입력하고 시안을 생성합니다. 문안에 맞는 대표 이미지를 고른 뒤 최종안으로 적용하면 됩니다."
+          badge="Step 5"
           tone="soft"
         >
           <div className="image-studio-stack">
@@ -262,7 +291,7 @@ export function ContentStudio({
               <div className="image-studio-actions">
                 <StatusPill active>{channelLabels[activeChannel]}</StatusPill>
                 <button className="button primary" disabled={imageBusy} type="button" onClick={onGenerateImages}>
-                  {imageBusy ? "시안 생성 중" : "기본 시안 생성"}
+                  {imageBusy ? "시안 생성 중" : "이미지 시안 생성"}
                 </button>
               </div>
             </div>
@@ -292,9 +321,9 @@ export function ContentStudio({
 
       {showReview ? (
         <SectionCard
-          title="검수 패널"
-          description="브랜드 일치도, 채널 적합도, 금지 표현 여부를 빠르게 확인하는 MVP 검수 영역입니다."
-          badge="Step 5"
+          title="최종 검수"
+          description="브랜드 일치도, 채널 적합도, CTA 명확성을 확인합니다. 수정이 필요하면 해당 채널로 바로 돌아갈 수 있습니다."
+          badge="Step 6"
         >
           {studio?.brandProfile ? (
             <>
@@ -345,126 +374,30 @@ export function ContentStudio({
       ) : null}
 
       {showOps ? (
-        <SectionCard
-          title="운영 패널"
-          description="먼저 채널 하나만 확인한 뒤, 필요하면 전체 JSON을 확인하고 발행 준비로 넘깁니다."
-          badge="Ops"
-        >
-          <div className="ops-grid">
-            <div className="ops-actions">
-              <div className="ops-action-guide">
-                <strong>지금 할 일</strong>
-                <p className="fine-print">
-                  검수할 채널을 하나 고른 뒤 `현재 채널 미리보기`를 먼저 보세요. 구조 확인이 필요할 때만 `전체 JSON 보기`를 쓰면 됩니다.
-                </p>
-              </div>
-              <div className="content-tabs">
-                {(Object.keys(channelLabels) as Array<keyof typeof channelLabels>).map((channel) => (
-                  <button
-                    key={channel}
-                    className={`content-tab ${activeChannel === channel ? "active" : ""}`}
-                    type="button"
-                    onClick={() => onChannelChange(channel)}
-                  >
-                    {channelLabels[channel]}
-                  </button>
-                ))}
-              </div>
-              <button className="button primary" disabled={exportBusy} type="button" onClick={() => void onExportChannel(activeChannel)}>
-                {exportBusy ? "미리보기 불러오는 중" : `${channelLabels[activeChannel]} 미리보기`}
-              </button>
-              <button className="button ghost" disabled={exportBusy} type="button" onClick={() => void onExportAll()}>
-                전체 JSON 보기
-              </button>
-              <button className="button" disabled={publishBusy} type="button" onClick={() => void onPreparePublish()}>
-                {publishBusy ? "발행 준비 중" : "발행 준비"}
-              </button>
-            </div>
-            <div className="export-preview-card">
-              <div className="export-preview-header">
-                <div>
-                  <strong>내보내기 미리보기</strong>
-                  <p className="fine-print">
-                    채널별 Markdown 또는 전체 JSON을 먼저 확인한 뒤 필요한 경우 별도로 저장할 수 있습니다.
-                  </p>
-                </div>
-                {exportPreview.bundle ? (
-                  <div className="export-preview-tabs">
-                    <button
-                      className={`content-tab ${exportPreview.activeView === "blog" ? "active" : ""}`}
-                      type="button"
-                      onClick={() => onExportPreviewViewChange("blog")}
-                    >
-                      블로그
-                    </button>
-                    <button
-                      className={`content-tab ${exportPreview.activeView === "instagram" ? "active" : ""}`}
-                      type="button"
-                      onClick={() => onExportPreviewViewChange("instagram")}
-                    >
-                      인스타
-                    </button>
-                    <button
-                      className={`content-tab ${exportPreview.activeView === "facebook" ? "active" : ""}`}
-                      type="button"
-                      onClick={() => onExportPreviewViewChange("facebook")}
-                    >
-                      페이스북
-                    </button>
-                    <button
-                      className={`content-tab ${exportPreview.activeView === "json" ? "active" : ""}`}
-                      type="button"
-                      onClick={() => onExportPreviewViewChange("json")}
-                    >
-                      JSON
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-
-              {exportPreview.bundle ? (
-                <>
-                  <div className="export-preview-meta">
-                    <span className="fine-print">
-                      생성 시각 {new Date(exportPreview.bundle.generatedAt).toLocaleString("ko-KR")}
-                    </span>
-                    <span className="fine-print">
-                      {exportPreview.activeView === "json"
-                        ? exportPreview.bundle.jsonFilename
-                        : activeExportChannel?.filename || "선택된 파일 없음"}
-                    </span>
-                  </div>
-                  <div className="export-preview-body">
-                    {exportPreview.activeView === "json"
-                      ? JSON.stringify(exportPreview.bundle, null, 2)
-                      : activeExportChannel?.content || "선택된 내보내기 초안이 없습니다."}
-                  </div>
-                </>
-              ) : (
-                <EmptyStatePanel
-                  title="아직 불러온 내보내기 결과가 없습니다."
-                  description="위 버튼 중 `블로그 미리보기`를 먼저 누르거나, 구조를 보고 싶다면 `전체 JSON 보기`를 누르면 이 영역에 바로 표시됩니다."
-                />
-              )}
-            </div>
-            <div className="review-list">
-              {history.length > 0 ? (
-                history.slice(0, 6).map((item) => (
-                  <div className="review-item" key={item.id}>
-                    <strong>{item.title}</strong>
-                    <p className="fine-print">{item.description}</p>
-                    <p className="fine-print">{new Date(item.timestamp).toLocaleString("ko-KR")}</p>
-                  </div>
-                ))
-              ) : (
-                <EmptyStatePanel
-                  title="아직 기록된 작업 이력이 없습니다."
-                  description="저장, 생성, 발행 준비 작업이 발생하면 최근 이력이 운영 패널에 쌓입니다."
-                />
-              )}
-            </div>
-          </div>
-        </SectionCard>
+        <PublishPanel
+          activeChannel={activeChannel}
+          copyBusy={copyBusy}
+          copyStatus={copyStatus}
+          exportBusy={exportBusy}
+          publishBusy={publishBusy}
+          settingsBusy={settingsBusy}
+          exportPreview={exportPreview}
+          history={history}
+          publishPackage={publishPackage}
+          publishDraft={publishDraft}
+          wordpressConfig={wordpressConfig}
+          wordpressResult={wordpressResult}
+          onChannelChange={onChannelChange}
+          onExportChannel={onExportChannel}
+          onExportAll={onExportAll}
+          onExportPreviewViewChange={onExportPreviewViewChange}
+          onPreparePublish={onPreparePublish}
+          onSaveWordPressDefaults={onSaveWordPressDefaults}
+          onCopyExportPreview={onCopyExportPreview}
+          onCopyBlogPublishHtml={onCopyBlogPublishHtml}
+          onPublishDraftChange={onPublishDraftChange}
+          onWordPressConfigChange={onWordPressConfigChange}
+        />
       ) : null}
     </div>
   );

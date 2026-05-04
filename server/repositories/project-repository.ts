@@ -30,6 +30,10 @@ export type ProjectDetailRecord = {
     topic: string;
     objective: string | null;
     status: string;
+    publishProvider: string | null;
+    externalPostId: string | null;
+    externalPostUrl: string | null;
+    publishedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
     assets: Array<{
@@ -134,6 +138,26 @@ export async function createProjectWithSeeds(params: {
     }
 
     return project.id;
+  });
+}
+
+export async function updateProjectSettings(params: {
+  projectId: string;
+  wordpressSiteUrl?: string;
+  wordpressUsername?: string;
+  wordpressStatus?: string;
+  wordpressCategoryNames?: string;
+  wordpressTagNames?: string;
+}) {
+  return prisma.project.update({
+    where: { id: params.projectId },
+    data: {
+      wordpressSiteUrl: params.wordpressSiteUrl,
+      wordpressUsername: params.wordpressUsername,
+      wordpressStatus: params.wordpressStatus,
+      wordpressCategoryNames: params.wordpressCategoryNames,
+      wordpressTagNames: params.wordpressTagNames,
+    },
   });
 }
 
@@ -590,6 +614,35 @@ export async function updateLatestContentJobStatus(projectId: string, status: st
   return prisma.contentJob.update({
     where: { id: latestContentJob.id },
     data: { status },
+  });
+}
+
+export async function saveLatestContentJobPublishResult(params: {
+  projectId: string;
+  status: string;
+  publishProvider?: string | null;
+  externalPostId?: string | null;
+  externalPostUrl?: string | null;
+  publishedAt?: Date | null;
+}) {
+  const latestContentJob = await prisma.contentJob.findFirst({
+    where: { projectId: params.projectId },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+  });
+
+  if (!latestContentJob) {
+    return null;
+  }
+
+  return prisma.contentJob.update({
+    where: { id: latestContentJob.id },
+    data: {
+      status: params.status,
+      publishProvider: params.publishProvider ?? null,
+      externalPostId: params.externalPostId ?? null,
+      externalPostUrl: params.externalPostUrl ?? null,
+      publishedAt: params.publishedAt ?? null,
+    },
   });
 }
 

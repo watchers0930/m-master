@@ -82,7 +82,7 @@ function buildBlogBody(topic: string, profile: BrandProfileSeed): string {
 function buildInstagramBody(topic: string, profile: BrandProfileSeed): string {
   const summary = toSentence(profile.summary, "서비스 핵심을 짧게 설명한다.", 110);
   const audience = toSentence(profile.audience, "실무 팀과 잠재 고객이 빠르게 핵심을 파악하도록 돕는다.", 100);
-  const cta = toSentence(profile.cta, "저장하고 필요할 때 다시 확인하세요.", 100);
+  const cta = toSentence(profile.cta, "핵심 내용을 확인하고 자세한 정보를 이어서 살펴보세요.", 100);
 
   return [
     `1장. ${topic}`,
@@ -123,7 +123,7 @@ export function buildStudioSeed(params: {
 
   return {
     topic: selectedTopic,
-    objective: "블로그 원문을 기준으로 인스타그램과 페이스북 파생 초안을 각 채널 문법에 맞게 동시에 준비한다.",
+    objective: "선택한 주제를 기준으로 서비스 설명의 핵심 맥락을 정리하고, 이를 채널별 형식에 맞는 초안으로 준비한다.",
     assets: [
       {
         channel: "blog",
@@ -133,13 +133,13 @@ export function buildStudioSeed(params: {
       },
       {
         channel: "instagram",
-        title: `${selectedTopic} 카드뉴스 초안`,
+        title: `${selectedTopic} 인스타그램 초안`,
         body: buildInstagramBody(selectedTopic, params.profile),
-        cta: "저장하고 필요할 때 다시 확인하세요.",
+        cta: toSentence(params.profile.cta, "핵심 내용을 확인하고 자세한 정보를 이어서 살펴보세요.", 100),
       },
       {
         channel: "facebook",
-        title: `${selectedTopic} 링크 포스트 초안`,
+        title: `${selectedTopic} 페이스북 초안`,
         body: buildFacebookBody(selectedTopic, params.profile),
         cta: toSentence(params.profile.cta, "상세 내용을 확인하세요.", 110),
       },

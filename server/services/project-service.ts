@@ -11,17 +11,21 @@ import {
   listProjects,
   replaceProjectTopics,
   saveBrandProfileDraft,
+  saveLatestContentJobPublishResult,
   saveLatestContentJobAssets,
   selectImageAssetForContentAsset,
+  updateProjectSettings,
   updateLatestContentJobStatus,
 } from "../repositories/project-repository";
 import { buildContextDraft } from "./context-draft-service";
 import { buildImageVariants } from "./image-studio-service";
+import { buildBlogPublishPackage, createExportSlug } from "./blog-publish-service";
 import { buildReviewSummary } from "./review-service";
 import { analyzeSourceFiles } from "./source-analysis-service";
 import { buildStudioSeed } from "./studio-seed-service";
 import { buildTopicRecommendations, normalizeTopicTitle } from "./topic-recommendation-service";
 import { fetchWebsiteSource } from "./website-source-service";
+import { publishToWordPress, WordPressPublishError } from "./wordpress-publish-service";
 import type { CreateProjectInput } from "../validators/project-validator";
 
 export class ProjectNotFoundError extends Error {
@@ -51,6 +55,8 @@ export class ProjectContextApprovalRequiredError extends Error {
     this.name = "ProjectContextApprovalRequiredError";
   }
 }
+
+export { WordPressPublishError };
 
 function isLegacyContentShape(params: {
   topic: string;
@@ -124,6 +130,11 @@ function serializeProjectDetail(record: NonNullable<Awaited<ReturnType<typeof ge
       domain: record.project.domain,
       workingPath: record.project.workingPath,
       status: record.project.status,
+      wordpressSiteUrl: record.project.wordpressSiteUrl,
+      wordpressUsername: record.project.wordpressUsername,
+      wordpressStatus: record.project.wordpressStatus,
+      wordpressCategoryNames: record.project.wordpressCategoryNames,
+      wordpressTagNames: record.project.wordpressTagNames,
       createdAt: record.project.createdAt,
       updatedAt: record.project.updatedAt,
     },
@@ -156,6 +167,10 @@ function serializeProjectDetail(record: NonNullable<Awaited<ReturnType<typeof ge
           topic: record.latestContentJob.topic,
           objective: record.latestContentJob.objective,
           status: record.latestContentJob.status,
+          publishProvider: record.latestContentJob.publishProvider,
+          externalPostId: record.latestContentJob.externalPostId,
+          externalPostUrl: record.latestContentJob.externalPostUrl,
+          publishedAt: record.latestContentJob.publishedAt?.toISOString() ?? null,
           createdAt: record.latestContentJob.createdAt,
           updatedAt: record.latestContentJob.updatedAt,
           assets: record.latestContentJob.assets.map((asset) => ({
@@ -245,6 +260,32 @@ export async function deleteProject(projectId: string) {
 
   await deleteProjectById(projectId);
   return { id: projectId };
+}
+
+export async function saveProjectSettings(params: {
+  projectId: string;
+  wordpressSiteUrl?: string;
+  wordpressUsername?: string;
+  wordpressStatus?: "draft" | "publish";
+  wordpressCategoryNames?: string;
+  wordpressTagNames?: string;
+}) {
+  const record = await getProjectDetail(params.projectId);
+
+  if (!record) {
+    throw new ProjectNotFoundError(params.projectId);
+  }
+
+  await updateProjectSettings({
+    projectId: params.projectId,
+    wordpressSiteUrl: params.wordpressSiteUrl,
+    wordpressUsername: params.wordpressUsername,
+    wordpressStatus: params.wordpressStatus,
+    wordpressCategoryNames: params.wordpressCategoryNames,
+    wordpressTagNames: params.wordpressTagNames,
+  });
+
+  return getProjectById(params.projectId);
 }
 
 export async function getProjectById(projectId: string) {
@@ -545,13 +586,18 @@ export async function getProjectActivity(projectId: string) {
 
   const contentEvents = contentJobs.map((job) => ({
     id: `content-${job.id}`,
-    kind: job.status === "ready_to_publish" ? "publish-ready" : "content-saved",
+    kind: job.publishProvider && job.externalPostUrl ? "publish-ready" : job.status === "ready_to_publish" ? "publish-ready" : "content-saved",
     title:
-      job.status === "ready_to_publish"
-        ? `${job.topic} 발행 준비 완료`
+      job.publishProvider && job.externalPostUrl
+        ? `${job.topic} ${job.publishProvider} 게시 완료`
+        : job.status === "ready_to_publish"
+          ? `${job.topic} 발행 준비 완료`
         : `${job.topic} 콘텐츠 저장`,
-    description: `${job.assets.length}개 채널 초안 · 상태 ${job.status}`,
-    timestamp: job.updatedAt.toISOString(),
+    description:
+      job.publishProvider && job.externalPostUrl
+        ? `${job.assets.length}개 채널 초안 · 상태 ${job.status} · ${job.externalPostUrl}`
+        : `${job.assets.length}개 채널 초안 · 상태 ${job.status}`,
+    timestamp: (job.publishedAt ?? job.updatedAt).toISOString(),
   }));
 
   return [...brandEvents, ...contentEvents].sort((left, right) => right.timestamp.localeCompare(left.timestamp));
@@ -565,7 +611,7 @@ export async function exportProjectContent(projectId: string) {
     throw new ProjectContentNotFoundError(projectId);
   }
 
-  const slug = studio.project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project";
+  const slug = createExportSlug(studio.project.name);
   const channels = studio.draft.assets.map((asset) => ({
     channel: asset.channel,
     filename: `${slug}-${asset.channel}.md`,
@@ -580,10 +626,81 @@ export async function exportProjectContent(projectId: string) {
   };
 }
 
-export async function markProjectReadyForPublish(projectId: string) {
-  requireApprovedBrandProfile(await getProjectDetail(projectId), projectId);
+export async function markProjectReadyForPublish(
+  projectId: string,
+  options?: {
+    wordpress?: {
+      siteUrl: string;
+      username: string;
+      appPassword: string;
+      status: "draft" | "publish";
+      categoryNames?: string;
+      tagNames?: string;
+    };
+    publishOverrides?: {
+      title?: string;
+      slug?: string;
+      summary?: string;
+      bodyHtml?: string;
+    };
+  },
+) {
+  const record = requireApprovedBrandProfile(await getProjectDetail(projectId), projectId);
+  const latestContentJob = record.latestContentJob;
 
-  const updated = await updateLatestContentJobStatus(projectId, "ready_to_publish");
+  if (!latestContentJob) {
+    throw new ProjectContentNotFoundError(projectId);
+  }
+
+  const blogAsset = latestContentJob.assets.find((asset) => asset.channel === "blog");
+
+  if (!blogAsset) {
+    throw new ProjectContentNotFoundError(projectId);
+  }
+
+  const publishPackage = buildBlogPublishPackage({
+    project: record.project,
+    profile: record.brandProfile,
+    asset: blogAsset,
+    fallbackTitle: latestContentJob.topic || `${record.project.name} 블로그 초안`,
+    contentJobId: latestContentJob.id,
+    status: latestContentJob.status,
+    updatedAt: latestContentJob.updatedAt.toISOString(),
+    overrides: options?.publishOverrides,
+  });
+  const wordpress =
+    options?.wordpress && options.wordpress.siteUrl && options.wordpress.username && options.wordpress.appPassword
+      ? await publishToWordPress({
+          siteUrl: options.wordpress.siteUrl,
+          username: options.wordpress.username,
+          appPassword: options.wordpress.appPassword,
+          status: options.wordpress.status,
+          title: publishPackage.title,
+          slug: publishPackage.slug,
+          excerpt: publishPackage.summary,
+          content: publishPackage.bodyHtml,
+          coverImageUrl: publishPackage.coverImageUrl,
+          categoryNames: options.wordpress.categoryNames,
+          tagNames: options.wordpress.tagNames,
+        })
+      : null;
+  const updated = wordpress
+    ? await saveLatestContentJobPublishResult({
+        projectId,
+        status: options?.wordpress?.status === "publish" ? "published" : "ready_to_publish",
+        publishProvider: "wordpress",
+        externalPostId: String(wordpress.postId),
+        externalPostUrl: wordpress.link,
+        publishedAt: new Date(),
+      })
+    : await saveLatestContentJobPublishResult({
+        projectId,
+        status: "ready_to_publish",
+        publishProvider: null,
+        externalPostId: null,
+        externalPostUrl: null,
+        publishedAt: null,
+      });
 
   if (!updated) {
     throw new ProjectContentNotFoundError(projectId);
@@ -594,6 +711,13 @@ export async function markProjectReadyForPublish(projectId: string) {
     contentJobId: updated.id,
     status: updated.status,
     updatedAt: updated.updatedAt.toISOString(),
+    publishPackage: {
+      ...publishPackage,
+      contentJobId: updated.id,
+      status: updated.status,
+      updatedAt: updated.updatedAt.toISOString(),
+    },
+    wordpress,
   };
 }
 

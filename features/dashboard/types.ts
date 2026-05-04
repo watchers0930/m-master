@@ -68,6 +68,11 @@ export type ProjectDetail = {
     domain?: string | null;
     workingPath?: string | null;
     status: string;
+    wordpressSiteUrl?: string | null;
+    wordpressUsername?: string | null;
+    wordpressStatus?: string | null;
+    wordpressCategoryNames?: string | null;
+    wordpressTagNames?: string | null;
     createdAt: string;
     updatedAt: string;
   };
@@ -92,6 +97,16 @@ export type ProjectDetail = {
     rationale?: string | null;
     createdAt: string;
   }>;
+  latestContentJob?: {
+    id: string;
+    topic: string;
+    objective?: string | null;
+    status: string;
+    publishProvider?: string | null;
+    externalPostId?: string | null;
+    externalPostUrl?: string | null;
+    publishedAt?: string | null;
+  } | null;
   sourceAnalysis?: SourceAnalysisSummary | null;
 };
 
@@ -201,4 +216,47 @@ export type ExportBundle = {
 export type ExportPreviewState = {
   bundle: ExportBundle | null;
   activeView: ChannelKey | "json";
+};
+
+export type BlogPublishPackage = {
+  platform: "blog";
+  projectId: string;
+  contentJobId: string;
+  status: string;
+  updatedAt: string;
+  slug: string;
+  title: string;
+  summary: string;
+  bodyMarkdown: string;
+  bodyHtml: string;
+  htmlWarnings: string[];
+  cta?: string | null;
+  coverImageUrl?: string | null;
+  sourceUrl?: string | null;
+};
+
+export type BlogPublishDraft = {
+  title: string;
+  slug: string;
+  summary: string;
+  bodyHtml: string;
+};
+
+export type WordPressPublishConfig = {
+  siteUrl: string;
+  username: string;
+  appPassword: string;
+  status: "draft" | "publish";
+  categoryNames: string;
+  tagNames: string;
+};
+
+export type WordPressPublishResult = {
+  postId: number;
+  link: string;
+  status: string;
+  featuredMediaId?: number | null;
+  mediaWarning?: string | null;
+  categoryIds?: number[];
+  tagIds?: number[];
 };

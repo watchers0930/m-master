@@ -2,8 +2,11 @@ import type { SourceFileInput } from "../validators/project-validator";
 
 type WebsiteSnapshot = {
   title?: string;
+  siteName?: string;
   description?: string;
+  keywords: string[];
   headings: string[];
+  keySections: string[];
   bodyExcerpt: string;
   fetchedUrl: string;
 };
@@ -28,7 +31,16 @@ const UI_NOISE_WORDS = new Set([
   "view",
   "learn",
   "read",
+  "cookie",
+  "privacy",
+  "login",
+  "sign",
+  "search",
 ]);
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 function preprocessHtml(value: string) {
   return value
@@ -40,6 +52,8 @@ function preprocessHtml(value: string) {
     .replace(/<header[\s\S]*?<\/header>/gi, " ")
     .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
     .replace(/<aside[\s\S]*?<\/aside>/gi, " ")
+    .replace(/<form[\s\S]*?<\/form>/gi, " ")
+    .replace(/<dialog[\s\S]*?<\/dialog>/gi, " ")
     .replace(/<button[\s\S]*?<\/button>/gi, " ");
 }
 
@@ -50,6 +64,8 @@ function stripTags(value: string) {
     .replace(/&amp;/gi, "&")
     .replace(/&quot;/gi, "\"")
     .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -88,9 +104,77 @@ function normalizeWebsiteText(value: string) {
   return tokens.join(" ").trim();
 }
 
+function parseWebsiteTarget(target?: string) {
+  if (!target) {
+    return null;
+  }
+
+  const trimmed = target.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  try {
+    const parsed = new URL(candidate);
+    const normalizedPath = parsed.pathname.replace(/\/{2,}/g, "/");
+    const pathname = normalizedPath === "/" ? "" : normalizedPath.replace(/\/+$/, "");
+
+    return {
+      original: target,
+      hostname: parsed.hostname.toLowerCase(),
+      pathname,
+      protocol: parsed.protocol,
+      href: `${parsed.origin}${pathname || "/"}`,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function buildCandidateUrls(target?: string) {
+  const parsed = parseWebsiteTarget(target);
+
+  if (!parsed) {
+    return [];
+  }
+
+  const withPath = parsed.pathname || "/";
+  const urlSet = new Set<string>();
+
+  if (/^https?:\/\//i.test(target || "")) {
+    urlSet.add(parsed.href);
+  } else {
+    urlSet.add(`https://${parsed.hostname}${withPath}`);
+    urlSet.add(`http://${parsed.hostname}${withPath}`);
+  }
+
+  if (parsed.pathname) {
+    urlSet.add(`https://${parsed.hostname}/`);
+  }
+
+  return [...urlSet];
+}
+
 function matchTag(html: string, pattern: RegExp) {
   const matched = html.match(pattern);
   return matched?.[1] ? normalizeWebsiteText(matched[1]) : undefined;
+}
+
+function matchMetaContent(html: string, attributes: string[]) {
+  for (const attribute of attributes) {
+    const pattern = new RegExp(
+      `<meta[^>]+(?:name|property)=["']${escapeRegExp(attribute)}["'][^>]+content=["']([\\s\\S]*?)["'][^>]*>`,
+      "i",
+    );
+    const matched = matchTag(html, pattern);
+    if (matched) {
+      return matched;
+    }
+  }
+
+  return undefined;
 }
 
 function extractHeadings(html: string) {
@@ -99,11 +183,36 @@ function extractHeadings(html: string) {
   return matches
     .map((match) => normalizeWebsiteText(match[1] || ""))
     .filter((heading) => heading.length >= 8)
-    .slice(0, 6);
+    .slice(0, 8);
+}
+
+function extractKeySections(html: string) {
+  const matches = [...html.matchAll(/<(main|article|section)[^>]*>([\s\S]*?)<\/\1>/gi)];
+  const deduped = new Set<string>();
+
+  for (const match of matches) {
+    const cleaned = normalizeWebsiteText(match[2] || "");
+
+    if (cleaned.length < 60) {
+      continue;
+    }
+
+    if (deduped.has(cleaned)) {
+      continue;
+    }
+
+    deduped.add(cleaned.slice(0, 220));
+
+    if (deduped.size >= 4) {
+      break;
+    }
+  }
+
+  return [...deduped];
 }
 
 function extractMeaningfulBlocks(html: string) {
-  const matches = [...html.matchAll(/<(p|li|h1|h2|h3)[^>]*>([\s\S]*?)<\/\1>/gi)];
+  const matches = [...html.matchAll(/<(p|li|h1|h2|h3|strong)[^>]*>([\s\S]*?)<\/\1>/gi)];
   const deduped = new Set<string>();
 
   for (const match of matches) {
@@ -119,7 +228,7 @@ function extractMeaningfulBlocks(html: string) {
 
     deduped.add(cleaned);
 
-    if (deduped.size >= 8) {
+    if (deduped.size >= 12) {
       break;
     }
   }
@@ -127,24 +236,36 @@ function extractMeaningfulBlocks(html: string) {
   return [...deduped];
 }
 
+function extractKeywords(description?: string) {
+  if (!description) {
+    return [];
+  }
+
+  return description
+    .split(/[|,·/]/)
+    .map((entry) => normalizeWebsiteText(entry))
+    .filter((entry) => entry.length >= 2)
+    .slice(0, 5);
+}
+
 function buildWebsiteSnapshot(html: string, fetchedUrl: string): WebsiteSnapshot {
   const preprocessedHtml = preprocessHtml(html);
-  const title = matchTag(preprocessedHtml, /<title[^>]*>([\s\S]*?)<\/title>/i);
-  const description = matchTag(
-    preprocessedHtml,
-    /<meta[^>]+name=["']description["'][^>]+content=["']([\s\S]*?)["'][^>]*>/i,
-  );
-  const ogDescription = matchTag(
-    preprocessedHtml,
-    /<meta[^>]+property=["']og:description["'][^>]+content=["']([\s\S]*?)["'][^>]*>/i,
-  );
+  const title = matchTag(preprocessedHtml, /<title[^>]*>([\s\S]*?)<\/title>/i) || matchMetaContent(preprocessedHtml, ["og:title"]);
+  const siteName = matchMetaContent(preprocessedHtml, ["og:site_name", "application-name"]);
+  const description =
+    matchMetaContent(preprocessedHtml, ["description", "og:description", "twitter:description"]) || undefined;
   const headings = extractHeadings(preprocessedHtml);
-  const bodyExcerpt = extractMeaningfulBlocks(preprocessedHtml).join(" ").slice(0, 2400);
+  const keySections = extractKeySections(preprocessedHtml);
+  const meaningfulBlocks = extractMeaningfulBlocks(preprocessedHtml);
+  const bodyExcerpt = meaningfulBlocks.join(" ").slice(0, 3200);
 
   return {
     title,
-    description: description || ogDescription,
+    siteName,
+    description,
+    keywords: extractKeywords(matchMetaContent(preprocessedHtml, ["keywords"])),
     headings,
+    keySections,
     bodyExcerpt,
     fetchedUrl,
   };
@@ -152,18 +273,31 @@ function buildWebsiteSnapshot(html: string, fetchedUrl: string): WebsiteSnapshot
 
 function toExcerpt(snapshot: WebsiteSnapshot) {
   const parts = [
+    snapshot.siteName ? `사이트명: ${snapshot.siteName}` : "",
     snapshot.title ? `페이지 제목: ${snapshot.title}` : "",
     snapshot.description ? `설명: ${snapshot.description}` : "",
-    snapshot.headings.length > 0 ? `주요 섹션: ${snapshot.headings.join(" | ")}` : "",
+    snapshot.keywords.length > 0 ? `메타 키워드: ${snapshot.keywords.join(", ")}` : "",
+    snapshot.headings.length > 0 ? `주요 헤딩: ${snapshot.headings.join(" | ")}` : "",
+    snapshot.keySections.length > 0 ? `핵심 섹션: ${snapshot.keySections.join(" || ")}` : "",
     snapshot.bodyExcerpt ? `본문 발췌: ${snapshot.bodyExcerpt}` : "",
   ].filter(Boolean);
 
   return parts.join("\n").slice(0, 4000);
 }
 
+function createSnapshotFileName(target?: string) {
+  const parsed = parseWebsiteTarget(target);
+  const base = parsed?.hostname || "website";
+  const pathLabel = parsed?.pathname
+    ? parsed.pathname.replace(/^\//, "").replace(/[^a-z0-9가-힣]+/gi, "-").replace(/^-+|-+$/g, "")
+    : "homepage";
+
+  return `${base}-${pathLabel || "page"}.html`;
+}
+
 async function fetchHtml(url: string) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 6000);
+  const timeout = setTimeout(() => controller.abort(), 8000);
 
   try {
     const response = await fetch(url, {
@@ -196,11 +330,7 @@ async function fetchHtml(url: string) {
 }
 
 export async function fetchWebsiteSource(domain?: string): Promise<SourceFileInput | null> {
-  if (!domain) {
-    return null;
-  }
-
-  const candidates = [`https://${domain}`, `http://${domain}`];
+  const candidates = buildCandidateUrls(domain);
 
   for (const candidate of candidates) {
     try {
@@ -218,7 +348,7 @@ export async function fetchWebsiteSource(domain?: string): Promise<SourceFileInp
       }
 
       return {
-        name: `${domain}-homepage.html`,
+        name: createSnapshotFileName(domain),
         relativePath: result.fetchedUrl,
         mimeType: "text/html",
         extension: "html",

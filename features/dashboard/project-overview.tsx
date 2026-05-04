@@ -29,8 +29,8 @@ export function ProjectOverview({
 }: ProjectOverviewProps) {
   return (
     <SectionCard
-      title="컨텍스트 승인 패널"
-      description="브랜드 요약만 먼저 검토하고 승인합니다. 세부 설정은 필요할 때만 펼쳐 수정합니다."
+      title="브랜드 콘텍스트 정리"
+      description="사이트에서 읽은 브랜드 요약, 타겟, 톤을 확인합니다. 여기서 정리한 내용이 이후 블로그, 인스타그램, 페이스북 초안의 기준이 됩니다."
       badge="Step 2"
     >
       {activeProject?.brandProfile ? (
@@ -38,11 +38,11 @@ export function ProjectOverview({
           <div className="step-focus-card">
             <strong>지금 할 일</strong>
             <p className="fine-print">
-              아래 브랜드 요약만 먼저 읽고 필요한 부분만 고친 뒤 승인하세요. 타겟, 톤, CTA, 금지 표현은 필요할 때만 펼치면 됩니다.
+              아래 브랜드 요약만 먼저 읽고 필요한 부분만 고친 뒤 승인하세요. 타겟, 톤, CTA, 금지 표현은 필요할 때만 펼쳐 수정하면 됩니다.
             </p>
             <div className="button-row" style={{ marginTop: 12 }}>
               <button className="button ghost" disabled={loading} type="button" onClick={() => void onRegenerateContext()}>
-                {loading ? "재생성 중" : "새 규칙으로 컨텍스트 다시 만들기"}
+                {loading ? "재생성 중" : "사이트 다시 읽기"}
               </button>
             </div>
           </div>
@@ -51,9 +51,9 @@ export function ProjectOverview({
             <strong>{activeProject.project.name}</strong>
             <div className="project-meta">
               <StatusPill active>{activeProject.project.status}</StatusPill>
-              <span className="fine-print">{activeProject.project.domain || "도메인 미입력"}</span>
+              <span className="fine-print">{activeProject.project.domain || "사이트 주소 미입력"}</span>
               <span className="fine-print">{activeProject.project.workingPath || "폴더 미지정"}</span>
-              <span className="fine-print">토픽 {activeProject.topics.length}개</span>
+              <span className="fine-print">테마 {activeProject.topics.length}개</span>
             </div>
           </div>
 
@@ -114,16 +114,16 @@ export function ProjectOverview({
           </details>
 
           <details className="inline-details">
-            <summary>소스 근거와 다른 프로젝트 보기</summary>
+            <summary>수집 근거와 다른 프로젝트 보기</summary>
             <div className="inline-details-body stack">
               <p className="fine-print">
-                재생성은 현재 저장된 프로젝트명과 도메인, 그리고 사이트를 다시 읽은 결과를 기준으로 새 draft를 만듭니다.
+                재생성은 현재 저장된 프로젝트명과 사이트 주소, 그리고 연결된 자료를 기준으로 새 콘텍스트 초안을 만듭니다.
               </p>
               {activeProject.sourceAnalysis ? (
                 <SourceAnalysisPanel
                   analysis={activeProject.sourceAnalysis}
                   title="참조 문서 요약"
-                  description="컨텍스트 초안이 어떤 파일 excerpt를 근거로 만들어졌는지 확인한 뒤 승인합니다."
+                  description="콘텍스트 초안이 어떤 사이트/파일 내용을 근거로 만들어졌는지 확인한 뒤 승인합니다."
                 />
               ) : null}
 
@@ -145,9 +145,9 @@ export function ProjectOverview({
                         <strong>{project.name}</strong>
                         <div className="project-meta">
                           <StatusPill active={activeProject.project.id === project.id}>{project.status}</StatusPill>
-                          <span className="fine-print">{project.domain || "도메인 미입력"}</span>
+                          <span className="fine-print">{project.domain || "사이트 주소 미입력"}</span>
                           <span className="fine-print">{project.workingPath || "폴더 미지정"}</span>
-                          <span className="fine-print">토픽 {project.topicCount}개</span>
+                          <span className="fine-print">테마 {project.topicCount}개</span>
                         </div>
                       </button>
                       <div className="project-item-actions">
@@ -167,10 +167,10 @@ export function ProjectOverview({
             </StatusPill>
             <StatusPill>{`Version ${activeProject.brandProfile.version}`}</StatusPill>
             <button className="button" disabled={loading} type="button" onClick={() => void onSaveContext()}>
-              {loading ? "저장 중" : "컨텍스트 임시 저장"}
+              {loading ? "저장 중" : "콘텍스트 저장"}
             </button>
             <button className="button primary" disabled={loading} type="button" onClick={() => void onApproveContext()}>
-              {loading ? "저장 중" : "컨텍스트 승인 저장"}
+              {loading ? "저장 중" : "이 콘텍스트로 진행"}
             </button>
           </div>
         </div>

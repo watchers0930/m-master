@@ -4,11 +4,10 @@ import { useEffect, useState } from "react";
 import { ContentStudio } from "@/features/dashboard/content-studio";
 import { ProjectIntakeForm } from "@/features/dashboard/project-intake-form";
 import { ProjectOverview } from "@/features/dashboard/project-overview";
+import { usePublishWorkflow } from "@/features/dashboard/use-publish-workflow";
 import type {
   ChannelKey,
   EditableBrandProfileField,
-  ExportBundle,
-  ExportPreviewState,
   ImageStudioState,
   ImageStudioVariant,
   ProjectActivityItem,
@@ -153,12 +152,6 @@ export function DashboardShell() {
   const [files, setFiles] = useState<SourceFileDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [exportBusy, setExportBusy] = useState(false);
-  const [exportPreview, setExportPreview] = useState<ExportPreviewState>({
-    bundle: null,
-    activeView: "blog",
-  });
-  const [publishBusy, setPublishBusy] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
   const [folderSupported, setFolderSupported] = useState<boolean | null>(null);
 
@@ -174,13 +167,18 @@ export function DashboardShell() {
     6: Boolean(contextApproved && activeProject && studio),
   } as const;
   const stepMeta = [
-    { step: 1 as const, title: "프로젝트 생성", description: "폴더와 도메인을 연결합니다." },
-    { step: 2 as const, title: "컨텍스트 승인", description: "AI가 읽은 브랜드 초안을 다듬습니다." },
-    { step: 3 as const, title: "주제 선택", description: "컨텍스트 승인 후 이번 콘텐츠의 기준 주제를 고릅니다." },
-    { step: 4 as const, title: "콘텐츠 편집", description: "컨텍스트 승인 후 채널별 텍스트 초안을 생성하고 수정합니다." },
-    { step: 5 as const, title: "이미지 생성", description: "컨텍스트 승인 후 선택 채널용 이미지를 만듭니다." },
-    { step: 6 as const, title: "검수 및 내보내기", description: "컨텍스트 승인 후 검수와 발행 준비를 진행합니다." },
+    { step: 1 as const, title: "사이트 등록", description: "사이트 URL과 참고 자료를 연결합니다." },
+    { step: 2 as const, title: "콘텍스트 정리", description: "사이트에서 읽은 브랜드 콘텍스트를 확인합니다." },
+    { step: 3 as const, title: "테마 선택", description: "이번에 만들 콘텐츠의 작성 테마를 고릅니다." },
+    { step: 4 as const, title: "채널별 문안", description: "블로그, 인스타그램, 페이스북 초안을 생성하고 수정합니다." },
+    { step: 5 as const, title: "이미지 생성", description: "채널 문안에 맞는 대표 이미지를 만듭니다." },
+    { step: 6 as const, title: "복사/발행 준비", description: "최종 결과를 복사하거나 매체 등록 준비로 넘깁니다." },
   ];
+  const publishWorkflow = usePublishWorkflow({
+    projectId: activeProject?.project.id ?? null,
+    onError: (message) => setError(message || null),
+    reloadProject: loadProject,
+  });
 
   useEffect(() => {
     if (!contextApproved && currentStep > 2) {
@@ -242,10 +240,8 @@ export function DashboardShell() {
     setSelectedTopicId(matchedTopic?.id ?? null);
     setHistory(historyPayload.data.history);
     setImageStudios(toImageStudios(nextStudio));
-    setExportPreview({
-      bundle: null,
-      activeView: "blog",
-    });
+    publishWorkflow.resetPublishState();
+    publishWorkflow.hydratePublishResult(nextProject);
   }
 
   async function requestPreview() {
@@ -750,95 +746,6 @@ export function DashboardShell() {
     }
   }
 
-  async function handleExportChannel(channel: ChannelKey) {
-    if (!activeProject?.project.id) {
-      return;
-    }
-
-    setError(null);
-    setExportBusy(true);
-
-    try {
-      const response = await fetch(`/api/projects/${activeProject.project.id}/export`, {
-        cache: "no-store",
-      });
-      const payload = await parseJson<ApiResponse<{ bundle: ExportBundle }>>(response);
-
-      if (!payload.ok) {
-        throw new Error(payload.error.message);
-      }
-      setExportPreview({
-        bundle: payload.data.bundle,
-        activeView: channel,
-      });
-    } catch (exportError) {
-      setError(exportError instanceof Error ? exportError.message : "채널 미리보기를 불러오지 못했습니다.");
-    } finally {
-      setExportBusy(false);
-    }
-  }
-
-  async function handleExportAll() {
-    if (!activeProject?.project.id) {
-      return;
-    }
-
-    setError(null);
-    setExportBusy(true);
-
-    try {
-      const response = await fetch(`/api/projects/${activeProject.project.id}/export`, {
-        cache: "no-store",
-      });
-      const payload = await parseJson<ApiResponse<{ bundle: ExportBundle }>>(response);
-
-      if (!payload.ok) {
-        throw new Error(payload.error.message);
-      }
-      setExportPreview({
-        bundle: payload.data.bundle,
-        activeView: "json",
-      });
-    } catch (exportError) {
-      setError(exportError instanceof Error ? exportError.message : "전체 JSON 보기를 불러오지 못했습니다.");
-    } finally {
-      setExportBusy(false);
-    }
-  }
-
-  function handleExportPreviewViewChange(view: ChannelKey | "json") {
-    setExportPreview((current) => ({
-      bundle: current.bundle,
-      activeView: view,
-    }));
-  }
-
-  async function handlePreparePublish() {
-    if (!activeProject?.project.id) {
-      return;
-    }
-
-    setError(null);
-    setPublishBusy(true);
-
-    try {
-      const response = await fetch(`/api/projects/${activeProject.project.id}/publish`, {
-        method: "POST",
-      });
-      const payload = await parseJson<ApiResponse<{ publish: { status: string } }>>(response);
-
-      if (!payload.ok) {
-        throw new Error(payload.error.message);
-      }
-
-      await loadProject(activeProject.project.id);
-    } catch (publishError) {
-      setError(publishError instanceof Error ? publishError.message : "발행 준비 처리에 실패했습니다.");
-    } finally {
-      setPublishBusy(false);
-    }
-  }
-
   function handleJumpToReviewTarget(finding: StudioDetail["review"]["findings"][number]) {
     if (finding.channel === "blog" || finding.channel === "instagram" || finding.channel === "facebook") {
       setActiveChannel(finding.channel);
@@ -855,13 +762,14 @@ export function DashboardShell() {
   const currentStepMeta = stepMeta.find((item) => item.step === currentStep) || stepMeta[0];
   const previousStep = currentStep > 1 ? ((currentStep - 1) as 1 | 2 | 3 | 4 | 5) : null;
   const nextStep = currentStep < 6 ? ((currentStep + 1) as 2 | 3 | 4 | 5 | 6) : null;
+  const journeyLabels = ["URL 입력", "콘텍스트 정리", "테마 선택", "채널 작성", "이미지 생성", "복사/발행"] as const;
   const stepFocusCopy = {
-    1: "프로젝트명과 도메인을 넣고 바로 저장하거나, 필요하면 수집 결과만 먼저 확인합니다.",
-    2: "브랜드 요약만 먼저 다듬고 승인하면 다음 단계가 열립니다.",
-    3: "주제는 하나만 고르고 바로 초안 생성을 시작합니다.",
-    4: "한 번에 한 채널만 수정하고 저장합니다.",
-    5: "이미지는 선택 사항입니다. 필요 없으면 바로 다음 단계로 넘어가도 됩니다.",
-    6: "현재 채널 미리보기를 먼저 보고, 문제가 없으면 발행 준비로 마칩니다.",
+    1: "사이트 주소를 넣고 분석을 시작합니다. 필요하면 소개 자료 폴더를 함께 연결합니다.",
+    2: "브랜드 콘텍스트를 확인하고 이 프로젝트의 기준 문장으로 정리합니다.",
+    3: "이번에 만들 콘텐츠 테마를 하나 고른 뒤 채널별 초안을 생성합니다.",
+    4: "블로그, 인스타그램, 페이스북 문안을 채널별로 다듬고 저장합니다.",
+    5: "선택한 채널 문안에 맞는 이미지 시안을 만들고 대표안을 고릅니다.",
+    6: "최종 결과를 확인한 뒤 복사해서 바로 쓰거나 매체 등록 준비로 넘깁니다.",
   } as const;
 
   return (
@@ -871,15 +779,15 @@ export function DashboardShell() {
           <div className="sidebar-brand">
             <div className="rule" />
             <span className="eyebrow">m-master</span>
-            <h1 className="brand-title">Context-aware marketing OS</h1>
+            <h1 className="brand-title">Website To Content Pipeline</h1>
             <p className="brand-copy">
-              프로젝트 생성부터 검수까지 한 단계씩만 보여주는 순차형 작업 화면입니다.
+              사이트 URL에서 브랜드 콘텍스트를 읽고, 테마를 고른 뒤 채널별 콘텐츠와 이미지까지 만드는 순차형 작업 화면입니다.
             </p>
           </div>
           {onboardingMode ? (
             <div className="onboarding-copy">
-              <strong>처음에는 이 두 가지만 있으면 됩니다.</strong>
-              <p className="fine-print">프로젝트명과 도메인만 입력하고 저장하세요. 폴더 연결과 미리보기는 필요할 때만 사용하면 됩니다.</p>
+              <strong>처음에는 프로젝트 이름과 사이트 주소면 충분합니다.</strong>
+              <p className="fine-print">사이트를 읽어 콘텍스트와 작성 테마를 만들고, 이후 단계에서 블로그, 인스타그램, 페이스북 콘텐츠를 생성합니다.</p>
             </div>
           ) : (
             <nav className="wizard-nav">
@@ -903,16 +811,16 @@ export function DashboardShell() {
         <section className="main-area">
           <div className="main-topbar">
             <div>
-              <p className="eyebrow" style={{ margin: 0 }}>Web MVP Dashboard</p>
+              <p className="eyebrow" style={{ margin: 0 }}>Content Workflow</p>
               <h2 className="hero-title">{currentStepMeta.title}</h2>
               <p className="hero-copy">
-                {currentStepMeta.description} 지금 단계에 필요한 작업만 먼저 마친 뒤 다음 단계로 이동합니다.
+                {currentStepMeta.description} 사용자는 URL 입력부터 최종 복사/발행 준비까지 이 흐름대로 진행합니다.
               </p>
             </div>
             {!onboardingMode ? (
               <div className="hero-actions">
                 <div className="status-pill active">{projects.length} Projects</div>
-                <div className="status-pill">{files.length} Files Loaded</div>
+                <div className="status-pill">{files.length} Docs</div>
                 <div className="status-pill">{`Step ${currentStep}/6`}</div>
               </div>
             ) : null}
@@ -920,6 +828,13 @@ export function DashboardShell() {
 
           <div className="wizard-stage">
             {error ? <p className="error-text wizard-error">{error}</p> : null}
+            <div className="journey-strip">
+              {journeyLabels.map((label, index) => (
+                <div className={`journey-node ${currentStep >= index + 1 ? "active" : ""}`} key={label}>
+                  {label}
+                </div>
+              ))}
+            </div>
             <div className="step-focus-banner">
               <strong>{`Step ${currentStep}에서 할 일`}</strong>
               <p className="fine-print">{stepFocusCopy[currentStep]}</p>
@@ -974,12 +889,19 @@ export function DashboardShell() {
                 imageStudio={currentImageStudio}
                 history={history}
                 imageBusy={imageBusy}
-                exportBusy={exportBusy}
-                publishBusy={publishBusy}
-                exportPreview={exportPreview}
+                exportBusy={publishWorkflow.exportBusy}
+                publishBusy={publishWorkflow.publishBusy}
+                settingsBusy={publishWorkflow.settingsBusy}
+                exportPreview={publishWorkflow.exportPreview}
                 activeChannel={activeChannel}
                 selectedTopicId={selectedTopicId}
                 loading={loading}
+                copyBusy={publishWorkflow.copyBusy}
+                copyStatus={publishWorkflow.copyStatus}
+                publishPackage={publishWorkflow.publishPackage}
+                publishDraft={publishWorkflow.publishDraft}
+                wordpressConfig={publishWorkflow.wordpressConfig}
+                wordpressResult={publishWorkflow.wordpressResult}
                 onChannelChange={setActiveChannel}
                 onTopicSelect={handleTopicSelect}
                 onAssetChange={handleAssetChange}
@@ -989,10 +911,15 @@ export function DashboardShell() {
                 onApplyImageVariant={handleApplyImageVariant}
                 onSaveContent={handleSaveContent}
                 onGenerateContent={handleGenerateContent}
-                onExportChannel={handleExportChannel}
-                onExportAll={handleExportAll}
-                onExportPreviewViewChange={handleExportPreviewViewChange}
-                onPreparePublish={handlePreparePublish}
+                onExportChannel={publishWorkflow.handleExportChannel}
+                onExportAll={publishWorkflow.handleExportAll}
+                onExportPreviewViewChange={publishWorkflow.handleExportPreviewViewChange}
+                onPreparePublish={publishWorkflow.handlePreparePublish}
+                onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
+                onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
+                onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}
+                onPublishDraftChange={publishWorkflow.handlePublishDraftChange}
+                onWordPressConfigChange={publishWorkflow.handleWordPressConfigChange}
                 onContinueWithTopic={handleGenerateContent}
                 onJumpToReviewTarget={handleJumpToReviewTarget}
                 showTopics
@@ -1010,12 +937,19 @@ export function DashboardShell() {
                 imageStudio={currentImageStudio}
                 history={history}
                 imageBusy={imageBusy}
-                exportBusy={exportBusy}
-                publishBusy={publishBusy}
-                exportPreview={exportPreview}
+                exportBusy={publishWorkflow.exportBusy}
+                publishBusy={publishWorkflow.publishBusy}
+                settingsBusy={publishWorkflow.settingsBusy}
+                exportPreview={publishWorkflow.exportPreview}
                 activeChannel={activeChannel}
                 selectedTopicId={selectedTopicId}
                 loading={loading}
+                copyBusy={publishWorkflow.copyBusy}
+                copyStatus={publishWorkflow.copyStatus}
+                publishPackage={publishWorkflow.publishPackage}
+                publishDraft={publishWorkflow.publishDraft}
+                wordpressConfig={publishWorkflow.wordpressConfig}
+                wordpressResult={publishWorkflow.wordpressResult}
                 onChannelChange={setActiveChannel}
                 onTopicSelect={handleTopicSelect}
                 onAssetChange={handleAssetChange}
@@ -1025,10 +959,15 @@ export function DashboardShell() {
                 onApplyImageVariant={handleApplyImageVariant}
                 onSaveContent={handleSaveContent}
                 onGenerateContent={handleGenerateContent}
-                onExportChannel={handleExportChannel}
-                onExportAll={handleExportAll}
-                onExportPreviewViewChange={handleExportPreviewViewChange}
-                onPreparePublish={handlePreparePublish}
+                onExportChannel={publishWorkflow.handleExportChannel}
+                onExportAll={publishWorkflow.handleExportAll}
+                onExportPreviewViewChange={publishWorkflow.handleExportPreviewViewChange}
+                onPreparePublish={publishWorkflow.handlePreparePublish}
+                onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
+                onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
+                onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}
+                onPublishDraftChange={publishWorkflow.handlePublishDraftChange}
+                onWordPressConfigChange={publishWorkflow.handleWordPressConfigChange}
                 onContinueWithTopic={handleGenerateContent}
                 onJumpToReviewTarget={handleJumpToReviewTarget}
                 showTopics={false}
@@ -1046,12 +985,19 @@ export function DashboardShell() {
                 imageStudio={currentImageStudio}
                 history={history}
                 imageBusy={imageBusy}
-                exportBusy={exportBusy}
-                publishBusy={publishBusy}
-                exportPreview={exportPreview}
+                exportBusy={publishWorkflow.exportBusy}
+                publishBusy={publishWorkflow.publishBusy}
+                settingsBusy={publishWorkflow.settingsBusy}
+                exportPreview={publishWorkflow.exportPreview}
                 activeChannel={activeChannel}
                 selectedTopicId={selectedTopicId}
                 loading={loading}
+                copyBusy={publishWorkflow.copyBusy}
+                copyStatus={publishWorkflow.copyStatus}
+                publishPackage={publishWorkflow.publishPackage}
+                publishDraft={publishWorkflow.publishDraft}
+                wordpressConfig={publishWorkflow.wordpressConfig}
+                wordpressResult={publishWorkflow.wordpressResult}
                 onChannelChange={setActiveChannel}
                 onTopicSelect={handleTopicSelect}
                 onAssetChange={handleAssetChange}
@@ -1061,10 +1007,15 @@ export function DashboardShell() {
                 onApplyImageVariant={handleApplyImageVariant}
                 onSaveContent={handleSaveContent}
                 onGenerateContent={handleGenerateContent}
-                onExportChannel={handleExportChannel}
-                onExportAll={handleExportAll}
-                onExportPreviewViewChange={handleExportPreviewViewChange}
-                onPreparePublish={handlePreparePublish}
+                onExportChannel={publishWorkflow.handleExportChannel}
+                onExportAll={publishWorkflow.handleExportAll}
+                onExportPreviewViewChange={publishWorkflow.handleExportPreviewViewChange}
+                onPreparePublish={publishWorkflow.handlePreparePublish}
+                onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
+                onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
+                onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}
+                onPublishDraftChange={publishWorkflow.handlePublishDraftChange}
+                onWordPressConfigChange={publishWorkflow.handleWordPressConfigChange}
                 onContinueWithTopic={handleGenerateContent}
                 onJumpToReviewTarget={handleJumpToReviewTarget}
                 showTopics={false}
@@ -1082,12 +1033,19 @@ export function DashboardShell() {
                 imageStudio={currentImageStudio}
                 history={history}
                 imageBusy={imageBusy}
-                exportBusy={exportBusy}
-                publishBusy={publishBusy}
-                exportPreview={exportPreview}
+                exportBusy={publishWorkflow.exportBusy}
+                publishBusy={publishWorkflow.publishBusy}
+                settingsBusy={publishWorkflow.settingsBusy}
+                exportPreview={publishWorkflow.exportPreview}
                 activeChannel={activeChannel}
                 selectedTopicId={selectedTopicId}
                 loading={loading}
+                copyBusy={publishWorkflow.copyBusy}
+                copyStatus={publishWorkflow.copyStatus}
+                publishPackage={publishWorkflow.publishPackage}
+                publishDraft={publishWorkflow.publishDraft}
+                wordpressConfig={publishWorkflow.wordpressConfig}
+                wordpressResult={publishWorkflow.wordpressResult}
                 onChannelChange={setActiveChannel}
                 onTopicSelect={handleTopicSelect}
                 onAssetChange={handleAssetChange}
@@ -1097,10 +1055,15 @@ export function DashboardShell() {
                 onApplyImageVariant={handleApplyImageVariant}
                 onSaveContent={handleSaveContent}
                 onGenerateContent={handleGenerateContent}
-                onExportChannel={handleExportChannel}
-                onExportAll={handleExportAll}
-                onExportPreviewViewChange={handleExportPreviewViewChange}
-                onPreparePublish={handlePreparePublish}
+                onExportChannel={publishWorkflow.handleExportChannel}
+                onExportAll={publishWorkflow.handleExportAll}
+                onExportPreviewViewChange={publishWorkflow.handleExportPreviewViewChange}
+                onPreparePublish={publishWorkflow.handlePreparePublish}
+                onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
+                onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
+                onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}
+                onPublishDraftChange={publishWorkflow.handlePublishDraftChange}
+                onWordPressConfigChange={publishWorkflow.handleWordPressConfigChange}
                 onContinueWithTopic={handleGenerateContent}
                 onJumpToReviewTarget={handleJumpToReviewTarget}
                 showTopics={false}
