@@ -12,6 +12,7 @@ model Project {
   id                     String         @id @default(cuid())
   name                   String
   domain                 String?
+  industry               String?
   workingPath            String?
   status                 String         @default("active")
   wordpressSiteUrl       String?
@@ -63,6 +64,7 @@ model ContentJob {
   topic           String
   objective       String?
   status          String         @default("pending")
+  generationProvider String?
   publishProvider String?
   externalPostId  String?
   externalPostUrl String?
@@ -82,6 +84,7 @@ model ContentAsset {
   title         String?
   body          String        @db.Text
   cta           String?       @db.Text
+  hashtags      String?       @db.Text
   version       Int           @default(1)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt

@@ -5,6 +5,7 @@ export type ContentAssetInput = {
   title?: string;
   body: string;
   cta?: string;
+  hashtags?: string;
 };
 
 export type ContentJobInput = {
@@ -57,6 +58,7 @@ function parseAssets(value: unknown): ContentAssetInput[] | undefined {
       title: normalizeOptionalString(record.title, 300),
       body,
       cta: normalizeOptionalString(record.cta, 1000),
+      hashtags: normalizeOptionalString(record.hashtags, 1000),
     };
   });
 }

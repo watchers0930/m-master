@@ -2,6 +2,7 @@ export type BlogPublishAsset = {
   title: string | null;
   body: string;
   cta: string | null;
+  hashtags?: string | null;
   imageJobs: Array<{
     imageAssets: Array<{
       originalPath: string | null;
@@ -35,12 +36,20 @@ export type BlogPublishPackage = {
   bodyHtml: string;
   htmlWarnings: string[];
   cta?: string | null;
+  hashtags?: string | null;
   coverImageUrl?: string | null;
   sourceUrl?: string | null;
 };
 
 function createSlug(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project";
+  const normalized = value
+    .normalize("NFKC")
+    .trim()
+    .toLocaleLowerCase("ko-KR")
+    .replace(/[^\p{Letter}\p{Number}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return normalized || "project";
 }
 
 function escapeHtml(value: string) {
@@ -59,6 +68,81 @@ function paragraphizeMarkdown(value: string) {
     .filter(Boolean)
     .map((block) => `<p>${escapeHtml(block).replace(/\n/g, "<br />")}</p>`)
     .join("\n");
+}
+
+function renderStructuredBlogBody(value: string) {
+  const blocks: string[] = [];
+  const lines = value.split("\n");
+  let paragraphLines: string[] = [];
+  let listItems: string[] = [];
+
+  const flushParagraph = () => {
+    if (paragraphLines.length === 0) {
+      return;
+    }
+
+    blocks.push(`<p>${escapeHtml(paragraphLines.join(" ")).replace(/\n/g, "<br />")}</p>`);
+    paragraphLines = [];
+  };
+
+  const flushList = () => {
+    if (listItems.length === 0) {
+      return;
+    }
+
+    blocks.push(`<ul>${listItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`);
+    listItems = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+
+    if (!line) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const imageCue = line.match(/^\[이미지\s+(\d+)\]\s+(.+)$/);
+
+    if (imageCue) {
+      flushParagraph();
+      flushList();
+      blocks.push(
+        `<figure><figcaption>이미지 ${escapeHtml(imageCue[1])}. ${escapeHtml(imageCue[2])}</figcaption></figure>`,
+      );
+      continue;
+    }
+
+    if (line.startsWith("## ")) {
+      flushParagraph();
+      flushList();
+      blocks.push(`<h2>${escapeHtml(line.slice(3).trim())}</h2>`);
+      continue;
+    }
+
+    if (line.startsWith("- ")) {
+      flushParagraph();
+      listItems.push(line.slice(2).trim());
+      continue;
+    }
+
+    flushList();
+    paragraphLines.push(line);
+  }
+
+  flushParagraph();
+  flushList();
+
+  return blocks.join("\n");
+}
+
+function parseHashtagText(value?: string | null) {
+  if (!value) {
+    return [];
+  }
+
+  return [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))];
 }
 
 export function createExportSlug(value: string) {
@@ -125,15 +209,21 @@ export function buildBlogHtml(params: {
   title: string;
   body: string;
   cta?: string | null;
+  hashtags?: string | null;
   coverImageUrl?: string | null;
 }) {
-  const bodyHtml = paragraphizeMarkdown(params.body);
+  const bodyHtml = params.body.includes("## ") || /\[이미지\s+\d+\]/.test(params.body)
+    ? renderStructuredBlogBody(params.body)
+    : paragraphizeMarkdown(params.body);
   const ctaHtml = params.cta ? `<section><h2>다음 단계</h2><p>${escapeHtml(params.cta)}</p></section>` : "";
+  const hashtagHtml = parseHashtagText(params.hashtags).length
+    ? `<section><h2>해시태그</h2><p>${parseHashtagText(params.hashtags).map((tag) => escapeHtml(tag)).join(" ")}</p></section>`
+    : "";
   const coverHtml = params.coverImageUrl
     ? `<figure><img src="${escapeHtml(params.coverImageUrl)}" alt="${escapeHtml(params.title)}" style="max-width:100%;height:auto;border-radius:16px;" /></figure>`
     : "";
 
-  return [`<article>`, `<h1>${escapeHtml(params.title)}</h1>`, coverHtml, bodyHtml, ctaHtml, `</article>`]
+  return [`<article>`, `<h1>${escapeHtml(params.title)}</h1>`, coverHtml, bodyHtml, ctaHtml, hashtagHtml, `</article>`]
     .filter(Boolean)
     .join("\n");
 }
@@ -169,14 +259,16 @@ export function buildBlogPublishPackage(params: {
   const title = params.overrides?.title?.trim() || params.asset.title || params.fallbackTitle;
   const summary = (params.overrides?.summary?.trim() || params.profile.summary).slice(0, 220);
   const cta = params.asset.cta || params.profile.cta || null;
+  const hashtags = params.asset.hashtags?.trim() || null;
   const slug = params.overrides?.slug?.trim() || createSlug(title);
-  const bodyMarkdown = [params.asset.body, "", "CTA", cta || ""].filter(Boolean).join("\n");
+  const bodyMarkdown = [params.asset.body, "", "CTA", cta || "", "", "해시태그", hashtags || ""].filter(Boolean).join("\n");
   const rawBodyHtml =
     params.overrides?.bodyHtml?.trim() ||
     buildBlogHtml({
       title,
       body: params.asset.body,
       cta,
+      hashtags,
       coverImageUrl,
     });
   const { bodyHtml, htmlWarnings } = sanitizeHtmlContent(rawBodyHtml);
@@ -194,6 +286,7 @@ export function buildBlogPublishPackage(params: {
     bodyHtml,
     htmlWarnings,
     cta,
+    hashtags,
     coverImageUrl,
     sourceUrl: params.project.domain ?? null,
   };

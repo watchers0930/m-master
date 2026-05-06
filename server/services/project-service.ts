@@ -18,8 +18,9 @@ import {
   updateLatestContentJobStatus,
 } from "../repositories/project-repository";
 import { buildContextDraft } from "./context-draft-service";
+import { buildGeneratedStudioSeed, type ContentGenerationProvider } from "./content-generation-service";
 import { buildImageVariants } from "./image-studio-service";
-import { buildBlogPublishPackage, createExportSlug } from "./blog-publish-service";
+import { buildBlogHtml, buildBlogPublishPackage, createExportSlug } from "./blog-publish-service";
 import { buildReviewSummary } from "./review-service";
 import { analyzeSourceFiles } from "./source-analysis-service";
 import { buildStudioSeed } from "./studio-seed-service";
@@ -98,6 +99,7 @@ function serializeProjectListItem(item: Awaited<ReturnType<typeof listProjects>>
     id: item.id,
     name: item.name,
     domain: item.domain,
+    industry: item.industry,
     workingPath: item.workingPath,
     status: item.status,
     createdAt: item.createdAt,
@@ -128,6 +130,7 @@ function serializeProjectDetail(record: NonNullable<Awaited<ReturnType<typeof ge
       id: record.project.id,
       name: record.project.name,
       domain: record.project.domain,
+      industry: record.project.industry,
       workingPath: record.project.workingPath,
       status: record.project.status,
       wordpressSiteUrl: record.project.wordpressSiteUrl,
@@ -264,6 +267,7 @@ export async function deleteProject(projectId: string) {
 
 export async function saveProjectSettings(params: {
   projectId: string;
+  industry?: string;
   wordpressSiteUrl?: string;
   wordpressUsername?: string;
   wordpressStatus?: "draft" | "publish";
@@ -278,6 +282,7 @@ export async function saveProjectSettings(params: {
 
   await updateProjectSettings({
     projectId: params.projectId,
+    industry: params.industry,
     wordpressSiteUrl: params.wordpressSiteUrl,
     wordpressUsername: params.wordpressUsername,
     wordpressStatus: params.wordpressStatus,
@@ -310,6 +315,7 @@ export async function getProjectStudioSeed(projectId: string) {
   const persistedAssets = record.latestContentJob?.assets ?? [];
   const seed = buildStudioSeed({
     projectName: record.project.name,
+    industry: record.project.industry,
     profile: record.brandProfile,
     topics: record.topics,
   });
@@ -319,6 +325,7 @@ export async function getProjectStudioSeed(projectId: string) {
     title: asset.title ?? "",
     body: asset.body,
     cta: asset.cta ?? "",
+    hashtags: asset.hashtags ?? "",
   }));
   const usePersistedAssets =
     persistedAssetPayload.length > 0 &&
@@ -326,10 +333,13 @@ export async function getProjectStudioSeed(projectId: string) {
       topic: record.latestContentJob?.topic ?? "",
       assets: persistedAssetPayload,
     });
+  const generationProvider: ContentGenerationProvider =
+    usePersistedAssets && record.latestContentJob?.generationProvider === "openai" ? "openai" : "fallback";
   const assets = usePersistedAssets
     ? persistedAssetPayload
     : buildStudioSeed({
         projectName: record.project.name,
+        industry: record.project.industry,
         profile: record.brandProfile,
         topics: [{ title: normalizedLatestTopic, score: 10 }],
       }).assets;
@@ -360,6 +370,7 @@ export async function getProjectStudioSeed(projectId: string) {
       id: record.project.id,
       name: record.project.name,
       domain: record.project.domain,
+      industry: record.project.industry,
       workingPath: record.project.workingPath,
       status: record.project.status,
     },
@@ -384,6 +395,7 @@ export async function getProjectStudioSeed(projectId: string) {
         usePersistedAssets && record.latestContentJob?.objective
           ? record.latestContentJob.objective
           : seed.objective,
+      generationProvider,
       assets,
       images: assetImages,
     },
@@ -472,6 +484,7 @@ export async function regenerateProjectContextDraft(projectId: string) {
   const baseInput: CreateProjectInput = {
     name: record.project.name,
     domain: record.project.domain ?? undefined,
+    industry: record.project.industry ?? undefined,
     workingPath: record.project.workingPath ?? undefined,
     sourceFiles: [],
   };
@@ -523,16 +536,19 @@ export async function generateProjectContent(params: {
   }
 
   const normalizedTopic = normalizeTopicTitle(selectedTopic, record.project.name);
-  const seed = buildStudioSeed({
+  const generated = await buildGeneratedStudioSeed({
     projectName: record.project.name,
+    industry: record.project.industry,
     profile: record.brandProfile,
     topics: [{ title: normalizedTopic, score: 10 }],
   });
+  const seed = generated.seed;
 
   await createOrUpdateContentJobWithAssets({
     projectId: params.projectId,
     topic: normalizedTopic,
     objective: params.objective || seed.objective,
+    generationProvider: generated.provider,
     assets: seed.assets,
   });
 
@@ -548,6 +564,7 @@ export async function saveProjectContentDraft(params: {
     title?: string;
     body: string;
     cta?: string;
+    hashtags?: string;
   }>;
 }) {
   const record = requireApprovedBrandProfile(await getProjectDetail(params.projectId), params.projectId);
@@ -614,9 +631,19 @@ export async function exportProjectContent(projectId: string) {
   const slug = createExportSlug(studio.project.name);
   const channels = studio.draft.assets.map((asset) => ({
     channel: asset.channel,
-    filename: `${slug}-${asset.channel}.md`,
+    filename: asset.channel === "blog" ? `${slug}-blog.html` : `${slug}-${asset.channel}.txt`,
+    hashtagsFilename: asset.channel === "blog" ? undefined : `${slug}-${asset.channel}-hashtags.txt`,
     title: asset.title,
-    content: [`# ${asset.title}`, "", asset.body, "", "CTA", asset.cta].join("\n"),
+    content:
+      asset.channel === "blog"
+        ? buildBlogHtml({
+            title: asset.title,
+            body: asset.body,
+            cta: asset.cta,
+            hashtags: asset.hashtags,
+          })
+        : [asset.title, "", asset.body, "", "CTA", asset.cta].filter(Boolean).join("\n"),
+    hashtags: asset.channel === "blog" ? "" : asset.hashtags || "",
   }));
 
   return {
@@ -681,7 +708,13 @@ export async function markProjectReadyForPublish(
           content: publishPackage.bodyHtml,
           coverImageUrl: publishPackage.coverImageUrl,
           categoryNames: options.wordpress.categoryNames,
-          tagNames: options.wordpress.tagNames,
+          tagNames:
+            options.wordpress.tagNames ||
+            blogAsset.hashtags
+              ?.split(",")
+              .map((tag) => tag.trim().replace(/^#/, ""))
+              .filter(Boolean)
+              .join(", "),
         })
       : null;
   const updated = wordpress
