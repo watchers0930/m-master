@@ -1,11 +1,13 @@
 export type CreateProjectInput = {
   name: string;
   domain?: string;
+  industry?: string;
   workingPath?: string;
   sourceFiles: SourceFileInput[];
 };
 
 export type UpdateProjectSettingsInput = {
+  industry?: string;
   wordpressSiteUrl?: string;
   wordpressUsername?: string;
   wordpressStatus?: "draft" | "publish";
@@ -29,6 +31,8 @@ export class ProjectValidationError extends Error {
     this.name = "ProjectValidationError";
   }
 }
+
+const ALLOWED_INDUSTRIES = new Set(["general", "real-estate", "marketing", "saas", "finance"]);
 
 function normalizeOptionalString(value: unknown): string | undefined {
   if (typeof value !== "string") {
@@ -149,6 +153,16 @@ export async function parseCreateProjectInput(request: Request): Promise<CreateP
   return {
     name,
     domain: normalizeWebsiteTarget(normalizeOptionalString(inputRecord.domain)),
+    industry: (() => {
+      const industry = normalizeOptionalString(inputRecord.industry);
+      if (!industry) {
+        return undefined;
+      }
+      if (!ALLOWED_INDUSTRIES.has(industry)) {
+        throw new ProjectValidationError("업종 분류 값이 올바르지 않습니다.");
+      }
+      return industry;
+    })(),
     workingPath,
     sourceFiles: parseSourceFiles(inputRecord.sourceFiles),
   };
@@ -169,12 +183,18 @@ export async function parseUpdateProjectSettingsInput(request: Request): Promise
 
   const inputRecord = body as Record<string, unknown>;
   const wordpressStatus = normalizeOptionalString(inputRecord.wordpressStatus);
+  const industry = normalizeOptionalString(inputRecord.industry);
 
   if (wordpressStatus && wordpressStatus !== "draft" && wordpressStatus !== "publish") {
     throw new ProjectValidationError("워드프레스 게시 상태는 draft 또는 publish만 허용됩니다.");
   }
 
+  if (industry && !ALLOWED_INDUSTRIES.has(industry)) {
+    throw new ProjectValidationError("업종 분류 값이 올바르지 않습니다.");
+  }
+
   return {
+    industry,
     wordpressSiteUrl: normalizeWebsiteTarget(normalizeOptionalString(inputRecord.wordpressSiteUrl)),
     wordpressUsername: normalizeOptionalString(inputRecord.wordpressUsername)?.slice(0, 120),
     wordpressStatus: wordpressStatus as "draft" | "publish" | undefined,

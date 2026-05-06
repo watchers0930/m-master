@@ -30,6 +30,7 @@ export type ProjectDetailRecord = {
     topic: string;
     objective: string | null;
     status: string;
+    generationProvider: string | null;
     publishProvider: string | null;
     externalPostId: string | null;
     externalPostUrl: string | null;
@@ -42,6 +43,7 @@ export type ProjectDetailRecord = {
       title: string | null;
       body: string;
       cta: string | null;
+      hashtags: string | null;
       version: number;
       createdAt: Date;
       updatedAt: Date;
@@ -89,6 +91,7 @@ export async function createProjectWithSeeds(params: {
   project: {
     name: string;
     domain?: string;
+    industry?: string;
     workingPath?: string;
   };
   brandProfile: {
@@ -110,6 +113,7 @@ export async function createProjectWithSeeds(params: {
       data: {
         name: params.project.name,
         domain: params.project.domain,
+        industry: params.project.industry,
         workingPath: params.project.workingPath,
       },
     });
@@ -143,6 +147,7 @@ export async function createProjectWithSeeds(params: {
 
 export async function updateProjectSettings(params: {
   projectId: string;
+  industry?: string;
   wordpressSiteUrl?: string;
   wordpressUsername?: string;
   wordpressStatus?: string;
@@ -152,6 +157,7 @@ export async function updateProjectSettings(params: {
   return prisma.project.update({
     where: { id: params.projectId },
     data: {
+      industry: params.industry,
       wordpressSiteUrl: params.wordpressSiteUrl,
       wordpressUsername: params.wordpressUsername,
       wordpressStatus: params.wordpressStatus,
@@ -360,11 +366,13 @@ export async function createOrUpdateContentJobWithAssets(params: {
   projectId: string;
   topic: string;
   objective?: string;
+  generationProvider?: string;
   assets: Array<{
     channel: string;
     title?: string;
     body: string;
     cta?: string;
+    hashtags?: string;
   }>;
 }) {
   return prisma.$transaction(async (tx) => {
@@ -381,6 +389,7 @@ export async function createOrUpdateContentJobWithAssets(params: {
         where: { id: latestJob.id },
         data: {
           objective: params.objective,
+          generationProvider: params.generationProvider,
           status: "generated",
         },
       });
@@ -395,6 +404,7 @@ export async function createOrUpdateContentJobWithAssets(params: {
               title: asset.title,
               body: asset.body,
               cta: asset.cta,
+              hashtags: asset.hashtags,
               version: existingAsset.version + 1,
             },
           });
@@ -408,6 +418,7 @@ export async function createOrUpdateContentJobWithAssets(params: {
             title: asset.title,
             body: asset.body,
             cta: asset.cta,
+            hashtags: asset.hashtags,
           },
         });
       }
@@ -427,6 +438,7 @@ export async function createOrUpdateContentJobWithAssets(params: {
         projectId: params.projectId,
         topic: params.topic,
         objective: params.objective,
+        generationProvider: params.generationProvider,
         status: "generated",
         assets: {
           create: params.assets.map((asset) => ({
@@ -434,6 +446,7 @@ export async function createOrUpdateContentJobWithAssets(params: {
             title: asset.title,
             body: asset.body,
             cta: asset.cta,
+            hashtags: asset.hashtags,
           })),
         },
       },
@@ -453,6 +466,7 @@ export async function updateContentAssetDraft(params: {
   title?: string;
   body: string;
   cta?: string;
+  hashtags?: string;
 }) {
   return prisma.$transaction(async (tx) => {
     const asset = await tx.contentAsset.findFirst({
@@ -482,6 +496,7 @@ export async function updateContentAssetDraft(params: {
         title: params.title,
         body: params.body,
         cta: params.cta,
+        hashtags: params.hashtags,
         version: asset.version + 1,
       },
     });
@@ -497,6 +512,7 @@ export async function saveLatestContentJobAssets(params: {
     title?: string;
     body: string;
     cta?: string;
+    hashtags?: string;
   }>;
 }) {
   return prisma.$transaction(async (tx) => {
@@ -521,6 +537,7 @@ export async function saveLatestContentJobAssets(params: {
               title: asset.title,
               body: asset.body,
               cta: asset.cta,
+              hashtags: asset.hashtags,
             })),
           },
         },
@@ -555,6 +572,7 @@ export async function saveLatestContentJobAssets(params: {
             title: asset.title,
             body: asset.body,
             cta: asset.cta,
+            hashtags: asset.hashtags,
             version: (latestAssetVersions.get(asset.channel) ?? existing.version) + 1,
           },
         });
@@ -566,6 +584,7 @@ export async function saveLatestContentJobAssets(params: {
             title: asset.title,
             body: asset.body,
             cta: asset.cta,
+            hashtags: asset.hashtags,
           },
         });
       }

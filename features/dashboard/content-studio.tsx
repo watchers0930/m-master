@@ -48,7 +48,7 @@ type ContentStudioProps = {
   loading?: boolean;
   onChannelChange: (channel: ChannelKey) => void;
   onTopicSelect: (topicId: string) => void;
-  onAssetChange: (channel: ChannelKey, field: "title" | "body" | "cta", value: string) => void;
+  onAssetChange: (channel: ChannelKey, field: "title" | "body" | "cta" | "hashtags", value: string) => void;
   onImagePromptChange: (value: string) => void;
   onGenerateImages: () => void;
   onSelectImageVariant: (variantId: string) => void;
@@ -61,6 +61,8 @@ type ContentStudioProps = {
   onPreparePublish: () => Promise<void>;
   onSaveWordPressDefaults: () => Promise<void>;
   onCopyExportPreview?: () => Promise<void>;
+  onDownloadExportContent?: () => Promise<void>;
+  onDownloadExportHashtags?: () => Promise<void>;
   onCopyBlogPublishHtml?: () => Promise<void>;
   onPublishDraftChange: (field: keyof BlogPublishDraft, value: string) => void;
   onWordPressConfigChange: (field: keyof WordPressPublishConfig, value: string) => void;
@@ -77,6 +79,17 @@ const channelLabels = {
   blog: "블로그",
   instagram: "인스타그램",
   facebook: "페이스북",
+} as const;
+
+const generationProviderMeta = {
+  openai: {
+    label: "GPT 초안",
+    detail: "OpenAI로 생성된 초안입니다.",
+  },
+  fallback: {
+    label: "기본 템플릿",
+    detail: "외부 생성 실패 또는 미사용 시 규칙 기반 초안입니다.",
+  },
 } as const;
 
 export function ContentStudio({
@@ -113,6 +126,8 @@ export function ContentStudio({
   onPreparePublish,
   onSaveWordPressDefaults,
   onCopyExportPreview,
+  onDownloadExportContent,
+  onDownloadExportHashtags,
   onCopyBlogPublishHtml,
   onPublishDraftChange,
   onWordPressConfigChange,
@@ -125,6 +140,7 @@ export function ContentStudio({
   onJumpToReviewTarget,
 }: ContentStudioProps) {
   const activeAsset = studio?.draft.assets.find((asset) => asset.channel === activeChannel);
+  const providerMeta = studio ? generationProviderMeta[studio.draft.generationProvider] : null;
   const hasImageVariants = imageStudio.variants.length > 0;
   const activeExportChannel =
     exportPreview.activeView === "json"
@@ -196,8 +212,10 @@ export function ContentStudio({
                     {studio.draft.topic || "선택된 주제가 없습니다."}
                   </strong>
                   <span className="fine-print">{studio.draft.objective}</span>
+                  {providerMeta ? <p className="fine-print" style={{ marginTop: 6 }}>{providerMeta.detail}</p> : null}
                 </div>
                 <div className="button-cluster">
+                  {providerMeta ? <StatusPill active={studio.draft.generationProvider === "openai"}>{providerMeta.label}</StatusPill> : null}
                   <StatusPill active>{studio.project.status}</StatusPill>
                   <button className="button ghost" disabled={loading} type="button" onClick={() => void onGenerateContent()}>
                     {loading ? "초안 생성 중" : "채널 초안 다시 만들기"}
@@ -251,12 +269,25 @@ export function ContentStudio({
                   multiline
                   rows={4}
                 />
+                <InputField
+                  id={`studio-hashtags-${activeChannel}`}
+                  label={`${channelLabels[activeChannel]} 해시태그`}
+                  value={activeAsset?.hashtags || ""}
+                  onChange={(value) => onAssetChange(activeChannel, "hashtags", value)}
+                  placeholder="#토픽, #브랜드명 형태로 입력하고 더 추가할 수 있습니다."
+                  multiline
+                  rows={3}
+                />
+                <p className="fine-print" style={{ marginTop: -6 }}>
+                  자동 생성된 태그를 시작점으로 쓰고, 필요한 해시태그를 직접 추가해 확장할 수 있습니다.
+                </p>
                 <div className="content-editor preview">
                   <strong style={{ display: "block", fontSize: 16, marginBottom: 10 }}>
                     {activeAsset?.title || "채널 초안 없음"}
                   </strong>
                   {activeAsset?.body || "초안이 아직 준비되지 않았습니다."}
                   {activeAsset?.cta ? `\n\nCTA\n${activeAsset.cta}` : ""}
+                  {activeAsset?.hashtags ? `\n\n해시태그\n${activeAsset.hashtags}` : ""}
                 </div>
               </div>
             </>
@@ -394,6 +425,8 @@ export function ContentStudio({
           onPreparePublish={onPreparePublish}
           onSaveWordPressDefaults={onSaveWordPressDefaults}
           onCopyExportPreview={onCopyExportPreview}
+          onDownloadExportContent={onDownloadExportContent}
+          onDownloadExportHashtags={onDownloadExportHashtags}
           onCopyBlogPublishHtml={onCopyBlogPublishHtml}
           onPublishDraftChange={onPublishDraftChange}
           onWordPressConfigChange={onWordPressConfigChange}

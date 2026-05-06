@@ -38,6 +38,7 @@ export type ProjectListItem = {
   id: string;
   name: string;
   domain?: string | null;
+  industry?: string | null;
   workingPath?: string | null;
   status: string;
   createdAt: string;
@@ -66,6 +67,7 @@ export type ProjectDetail = {
     id: string;
     name: string;
     domain?: string | null;
+    industry?: string | null;
     workingPath?: string | null;
     status: string;
     wordpressSiteUrl?: string | null;
@@ -133,6 +135,7 @@ export type StudioDetail = {
     id: string;
     name: string;
     domain?: string | null;
+    industry?: string | null;
     workingPath?: string | null;
     status: string;
   };
@@ -154,11 +157,13 @@ export type StudioDetail = {
   draft: {
     topic: string;
     objective: string;
+    generationProvider: "openai" | "fallback";
     assets: Array<{
       channel: ChannelKey;
       title: string;
       body: string;
       cta: string;
+      hashtags: string;
     }>;
     images: Array<{
       channel: ChannelKey;
@@ -210,6 +215,8 @@ export type ExportBundle = {
     filename: string;
     title: string;
     content: string;
+    hashtags: string;
+    hashtagsFilename?: string;
   }>;
 };
 
@@ -231,6 +238,7 @@ export type BlogPublishPackage = {
   bodyHtml: string;
   htmlWarnings: string[];
   cta?: string | null;
+  hashtags?: string | null;
   coverImageUrl?: string | null;
   sourceUrl?: string | null;
 };

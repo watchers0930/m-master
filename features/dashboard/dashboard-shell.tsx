@@ -98,6 +98,7 @@ function createEmptyAsset(channel: ChannelKey): StudioAsset {
     title: "",
     body: "",
     cta: "",
+    hashtags: "",
   };
 }
 
@@ -148,6 +149,7 @@ export function DashboardShell() {
   const [imageStudios, setImageStudios] = useState<Record<ChannelKey, ImageStudioState>>(createEmptyImageStudio());
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("");
+  const [industry, setIndustry] = useState("general");
   const [workingPath, setWorkingPath] = useState("");
   const [files, setFiles] = useState<SourceFileDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -261,6 +263,7 @@ export function DashboardShell() {
         body: JSON.stringify({
           name,
           domain,
+          industry,
           workingPath,
           sourceFiles: files,
         }),
@@ -337,6 +340,7 @@ export function DashboardShell() {
         body: JSON.stringify({
           name,
           domain,
+          industry,
           workingPath,
           sourceFiles: files,
         }),
@@ -350,6 +354,7 @@ export function DashboardShell() {
 
       setName("");
       setDomain("");
+      setIndustry("general");
       setWorkingPath("");
       setFiles([]);
       setPreview(null);
@@ -570,6 +575,60 @@ export function DashboardShell() {
     });
   }
 
+  function handleProjectIndustryChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          industry: value,
+        },
+      };
+    });
+  }
+
+  async function handleSaveProjectSettings() {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          industry: activeProject.project.industry || "general",
+          wordpressSiteUrl: activeProject.project.wordpressSiteUrl,
+          wordpressUsername: activeProject.project.wordpressUsername,
+          wordpressStatus: activeProject.project.wordpressStatus,
+          wordpressCategoryNames: activeProject.project.wordpressCategoryNames,
+          wordpressTagNames: activeProject.project.wordpressTagNames,
+        }),
+      });
+
+      const payload = await parseJson<ApiResponse<{ project: ProjectDetail }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      setActiveProject(payload.data.project);
+      await loadProject(activeProject.project.id);
+      await loadProjects();
+    } catch (settingsError) {
+      setError(settingsError instanceof Error ? settingsError.message : "프로젝트 설정 저장에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function handleTopicSelect(topicId: string) {
     const nextTopic = activeProject?.topics.find((topic) => topic.id === topicId);
 
@@ -593,7 +652,7 @@ export function DashboardShell() {
     });
   }
 
-  function handleAssetChange(channel: ChannelKey, field: "title" | "body" | "cta", value: string) {
+  function handleAssetChange(channel: ChannelKey, field: "title" | "body" | "cta" | "hashtags", value: string) {
     setStudio((currentStudio) => {
       if (!currentStudio) {
         return currentStudio;
@@ -854,6 +913,7 @@ export function DashboardShell() {
               <ProjectIntakeForm
                 name={name}
                 domain={domain}
+                industry={industry}
                 workingPath={workingPath}
                 files={files}
                 preview={preview}
@@ -862,6 +922,7 @@ export function DashboardShell() {
                 error={error}
                 onNameChange={setName}
                 onDomainChange={setDomain}
+                onIndustryChange={setIndustry}
                 onPickFolder={handlePickFolder}
                 onPreview={requestPreview}
                 onSubmit={handleSubmit}
@@ -876,6 +937,8 @@ export function DashboardShell() {
                 onSelectProject={loadProject}
                 onDeleteProject={handleDeleteProject}
                 onRegenerateContext={handleRegenerateContext}
+                onProjectIndustryChange={handleProjectIndustryChange}
+                onSaveProjectSettings={handleSaveProjectSettings}
                 onBrandProfileChange={handleBrandProfileChange}
                 onSaveContext={handleSaveContext}
                 onApproveContext={handleApproveContext}
@@ -917,6 +980,8 @@ export function DashboardShell() {
                 onPreparePublish={publishWorkflow.handlePreparePublish}
                 onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
                 onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
+                onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
+                onDownloadExportHashtags={publishWorkflow.handleDownloadExportHashtags}
                 onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}
                 onPublishDraftChange={publishWorkflow.handlePublishDraftChange}
                 onWordPressConfigChange={publishWorkflow.handleWordPressConfigChange}
@@ -965,6 +1030,8 @@ export function DashboardShell() {
                 onPreparePublish={publishWorkflow.handlePreparePublish}
                 onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
                 onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
+                onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
+                onDownloadExportHashtags={publishWorkflow.handleDownloadExportHashtags}
                 onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}
                 onPublishDraftChange={publishWorkflow.handlePublishDraftChange}
                 onWordPressConfigChange={publishWorkflow.handleWordPressConfigChange}
@@ -1013,6 +1080,8 @@ export function DashboardShell() {
                 onPreparePublish={publishWorkflow.handlePreparePublish}
                 onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
                 onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
+                onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
+                onDownloadExportHashtags={publishWorkflow.handleDownloadExportHashtags}
                 onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}
                 onPublishDraftChange={publishWorkflow.handlePublishDraftChange}
                 onWordPressConfigChange={publishWorkflow.handleWordPressConfigChange}
@@ -1061,6 +1130,8 @@ export function DashboardShell() {
                 onPreparePublish={publishWorkflow.handlePreparePublish}
                 onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
                 onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
+                onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
+                onDownloadExportHashtags={publishWorkflow.handleDownloadExportHashtags}
                 onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}
                 onPublishDraftChange={publishWorkflow.handlePublishDraftChange}
                 onWordPressConfigChange={publishWorkflow.handleWordPressConfigChange}

@@ -11,6 +11,8 @@ type ProjectOverviewProps = {
   onSelectProject: (projectId: string) => Promise<void>;
   onDeleteProject: (projectId: string) => void;
   onRegenerateContext: () => Promise<void>;
+  onProjectIndustryChange: (value: string) => void;
+  onSaveProjectSettings: () => Promise<void>;
   onBrandProfileChange: (field: EditableBrandProfileField, value: string) => void;
   onSaveContext: () => Promise<void>;
   onApproveContext: () => Promise<void>;
@@ -23,6 +25,8 @@ export function ProjectOverview({
   onSelectProject,
   onDeleteProject,
   onRegenerateContext,
+  onProjectIndustryChange,
+  onSaveProjectSettings,
   onBrandProfileChange,
   onSaveContext,
   onApproveContext,
@@ -52,9 +56,34 @@ export function ProjectOverview({
             <div className="project-meta">
               <StatusPill active>{activeProject.project.status}</StatusPill>
               <span className="fine-print">{activeProject.project.domain || "사이트 주소 미입력"}</span>
+              <span className="fine-print">{activeProject.project.industry || "업종 미지정"}</span>
               <span className="fine-print">{activeProject.project.workingPath || "폴더 미지정"}</span>
               <span className="fine-print">테마 {activeProject.topics.length}개</span>
             </div>
+          </div>
+
+          <div className="field-group">
+            <label className="field-label" htmlFor="project-industry-setting">
+              업종 분류
+            </label>
+            <div className="row">
+              <select
+                id="project-industry-setting"
+                className="text-input"
+                value={activeProject.project.industry || "general"}
+                onChange={(event) => onProjectIndustryChange(event.target.value)}
+              >
+                <option value="general">일반</option>
+                <option value="real-estate">부동산</option>
+                <option value="marketing">마케팅</option>
+                <option value="saas">SaaS</option>
+                <option value="finance">금융</option>
+              </select>
+              <button className="button" disabled={loading} type="button" onClick={() => void onSaveProjectSettings()}>
+                {loading ? "저장 중" : "업종 저장"}
+              </button>
+            </div>
+            <p className="fine-print">업종 분류를 바꾸면 이후 해시태그 추천과 채널 초안 우선 태그가 이 값을 먼저 참조합니다.</p>
           </div>
 
           <InputField
