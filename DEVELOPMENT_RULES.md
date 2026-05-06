@@ -125,3 +125,22 @@
 4. `tm-master.vercel.app`에서 확인한다.
 5. PR로 `production` 승격을 요청한다.
 6. 승인 후 `production` 머지로 운영 반영한다.
+
+## 14. 승격 체크리스트
+
+1. `test` 브랜치 HEAD가 배포 대상 최신 커밋인지 확인한다.
+2. `git status`가 의도한 변경만 포함하는지 확인한다.
+3. `npm run build`를 통과시킨다.
+4. `origin/test` 푸시 후 GitHub Actions preview 배포 성공을 확인한다.
+5. `tm-master.vercel.app`에서 실제 사용자 흐름을 확인한다.
+6. `test -> production` PR을 생성한다.
+7. 저장소 정책에 맞는 방식으로 머지한다.
+8. production deploy workflow 성공을 확인한다.
+9. `m-master.vercel.app` 응답과 주요 화면을 확인한다.
+
+## 15. 승격 예외 처리
+
+- `production` 직접 push나 force push는 하지 않는다.
+- `test -> production` PR이 충돌나면, 최신 `origin/production` 기준 임시 정렬 브랜치를 만든다.
+- 임시 정렬 브랜치에 검증된 `test` 내용을 반영한 뒤 `production`으로 새 PR을 만든다.
+- PR 머지 후 production deploy가 자동으로 뜨지 않으면 `deploy.yml`을 `production` 기준으로 수동 실행한다.
