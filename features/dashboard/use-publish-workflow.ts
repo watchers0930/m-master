@@ -31,6 +31,30 @@ async function parseJson<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+function triggerTextDownload(filename: string, content: string) {
+  if (typeof document === "undefined") {
+    throw new Error("현재 환경에서는 파일 다운로드를 지원하지 않습니다.");
+  }
+
+  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
+function hashtagsToWordPressTags(value?: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  return [...new Set(value.split(",").map((item) => item.trim().replace(/^#/, "")).filter(Boolean))].join(", ");
+}
+
 export function usePublishWorkflow(params: {
   projectId?: string | null;
   onError: (message: string) => void;
@@ -215,6 +239,51 @@ export function usePublishWorkflow(params: {
     }
   }
 
+  async function handleDownloadExportContent() {
+    if (!exportPreview.bundle || exportPreview.activeView === "json") {
+      setCopyStatus("다운로드할 채널 결과를 먼저 선택하세요.");
+      return;
+    }
+
+    const activeChannel = exportPreview.bundle.channels.find((item) => item.channel === exportPreview.activeView);
+    if (!activeChannel) {
+      setCopyStatus("다운로드할 채널 결과가 없습니다.");
+      return;
+    }
+
+    try {
+      triggerTextDownload(activeChannel.filename, activeChannel.content);
+      setCopyStatus(`${activeChannel.filename} 파일을 다운로드했습니다.`);
+    } catch (downloadError) {
+      setCopyStatus(downloadError instanceof Error ? downloadError.message : "본문 파일 다운로드에 실패했습니다.");
+    }
+  }
+
+  async function handleDownloadExportHashtags() {
+    if (!exportPreview.bundle || exportPreview.activeView === "json") {
+      setCopyStatus("다운로드할 채널 결과를 먼저 선택하세요.");
+      return;
+    }
+
+    const activeChannel = exportPreview.bundle.channels.find((item) => item.channel === exportPreview.activeView);
+    if (!activeChannel) {
+      setCopyStatus("다운로드할 채널 결과가 없습니다.");
+      return;
+    }
+
+    if (!activeChannel.hashtagsFilename) {
+      setCopyStatus("이 채널은 별도 해시태그 파일을 제공하지 않습니다.");
+      return;
+    }
+
+    try {
+      triggerTextDownload(activeChannel.hashtagsFilename, activeChannel.hashtags || "");
+      setCopyStatus(`${activeChannel.hashtagsFilename} 파일을 다운로드했습니다.`);
+    } catch (downloadError) {
+      setCopyStatus(downloadError instanceof Error ? downloadError.message : "해시태그 파일 다운로드에 실패했습니다.");
+    }
+  }
+
   async function handleCopyBlogPublishHtml() {
     if (!publishPackage || typeof navigator === "undefined" || !navigator.clipboard) {
       setCopyStatus("복사할 블로그 등록 패키지가 없거나 현재 환경에서 클립보드 복사를 지원하지 않습니다.");
@@ -308,6 +377,10 @@ export function usePublishWorkflow(params: {
         summary: payload.data.publish.publishPackage.summary,
         bodyHtml: payload.data.publish.publishPackage.bodyHtml,
       });
+      setWordpressConfig((current) => ({
+        ...current,
+        tagNames: current.tagNames || hashtagsToWordPressTags(payload.data.publish.publishPackage.hashtags),
+      }));
       setWordpressResult(payload.data.publish.wordpress ?? null);
     } catch (publishError) {
       onError(publishError instanceof Error ? publishError.message : "발행 준비 처리에 실패했습니다.");
@@ -367,6 +440,8 @@ export function usePublishWorkflow(params: {
     handleExportChannel,
     handleExportAll,
     handleCopyExportPreview,
+    handleDownloadExportContent,
+    handleDownloadExportHashtags,
     handleCopyBlogPublishHtml,
     handleWordPressConfigChange,
     handleExportPreviewViewChange,
