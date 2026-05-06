@@ -31,6 +31,24 @@ Context-aware marketing platform.
 - `tm-master.vercel.app` is the fixed test domain
 - `m-master.vercel.app` is the fixed production domain
 
+## Promotion checklist
+
+1. Work only on `test`
+2. Run local verification: at minimum `npm run build`
+3. Push `test` and wait for the preview deploy
+4. Verify `tm-master.vercel.app`
+5. Create a `test -> production` PR
+6. Merge the PR to trigger production deploy
+7. Verify `m-master.vercel.app`
+
+### If production promotion is not clean
+
+- Do not force-push `production`
+- If `test -> production` cannot merge cleanly, create a temporary alignment branch from the latest `origin/production`
+- Apply the tested `test` content onto that branch
+- Open a clean PR from the alignment branch into `production`
+- If the production deploy workflow does not auto-start after merge, run `deploy.yml` with `workflow_dispatch` on `production`
+
 ## Database
 
 - Separate Neon database for `m-master`
