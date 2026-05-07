@@ -70,6 +70,10 @@ export function PublishPanel({
   onPublishDraftChange,
   onWordPressConfigChange,
 }: PublishPanelProps) {
+  const hasWordPressCredentials = Boolean(
+    wordpressConfig.siteUrl && wordpressConfig.username && wordpressConfig.appPassword,
+  );
+  const readyToPostToWordPress = Boolean(publishPackage && hasWordPressCredentials);
   const activeExportChannel =
     exportPreview.activeView === "json"
       ? null
@@ -78,7 +82,7 @@ export function PublishPanel({
   return (
     <SectionCard
       title="복사 및 발행 준비"
-      description="채널별 결과를 미리 보고 바로 복사해 붙여넣거나, 발행 준비 상태로 넘길 수 있습니다. 실제 매체 연동은 이 단계에서 확장합니다."
+      description="채널별 결과를 미리 보고 바로 복사해 붙여넣거나, 블로그 등록 패키지를 만든 뒤 워드프레스에 게시할 수 있습니다."
       badge="Publish"
     >
       <div className="ops-grid">
@@ -92,7 +96,7 @@ export function PublishPanel({
           <div className="review-item">
             <strong>블로그 게시 설정</strong>
             <p className="fine-print">
-              먼저 블로그 등록 패키지를 만들고 제목, slug, excerpt를 검토한 뒤 다시 버튼을 누르면 워드프레스에 게시합니다. 인스타그램과 페이스북 탭은 결과 미리보기 확인용입니다.
+              먼저 블로그 등록 패키지를 만들고 제목, slug, excerpt를 검토합니다. 워드프레스 정보가 입력된 상태에서 다시 실행하면 실제 게시까지 이어집니다. 인스타그램과 페이스북 탭은 결과 미리보기 확인용입니다.
             </p>
           </div>
           <InputField
@@ -170,7 +174,13 @@ export function PublishPanel({
             {settingsBusy ? "기본값 저장 중" : "워드프레스 기본값 저장"}
           </button>
           <button className="button" disabled={publishBusy} type="button" onClick={() => void onPreparePublish()}>
-            {publishBusy ? "블로그 등록 준비 중" : "블로그 등록 준비"}
+            {publishBusy
+              ? readyToPostToWordPress
+                ? "워드프레스 게시 중"
+                : "블로그 등록 패키지 준비 중"
+              : readyToPostToWordPress
+                ? "워드프레스 게시"
+                : "블로그 등록 패키지 준비"}
           </button>
           <button className="button ghost" disabled={copyBusy || !exportPreview.bundle} type="button" onClick={() => void onCopyExportPreview?.()}>
             {copyBusy ? "복사 중" : "현재 결과 복사"}
@@ -357,7 +367,7 @@ export function PublishPanel({
           ) : (
             <EmptyStatePanel
               title="블로그 등록 패키지가 아직 없습니다."
-              description="매체 등록 준비 버튼을 누르면 블로그용 제목, 요약, 이미지, HTML 본문 패키지가 생성됩니다."
+              description="블로그 등록 패키지 준비 버튼을 누르면 블로그용 제목, 요약, 이미지, HTML 본문 패키지가 생성됩니다."
             />
           )}
         </div>
