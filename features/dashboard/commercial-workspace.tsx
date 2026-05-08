@@ -221,53 +221,72 @@ export function CommercialWorkspace(props: CommercialWorkspaceProps) {
         {!activeProject ? (
           <section className="commercial-card">
             <form className="commercial-form" onSubmit={onSubmit}>
-              <InputField id="commercial-project-name" label="제목" value={name} onChange={onNameChange} placeholder="프로젝트 또는 캠페인 제목" />
-              <InputField id="commercial-project-domain" label="사이트 주소" value={domain} onChange={onDomainChange} placeholder="https://example.com" />
-              <div className="field-group">
-                <label className="field-label" htmlFor="commercial-industry">
-                  업종
-                </label>
-                <select id="commercial-industry" className="text-input" value={industry} onChange={(event) => onIndustryChange(event.target.value)}>
-                  <option value="general">일반</option>
-                  <option value="real-estate">부동산</option>
-                  <option value="marketing">마케팅</option>
-                  <option value="saas">SaaS</option>
-                  <option value="finance">금융</option>
-                </select>
-              </div>
-              <div className="workspace-upload-card">
-                <div>
-                  <strong>자료 업로드</strong>
-                  <p className="fine-print">
-                    소개서, 브로슈어, 기획안, FAQ를 연결하면 콘셉트와 해시태그 추천이 더 정확해집니다.
-                  </p>
+              <div className="workspace-section">
+                <div className="workspace-section-header">
+                  <strong>기본 정보</strong>
                 </div>
-                <button className="button ghost" type="button" onClick={() => void onPickFolder()}>
-                  파일 연결
-                </button>
-                <p className="fine-print">
-                  {folderSupported === false
-                    ? "현재 브라우저는 폴더 선택 API를 지원하지 않습니다."
-                    : workingPath || "아직 연결된 자료가 없습니다."}
-                </p>
-                {files.length ? (
-                  <div className="workspace-chip-row">
-                    {files.slice(0, 6).map((file) => (
-                      <span className="workspace-chip" key={`${file.relativePath || file.name}-${file.size ?? 0}`}>
-                        {file.name}
-                      </span>
-                    ))}
+                <div className="workspace-form-stack">
+                  <InputField id="commercial-project-name" label="제목" value={name} onChange={onNameChange} placeholder="프로젝트 또는 캠페인 제목" />
+                  <InputField id="commercial-project-domain" label="사이트 주소" value={domain} onChange={onDomainChange} placeholder="https://example.com" />
+                  <div className="field-group">
+                    <label className="field-label" htmlFor="commercial-industry">
+                      업종
+                    </label>
+                    <select id="commercial-industry" className="text-input" value={industry} onChange={(event) => onIndustryChange(event.target.value)}>
+                      <option value="general">일반</option>
+                      <option value="real-estate">부동산</option>
+                      <option value="marketing">마케팅</option>
+                      <option value="saas">SaaS</option>
+                      <option value="finance">금융</option>
+                    </select>
                   </div>
-                ) : null}
+                </div>
+              </div>
+              <div className="workspace-divider" />
+              <div className="workspace-section">
+                <div className="workspace-section-header">
+                  <strong>자료 연결</strong>
+                </div>
+                <div className="workspace-upload-card">
+                  <div>
+                    <strong>자료 업로드</strong>
+                    <p className="fine-print">
+                      소개서, 브로슈어, 기획안, FAQ를 연결하면 콘셉트와 해시태그 추천이 더 정확해집니다.
+                    </p>
+                  </div>
+                  <button className="button ghost" type="button" onClick={() => void onPickFolder()}>
+                    파일 연결
+                  </button>
+                  <p className="fine-print">
+                    {folderSupported === false
+                      ? "현재 브라우저는 폴더 선택 API를 지원하지 않습니다."
+                      : workingPath || "아직 연결된 자료가 없습니다."}
+                  </p>
+                  {files.length ? (
+                    <div className="workspace-chip-row">
+                      {files.slice(0, 6).map((file) => (
+                        <span className="workspace-chip" key={`${file.relativePath || file.name}-${file.size ?? 0}`}>
+                          {file.name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
               </div>
               {error ? <p className="error-text">{error}</p> : null}
-              <div className="button-row">
-                <button className="button" disabled={loading} type="button" onClick={() => void onPreview()}>
-                  {loading ? "분석 중" : "미리 보기"}
-                </button>
-                <button className="button primary" disabled={loading} type="submit">
-                  {loading ? "생성 중" : "콘텐츠 생성하기"}
-                </button>
+              <div className="workspace-divider" />
+              <div className="workspace-section">
+                <div className="workspace-section-header">
+                  <strong>실행</strong>
+                </div>
+                <div className="button-row workspace-action-bar">
+                  <button className="button" disabled={loading} type="button" onClick={() => void onPreview()}>
+                    {loading ? "분석 중" : "미리 보기"}
+                  </button>
+                  <button className="button primary" disabled={loading} type="submit">
+                    {loading ? "생성 중" : "콘텐츠 생성하기"}
+                  </button>
+                </div>
               </div>
             </form>
             {preview ? (
@@ -288,27 +307,30 @@ export function CommercialWorkspace(props: CommercialWorkspaceProps) {
                 </div>
                 <StatusPill active={contextApproved}>{contextApproved ? "승인됨" : "검토 필요"}</StatusPill>
               </div>
-              <div className="workspace-meta-grid">
-                <div>
-                  <span className="workspace-meta-label">업종</span>
-                  <select
-                    className="text-input"
-                    value={activeProject.project.industry || "general"}
-                    onChange={(event) => onProjectIndustryChange(event.target.value)}
-                  >
-                    <option value="general">일반</option>
-                    <option value="real-estate">부동산</option>
-                    <option value="marketing">마케팅</option>
-                    <option value="saas">SaaS</option>
-                    <option value="finance">금융</option>
-                  </select>
-                </div>
-                <div>
-                  <span className="workspace-meta-label">연결 자료</span>
-                  <div className="workspace-muted-box">{activeProject.project.workingPath || "연결된 자료 없음"}</div>
+              <div className="workspace-section">
+                <div className="workspace-meta-grid">
+                  <div className="field-group">
+                    <span className="workspace-meta-label">업종</span>
+                    <select
+                      className="text-input"
+                      value={activeProject.project.industry || "general"}
+                      onChange={(event) => onProjectIndustryChange(event.target.value)}
+                    >
+                      <option value="general">일반</option>
+                      <option value="real-estate">부동산</option>
+                      <option value="marketing">마케팅</option>
+                      <option value="saas">SaaS</option>
+                      <option value="finance">금융</option>
+                    </select>
+                  </div>
+                  <div className="field-group">
+                    <span className="workspace-meta-label">연결 자료</span>
+                    <div className="workspace-muted-box">{activeProject.project.workingPath || "연결된 자료 없음"}</div>
+                  </div>
                 </div>
               </div>
-              <div className="button-row">
+              <div className="workspace-divider" />
+              <div className="button-row workspace-action-bar">
                 <button className="button ghost" disabled={loading} type="button" onClick={() => void onSaveProjectSettings()}>
                   {loading ? "저장 중" : "프로젝트 저장"}
                 </button>
@@ -327,36 +349,48 @@ export function CommercialWorkspace(props: CommercialWorkspaceProps) {
                     <h3>브랜드 콘셉트</h3>
                   </div>
                 </div>
-                <InputField
-                  id="workspace-brand-summary"
-                  label="컨셉"
-                  value={activeProject.brandProfile.summary}
-                  onChange={(value) => onBrandProfileChange("summary", value)}
-                  placeholder="브랜드와 서비스 콘셉트를 정리하세요."
-                  multiline
-                  rows={7}
-                />
-                <div className="workspace-two-up">
+                <div className="workspace-section">
+                  <div className="workspace-section-header">
+                    <strong>핵심 설명</strong>
+                  </div>
                   <InputField
-                    id="workspace-brand-audience"
-                    label="타겟"
-                    value={activeProject.brandProfile.audience || ""}
-                    onChange={(value) => onBrandProfileChange("audience", value)}
-                    placeholder="주요 독자"
+                    id="workspace-brand-summary"
+                    label="컨셉"
+                    value={activeProject.brandProfile.summary}
+                    onChange={(value) => onBrandProfileChange("summary", value)}
+                    placeholder="브랜드와 서비스 콘셉트를 정리하세요."
                     multiline
-                    rows={4}
-                  />
-                  <InputField
-                    id="workspace-brand-cta"
-                    label="CTA"
-                    value={activeProject.brandProfile.cta || ""}
-                    onChange={(value) => onBrandProfileChange("cta", value)}
-                    placeholder="문의, 신청, 상담"
-                    multiline
-                    rows={4}
+                    rows={7}
                   />
                 </div>
-                <div className="button-row">
+                <div className="workspace-divider" />
+                <div className="workspace-section">
+                  <div className="workspace-section-header">
+                    <strong>대상과 전환</strong>
+                  </div>
+                  <div className="workspace-two-up">
+                    <InputField
+                      id="workspace-brand-audience"
+                      label="타겟"
+                      value={activeProject.brandProfile.audience || ""}
+                      onChange={(value) => onBrandProfileChange("audience", value)}
+                      placeholder="주요 독자"
+                      multiline
+                      rows={4}
+                    />
+                    <InputField
+                      id="workspace-brand-cta"
+                      label="CTA"
+                      value={activeProject.brandProfile.cta || ""}
+                      onChange={(value) => onBrandProfileChange("cta", value)}
+                      placeholder="문의, 신청, 상담"
+                      multiline
+                      rows={4}
+                    />
+                  </div>
+                </div>
+                <div className="workspace-divider" />
+                <div className="button-row workspace-action-bar">
                   <button className="button ghost" disabled={loading} type="button" onClick={() => void onSaveContext()}>
                     {loading ? "저장 중" : "콘셉트 저장"}
                   </button>
@@ -368,25 +402,25 @@ export function CommercialWorkspace(props: CommercialWorkspaceProps) {
             ) : null}
 
             <section className="commercial-card">
-              <div className="commercial-inline-header">
-                <div>
-                  <strong>프로젝트 전환</strong>
-                  <p className="fine-print">현재 저장된 프로젝트를 바로 바꿔가며 작업할 수 있습니다.</p>
+              <details className="workspace-disclosure">
+                <summary>
+                  <span>프로젝트 전환</span>
+                  <span className="fine-print">저장된 프로젝트 {projects.length}개</span>
+                </summary>
+                <div className="workspace-disclosure-body workspace-project-list">
+                  {projects.map((project) => (
+                    <div className={`workspace-project-row ${activeProject.project.id === project.id ? "active" : ""}`} key={project.id}>
+                      <button className="workspace-project-button" type="button" onClick={() => void onSelectProject(project.id)}>
+                        <strong>{project.name}</strong>
+                        <span className="fine-print">{project.domain || "사이트 주소 없음"}</span>
+                      </button>
+                      <button className="button ghost danger" type="button" onClick={() => onDeleteProject(project.id)}>
+                        삭제
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              </div>
-              <div className="workspace-project-list">
-                {projects.map((project) => (
-                  <div className={`workspace-project-row ${activeProject.project.id === project.id ? "active" : ""}`} key={project.id}>
-                    <button className="workspace-project-button" type="button" onClick={() => void onSelectProject(project.id)}>
-                      <strong>{project.name}</strong>
-                      <span className="fine-print">{project.domain || "사이트 주소 없음"}</span>
-                    </button>
-                    <button className="button ghost danger" type="button" onClick={() => onDeleteProject(project.id)}>
-                      삭제
-                    </button>
-                  </div>
-                ))}
-              </div>
+              </details>
             </section>
 
             {contextApproved && activeProject.topics.length ? (
@@ -410,7 +444,8 @@ export function CommercialWorkspace(props: CommercialWorkspaceProps) {
                     </button>
                   ))}
                 </div>
-                <div className="button-row">
+                <div className="workspace-divider" />
+                <div className="button-row workspace-action-bar">
                   <button className="button primary" disabled={loading || !selectedTopicId} type="button" onClick={() => void onGenerateContent()}>
                     {loading ? "생성 중" : "블로그 기준 콘텐츠 생성"}
                   </button>
@@ -549,87 +584,91 @@ export function CommercialWorkspace(props: CommercialWorkspaceProps) {
           </div>
           <p className="fine-print workspace-section-intro">블로그 본문을 기준으로 채널별 길이와 톤만 바꿔 자동 파생합니다.</p>
           <div className="workspace-social-stack">
-            <article className="workspace-social-card">
-              <div className="commercial-inline-header">
-                <strong>인스타그램</strong>
-                <StatusPill active>블로그 기반 자동 생성</StatusPill>
+            <details className="workspace-social-card workspace-disclosure" open>
+              <summary>
+                <span>인스타그램</span>
+                <StatusPill active>자동 파생</StatusPill>
+              </summary>
+              <div className="workspace-disclosure-body workspace-form-stack">
+                <InputField
+                  id="workspace-instagram-title"
+                  label="인스타그램 제목"
+                  value={instagramAsset?.title || ""}
+                  onChange={(value) => onAssetChange("instagram", "title", value)}
+                  placeholder="인스타그램 제목"
+                />
+                <InputField
+                  id="workspace-instagram-body"
+                  label="인스타그램 문안"
+                  value={instagramAsset?.body || ""}
+                  onChange={(value) => onAssetChange("instagram", "body", value)}
+                  placeholder="블로그 요약이 자동 반영됩니다."
+                  multiline
+                  rows={8}
+                />
+                <InputField
+                  id="workspace-instagram-cta"
+                  label="인스타그램 CTA"
+                  value={instagramAsset?.cta || ""}
+                  onChange={(value) => onAssetChange("instagram", "cta", value)}
+                  placeholder="인스타그램 CTA"
+                  multiline
+                  rows={3}
+                />
+                <InputField
+                  id="workspace-instagram-tags"
+                  label="인스타그램 해시태그"
+                  value={instagramAsset?.hashtags || ""}
+                  onChange={(value) => onAssetChange("instagram", "hashtags", value)}
+                  placeholder="#인스타그램, #태그"
+                  multiline
+                  rows={3}
+                />
               </div>
-              <InputField
-                id="workspace-instagram-title"
-                label="인스타그램 제목"
-                value={instagramAsset?.title || ""}
-                onChange={(value) => onAssetChange("instagram", "title", value)}
-                placeholder="인스타그램 제목"
-              />
-              <InputField
-                id="workspace-instagram-body"
-                label="인스타그램 문안"
-                value={instagramAsset?.body || ""}
-                onChange={(value) => onAssetChange("instagram", "body", value)}
-                placeholder="블로그 요약이 자동 반영됩니다."
-                multiline
-                rows={8}
-              />
-              <InputField
-                id="workspace-instagram-cta"
-                label="인스타그램 CTA"
-                value={instagramAsset?.cta || ""}
-                onChange={(value) => onAssetChange("instagram", "cta", value)}
-                placeholder="인스타그램 CTA"
-                multiline
-                rows={3}
-              />
-              <InputField
-                id="workspace-instagram-tags"
-                label="인스타그램 해시태그"
-                value={instagramAsset?.hashtags || ""}
-                onChange={(value) => onAssetChange("instagram", "hashtags", value)}
-                placeholder="#인스타그램, #태그"
-                multiline
-                rows={3}
-              />
-            </article>
+            </details>
 
-            <article className="workspace-social-card">
-              <div className="commercial-inline-header">
-                <strong>페이스북</strong>
-                <StatusPill active>블로그 기반 자동 생성</StatusPill>
+            <details className="workspace-social-card workspace-disclosure">
+              <summary>
+                <span>페이스북</span>
+                <StatusPill active>자동 파생</StatusPill>
+              </summary>
+              <div className="workspace-disclosure-body workspace-form-stack">
+                <InputField
+                  id="workspace-facebook-title"
+                  label="페이스북 제목"
+                  value={facebookAsset?.title || ""}
+                  onChange={(value) => onAssetChange("facebook", "title", value)}
+                  placeholder="페이스북 제목"
+                />
+                <InputField
+                  id="workspace-facebook-body"
+                  label="페이스북 문안"
+                  value={facebookAsset?.body || ""}
+                  onChange={(value) => onAssetChange("facebook", "body", value)}
+                  placeholder="블로그 요약이 자동 반영됩니다."
+                  multiline
+                  rows={8}
+                />
+                <InputField
+                  id="workspace-facebook-cta"
+                  label="페이스북 CTA"
+                  value={facebookAsset?.cta || ""}
+                  onChange={(value) => onAssetChange("facebook", "cta", value)}
+                  placeholder="페이스북 CTA"
+                  multiline
+                  rows={3}
+                />
+                <InputField
+                  id="workspace-facebook-tags"
+                  label="페이스북 해시태그"
+                  value={facebookAsset?.hashtags || ""}
+                  onChange={(value) => onAssetChange("facebook", "hashtags", value)}
+                  placeholder="#페이스북, #태그"
+                  multiline
+                  rows={3}
+                />
               </div>
-              <InputField
-                id="workspace-facebook-title"
-                label="페이스북 제목"
-                value={facebookAsset?.title || ""}
-                onChange={(value) => onAssetChange("facebook", "title", value)}
-                placeholder="페이스북 제목"
-              />
-              <InputField
-                id="workspace-facebook-body"
-                label="페이스북 문안"
-                value={facebookAsset?.body || ""}
-                onChange={(value) => onAssetChange("facebook", "body", value)}
-                placeholder="블로그 요약이 자동 반영됩니다."
-                multiline
-                rows={8}
-              />
-              <InputField
-                id="workspace-facebook-cta"
-                label="페이스북 CTA"
-                value={facebookAsset?.cta || ""}
-                onChange={(value) => onAssetChange("facebook", "cta", value)}
-                placeholder="페이스북 CTA"
-                multiline
-                rows={3}
-              />
-              <InputField
-                id="workspace-facebook-tags"
-                label="페이스북 해시태그"
-                value={facebookAsset?.hashtags || ""}
-                onChange={(value) => onAssetChange("facebook", "hashtags", value)}
-                placeholder="#페이스북, #태그"
-                multiline
-                rows={3}
-              />
-            </article>
+            </details>
           </div>
         </section>
       </section>
@@ -700,50 +739,58 @@ export function CommercialWorkspace(props: CommercialWorkspaceProps) {
             {copyStatus ? <p className="fine-print">{copyStatus}</p> : null}
           </div>
           <div className="workspace-divider" />
-          <div className="workspace-provider-note">
-            <strong>이미지 제작 제안</strong>
-            <p className="fine-print">
-              현재 앱은 OpenAI 이미지 경로를 쓰고 있습니다. 상업용 품질을 더 높일 때는 Ideogram, FLUX 계열(Replicate), Midjourney 같은 외부 생성 경로를 별도 연결하는 구성이 적합합니다.
-            </p>
-          </div>
+          <details className="workspace-provider-note workspace-disclosure">
+            <summary>
+              <span>이미지 제작 제안</span>
+              <span className="fine-print">외부 생성 경로</span>
+            </summary>
+            <div className="workspace-disclosure-body">
+              <p className="fine-print">
+                현재 앱은 OpenAI 이미지 경로를 쓰고 있습니다. 상업용 품질을 더 높일 때는 Ideogram, FLUX 계열(Replicate), Midjourney 같은 외부 생성 경로를 별도 연결하는 구성이 적합합니다.
+              </p>
+            </div>
+          </details>
           <div className="workspace-divider" />
-          <div className="workspace-section">
-            <div className="workspace-section-header">
-              <strong>워드프레스 발행</strong>
-            </div>
-            <div className="workspace-two-up">
+          <details className="workspace-disclosure" open={Boolean(publishPackage || wordpressResult || wordpressConfig.siteUrl || wordpressConfig.username)}>
+            <summary>
+              <span>워드프레스 발행</span>
+              <span className="fine-print">{publishPackage ? "패키지 준비됨" : "설정 필요"}</span>
+            </summary>
+            <div className="workspace-disclosure-body workspace-section">
+              <div className="workspace-two-up">
+                <InputField
+                  id="workspace-wordpress-site"
+                  label="워드프레스 주소"
+                  value={wordpressConfig.siteUrl}
+                  onChange={(value) => onWordPressConfigChange("siteUrl", value)}
+                  placeholder="https://yourblog.com"
+                />
+                <InputField
+                  id="workspace-wordpress-user"
+                  label="사용자명"
+                  value={wordpressConfig.username}
+                  onChange={(value) => onWordPressConfigChange("username", value)}
+                  placeholder="editor"
+                />
+              </div>
               <InputField
-                id="workspace-wordpress-site"
-                label="워드프레스 주소"
-                value={wordpressConfig.siteUrl}
-                onChange={(value) => onWordPressConfigChange("siteUrl", value)}
-                placeholder="https://yourblog.com"
+                id="workspace-wordpress-password"
+                label="앱 비밀번호"
+                value={wordpressConfig.appPassword}
+                onChange={(value) => onWordPressConfigChange("appPassword", value)}
+                type="password"
+                placeholder="WordPress Application Password"
               />
-              <InputField
-                id="workspace-wordpress-user"
-                label="사용자명"
-                value={wordpressConfig.username}
-                onChange={(value) => onWordPressConfigChange("username", value)}
-                placeholder="editor"
-              />
+              <div className="button-row">
+                <button className="button ghost" disabled={settingsBusy} type="button" onClick={() => void onSaveWordPressDefaults()}>
+                  {settingsBusy ? "저장 중" : "워드프레스 기본값 저장"}
+                </button>
+                <button className="button primary" disabled={publishBusy || !blogAsset} type="button" onClick={() => void onPreparePublish()}>
+                  {publishBusy ? "발행 처리 중" : publishPackage ? "워드프레스 게시" : "블로그 발행 패키지 준비"}
+                </button>
+              </div>
             </div>
-            <InputField
-              id="workspace-wordpress-password"
-              label="앱 비밀번호"
-              value={wordpressConfig.appPassword}
-              onChange={(value) => onWordPressConfigChange("appPassword", value)}
-              type="password"
-              placeholder="WordPress Application Password"
-            />
-            <div className="button-row">
-              <button className="button ghost" disabled={settingsBusy} type="button" onClick={() => void onSaveWordPressDefaults()}>
-                {settingsBusy ? "저장 중" : "워드프레스 기본값 저장"}
-              </button>
-              <button className="button primary" disabled={publishBusy || !blogAsset} type="button" onClick={() => void onPreparePublish()}>
-                {publishBusy ? "발행 처리 중" : publishPackage ? "워드프레스 게시" : "블로그 발행 패키지 준비"}
-              </button>
-            </div>
-          </div>
+          </details>
 
           {publishPackage ? (
             <div className="workspace-publish-editor workspace-section">
@@ -791,18 +838,24 @@ export function CommercialWorkspace(props: CommercialWorkspaceProps) {
             <strong>최근 작업</strong>
             <StatusPill>{`${history.length} entries`}</StatusPill>
           </div>
-          <div className="workspace-history-list">
-            {history.length ? (
-              history.slice(0, 5).map((item) => (
-                <article className="workspace-history-item" key={item.id}>
-                  <strong>{item.title}</strong>
-                  <p className="fine-print">{item.description}</p>
-                </article>
-              ))
-            ) : (
-              <EmptyStatePanel title="최근 작업 이력이 없습니다." description="생성, 저장, 발행 작업이 누적되면 여기서 바로 확인할 수 있습니다." />
-            )}
-          </div>
+          <details className="workspace-disclosure">
+            <summary>
+              <span>최근 작업 보기</span>
+              <span className="fine-print">기록 펼치기</span>
+            </summary>
+            <div className="workspace-disclosure-body workspace-history-list">
+              {history.length ? (
+                history.slice(0, 5).map((item) => (
+                  <article className="workspace-history-item" key={item.id}>
+                    <strong>{item.title}</strong>
+                    <p className="fine-print">{item.description}</p>
+                  </article>
+                ))
+              ) : (
+                <EmptyStatePanel title="최근 작업 이력이 없습니다." description="생성, 저장, 발행 작업이 누적되면 여기서 바로 확인할 수 있습니다." />
+              )}
+            </div>
+          </details>
         </section>
       </aside>
     </div>

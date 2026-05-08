@@ -890,17 +890,17 @@ button {
 }
 
 .commercial-app-shell {
-  padding: 18px;
+  padding: 20px;
   background:
     radial-gradient(circle at top left, rgba(24, 46, 78, 0.045), transparent 22%),
     linear-gradient(180deg, #f8fafc 0%, #f1f4f8 100%);
 }
 
 .commercial-shell {
-  width: min(95vw, 1720px);
+  width: min(94vw, 1440px);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 300px minmax(0, 920px) 340px;
+  grid-template-columns: 280px minmax(0, 1fr) 300px;
   justify-content: center;
   gap: 20px;
 }
@@ -913,7 +913,7 @@ button {
 
 .commercial-card {
   border: 1px solid rgba(24, 46, 78, 0.07);
-  border-radius: 24px;
+  border-radius: 20px;
   background: rgba(255, 255, 255, 0.92);
   padding: 22px;
   box-shadow: 0 10px 24px rgba(24, 46, 78, 0.045);
@@ -942,18 +942,18 @@ button {
 .workspace-project-button strong {
   margin: 0;
   font-weight: 420;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.015em;
   color: #1b314f;
 }
 
 .commercial-card-heading h2 {
-  font-size: 21px;
-  line-height: 1.18;
+  font-size: 20px;
+  line-height: 1.24;
 }
 
 .commercial-card-heading h3 {
-  font-size: 17px;
-  line-height: 1.24;
+  font-size: 16px;
+  line-height: 1.28;
 }
 
 .commercial-kicker,
@@ -961,17 +961,17 @@ button {
 .workspace-panel-label {
   margin: 0 0 4px;
   color: rgba(27, 49, 79, 0.72);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 420;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .commercial-copy {
   margin: 10px 0 0;
   color: rgba(27, 49, 79, 0.64);
-  font-size: 13px;
-  line-height: 1.68;
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 .workspace-icon {
@@ -992,7 +992,7 @@ button {
 .workspace-history-list,
 .workspace-image-stack {
   display: grid;
-  gap: 18px;
+  gap: 16px;
 }
 
 .workspace-section,
@@ -1001,13 +1001,49 @@ button {
   gap: 16px;
 }
 
+.workspace-disclosure {
+  border: 1px solid rgba(24, 46, 78, 0.08);
+  border-radius: 16px;
+  background: rgba(250, 252, 254, 0.8);
+}
+
+.workspace-disclosure summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.workspace-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.workspace-disclosure summary span:first-child {
+  font-size: 14px;
+  font-weight: 420;
+  color: #1b314f;
+}
+
+.workspace-disclosure[open] summary {
+  border-bottom: 1px solid rgba(24, 46, 78, 0.07);
+}
+
+.workspace-disclosure-body {
+  display: grid;
+  gap: 16px;
+  padding: 16px 20px 20px;
+}
+
 .workspace-section-header {
   display: grid;
   gap: 6px;
 }
 
 .workspace-section-header strong {
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.3;
 }
 
@@ -1021,7 +1057,7 @@ button {
 }
 
 .workspace-action-bar {
-  padding-top: 4px;
+  padding-top: 8px;
 }
 
 .workspace-upload-card,
@@ -1032,7 +1068,7 @@ button {
 .workspace-history-item,
 .workspace-metric-card {
   border: 1px solid rgba(24, 46, 78, 0.08);
-  border-radius: 18px;
+  border-radius: 16px;
   background: #fafbfd;
 }
 
@@ -1040,21 +1076,25 @@ button {
 .workspace-social-card,
 .workspace-history-item,
 .workspace-topic-card {
-  padding: 18px;
+  padding: 20px;
+}
+
+.workspace-social-card {
+  padding: 0;
 }
 
 .workspace-muted-box {
   min-height: 42px;
   display: flex;
   align-items: center;
-  padding: 0 14px;
+  padding: 0 16px;
   color: rgba(27, 49, 79, 0.68);
 }
 
 .workspace-chip-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
 }
 
 .workspace-chip {
@@ -1066,7 +1106,7 @@ button {
   border: 1px solid rgba(39, 69, 110, 0.1);
   color: #2a466d;
   background: rgba(39, 69, 110, 0.045);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 420;
 }
 
@@ -1074,7 +1114,7 @@ button {
 .workspace-two-up,
 .workspace-metric-board {
   display: grid;
-  gap: 16px;
+  gap: 20px;
 }
 
 .workspace-meta-grid,
@@ -1085,7 +1125,7 @@ button {
 .workspace-project-list,
 .workspace-chip-grid {
   display: grid;
-  gap: 12px;
+  gap: 16px;
 }
 
 .workspace-topic-card {
@@ -1105,7 +1145,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  padding: 14px;
+  padding: 16px 18px;
 }
 
 .workspace-project-button {
@@ -1122,7 +1162,7 @@ button {
 .commercial-cover-preview,
 .workspace-image-panel {
   overflow: hidden;
-  border-radius: 20px;
+  border-radius: 16px;
   border: 1px solid rgba(24, 46, 78, 0.07);
   background: linear-gradient(180deg, #f8fafc 0%, #eff4f8 100%);
 }
@@ -1149,12 +1189,12 @@ button {
   align-items: center;
   justify-content: center;
   color: rgba(27, 49, 79, 0.42);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .workspace-image-empty.tall {
   min-height: 260px;
-  border-radius: 18px;
+  border-radius: 16px;
   border: 1px dashed rgba(24, 46, 78, 0.12);
   background: rgba(255, 255, 255, 0.66);
 }
@@ -1170,7 +1210,7 @@ button {
 .workspace-metric-card span {
   display: block;
   color: rgba(27, 49, 79, 0.54);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .workspace-metric-card strong {
@@ -1179,6 +1219,7 @@ button {
   font-size: 22px;
   font-weight: 420;
   color: #1b314f;
+  letter-spacing: 0;
 }
 
 .workspace-metric-card.warn {
@@ -1187,7 +1228,7 @@ button {
 }
 
 .workspace-image-panel {
-  padding: 12px;
+  padding: 16px;
 }
 
 .workspace-image-panel.body {
@@ -1197,12 +1238,12 @@ button {
 .workspace-image-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 
 .workspace-provider-note {
-  padding: 18px;
-  border-radius: 18px;
+  padding: 0;
+  border-radius: 16px;
   border: 1px solid rgba(39, 69, 110, 0.08);
   background: rgba(39, 69, 110, 0.035);
 }
@@ -1218,6 +1259,10 @@ button {
 .commercial-shell .field-label,
 .commercial-shell strong {
   font-weight: 420;
+}
+
+.commercial-shell .field-group {
+  gap: 10px;
 }
 
 .commercial-shell .button.primary {
@@ -1237,24 +1282,41 @@ button {
 .commercial-shell .brand-copy {
   color: rgba(27, 49, 79, 0.58);
   line-height: 1.68;
-  font-size: 12px;
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.commercial-shell .field-label {
+  margin-bottom: 2px;
 }
 
 .commercial-shell .text-input,
 .commercial-shell .text-area,
 .commercial-shell .button {
-  min-height: 42px;
-  font-size: 13px;
+  min-height: 48px;
+  font-size: 14px;
+}
+
+.commercial-shell .text-input,
+.commercial-shell select.text-input,
+.commercial-shell .text-area {
+  padding-left: 18px;
+  padding-right: 18px;
 }
 
 .commercial-shell .text-area {
-  padding-top: 11px;
-  padding-bottom: 11px;
+  padding-top: 14px;
+  padding-bottom: 14px;
 }
 
 .commercial-shell .status-pill {
-  font-size: 11px;
-  min-height: 28px;
+  font-size: 12px;
+  min-height: 30px;
+}
+
+.commercial-shell .button-row {
+  gap: 14px;
+  margin-top: 2px;
 }
 
 @media (max-width: 1420px) {
@@ -1291,8 +1353,8 @@ button {
   }
 
   .commercial-card {
-    padding: 16px;
-    border-radius: 20px;
+    padding: 18px;
+    border-radius: 18px;
   }
 
   .commercial-card-heading h2 {
