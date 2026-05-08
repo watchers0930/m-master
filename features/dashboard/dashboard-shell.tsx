@@ -174,7 +174,7 @@ export function DashboardShell() {
     { step: 3 as const, title: "테마 선택", description: "이번에 만들 콘텐츠의 작성 테마를 고릅니다." },
     { step: 4 as const, title: "채널별 문안", description: "블로그, 인스타그램, 페이스북 초안을 생성하고 수정합니다." },
     { step: 5 as const, title: "이미지 생성", description: "채널 문안에 맞는 대표 이미지를 만듭니다." },
-    { step: 6 as const, title: "복사/발행 준비", description: "최종 결과를 복사하거나 매체 등록 준비로 넘깁니다." },
+    { step: 6 as const, title: "복사/발행", description: "최종 결과를 복사하거나 워드프레스 게시까지 진행합니다." },
   ];
   const publishWorkflow = usePublishWorkflow({
     projectId: activeProject?.project.id ?? null,
@@ -715,7 +715,6 @@ export function DashboardShell() {
       setStudio(payload.data.studio);
       setImageStudios(toImageStudios(payload.data.studio));
       await loadProject(activeProject.project.id);
-      setCurrentStep(6);
     } catch (imageError) {
       setError(imageError instanceof Error ? imageError.message : "이미지 생성에 실패했습니다.");
     } finally {
@@ -756,6 +755,7 @@ export function DashboardShell() {
       setStudio(payload.data.studio);
       setImageStudios(toImageStudios(payload.data.studio));
       await loadProject(activeProject.project.id);
+      setCurrentStep(6);
     } catch (selectError) {
       setError(selectError instanceof Error ? selectError.message : "이미지 선택 적용에 실패했습니다.");
     } finally {
@@ -828,7 +828,7 @@ export function DashboardShell() {
     3: "이번에 만들 콘텐츠 테마를 하나 고른 뒤 채널별 초안을 생성합니다.",
     4: "블로그, 인스타그램, 페이스북 문안을 채널별로 다듬고 저장합니다.",
     5: "선택한 채널 문안에 맞는 이미지 시안을 만들고 대표안을 고릅니다.",
-    6: "최종 결과를 확인한 뒤 복사해서 바로 쓰거나 매체 등록 준비로 넘깁니다.",
+    6: "최종 결과를 확인한 뒤 복사해서 바로 쓰거나 워드프레스 게시까지 진행합니다.",
   } as const;
 
   return (
@@ -873,7 +873,7 @@ export function DashboardShell() {
               <p className="eyebrow" style={{ margin: 0 }}>Content Workflow</p>
               <h2 className="hero-title">{currentStepMeta.title}</h2>
               <p className="hero-copy">
-                {currentStepMeta.description} 사용자는 URL 입력부터 최종 복사/발행 준비까지 이 흐름대로 진행합니다.
+                {currentStepMeta.description} 사용자는 URL 입력부터 최종 복사/발행까지 이 흐름대로 진행합니다.
               </p>
             </div>
             {!onboardingMode ? (
