@@ -1057,7 +1057,8 @@ button {
 }
 
 .workspace-action-bar {
-  padding-top: 8px;
+  padding-top: 14px;
+  margin-top: 4px;
 }
 
 .workspace-upload-card,
@@ -1197,6 +1198,11 @@ button {
   border-radius: 16px;
   border: 1px dashed rgba(24, 46, 78, 0.12);
   background: rgba(255, 255, 255, 0.66);
+  grid-column: 1 / -1;
+  padding: 18px;
+  text-align: left;
+  align-items: flex-end;
+  justify-content: flex-start;
 }
 
 .workspace-metric-board {
@@ -1262,7 +1268,7 @@ button {
 }
 
 .commercial-shell .field-group {
-  gap: 10px;
+  gap: 12px;
 }
 
 .commercial-shell .button.primary {
@@ -1315,8 +1321,8 @@ button {
 }
 
 .commercial-shell .button-row {
-  gap: 14px;
-  margin-top: 2px;
+  gap: 16px;
+  margin-top: 8px;
 }
 
 @media (max-width: 1420px) {
@@ -1345,6 +1351,15 @@ button {
   .workspace-metric-board {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .commercial-column:last-child .button-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .commercial-column:last-child .button-row .button {
+    width: 100%;
+  }
 }
 
 @media (max-width: 720px) {
@@ -1363,5 +1378,39 @@ button {
 
   .workspace-metric-board {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace-disclosure summary {
+    grid-template-columns: minmax(0, 1fr);
+    justify-content: start;
+    align-items: start;
+    gap: 6px;
+  }
+
+  .workspace-disclosure summary .fine-print,
+  .workspace-disclosure summary .status-pill {
+    justify-self: start;
+  }
+
+  .commercial-shell .button-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .commercial-shell .button-row .button {
+    width: 100%;
+  }
+
+  .workspace-action-bar {
+    padding-top: 16px;
+  }
+
+  .commercial-cover-preview {
+    min-height: 180px;
+  }
+
+  .workspace-image-panel,
+  .workspace-image-panel.body {
+    padding: 14px;
   }
 }
