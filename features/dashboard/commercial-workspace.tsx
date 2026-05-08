@@ -444,65 +444,85 @@ export function CommercialWorkspace(props: CommercialWorkspaceProps) {
               <div className="commercial-cover-preview">
                 {coverImage ? <img alt={blogAsset.title} src={coverImage} /> : <div className="workspace-cover-empty">썸네일 생성 전</div>}
               </div>
-              <InputField
-                id="workspace-blog-title"
-                label="블로그 제목"
-                value={blogAsset.title}
-                onChange={(value) => onAssetChange("blog", "title", value)}
-                placeholder="네이버 블로그 제목"
-              />
-              <InputField
-                id="workspace-blog-body"
-                label="블로그 본문"
-                value={blogAsset.body}
-                onChange={(value) => onAssetChange("blog", "body", value)}
-                placeholder="네이버 블로그 본문"
-                multiline
-                rows={18}
-              />
-              <div className="workspace-two-up">
-                <InputField
-                  id="workspace-blog-cta"
-                  label="블로그 CTA"
-                  value={blogAsset.cta}
-                  onChange={(value) => onAssetChange("blog", "cta", value)}
-                  placeholder="상담, 문의, 신청"
-                  multiline
-                  rows={4}
-                />
-                <InputField
-                  id="workspace-blog-tags"
-                  label="블로그 해시태그"
-                  value={blogAsset.hashtags}
-                  onChange={(value) => onAssetChange("blog", "hashtags", value)}
-                  placeholder="#브랜드, #키워드"
-                  multiline
-                  rows={4}
-                />
-              </div>
-              <div className="workspace-metric-board">
-                <div className={`workspace-metric-card ${blogMetrics.charOk ? "good" : "warn"}`}>
-                  <span>글자수</span>
-                  <strong>{blogMetrics.charCount}</strong>
-                  <p className="fine-print">권장 2,200~3,200자</p>
+              <div className="workspace-section">
+                <div className="workspace-section-header">
+                  <strong>블로그 원고</strong>
+                  <p className="fine-print">네이버 블로그 기준 원고를 먼저 다듬고, 아래 소셜 채널이 이를 요약해 따라갑니다.</p>
                 </div>
-                <div className={`workspace-metric-card ${blogMetrics.paragraphOk ? "good" : "warn"}`}>
-                  <span>문단수</span>
-                  <strong>{blogMetrics.paragraphCount}</strong>
-                  <p className="fine-print">권장 6~10문단</p>
-                </div>
-                <div className={`workspace-metric-card ${blogMetrics.imageOk ? "good" : "warn"}`}>
-                  <span>이미지 큐</span>
-                  <strong>{blogMetrics.imageCueCount}</strong>
-                  <p className="fine-print">권장 5~8장</p>
-                </div>
-                <div className={`workspace-metric-card ${blogMetrics.headingCount >= 5 ? "good" : "warn"}`}>
-                  <span>섹션</span>
-                  <strong>{blogMetrics.headingCount}</strong>
-                  <p className="fine-print">도입/본문/마무리 구조</p>
+                <div className="workspace-form-stack">
+                  <InputField
+                    id="workspace-blog-title"
+                    label="블로그 제목"
+                    value={blogAsset.title}
+                    onChange={(value) => onAssetChange("blog", "title", value)}
+                    placeholder="네이버 블로그 제목"
+                  />
+                  <InputField
+                    id="workspace-blog-body"
+                    label="블로그 본문"
+                    value={blogAsset.body}
+                    onChange={(value) => onAssetChange("blog", "body", value)}
+                    placeholder="네이버 블로그 본문"
+                    multiline
+                    rows={18}
+                  />
                 </div>
               </div>
-              <div className="button-row">
+              <div className="workspace-divider" />
+              <div className="workspace-section">
+                <div className="workspace-section-header">
+                  <strong>전환 요소</strong>
+                </div>
+                <div className="workspace-two-up">
+                  <InputField
+                    id="workspace-blog-cta"
+                    label="블로그 CTA"
+                    value={blogAsset.cta}
+                    onChange={(value) => onAssetChange("blog", "cta", value)}
+                    placeholder="상담, 문의, 신청"
+                    multiline
+                    rows={4}
+                  />
+                  <InputField
+                    id="workspace-blog-tags"
+                    label="블로그 해시태그"
+                    value={blogAsset.hashtags}
+                    onChange={(value) => onAssetChange("blog", "hashtags", value)}
+                    placeholder="#브랜드, #키워드"
+                    multiline
+                    rows={4}
+                  />
+                </div>
+              </div>
+              <div className="workspace-divider" />
+              <div className="workspace-section">
+                <div className="workspace-section-header">
+                  <strong>구성 점검</strong>
+                </div>
+                <div className="workspace-metric-board">
+                  <div className={`workspace-metric-card ${blogMetrics.charOk ? "good" : "warn"}`}>
+                    <span>글자수</span>
+                    <strong>{blogMetrics.charCount}</strong>
+                    <p className="fine-print">권장 2,200~3,200자</p>
+                  </div>
+                  <div className={`workspace-metric-card ${blogMetrics.paragraphOk ? "good" : "warn"}`}>
+                    <span>문단수</span>
+                    <strong>{blogMetrics.paragraphCount}</strong>
+                    <p className="fine-print">권장 6~10문단</p>
+                  </div>
+                  <div className={`workspace-metric-card ${blogMetrics.imageOk ? "good" : "warn"}`}>
+                    <span>이미지 큐</span>
+                    <strong>{blogMetrics.imageCueCount}</strong>
+                    <p className="fine-print">권장 5~8장</p>
+                  </div>
+                  <div className={`workspace-metric-card ${blogMetrics.headingCount >= 5 ? "good" : "warn"}`}>
+                    <span>섹션</span>
+                    <strong>{blogMetrics.headingCount}</strong>
+                    <p className="fine-print">도입/본문/마무리 구조</p>
+                  </div>
+                </div>
+              </div>
+              <div className="workspace-action-bar button-row">
                 <button className="button ghost" disabled={loading} type="button" onClick={() => void onGenerateContent()}>
                   {loading ? "재생성 중" : "블로그 다시 쓰기"}
                 </button>
@@ -527,6 +547,7 @@ export function CommercialWorkspace(props: CommercialWorkspaceProps) {
               <h3>인스타그램 · 페이스북 자동 파생</h3>
             </div>
           </div>
+          <p className="fine-print workspace-section-intro">블로그 본문을 기준으로 채널별 길이와 톤만 바꿔 자동 파생합니다.</p>
           <div className="workspace-social-stack">
             <article className="workspace-social-card">
               <div className="commercial-inline-header">
@@ -664,56 +685,71 @@ export function CommercialWorkspace(props: CommercialWorkspaceProps) {
               <h3>HTML 및 발행</h3>
             </div>
           </div>
-          <div className="button-row">
-            <button className="button" disabled={exportBusy || !blogAsset} type="button" onClick={() => void onDownloadBlogHtml()}>
-              {exportBusy ? "HTML 준비 중" : "블로그 HTML 다운로드"}
-            </button>
-            <button className="button ghost" disabled={!blogImageGroup?.variants.length} type="button" onClick={() => void handleDownloadImageBundle()}>
-              이미지 묶음 다운로드
-            </button>
+          <div className="workspace-section">
+            <div className="workspace-section-header">
+              <strong>다운로드</strong>
+            </div>
+            <div className="button-row">
+              <button className="button" disabled={exportBusy || !blogAsset} type="button" onClick={() => void onDownloadBlogHtml()}>
+                {exportBusy ? "HTML 준비 중" : "블로그 HTML 다운로드"}
+              </button>
+              <button className="button ghost" disabled={!blogImageGroup?.variants.length} type="button" onClick={() => void handleDownloadImageBundle()}>
+                이미지 묶음 다운로드
+              </button>
+            </div>
+            {copyStatus ? <p className="fine-print">{copyStatus}</p> : null}
           </div>
-          {copyStatus ? <p className="fine-print">{copyStatus}</p> : null}
+          <div className="workspace-divider" />
           <div className="workspace-provider-note">
             <strong>이미지 제작 제안</strong>
             <p className="fine-print">
               현재 앱은 OpenAI 이미지 경로를 쓰고 있습니다. 상업용 품질을 더 높일 때는 Ideogram, FLUX 계열(Replicate), Midjourney 같은 외부 생성 경로를 별도 연결하는 구성이 적합합니다.
             </p>
           </div>
-          <div className="workspace-two-up">
+          <div className="workspace-divider" />
+          <div className="workspace-section">
+            <div className="workspace-section-header">
+              <strong>워드프레스 발행</strong>
+            </div>
+            <div className="workspace-two-up">
+              <InputField
+                id="workspace-wordpress-site"
+                label="워드프레스 주소"
+                value={wordpressConfig.siteUrl}
+                onChange={(value) => onWordPressConfigChange("siteUrl", value)}
+                placeholder="https://yourblog.com"
+              />
+              <InputField
+                id="workspace-wordpress-user"
+                label="사용자명"
+                value={wordpressConfig.username}
+                onChange={(value) => onWordPressConfigChange("username", value)}
+                placeholder="editor"
+              />
+            </div>
             <InputField
-              id="workspace-wordpress-site"
-              label="워드프레스 주소"
-              value={wordpressConfig.siteUrl}
-              onChange={(value) => onWordPressConfigChange("siteUrl", value)}
-              placeholder="https://yourblog.com"
+              id="workspace-wordpress-password"
+              label="앱 비밀번호"
+              value={wordpressConfig.appPassword}
+              onChange={(value) => onWordPressConfigChange("appPassword", value)}
+              type="password"
+              placeholder="WordPress Application Password"
             />
-            <InputField
-              id="workspace-wordpress-user"
-              label="사용자명"
-              value={wordpressConfig.username}
-              onChange={(value) => onWordPressConfigChange("username", value)}
-              placeholder="editor"
-            />
-          </div>
-          <InputField
-            id="workspace-wordpress-password"
-            label="앱 비밀번호"
-            value={wordpressConfig.appPassword}
-            onChange={(value) => onWordPressConfigChange("appPassword", value)}
-            type="password"
-            placeholder="WordPress Application Password"
-          />
-          <div className="button-row">
-            <button className="button ghost" disabled={settingsBusy} type="button" onClick={() => void onSaveWordPressDefaults()}>
-              {settingsBusy ? "저장 중" : "워드프레스 기본값 저장"}
-            </button>
-            <button className="button primary" disabled={publishBusy || !blogAsset} type="button" onClick={() => void onPreparePublish()}>
-              {publishBusy ? "발행 처리 중" : publishPackage ? "워드프레스 게시" : "블로그 발행 패키지 준비"}
-            </button>
+            <div className="button-row">
+              <button className="button ghost" disabled={settingsBusy} type="button" onClick={() => void onSaveWordPressDefaults()}>
+                {settingsBusy ? "저장 중" : "워드프레스 기본값 저장"}
+              </button>
+              <button className="button primary" disabled={publishBusy || !blogAsset} type="button" onClick={() => void onPreparePublish()}>
+                {publishBusy ? "발행 처리 중" : publishPackage ? "워드프레스 게시" : "블로그 발행 패키지 준비"}
+              </button>
+            </div>
           </div>
 
           {publishPackage ? (
-            <div className="workspace-publish-editor">
+            <div className="workspace-publish-editor workspace-section">
+              <div className="workspace-section-header">
+                <strong>발행용 최종본</strong>
+              </div>
               <InputField
                 id="workspace-publish-title"
                 label="발행 제목"

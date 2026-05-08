@@ -900,21 +900,22 @@ button {
   width: min(95vw, 1720px);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr) 360px;
-  gap: 14px;
+  grid-template-columns: 300px minmax(0, 920px) 340px;
+  justify-content: center;
+  gap: 20px;
 }
 
 .commercial-column {
   display: grid;
   align-content: start;
-  gap: 14px;
+  gap: 20px;
 }
 
 .commercial-card {
   border: 1px solid rgba(24, 46, 78, 0.07);
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.92);
-  padding: 18px;
+  padding: 22px;
   box-shadow: 0 10px 24px rgba(24, 46, 78, 0.045);
   backdrop-filter: blur(12px);
 }
@@ -991,7 +992,36 @@ button {
 .workspace-history-list,
 .workspace-image-stack {
   display: grid;
-  gap: 12px;
+  gap: 18px;
+}
+
+.workspace-section,
+.workspace-form-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.workspace-section-header {
+  display: grid;
+  gap: 6px;
+}
+
+.workspace-section-header strong {
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.workspace-section-intro {
+  margin: -4px 0 2px;
+}
+
+.workspace-divider {
+  height: 1px;
+  background: linear-gradient(90deg, rgba(24, 46, 78, 0), rgba(24, 46, 78, 0.1), rgba(24, 46, 78, 0));
+}
+
+.workspace-action-bar {
+  padding-top: 4px;
 }
 
 .workspace-upload-card,
@@ -1010,7 +1040,7 @@ button {
 .workspace-social-card,
 .workspace-history-item,
 .workspace-topic-card {
-  padding: 14px;
+  padding: 18px;
 }
 
 .workspace-muted-box {
@@ -1044,7 +1074,7 @@ button {
 .workspace-two-up,
 .workspace-metric-board {
   display: grid;
-  gap: 12px;
+  gap: 16px;
 }
 
 .workspace-meta-grid,
@@ -1055,7 +1085,7 @@ button {
 .workspace-project-list,
 .workspace-chip-grid {
   display: grid;
-  gap: 8px;
+  gap: 12px;
 }
 
 .workspace-topic-card {
@@ -1074,8 +1104,8 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
+  gap: 14px;
+  padding: 14px;
 }
 
 .workspace-project-button {
@@ -1086,7 +1116,7 @@ button {
 }
 
 .commercial-preview-card {
-  gap: 12px;
+  gap: 20px;
 }
 
 .commercial-cover-preview,
@@ -1130,11 +1160,11 @@ button {
 }
 
 .workspace-metric-board {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .workspace-metric-card {
-  padding: 13px 14px;
+  padding: 16px;
 }
 
 .workspace-metric-card span {
@@ -1157,7 +1187,7 @@ button {
 }
 
 .workspace-image-panel {
-  padding: 10px;
+  padding: 12px;
 }
 
 .workspace-image-panel.body {
@@ -1167,18 +1197,18 @@ button {
 .workspace-image-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 14px;
 }
 
 .workspace-provider-note {
-  padding: 14px;
+  padding: 18px;
   border-radius: 18px;
   border: 1px solid rgba(39, 69, 110, 0.08);
   background: rgba(39, 69, 110, 0.035);
 }
 
 .workspace-history-item {
-  padding: 12px 14px;
+  padding: 16px 18px;
 }
 
 .commercial-shell .button,
@@ -1206,7 +1236,7 @@ button {
 .commercial-shell .card-copy,
 .commercial-shell .brand-copy {
   color: rgba(27, 49, 79, 0.58);
-  line-height: 1.58;
+  line-height: 1.68;
   font-size: 12px;
 }
 
@@ -1246,9 +1276,12 @@ button {
 
   .workspace-meta-grid,
   .workspace-two-up,
-  .workspace-metric-board,
   .workspace-image-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .workspace-metric-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -1264,5 +1297,9 @@ button {
 
   .commercial-card-heading h2 {
     font-size: 19px;
+  }
+
+  .workspace-metric-board {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
