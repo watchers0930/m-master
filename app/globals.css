@@ -890,38 +890,38 @@ button {
 }
 
 .commercial-app-shell {
-  padding: 18px;
+  padding: 24px;
   background:
-    radial-gradient(circle at top left, rgba(24, 46, 78, 0.045), transparent 22%),
-    linear-gradient(180deg, #f8fafc 0%, #f1f4f8 100%);
+    radial-gradient(circle at top left, rgba(16, 35, 63, 0.06), transparent 24%),
+    linear-gradient(180deg, #f5f7fa 0%, #eef2f6 100%);
 }
 
 .commercial-shell {
-  width: min(95vw, 1720px);
+  width: min(96vw, 1860px);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr) 360px;
-  gap: 14px;
+  grid-template-columns: 360px minmax(0, 1fr) 420px;
+  gap: 18px;
 }
 
 .commercial-column {
   display: grid;
   align-content: start;
-  gap: 14px;
+  gap: 18px;
 }
 
 .commercial-card {
-  border: 1px solid rgba(24, 46, 78, 0.07);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.92);
-  padding: 18px;
-  box-shadow: 0 10px 24px rgba(24, 46, 78, 0.045);
-  backdrop-filter: blur(12px);
+  border: 1px solid rgba(16, 35, 63, 0.09);
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.94);
+  padding: 24px;
+  box-shadow: 0 18px 50px rgba(16, 35, 63, 0.06);
+  backdrop-filter: blur(16px);
 }
 
 .commercial-card-hero {
   background:
-    linear-gradient(180deg, rgba(24, 46, 78, 0.04) 0%, rgba(255, 255, 255, 0.96) 100%),
+    linear-gradient(180deg, rgba(16, 35, 63, 0.06) 0%, rgba(255, 255, 255, 0.96) 100%),
     #fff;
 }
 
@@ -940,44 +940,44 @@ button {
 .workspace-history-item strong,
 .workspace-project-button strong {
   margin: 0;
-  font-weight: 420;
-  letter-spacing: -0.025em;
-  color: #1b314f;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  color: #10233f;
 }
 
 .commercial-card-heading h2 {
-  font-size: 21px;
-  line-height: 1.18;
+  font-size: 28px;
+  line-height: 1.06;
 }
 
 .commercial-card-heading h3 {
-  font-size: 17px;
-  line-height: 1.24;
+  font-size: 22px;
+  line-height: 1.12;
 }
 
 .commercial-kicker,
 .workspace-meta-label,
 .workspace-panel-label {
-  margin: 0 0 4px;
-  color: rgba(27, 49, 79, 0.72);
-  font-size: 10px;
-  font-weight: 420;
-  letter-spacing: 0.14em;
+  margin: 0 0 6px;
+  color: #17375f;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .commercial-copy {
-  margin: 10px 0 0;
-  color: rgba(27, 49, 79, 0.64);
-  font-size: 13px;
-  line-height: 1.68;
+  margin: 14px 0 0;
+  color: rgba(16, 35, 63, 0.72);
+  font-size: 14px;
+  line-height: 1.8;
 }
 
 .workspace-icon {
-  width: 20px;
-  height: 20px;
-  stroke: #27456e;
-  stroke-width: 1.45;
+  width: 24px;
+  height: 24px;
+  stroke: #17375f;
+  stroke-width: 1.6;
   fill: none;
   flex-shrink: 0;
   margin-top: 2px;
@@ -991,7 +991,7 @@ button {
 .workspace-history-list,
 .workspace-image-stack {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .workspace-upload-card,
@@ -1001,24 +1001,24 @@ button {
 .workspace-social-card,
 .workspace-history-item,
 .workspace-metric-card {
-  border: 1px solid rgba(24, 46, 78, 0.08);
-  border-radius: 18px;
-  background: #fafbfd;
+  border: 1px solid rgba(16, 35, 63, 0.1);
+  border-radius: 24px;
+  background: #f8fafc;
 }
 
 .workspace-upload-card,
 .workspace-social-card,
 .workspace-history-item,
 .workspace-topic-card {
-  padding: 14px;
+  padding: 16px;
 }
 
 .workspace-muted-box {
-  min-height: 42px;
+  min-height: 48px;
   display: flex;
   align-items: center;
-  padding: 0 14px;
-  color: rgba(27, 49, 79, 0.68);
+  padding: 0 16px;
+  color: rgba(16, 35, 63, 0.72);
 }
 
 .workspace-chip-row {
@@ -1030,14 +1030,14 @@ button {
 .workspace-chip {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
-  padding: 0 10px;
+  min-height: 32px;
+  padding: 0 12px;
   border-radius: 999px;
-  border: 1px solid rgba(39, 69, 110, 0.1);
-  color: #2a466d;
-  background: rgba(39, 69, 110, 0.045);
-  font-size: 11px;
-  font-weight: 420;
+  border: 1px solid rgba(23, 55, 95, 0.12);
+  color: #17375f;
+  background: rgba(23, 55, 95, 0.06);
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .workspace-meta-grid,
@@ -1055,7 +1055,7 @@ button {
 .workspace-project-list,
 .workspace-chip-grid {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .workspace-topic-card {
@@ -1066,8 +1066,8 @@ button {
 .workspace-topic-card.active,
 .workspace-project-row.active,
 .workspace-metric-card.good {
-  border-color: rgba(39, 69, 110, 0.18);
-  background: rgba(39, 69, 110, 0.05);
+  border-color: rgba(23, 55, 95, 0.24);
+  background: rgba(23, 55, 95, 0.08);
 }
 
 .workspace-project-row {
@@ -1075,7 +1075,7 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 12px;
 }
 
 .workspace-project-button {
@@ -1086,19 +1086,19 @@ button {
 }
 
 .commercial-preview-card {
-  gap: 12px;
+  gap: 16px;
 }
 
 .commercial-cover-preview,
 .workspace-image-panel {
   overflow: hidden;
-  border-radius: 20px;
-  border: 1px solid rgba(24, 46, 78, 0.07);
-  background: linear-gradient(180deg, #f8fafc 0%, #eff4f8 100%);
+  border-radius: 28px;
+  border: 1px solid rgba(16, 35, 63, 0.08);
+  background: linear-gradient(180deg, #f6f9fc 0%, #edf2f8 100%);
 }
 
 .commercial-cover-preview {
-  min-height: 220px;
+  min-height: 260px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1114,19 +1114,19 @@ button {
 
 .workspace-cover-empty,
 .workspace-image-empty {
-  min-height: 180px;
+  min-height: 220px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(27, 49, 79, 0.42);
-  font-size: 13px;
+  color: rgba(16, 35, 63, 0.44);
+  font-size: 14px;
 }
 
 .workspace-image-empty.tall {
-  min-height: 260px;
-  border-radius: 18px;
-  border: 1px dashed rgba(24, 46, 78, 0.12);
-  background: rgba(255, 255, 255, 0.66);
+  min-height: 320px;
+  border-radius: 24px;
+  border: 1px dashed rgba(16, 35, 63, 0.14);
+  background: rgba(255, 255, 255, 0.56);
 }
 
 .workspace-metric-board {
@@ -1134,51 +1134,51 @@ button {
 }
 
 .workspace-metric-card {
-  padding: 13px 14px;
+  padding: 16px;
 }
 
 .workspace-metric-card span {
   display: block;
-  color: rgba(27, 49, 79, 0.54);
-  font-size: 11px;
+  color: rgba(16, 35, 63, 0.56);
+  font-size: 12px;
 }
 
 .workspace-metric-card strong {
   display: block;
-  margin-top: 6px;
-  font-size: 22px;
-  font-weight: 420;
-  color: #1b314f;
+  margin-top: 8px;
+  font-size: 28px;
+  font-weight: 500;
+  color: #10233f;
 }
 
 .workspace-metric-card.warn {
-  border-color: rgba(24, 46, 78, 0.09);
-  background: #fcfdfe;
+  border-color: rgba(16, 35, 63, 0.12);
+  background: #fbfcfd;
 }
 
 .workspace-image-panel {
-  padding: 10px;
+  padding: 14px;
 }
 
 .workspace-image-panel.body {
-  padding: 10px;
+  padding: 12px;
 }
 
 .workspace-image-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .workspace-provider-note {
-  padding: 14px;
-  border-radius: 18px;
-  border: 1px solid rgba(39, 69, 110, 0.08);
-  background: rgba(39, 69, 110, 0.035);
+  padding: 16px;
+  border-radius: 24px;
+  border: 1px solid rgba(23, 55, 95, 0.1);
+  background: rgba(23, 55, 95, 0.04);
 }
 
 .workspace-history-item {
-  padding: 12px 14px;
+  padding: 14px 16px;
 }
 
 .commercial-shell .button,
@@ -1187,49 +1187,31 @@ button {
 .commercial-shell .text-area,
 .commercial-shell .field-label,
 .commercial-shell strong {
-  font-weight: 420;
+  font-weight: 500;
 }
 
 .commercial-shell .button.primary {
-  background: #203a5e;
-  border-color: #203a5e;
+  background: #10233f;
+  border-color: #10233f;
 }
 
 .commercial-shell .button,
 .commercial-shell .text-input,
 .commercial-shell .text-area,
 .commercial-shell .status-pill {
-  border-radius: 14px;
+  border-radius: 18px;
 }
 
 .commercial-shell .fine-print,
 .commercial-shell .card-copy,
 .commercial-shell .brand-copy {
-  color: rgba(27, 49, 79, 0.58);
-  line-height: 1.58;
-  font-size: 12px;
-}
-
-.commercial-shell .text-input,
-.commercial-shell .text-area,
-.commercial-shell .button {
-  min-height: 42px;
-  font-size: 13px;
-}
-
-.commercial-shell .text-area {
-  padding-top: 11px;
-  padding-bottom: 11px;
-}
-
-.commercial-shell .status-pill {
-  font-size: 11px;
-  min-height: 28px;
+  color: rgba(16, 35, 63, 0.64);
+  line-height: 1.72;
 }
 
 @media (max-width: 1420px) {
   .commercial-shell {
-    grid-template-columns: 280px minmax(0, 1fr);
+    grid-template-columns: 320px minmax(0, 1fr);
   }
 
   .commercial-column:last-child {
@@ -1254,15 +1236,15 @@ button {
 
 @media (max-width: 720px) {
   .commercial-app-shell {
-    padding: 12px;
+    padding: 14px;
   }
 
   .commercial-card {
-    padding: 16px;
-    border-radius: 20px;
+    padding: 18px;
+    border-radius: 24px;
   }
 
   .commercial-card-heading h2 {
-    font-size: 19px;
+    font-size: 24px;
   }
 }
