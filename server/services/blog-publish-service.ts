@@ -5,7 +5,6 @@ export type BlogPublishAsset = {
   hashtags?: string | null;
   imageJobs: Array<{
     imageAssets: Array<{
-      role?: string | null;
       originalPath: string | null;
       composedPath: string | null;
       selected: boolean;
@@ -71,7 +70,7 @@ function paragraphizeMarkdown(value: string) {
     .join("\n");
 }
 
-function renderStructuredBlogBody(value: string, bodyImageUrls: string[] = []) {
+function renderStructuredBlogBody(value: string) {
   const blocks: string[] = [];
   const lines = value.split("\n");
   let paragraphLines: string[] = [];
@@ -109,12 +108,8 @@ function renderStructuredBlogBody(value: string, bodyImageUrls: string[] = []) {
     if (imageCue) {
       flushParagraph();
       flushList();
-      const imageIndex = Number(imageCue[1]) - 1;
-      const imageUrl = bodyImageUrls[imageIndex];
       blocks.push(
-        imageUrl
-          ? `<figure><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(imageCue[2])}" style="max-width:100%;height:auto;border-radius:18px;" /><figcaption>이미지 ${escapeHtml(imageCue[1])}. ${escapeHtml(imageCue[2])}</figcaption></figure>`
-          : `<figure><figcaption>이미지 ${escapeHtml(imageCue[1])}. ${escapeHtml(imageCue[2])}</figcaption></figure>`,
+        `<figure><figcaption>이미지 ${escapeHtml(imageCue[1])}. ${escapeHtml(imageCue[2])}</figcaption></figure>`,
       );
       continue;
     }
@@ -216,10 +211,9 @@ export function buildBlogHtml(params: {
   cta?: string | null;
   hashtags?: string | null;
   coverImageUrl?: string | null;
-  bodyImageUrls?: string[];
 }) {
   const bodyHtml = params.body.includes("## ") || /\[이미지\s+\d+\]/.test(params.body)
-    ? renderStructuredBlogBody(params.body, params.bodyImageUrls)
+    ? renderStructuredBlogBody(params.body)
     : paragraphizeMarkdown(params.body);
   const ctaHtml = params.cta ? `<section><h2>다음 단계</h2><p>${escapeHtml(params.cta)}</p></section>` : "";
   const hashtagHtml = parseHashtagText(params.hashtags).length
@@ -238,23 +232,12 @@ export function selectBlogCoverImage(asset: BlogPublishAsset) {
   const imageAssets = asset.imageJobs.flatMap((job) => job.imageAssets);
 
   return (
-    imageAssets.find((imageAsset) => imageAsset.role === "cover")?.composedPath ||
-    imageAssets.find((imageAsset) => imageAsset.role === "cover")?.originalPath ||
     imageAssets.find((imageAsset) => imageAsset.selected)?.composedPath ||
     imageAssets[0]?.composedPath ||
     imageAssets.find((imageAsset) => imageAsset.selected)?.originalPath ||
     imageAssets[0]?.originalPath ||
     null
   );
-}
-
-export function selectBlogBodyImages(asset: BlogPublishAsset) {
-  return asset.imageJobs
-    .flatMap((job) => job.imageAssets)
-    .filter((imageAsset) => imageAsset.role?.startsWith("body-"))
-    .sort((left, right) => (left.role || "").localeCompare(right.role || "", "en"))
-    .map((imageAsset) => imageAsset.composedPath || imageAsset.originalPath)
-    .filter((path): path is string => Boolean(path));
 }
 
 export function buildBlogPublishPackage(params: {
@@ -273,7 +256,6 @@ export function buildBlogPublishPackage(params: {
   };
 }): BlogPublishPackage {
   const coverImageUrl = selectBlogCoverImage(params.asset);
-  const bodyImageUrls = selectBlogBodyImages(params.asset);
   const title = params.overrides?.title?.trim() || params.asset.title || params.fallbackTitle;
   const summary = (params.overrides?.summary?.trim() || params.profile.summary).slice(0, 220);
   const cta = params.asset.cta || params.profile.cta || null;
@@ -288,7 +270,6 @@ export function buildBlogPublishPackage(params: {
       cta,
       hashtags,
       coverImageUrl,
-      bodyImageUrls,
     });
   const { bodyHtml, htmlWarnings } = sanitizeHtmlContent(rawBodyHtml);
 

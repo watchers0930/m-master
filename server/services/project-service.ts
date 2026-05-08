@@ -20,11 +20,7 @@ import {
 import { buildContextDraft } from "./context-draft-service";
 import { buildGeneratedStudioSeed, type ContentGenerationProvider } from "./content-generation-service";
 import { buildImageVariants } from "./image-studio-service";
-import {
-  buildBlogHtml,
-  buildBlogPublishPackage,
-  createExportSlug,
-} from "./blog-publish-service";
+import { buildBlogHtml, buildBlogPublishPackage, createExportSlug } from "./blog-publish-service";
 import { buildReviewSummary } from "./review-service";
 import { analyzeSourceFiles } from "./source-analysis-service";
 import { buildStudioSeed } from "./studio-seed-service";
@@ -645,16 +641,6 @@ export async function exportProjectContent(projectId: string) {
             body: asset.body,
             cta: asset.cta,
             hashtags: asset.hashtags,
-            coverImageUrl:
-              studio.draft.images
-                .find((imageGroup) => imageGroup.channel === "blog")
-                ?.variants.find((variant) => variant.role === "cover" || variant.selected)?.url || null,
-            bodyImageUrls:
-              studio.draft.images
-                .find((imageGroup) => imageGroup.channel === "blog")
-                ?.variants.filter((variant) => variant.role.startsWith("body-"))
-                .sort((left, right) => left.role.localeCompare(right.role, "en"))
-                .map((variant) => variant.url) || [],
           })
         : [asset.title, "", asset.body, "", "CTA", asset.cta].filter(Boolean).join("\n"),
     hashtags: asset.channel === "blog" ? "" : asset.hashtags || "",

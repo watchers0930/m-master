@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 
-import { CommercialWorkspace } from "@/features/dashboard/commercial-workspace";
+import { ContentStudio } from "@/features/dashboard/content-studio";
+import { ProjectIntakeForm } from "@/features/dashboard/project-intake-form";
+import { ProjectOverview } from "@/features/dashboard/project-overview";
 import { usePublishWorkflow } from "@/features/dashboard/use-publish-workflow";
 import type {
   ChannelKey,
@@ -156,7 +158,6 @@ export function DashboardShell() {
   const [folderSupported, setFolderSupported] = useState<boolean | null>(null);
 
   const currentImageStudio = imageStudios[activeChannel];
-  const blogImageStudio = imageStudios.blog;
   const contextApproved = Boolean(activeProject?.brandProfile?.approved);
   const onboardingMode = !activeProject && projects.length === 0 && currentStep === 1;
   const stepAvailability = {
@@ -681,18 +682,14 @@ export function DashboardShell() {
     }));
   }
 
-  function handleImagePromptChangeForChannel(channel: ChannelKey, value: string) {
-    updateImageStudio(channel, (currentStudio) => ({
+  function handleImagePromptChange(value: string) {
+    updateImageStudio(activeChannel, (currentStudio) => ({
       ...currentStudio,
       prompt: value,
     }));
   }
 
-  function handleImagePromptChange(value: string) {
-    handleImagePromptChangeForChannel(activeChannel, value);
-  }
-
-  async function generateImagesForChannel(channel: ChannelKey, prompt: string) {
+  async function handleGenerateImages() {
     if (!activeProject?.project.id) {
       return;
     }
@@ -705,8 +702,8 @@ export function DashboardShell() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          channel,
-          prompt,
+          channel: activeChannel,
+          prompt: currentImageStudio.prompt,
         }),
       });
       const payload = await parseJson<ApiResponse<{ studio: StudioDetail }>>(response);
@@ -723,14 +720,6 @@ export function DashboardShell() {
     } finally {
       setImageBusy(false);
     }
-  }
-
-  async function handleGenerateImages() {
-    return generateImagesForChannel(activeChannel, currentImageStudio.prompt);
-  }
-
-  async function handleGenerateBlogImages() {
-    return generateImagesForChannel("blog", blogImageStudio.prompt);
   }
 
   function handleSelectImageVariant(variantId: string) {
@@ -829,59 +818,361 @@ export function DashboardShell() {
     setCurrentStep(2);
   }
 
+  const currentStepMeta = stepMeta.find((item) => item.step === currentStep) || stepMeta[0];
+  const previousStep = currentStep > 1 ? ((currentStep - 1) as 1 | 2 | 3 | 4 | 5) : null;
+  const nextStep = currentStep < 6 ? ((currentStep + 1) as 2 | 3 | 4 | 5 | 6) : null;
+  const journeyLabels = ["URL 입력", "콘텍스트 정리", "테마 선택", "채널 작성", "이미지 생성", "복사/발행"] as const;
+  const stepFocusCopy = {
+    1: "사이트 주소를 넣고 분석을 시작합니다. 필요하면 소개 자료 폴더를 함께 연결합니다.",
+    2: "브랜드 콘텍스트를 확인하고 이 프로젝트의 기준 문장으로 정리합니다.",
+    3: "이번에 만들 콘텐츠 테마를 하나 고른 뒤 채널별 초안을 생성합니다.",
+    4: "블로그, 인스타그램, 페이스북 문안을 채널별로 다듬고 저장합니다.",
+    5: "선택한 채널 문안에 맞는 이미지 시안을 만들고 대표안을 고릅니다.",
+    6: "최종 결과를 확인한 뒤 복사해서 바로 쓰거나 워드프레스 게시까지 진행합니다.",
+  } as const;
+
   return (
-    <main className="app-shell commercial-app-shell">
-      <CommercialWorkspace
-        name={name}
-        domain={domain}
-        industry={industry}
-        workingPath={workingPath}
-        files={files}
-        preview={preview}
-        folderSupported={folderSupported}
-        error={error}
-        loading={loading}
-        imageBusy={imageBusy}
-        exportBusy={publishWorkflow.exportBusy}
-        publishBusy={publishWorkflow.publishBusy}
-        settingsBusy={publishWorkflow.settingsBusy}
-        copyStatus={publishWorkflow.copyStatus}
-        activeProject={activeProject}
-        projects={projects}
-        studio={studio}
-        blogImageStudio={blogImageStudio}
-        history={history}
-        selectedTopicId={selectedTopicId}
-        publishPackage={publishWorkflow.publishPackage}
-        publishDraft={publishWorkflow.publishDraft}
-        wordpressConfig={publishWorkflow.wordpressConfig}
-        wordpressResult={publishWorkflow.wordpressResult}
-        onNameChange={setName}
-        onDomainChange={setDomain}
-        onIndustryChange={setIndustry}
-        onPickFolder={handlePickFolder}
-        onPreview={requestPreview}
-        onSubmit={handleSubmit}
-        onSelectProject={loadProject}
-        onDeleteProject={handleDeleteProject}
-        onRegenerateContext={handleRegenerateContext}
-        onProjectIndustryChange={handleProjectIndustryChange}
-        onSaveProjectSettings={handleSaveProjectSettings}
-        onBrandProfileChange={handleBrandProfileChange}
-        onSaveContext={handleSaveContext}
-        onApproveContext={handleApproveContext}
-        onTopicSelect={handleTopicSelect}
-        onGenerateContent={handleGenerateContent}
-        onSaveContent={handleSaveContent}
-        onAssetChange={handleAssetChange}
-        onImagePromptChange={(value) => handleImagePromptChangeForChannel("blog", value)}
-        onGenerateImages={handleGenerateBlogImages}
-        onPreparePublish={publishWorkflow.handlePreparePublish}
-        onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
-        onPublishDraftChange={publishWorkflow.handlePublishDraftChange}
-        onWordPressConfigChange={publishWorkflow.handleWordPressConfigChange}
-        onDownloadBlogHtml={publishWorkflow.handleDownloadBlogHtmlDirect}
-      />
+    <main className="app-shell">
+      <div className={`app-frame ${onboardingMode ? "onboarding-mode" : ""}`}>
+        <aside className={`sidebar ${onboardingMode ? "compact" : ""}`}>
+          <div className="sidebar-brand">
+            <div className="rule" />
+            <span className="eyebrow">m-master</span>
+            <h1 className="brand-title">Website To Content Pipeline</h1>
+            <p className="brand-copy">
+              사이트 URL에서 브랜드 콘텍스트를 읽고, 테마를 고른 뒤 채널별 콘텐츠와 이미지까지 만드는 순차형 작업 화면입니다.
+            </p>
+          </div>
+          {onboardingMode ? (
+            <div className="onboarding-copy">
+              <strong>처음에는 프로젝트 이름과 사이트 주소면 충분합니다.</strong>
+              <p className="fine-print">사이트를 읽어 콘텍스트와 작성 테마를 만들고, 이후 단계에서 블로그, 인스타그램, 페이스북 콘텐츠를 생성합니다.</p>
+            </div>
+          ) : (
+            <nav className="wizard-nav">
+              {stepMeta.map((item) => (
+                <button
+                  key={item.step}
+                  className={`wizard-nav-item ${currentStep === item.step ? "active" : ""}`}
+                  disabled={!stepAvailability[item.step]}
+                  type="button"
+                  onClick={() => goToStep(item.step)}
+                >
+                  <span className="wizard-nav-step">{`Step ${item.step}`}</span>
+                  <strong>{item.title}</strong>
+                  <span className="fine-print">{item.description}</span>
+                </button>
+              ))}
+            </nav>
+          )}
+        </aside>
+
+        <section className="main-area">
+          <div className="main-topbar">
+            <div>
+              <p className="eyebrow" style={{ margin: 0 }}>Content Workflow</p>
+              <h2 className="hero-title">{currentStepMeta.title}</h2>
+              <p className="hero-copy">
+                {currentStepMeta.description} 사용자는 URL 입력부터 최종 복사/발행까지 이 흐름대로 진행합니다.
+              </p>
+            </div>
+            {!onboardingMode ? (
+              <div className="hero-actions">
+                <div className="status-pill active">{projects.length} Projects</div>
+                <div className="status-pill">{files.length} Docs</div>
+                <div className="status-pill">{`Step ${currentStep}/6`}</div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="wizard-stage">
+            {error ? <p className="error-text wizard-error">{error}</p> : null}
+            <div className="journey-strip">
+              {journeyLabels.map((label, index) => (
+                <div className={`journey-node ${currentStep >= index + 1 ? "active" : ""}`} key={label}>
+                  {label}
+                </div>
+              ))}
+            </div>
+            <div className="step-focus-banner">
+              <strong>{`Step ${currentStep}에서 할 일`}</strong>
+              <p className="fine-print">{stepFocusCopy[currentStep]}</p>
+            </div>
+            {!activeProject ? (
+              <p className="fine-print">
+                Step 2-6은 프로젝트를 만든 뒤 순서대로 열립니다. 먼저 프로젝트를 생성하고 컨텍스트 승인 단계까지 진행해야 콘텐츠 작업이 시작됩니다.
+              </p>
+            ) : null}
+            {!contextApproved && activeProject ? (
+              <p className="fine-print">
+                컨텍스트 승인 전에는 Step 3-6이 잠깁니다. Step 2에서 브랜드 프로필을 승인해야 콘텐츠 단계로 이동할 수 있습니다.
+              </p>
+            ) : null}
+
+            {currentStep === 1 ? (
+              <ProjectIntakeForm
+                name={name}
+                domain={domain}
+                industry={industry}
+                workingPath={workingPath}
+                files={files}
+                preview={preview}
+                loading={loading}
+                folderSupported={folderSupported}
+                error={error}
+                onNameChange={setName}
+                onDomainChange={setDomain}
+                onIndustryChange={setIndustry}
+                onPickFolder={handlePickFolder}
+                onPreview={requestPreview}
+                onSubmit={handleSubmit}
+              />
+            ) : null}
+
+            {currentStep === 2 ? (
+              <ProjectOverview
+                projects={projects}
+                activeProject={activeProject}
+                loading={loading}
+                onSelectProject={loadProject}
+                onDeleteProject={handleDeleteProject}
+                onRegenerateContext={handleRegenerateContext}
+                onProjectIndustryChange={handleProjectIndustryChange}
+                onSaveProjectSettings={handleSaveProjectSettings}
+                onBrandProfileChange={handleBrandProfileChange}
+                onSaveContext={handleSaveContext}
+                onApproveContext={handleApproveContext}
+              />
+            ) : null}
+
+            {currentStep === 3 ? (
+              <ContentStudio
+                detail={activeProject}
+                studio={studio}
+                imageStudio={currentImageStudio}
+                history={history}
+                imageBusy={imageBusy}
+                exportBusy={publishWorkflow.exportBusy}
+                publishBusy={publishWorkflow.publishBusy}
+                settingsBusy={publishWorkflow.settingsBusy}
+                exportPreview={publishWorkflow.exportPreview}
+                activeChannel={activeChannel}
+                selectedTopicId={selectedTopicId}
+                loading={loading}
+                copyBusy={publishWorkflow.copyBusy}
+                copyStatus={publishWorkflow.copyStatus}
+                publishPackage={publishWorkflow.publishPackage}
+                publishDraft={publishWorkflow.publishDraft}
+                wordpressConfig={publishWorkflow.wordpressConfig}
+                wordpressResult={publishWorkflow.wordpressResult}
+                onChannelChange={setActiveChannel}
+                onTopicSelect={handleTopicSelect}
+                onAssetChange={handleAssetChange}
+                onImagePromptChange={handleImagePromptChange}
+                onGenerateImages={handleGenerateImages}
+                onSelectImageVariant={handleSelectImageVariant}
+                onApplyImageVariant={handleApplyImageVariant}
+                onSaveContent={handleSaveContent}
+                onGenerateContent={handleGenerateContent}
+                onExportChannel={publishWorkflow.handleExportChannel}
+                onExportAll={publishWorkflow.handleExportAll}
+                onExportPreviewViewChange={publishWorkflow.handleExportPreviewViewChange}
+                onPreparePublish={publishWorkflow.handlePreparePublish}
+                onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
+                onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
+                onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
+                onDownloadExportHashtags={publishWorkflow.handleDownloadExportHashtags}
+                onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}
+                onPublishDraftChange={publishWorkflow.handlePublishDraftChange}
+                onWordPressConfigChange={publishWorkflow.handleWordPressConfigChange}
+                onContinueWithTopic={handleGenerateContent}
+                onJumpToReviewTarget={handleJumpToReviewTarget}
+                showTopics
+                showContent={false}
+                showImages={false}
+                showReview={false}
+                showOps={false}
+              />
+            ) : null}
+
+            {currentStep === 4 ? (
+              <ContentStudio
+                detail={activeProject}
+                studio={studio}
+                imageStudio={currentImageStudio}
+                history={history}
+                imageBusy={imageBusy}
+                exportBusy={publishWorkflow.exportBusy}
+                publishBusy={publishWorkflow.publishBusy}
+                settingsBusy={publishWorkflow.settingsBusy}
+                exportPreview={publishWorkflow.exportPreview}
+                activeChannel={activeChannel}
+                selectedTopicId={selectedTopicId}
+                loading={loading}
+                copyBusy={publishWorkflow.copyBusy}
+                copyStatus={publishWorkflow.copyStatus}
+                publishPackage={publishWorkflow.publishPackage}
+                publishDraft={publishWorkflow.publishDraft}
+                wordpressConfig={publishWorkflow.wordpressConfig}
+                wordpressResult={publishWorkflow.wordpressResult}
+                onChannelChange={setActiveChannel}
+                onTopicSelect={handleTopicSelect}
+                onAssetChange={handleAssetChange}
+                onImagePromptChange={handleImagePromptChange}
+                onGenerateImages={handleGenerateImages}
+                onSelectImageVariant={handleSelectImageVariant}
+                onApplyImageVariant={handleApplyImageVariant}
+                onSaveContent={handleSaveContent}
+                onGenerateContent={handleGenerateContent}
+                onExportChannel={publishWorkflow.handleExportChannel}
+                onExportAll={publishWorkflow.handleExportAll}
+                onExportPreviewViewChange={publishWorkflow.handleExportPreviewViewChange}
+                onPreparePublish={publishWorkflow.handlePreparePublish}
+                onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
+                onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
+                onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
+                onDownloadExportHashtags={publishWorkflow.handleDownloadExportHashtags}
+                onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}
+                onPublishDraftChange={publishWorkflow.handlePublishDraftChange}
+                onWordPressConfigChange={publishWorkflow.handleWordPressConfigChange}
+                onContinueWithTopic={handleGenerateContent}
+                onJumpToReviewTarget={handleJumpToReviewTarget}
+                showTopics={false}
+                showContent
+                showImages={false}
+                showReview={false}
+                showOps={false}
+              />
+            ) : null}
+
+            {currentStep === 5 ? (
+              <ContentStudio
+                detail={activeProject}
+                studio={studio}
+                imageStudio={currentImageStudio}
+                history={history}
+                imageBusy={imageBusy}
+                exportBusy={publishWorkflow.exportBusy}
+                publishBusy={publishWorkflow.publishBusy}
+                settingsBusy={publishWorkflow.settingsBusy}
+                exportPreview={publishWorkflow.exportPreview}
+                activeChannel={activeChannel}
+                selectedTopicId={selectedTopicId}
+                loading={loading}
+                copyBusy={publishWorkflow.copyBusy}
+                copyStatus={publishWorkflow.copyStatus}
+                publishPackage={publishWorkflow.publishPackage}
+                publishDraft={publishWorkflow.publishDraft}
+                wordpressConfig={publishWorkflow.wordpressConfig}
+                wordpressResult={publishWorkflow.wordpressResult}
+                onChannelChange={setActiveChannel}
+                onTopicSelect={handleTopicSelect}
+                onAssetChange={handleAssetChange}
+                onImagePromptChange={handleImagePromptChange}
+                onGenerateImages={handleGenerateImages}
+                onSelectImageVariant={handleSelectImageVariant}
+                onApplyImageVariant={handleApplyImageVariant}
+                onSaveContent={handleSaveContent}
+                onGenerateContent={handleGenerateContent}
+                onExportChannel={publishWorkflow.handleExportChannel}
+                onExportAll={publishWorkflow.handleExportAll}
+                onExportPreviewViewChange={publishWorkflow.handleExportPreviewViewChange}
+                onPreparePublish={publishWorkflow.handlePreparePublish}
+                onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
+                onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
+                onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
+                onDownloadExportHashtags={publishWorkflow.handleDownloadExportHashtags}
+                onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}
+                onPublishDraftChange={publishWorkflow.handlePublishDraftChange}
+                onWordPressConfigChange={publishWorkflow.handleWordPressConfigChange}
+                onContinueWithTopic={handleGenerateContent}
+                onJumpToReviewTarget={handleJumpToReviewTarget}
+                showTopics={false}
+                showContent={false}
+                showImages
+                showReview={false}
+                showOps={false}
+              />
+            ) : null}
+
+            {currentStep === 6 ? (
+              <ContentStudio
+                detail={activeProject}
+                studio={studio}
+                imageStudio={currentImageStudio}
+                history={history}
+                imageBusy={imageBusy}
+                exportBusy={publishWorkflow.exportBusy}
+                publishBusy={publishWorkflow.publishBusy}
+                settingsBusy={publishWorkflow.settingsBusy}
+                exportPreview={publishWorkflow.exportPreview}
+                activeChannel={activeChannel}
+                selectedTopicId={selectedTopicId}
+                loading={loading}
+                copyBusy={publishWorkflow.copyBusy}
+                copyStatus={publishWorkflow.copyStatus}
+                publishPackage={publishWorkflow.publishPackage}
+                publishDraft={publishWorkflow.publishDraft}
+                wordpressConfig={publishWorkflow.wordpressConfig}
+                wordpressResult={publishWorkflow.wordpressResult}
+                onChannelChange={setActiveChannel}
+                onTopicSelect={handleTopicSelect}
+                onAssetChange={handleAssetChange}
+                onImagePromptChange={handleImagePromptChange}
+                onGenerateImages={handleGenerateImages}
+                onSelectImageVariant={handleSelectImageVariant}
+                onApplyImageVariant={handleApplyImageVariant}
+                onSaveContent={handleSaveContent}
+                onGenerateContent={handleGenerateContent}
+                onExportChannel={publishWorkflow.handleExportChannel}
+                onExportAll={publishWorkflow.handleExportAll}
+                onExportPreviewViewChange={publishWorkflow.handleExportPreviewViewChange}
+                onPreparePublish={publishWorkflow.handlePreparePublish}
+                onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
+                onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
+                onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
+                onDownloadExportHashtags={publishWorkflow.handleDownloadExportHashtags}
+                onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}
+                onPublishDraftChange={publishWorkflow.handlePublishDraftChange}
+                onWordPressConfigChange={publishWorkflow.handleWordPressConfigChange}
+                onContinueWithTopic={handleGenerateContent}
+                onJumpToReviewTarget={handleJumpToReviewTarget}
+                showTopics={false}
+                showContent={false}
+                showImages={false}
+                showReview
+                showOps
+              />
+            ) : null}
+          </div>
+
+          {!onboardingMode ? (
+            <div className="wizard-footer">
+              <div className="wizard-footer-copy">
+                <strong>{currentStepMeta.title}</strong>
+                <span className="fine-print">{currentStepMeta.description}</span>
+              </div>
+              <div className="button-cluster">
+                {previousStep ? (
+                  <button className="button ghost" type="button" onClick={() => goToStep(previousStep)}>
+                    이전 단계
+                  </button>
+                ) : null}
+                {nextStep ? (
+                  <button
+                    className="button primary"
+                    disabled={!stepAvailability[nextStep]}
+                    type="button"
+                    onClick={() => goToStep(nextStep)}
+                  >
+                    다음 단계
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+        </section>
+      </div>
     </main>
   );
 }
