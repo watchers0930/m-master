@@ -26,6 +26,10 @@ const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1-mini";
 const OPENAI_API_URL = "https://api.openai.com/v1/images/generations";
 const OPENAI_IMAGE_QUALITY = "low";
 const OPENAI_VARIANT_COUNT = 1;
+const BLOG_BODY_PRESET = {
+  width: 1200,
+  height: 900,
+} as const;
 const VARIANT_DIRECTIONS = [
   "제품 핵심 메시지를 정면으로 전달하는 선명한 히어로형 구도",
   "신뢰감 있는 카드형 정보 구조와 여백 중심의 에디토리얼 구도",
@@ -94,6 +98,53 @@ function buildSvgVariant(params: {
       <rect x="72" y="${preset.height - 126}" width="280" height="56" rx="28" fill="${palette.a}" />
       <text x="106" y="${preset.height - 90}" font-family="Pretendard, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF">${toSentence(params.asset.cta || "자세히 보기", 24)}</text>
       <text x="${preset.width - 220}" y="${preset.height - 84}" font-family="Pretendard, sans-serif" font-size="18" font-weight="700" fill="${palette.a}">${params.projectName}</text>
+    </svg>
+  `);
+}
+
+function extractImageCues(body: string) {
+  return body
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => /^\[이미지\s+\d+\]/.test(line))
+    .map((line, index) => {
+      const matched = line.match(/^\[이미지\s+\d+\]\s*(.+)$/);
+      return matched?.[1]?.trim() || `본문 요약 이미지 ${index + 1}`;
+    })
+    .slice(0, 6);
+}
+
+function buildBlogBodySvg(params: {
+  projectName: string;
+  title: string;
+  cue: string;
+  index: number;
+}) {
+  const width = BLOG_BODY_PRESET.width;
+  const height = BLOG_BODY_PRESET.height;
+  const title = toSentence(params.title, 32);
+  const cue = toSentence(params.cue, 72);
+  const accents = [
+    { navy: "#10233f", panel: "#eef4fb", line: "#d8e3f0", text: "#24415f" },
+    { navy: "#15304f", panel: "#f4f7fb", line: "#dbe4ef", text: "#31506f" },
+    { navy: "#16355d", panel: "#eef3f8", line: "#ced9e8", text: "#2f4a68" },
+  ];
+  const palette = accents[params.index % accents.length];
+
+  return svgToDataUri(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <rect width="100%" height="100%" rx="32" fill="#FBFDFF" />
+      <rect x="44" y="44" width="${width - 88}" height="${height - 88}" rx="28" fill="${palette.panel}" stroke="${palette.line}" />
+      <rect x="92" y="104" width="116" height="10" rx="5" fill="${palette.navy}" />
+      <text x="92" y="168" font-family="Paperlogy, Pretendard, sans-serif" font-size="42" font-weight="500" fill="${palette.navy}">${title}</text>
+      <foreignObject x="92" y="214" width="${width - 184}" height="300">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Paperlogy, Pretendard, sans-serif;font-size:34px;font-weight:400;line-height:1.45;color:${palette.text};">
+          ${cue}
+        </div>
+      </foreignObject>
+      <rect x="92" y="${height - 212}" width="${width - 184}" height="2" fill="${palette.line}" />
+      <text x="92" y="${height - 152}" font-family="Paperlogy, Pretendard, sans-serif" font-size="24" font-weight="400" fill="${palette.text}">본문 이미지 ${params.index + 1}</text>
+      <text x="92" y="${height - 112}" font-family="Paperlogy, Pretendard, sans-serif" font-size="20" font-weight="400" fill="${palette.navy}">${params.projectName}</text>
     </svg>
   `);
 }
@@ -203,7 +254,67 @@ async function buildOpenAiImageVariants(projectName: string, asset: AssetSeed, p
   };
 }
 
+async function buildBlogImageVariants(projectName: string, asset: AssetSeed, promptOverride?: string) {
+  const preset = PRESET_MAP.blog;
+  const prompt = promptOverride?.trim() || buildImagePrompt(projectName, asset);
+  const cues = extractImageCues(asset.body);
+  const cover =
+    canUseOpenAiImage()
+      ? await generateOpenAiVariant({
+          prompt: `${prompt} ${VARIANT_DIRECTIONS[0]}. 텍스트는 이미지에 직접 넣지 말고, 대표 썸네일로 사용할 수 있게 구성한다.`,
+          channel: "blog",
+          role: "cover",
+          selected: true,
+          width: preset.width,
+          height: preset.height,
+        }).catch(() => ({
+          role: "cover",
+          originalPath: buildSvgVariant({ projectName, asset, variantIndex: 0 }),
+          composedPath: buildSvgVariant({ projectName, asset, variantIndex: 0 }),
+          width: preset.width,
+          height: preset.height,
+          selected: true,
+        }))
+      : {
+          role: "cover",
+          originalPath: buildSvgVariant({ projectName, asset, variantIndex: 0 }),
+          composedPath: buildSvgVariant({ projectName, asset, variantIndex: 0 }),
+          width: preset.width,
+          height: preset.height,
+          selected: true,
+        };
+
+  const bodyImages = cues.map((cue, index) => ({
+    role: `body-${index + 1}`,
+    originalPath: buildBlogBodySvg({
+      projectName,
+      title: asset.title,
+      cue,
+      index,
+    }),
+    composedPath: buildBlogBodySvg({
+      projectName,
+      title: asset.title,
+      cue,
+      index,
+    }),
+    width: BLOG_BODY_PRESET.width,
+    height: BLOG_BODY_PRESET.height,
+    selected: false,
+  }));
+
+  return {
+    prompt,
+    preset,
+    images: [cover, ...bodyImages],
+  };
+}
+
 export async function buildImageVariants(projectName: string, asset: AssetSeed, promptOverride?: string) {
+  if (asset.channel === "blog") {
+    return buildBlogImageVariants(projectName, asset, promptOverride);
+  }
+
   if (!canUseOpenAiImage()) {
     return buildSvgImageVariants(projectName, asset, promptOverride);
   }

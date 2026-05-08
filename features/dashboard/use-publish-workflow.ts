@@ -47,6 +47,14 @@ function triggerTextDownload(filename: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
+async function fetchExportBundle(projectId: string) {
+  const response = await fetch(`/api/projects/${projectId}/export`, {
+    cache: "no-store",
+  });
+
+  return parseJson<ApiResponse<{ bundle: ExportBundle }>>(response);
+}
+
 function hashtagsToWordPressTags(value?: string | null) {
   if (!value) {
     return "";
@@ -158,10 +166,7 @@ export function usePublishWorkflow(params: {
     setExportBusy(true);
 
     try {
-      const response = await fetch(`/api/projects/${projectId}/export`, {
-        cache: "no-store",
-      });
-      const payload = await parseJson<ApiResponse<{ bundle: ExportBundle }>>(response);
+      const payload = await fetchExportBundle(projectId);
 
       if (!payload.ok) {
         throw new Error(payload.error.message);
@@ -187,10 +192,7 @@ export function usePublishWorkflow(params: {
     setExportBusy(true);
 
     try {
-      const response = await fetch(`/api/projects/${projectId}/export`, {
-        cache: "no-store",
-      });
-      const payload = await parseJson<ApiResponse<{ bundle: ExportBundle }>>(response);
+      const payload = await fetchExportBundle(projectId);
 
       if (!payload.ok) {
         throw new Error(payload.error.message);
@@ -281,6 +283,38 @@ export function usePublishWorkflow(params: {
       setCopyStatus(`${activeChannel.hashtagsFilename} 파일을 다운로드했습니다.`);
     } catch (downloadError) {
       setCopyStatus(downloadError instanceof Error ? downloadError.message : "해시태그 파일 다운로드에 실패했습니다.");
+    }
+  }
+
+  async function handleDownloadBlogHtmlDirect() {
+    if (!projectId) {
+      return;
+    }
+
+    setCopyStatus(null);
+    setExportBusy(true);
+
+    try {
+      const payload = await fetchExportBundle(projectId);
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      const blogChannel = payload.data.bundle.channels.find((item) => item.channel === "blog");
+      if (!blogChannel) {
+        throw new Error("다운로드할 블로그 HTML이 없습니다.");
+      }
+
+      triggerTextDownload(blogChannel.filename, blogChannel.content);
+      setExportPreview({
+        bundle: payload.data.bundle,
+        activeView: "blog",
+      });
+      setCopyStatus(`${blogChannel.filename} 파일을 다운로드했습니다.`);
+    } catch (downloadError) {
+      setCopyStatus(downloadError instanceof Error ? downloadError.message : "블로그 HTML 다운로드에 실패했습니다.");
+    } finally {
+      setExportBusy(false);
     }
   }
 
@@ -442,6 +476,7 @@ export function usePublishWorkflow(params: {
     handleCopyExportPreview,
     handleDownloadExportContent,
     handleDownloadExportHashtags,
+    handleDownloadBlogHtmlDirect,
     handleCopyBlogPublishHtml,
     handleWordPressConfigChange,
     handleExportPreviewViewChange,

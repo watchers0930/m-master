@@ -20,8 +20,10 @@ const OPENAI_TEXT_API_URL = "https://api.openai.com/v1/responses";
 const OPENAI_TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || "gpt-5.4-mini";
 const KOREAN_SUFFIXES = ["입니다", "하는", "하다", "에서", "으로", "에게", "까지", "처럼", "보다", "은", "는", "이", "가", "을", "를", "에", "의", "와", "과", "로", "도", "다"];
 const NAVER_BLOG_TARGET = {
-  minChars: 1500,
-  maxChars: 2200,
+  minChars: 2200,
+  maxChars: 3200,
+  minImageCues: 5,
+  preferredImageCues: 6,
 } as const;
 const INDUSTRY_PROMPT_HINTS = {
   "real-estate": [
@@ -261,6 +263,24 @@ function ensureBlogLength(body: string, profile: BrandProfileSeed, topic: string
   return `${expanded}\n\n${cta}`.slice(0, NAVER_BLOG_TARGET.maxChars).trim();
 }
 
+function extractImageCueCount(body: string) {
+  return body.split("\n").filter((line) => /^\[이미지\s+\d+\]/.test(line.trim())).length;
+}
+
+function ensureBlogImageCues(body: string) {
+  const cueCount = extractImageCueCount(body);
+  if (cueCount >= NAVER_BLOG_TARGET.minImageCues) {
+    return body;
+  }
+
+  const supplements = Array.from({ length: NAVER_BLOG_TARGET.preferredImageCues - cueCount }, (_, index) => {
+    const cue = cueCount + index + 1;
+    return ["", `[이미지 ${cue}] 본문 핵심 포인트를 시각적으로 요약하는 보조 이미지`, ""].join("\n");
+  }).join("\n");
+
+  return `${body.trim()}\n${supplements}`.trim();
+}
+
 function normalizeAsset(
   channel: "blog" | "instagram" | "facebook",
   asset: GeneratedAsset | undefined,
@@ -275,6 +295,7 @@ function normalizeAsset(
   }
   if (channel === "blog") {
     body = ensureBlogLength(body, profile, fallback.title, cta);
+    body = ensureBlogImageCues(body);
   } else {
     body = ensureCtaPresence(body, cta);
   }
@@ -327,11 +348,12 @@ function buildChannelPrompt(params: {
       ? [
           "- 출력은 반드시 JSON만 반환한다.",
           "- blog는 네이버 블로그용 초안으로 작성한다.",
-          '- 소제목은 "## 도입", "## 1. ...", "## 2. ...", "## 3. ...", "## 마무리" 형식을 우선 사용한다.',
-          "- [이미지 1]부터 [이미지 5]까지 자연스럽게 배치한다.",
-          "- 5개 섹션 안팎으로 구성하고, 각 문단은 2~3문장 정도로 짧게 끊는다.",
-          "- 블로그 본문은 대체로 1500~2200자 범위에서 작성한다.",
+          '- 소제목은 "## 도입", "## 1. ...", "## 2. ...", "## 3. ...", "## 4. ...", "## 마무리" 형식을 우선 사용한다.',
+          "- [이미지 1]부터 [이미지 6]까지 자연스럽게 배치한다.",
+          "- 6개 섹션 안팎으로 구성하고, 각 문단은 2~3문장 정도로 짧게 끊는다.",
+          "- 블로그 본문은 대체로 2200~3200자 범위에서 작성한다.",
           "- 너무 짧게 끝내지 말고, 실무 적용 포인트나 체크 포인트를 포함한다.",
+          "- 첫 문단은 주제를 바로 설명하고, 마지막 문단은 CTA로 자연스럽게 마무리한다.",
           "- 브랜드 요약 문장을 그대로 길게 복사하지 말고, 핵심 의미만 자연스럽게 풀어서 쓴다.",
           "- 같은 표현을 반복해서 붙이지 말고, URL이나 도메인 문자열을 본문에 여러 번 반복하지 않는다.",
         ]
@@ -382,6 +404,115 @@ ${JSON.stringify(params.fallbackAsset, null, 2)}
 `.trim();
 }
 
+function buildDerivedChannelPrompt(params: {
+  channel: "instagram" | "facebook";
+  projectName: string;
+  industry?: string | null;
+  topic: string;
+  profile: BrandProfileSeed;
+  blogAsset: GeneratedAsset;
+  fallbackAsset: StudioSeed["assets"][number];
+  fallbackObjective: string;
+}) {
+  const shared = buildSharedContext(params);
+  const example = CHANNEL_FEW_SHOTS[params.channel];
+  const channelRules =
+    params.channel === "instagram"
+      ? [
+          "- 출력은 반드시 JSON만 반환한다.",
+          "- 블로그 초안을 5장 내외 인스타그램 카드뉴스 문안으로 다시 압축한다.",
+          "- 각 줄은 카드 1장 분량으로 작성하고, 한 줄에 한 메시지만 남긴다.",
+          "- 블로그에서 가장 실용적인 문장과 체크 포인트를 우선 뽑는다.",
+          "- 첫 줄은 주제 선언, 마지막 줄은 CTA가 되도록 구성한다.",
+        ]
+      : [
+          "- 출력은 반드시 JSON만 반환한다.",
+          "- 블로그 초안을 링크 포스트형 페이스북 문안으로 다시 요약한다.",
+          "- 3~4개의 짧은 문단으로 나누고, 첫 문단에서 문제와 주제를 바로 설명한다.",
+          "- 블로그에서 핵심 기준과 실행 포인트를 압축해 전달한다.",
+          "- 마지막 문단은 CTA와 함께 마무리한다.",
+        ];
+
+  return `
+너는 한국어 콘텐츠 마케터다. 아래 블로그 초안을 기준으로 ${params.channel} 채널 파생 콘텐츠를 작성한다.
+
+${shared}
+
+[원본 블로그 초안]
+제목: ${params.blogAsset.title}
+본문:
+${params.blogAsset.body}
+
+CTA: ${params.blogAsset.cta}
+해시태그: ${params.blogAsset.hashtags}
+
+[작성 원칙]
+${channelRules.join("\n")}
+- 원본 블로그의 핵심 정보를 유지하되, 채널 문법은 ${params.channel}에 맞게 다시 쓴다.
+- hashtags는 쉼표로 구분된 해시태그 문자열로 작성한다.
+- hashtags는 원본 블로그 해시태그와 업종 키워드를 기준으로 4~6개 범위에서 정리한다.
+
+[JSON 스키마]
+{
+  "objective": "string",
+  "title": "string",
+  "body": "string",
+  "cta": "string",
+  "hashtags": "#a, #b"
+}
+
+[참고용 기본 목표]
+${params.fallbackObjective}
+
+[좋은 ${params.channel} 출력 예시]
+${JSON.stringify(example, null, 2)}
+
+[참고용 기존 ${params.channel} 초안]
+${JSON.stringify(params.fallbackAsset, null, 2)}
+`.trim();
+}
+
+function deriveSocialAssetFromBlog(params: {
+  channel: "instagram" | "facebook";
+  blogAsset: GeneratedAsset;
+  fallbackAsset: StudioSeed["assets"][number];
+}) {
+  const blogLines = params.blogAsset.body
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !line.startsWith("## "))
+    .filter((line) => !/^\[이미지\s+\d+\]/.test(line));
+  const distilled = blogLines.filter((line) => line.length > 24).slice(0, 5);
+
+  if (params.channel === "instagram") {
+    return {
+      channel: "instagram",
+      title: `${params.blogAsset.title} 인스타그램 초안`,
+      body: distilled.slice(0, 5).map((line, index) => `${index + 1}장. ${line}`).join("\n") || params.fallbackAsset.body,
+      cta: params.blogAsset.cta,
+      hashtags: params.blogAsset.hashtags || params.fallbackAsset.hashtags,
+    } satisfies GeneratedAsset;
+  }
+
+  return {
+    channel: "facebook",
+    title: `${params.blogAsset.title} 페이스북 초안`,
+    body:
+      [
+        distilled[0] || params.blogAsset.title,
+        "",
+        distilled[1] || distilled[0] || params.fallbackAsset.body,
+        "",
+        distilled[2] || params.blogAsset.cta,
+        "",
+        params.blogAsset.cta,
+      ].join("\n"),
+    cta: params.blogAsset.cta,
+    hashtags: params.blogAsset.hashtags || params.fallbackAsset.hashtags,
+  } satisfies GeneratedAsset;
+}
+
 async function requestOpenAiDraft(prompt: string) {
   const response = await fetch(OPENAI_TEXT_API_URL, {
     method: "POST",
@@ -418,24 +549,83 @@ export async function buildGeneratedStudioSeed(params: {
   const fallback = buildStudioSeed(params);
 
   if (!canUseOpenAiText()) {
+    const fallbackBlogAsset = fallback.assets.find((asset) => asset.channel === "blog")!;
     return {
       provider: "fallback" as const,
-      seed: fallback,
+      seed: {
+        ...fallback,
+        assets: [
+          normalizeAsset("blog", fallbackBlogAsset, fallbackBlogAsset, params.profile),
+          normalizeAsset(
+            "instagram",
+            deriveSocialAssetFromBlog({
+              channel: "instagram",
+              blogAsset: {
+                channel: "blog",
+                title: fallbackBlogAsset.title,
+                body: fallbackBlogAsset.body,
+                cta: fallbackBlogAsset.cta,
+                hashtags: fallbackBlogAsset.hashtags,
+              },
+              fallbackAsset: fallback.assets.find((asset) => asset.channel === "instagram")!,
+            }),
+            fallback.assets.find((asset) => asset.channel === "instagram")!,
+            params.profile,
+          ),
+          normalizeAsset(
+            "facebook",
+            deriveSocialAssetFromBlog({
+              channel: "facebook",
+              blogAsset: {
+                channel: "blog",
+                title: fallbackBlogAsset.title,
+                body: fallbackBlogAsset.body,
+                cta: fallbackBlogAsset.cta,
+                hashtags: fallbackBlogAsset.hashtags,
+              },
+              fallbackAsset: fallback.assets.find((asset) => asset.channel === "facebook")!,
+            }),
+            fallback.assets.find((asset) => asset.channel === "facebook")!,
+            params.profile,
+          ),
+        ],
+      },
     };
   }
 
   try {
-    const channels: Array<"blog" | "instagram" | "facebook"> = ["blog", "instagram", "facebook"];
-    const generatedAssets = await Promise.all(
-      channels.map(async (channel) => {
+    const fallbackBlogAsset = fallback.assets.find((asset) => asset.channel === "blog")!;
+    const blogPayload = (await requestOpenAiDraft(
+      buildChannelPrompt({
+        channel: "blog",
+        projectName: params.projectName,
+        industry: params.industry,
+        topic: fallback.topic,
+        profile: params.profile,
+        fallbackAsset: fallbackBlogAsset,
+        fallbackObjective: fallback.objective,
+      }),
+    )) as GeneratedChannelPayload;
+
+    const blogAsset = {
+      channel: "blog",
+      title: blogPayload.title || fallbackBlogAsset.title,
+      body: blogPayload.body || fallbackBlogAsset.body,
+      cta: blogPayload.cta || fallbackBlogAsset.cta,
+      hashtags: blogPayload.hashtags || fallbackBlogAsset.hashtags,
+    } satisfies GeneratedAsset;
+
+    const generatedSocialAssets = await Promise.all(
+      (["instagram", "facebook"] as const).map(async (channel) => {
         const fallbackAsset = fallback.assets.find((asset) => asset.channel === channel)!;
         const payload = (await requestOpenAiDraft(
-          buildChannelPrompt({
+          buildDerivedChannelPrompt({
             channel,
             projectName: params.projectName,
             industry: params.industry,
             topic: fallback.topic,
             profile: params.profile,
+            blogAsset,
             fallbackAsset,
             fallbackObjective: fallback.objective,
           }),
@@ -454,8 +644,11 @@ export async function buildGeneratedStudioSeed(params: {
       }),
     );
 
-    const assetMap = new Map(generatedAssets.map((item) => [item.asset.channel, item.asset]));
-    const objective = generatedAssets.find((item) => item.objective?.trim())?.objective;
+    const assetMap = new Map<"blog" | "instagram" | "facebook", GeneratedAsset>([
+      ["blog", blogAsset],
+      ...generatedSocialAssets.map((item) => [item.asset.channel, item.asset] as const),
+    ]);
+    const objective = blogPayload.objective || generatedSocialAssets.find((item) => item.objective?.trim())?.objective;
     return {
       provider: "openai" as const,
       seed: {
@@ -484,9 +677,47 @@ export async function buildGeneratedStudioSeed(params: {
       topic: fallback.topic,
       error: error instanceof Error ? error.message : "unknown_error",
     });
+    const fallbackBlogAsset = fallback.assets.find((asset) => asset.channel === "blog")!;
     return {
       provider: "fallback" as const,
-      seed: fallback,
+      seed: {
+        ...fallback,
+        assets: [
+          normalizeAsset("blog", fallbackBlogAsset, fallbackBlogAsset, params.profile),
+          normalizeAsset(
+            "instagram",
+            deriveSocialAssetFromBlog({
+              channel: "instagram",
+              blogAsset: {
+                channel: "blog",
+                title: fallbackBlogAsset.title,
+                body: fallbackBlogAsset.body,
+                cta: fallbackBlogAsset.cta,
+                hashtags: fallbackBlogAsset.hashtags,
+              },
+              fallbackAsset: fallback.assets.find((asset) => asset.channel === "instagram")!,
+            }),
+            fallback.assets.find((asset) => asset.channel === "instagram")!,
+            params.profile,
+          ),
+          normalizeAsset(
+            "facebook",
+            deriveSocialAssetFromBlog({
+              channel: "facebook",
+              blogAsset: {
+                channel: "blog",
+                title: fallbackBlogAsset.title,
+                body: fallbackBlogAsset.body,
+                cta: fallbackBlogAsset.cta,
+                hashtags: fallbackBlogAsset.hashtags,
+              },
+              fallbackAsset: fallback.assets.find((asset) => asset.channel === "facebook")!,
+            }),
+            fallback.assets.find((asset) => asset.channel === "facebook")!,
+            params.profile,
+          ),
+        ],
+      },
     };
   }
 }
