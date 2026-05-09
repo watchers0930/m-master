@@ -45,7 +45,7 @@ button {
   width: min(90vw, 1720px);
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 420px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
   border: 1px solid var(--line);
   border-radius: 28px;
   overflow: hidden;
@@ -70,6 +70,16 @@ button {
   margin-bottom: 28px;
 }
 
+.sidebar-brand.compact {
+  gap: 14px;
+}
+
+.sidebar-logo-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .rule {
   width: 48px;
   height: 4px;
@@ -90,6 +100,10 @@ button {
   font-size: 26px;
   line-height: 1.08;
   letter-spacing: -0.03em;
+}
+
+.brand-title.compact {
+  font-size: 22px;
 }
 
 .brand-copy,
@@ -116,6 +130,11 @@ button {
   font-size: 14px;
 }
 
+.brand-copy.compact {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .nav-list {
   display: flex;
   flex-direction: column;
@@ -127,6 +146,10 @@ button {
   display: grid;
   gap: 10px;
   margin-top: 24px;
+}
+
+.wizard-nav.compact {
+  margin-top: 10px;
 }
 
 .onboarding-copy {
@@ -149,6 +172,10 @@ button {
   background: rgba(255, 255, 255, 0.82);
   text-align: left;
   color: var(--graphite);
+}
+
+.wizard-nav-item.compact {
+  padding: 12px 14px;
 }
 
 .wizard-nav-item:disabled {
@@ -198,6 +225,26 @@ button {
   color: var(--blue);
 }
 
+.sidebar-project-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.sidebar-sections,
+.sidebar-section,
+.sidebar-channel-nav {
+  display: grid;
+  gap: 12px;
+}
+
+.sidebar-channel-nav .nav-pill {
+  justify-content: flex-start;
+}
+
 .main-area {
   padding: 32px;
 }
@@ -239,6 +286,18 @@ button {
 .wizard-stage {
   display: grid;
   gap: 20px;
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(340px, 0.75fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.workspace-primary,
+.workspace-secondary {
+  min-width: 0;
 }
 
 .wizard-footer {
@@ -808,10 +867,10 @@ button {
 .onboarding-mode {
   grid-template-columns: 340px minmax(0, 1fr);
 }
-
 @media (max-width: 1180px) {
   .app-frame,
-  .dashboard-grid {
+  .dashboard-grid,
+  .workspace-grid {
     grid-template-columns: 1fr;
   }
 
@@ -886,5 +945,9 @@ button {
 
   .project-item-actions {
     width: 100%;
+  }
+
+  .sidebar-project-card .row {
+    gap: 8px;
   }
 }
