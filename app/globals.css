@@ -145,7 +145,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .pipeline-grid {
   flex: 1;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr) 300px;
+  grid-template-columns: 340px minmax(0, 1fr) 300px;
   min-height: 0;
 }
 
@@ -902,7 +902,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 /* ─── Responsive ─── */
 @media (max-width: 1100px) {
-  .pipeline-grid { grid-template-columns: 260px minmax(0, 1fr); }
+  .pipeline-grid { grid-template-columns: 320px minmax(0, 1fr); }
   .image-panel { display: none; }
 }
 
