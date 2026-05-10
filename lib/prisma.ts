@@ -23,6 +23,13 @@ if (runtimeDatabaseUrl) {
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
+    datasources: runtimeDatabaseUrl
+      ? {
+          db: {
+            url: runtimeDatabaseUrl,
+          },
+        }
+      : undefined,
     log: ["error"],
   });
 

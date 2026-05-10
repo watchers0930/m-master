@@ -8,11 +8,18 @@ export async function GET() {
     const projects = await getProjectList();
     return jsonOk({ projects });
   } catch (error) {
+    const message =
+      process.env.VERCEL_ENV === "production"
+        ? "프로젝트 목록을 불러오지 못했습니다."
+        : error instanceof Error
+          ? error.message
+          : "프로젝트 목록을 불러오지 못했습니다.";
+
     logger.error("projects.list.failed", {
       error: error instanceof Error ? error.message : "unknown_error",
     });
 
-    return jsonError("프로젝트 목록을 불러오지 못했습니다.", 500);
+    return jsonError(message, 500);
   }
 }
 
@@ -31,10 +38,17 @@ export async function POST(request: Request) {
       return jsonError(error.message, 404);
     }
 
+    const message =
+      process.env.VERCEL_ENV === "production"
+        ? "프로젝트를 생성하지 못했습니다."
+        : error instanceof Error
+          ? error.message
+          : "프로젝트를 생성하지 못했습니다.";
+
     logger.error("projects.create.failed", {
       error: error instanceof Error ? error.message : "unknown_error",
     });
 
-    return jsonError("프로젝트를 생성하지 못했습니다.", 500);
+    return jsonError(message, 500);
   }
 }
