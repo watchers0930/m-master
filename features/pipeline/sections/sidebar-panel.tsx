@@ -144,16 +144,15 @@ export function SidebarPanel(props: Props) {
         <div className="sb-section-body">
           {!activeProject ? (
             <>
-              {projects.length > 0 && (
-                <div className="sb-project-list">
-                  {projects.map((p) => (
-                    <button key={p.id} className="sb-project-item" onClick={() => onSelectProject(p.id)}>
-                      <strong>{p.name}</strong>
-                      <span className="fine-print">{p.domain || "도메인 없음"}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div className="field-group">
+                <label className="field-label">토픽</label>
+                <input
+                  className="text-input"
+                  value={topicInput}
+                  onChange={(e) => onTopicInputChange(e.target.value)}
+                  placeholder="생성할 콘텐츠 토픽을 입력하세요"
+                />
+              </div>
               <div className="sb-form">
                 <InputField id="sb-name" label="프로젝트명" value={name} onChange={onNameChange} placeholder="프로젝트명" />
                 <InputField id="sb-domain" label="도메인" value={domain} onChange={onDomainChange} placeholder="https://..." />
@@ -164,11 +163,22 @@ export function SidebarPanel(props: Props) {
               </div>
             </>
           ) : (
-            <div className="sb-active-project">
-              <strong>{activeProject.project.name}</strong>
-              <span className="fine-print">{activeProject.project.domain || "도메인 없음"}</span>
-              {isApproved && <span className="status-pill active">콘텍스트 승인됨</span>}
-            </div>
+            <>
+              <div className="sb-active-project">
+                <strong>{activeProject.project.name}</strong>
+                <span className="fine-print">{activeProject.project.domain || "도메인 없음"}</span>
+                {isApproved && <span className="status-pill active">콘텍스트 승인됨</span>}
+              </div>
+              <div className="field-group">
+                <label className="field-label">토픽</label>
+                <input
+                  className="text-input"
+                  value={topicInput}
+                  onChange={(e) => onTopicInputChange(e.target.value)}
+                  placeholder="생성할 콘텐츠 토픽을 입력하세요"
+                />
+              </div>
+            </>
           )}
         </div>
       </details>
@@ -226,15 +236,6 @@ export function SidebarPanel(props: Props) {
         <details className="sb-section" open>
           <summary className="sb-section-title">콘텐츠 생성</summary>
           <div className="sb-section-body">
-            <div className="field-group">
-              <label className="field-label">토픽</label>
-              <input
-                className="text-input"
-                value={topicInput}
-                onChange={(e) => onTopicInputChange(e.target.value)}
-                placeholder="이전 토픽 선택 대신 직접 입력하세요"
-              />
-            </div>
             <button className="button primary sb-btn-full" disabled={generateBusy || !topicInput.trim()} onClick={onGenerate}>
               {generateBusy ? "생성 중…" : "전체 생성"}
             </button>
