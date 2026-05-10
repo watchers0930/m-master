@@ -819,12 +819,45 @@ export async function generateProjectImages(params: {
     cta: asset.cta || record.brandProfile.cta || "자세히 보기",
   }, params.prompt);
 
-  await createImageJobWithAssets({
-    contentAssetId: asset.id,
-    channelPreset: `${params.channel}-${bundle.preset.width}x${bundle.preset.height}`,
-    prompt: bundle.prompt,
-    imageAssets: bundle.images,
-  });
+  try {
+    await createImageJobWithAssets({
+      contentAssetId: asset.id,
+      channelPreset: `${params.channel}-${bundle.preset.width}x${bundle.preset.height}`,
+      prompt: bundle.prompt,
+      imageAssets: bundle.images,
+    });
+  } catch (error) {
+    logger.error("project.images.persist.failed", {
+      projectId: params.projectId,
+      channel: params.channel,
+      error: error instanceof Error ? error.message : "unknown_error",
+    });
+
+    const studio = await getProjectStudioSeed(params.projectId);
+    const ephemeralImageGroup = {
+      channel: params.channel,
+      prompt: bundle.prompt,
+      variants: bundle.images.map((image, index) => ({
+        id: `temp-${params.channel}-${index + 1}`,
+        role: image.role,
+        url: image.composedPath || image.originalPath || "",
+        width: image.width,
+        height: image.height,
+        selected: image.selected ?? index === 0,
+      })),
+    };
+
+    return {
+      ...studio,
+      draft: {
+        ...studio.draft,
+        images: [
+          ...studio.draft.images.filter((group) => group.channel !== params.channel),
+          ephemeralImageGroup,
+        ],
+      },
+    };
+  }
 
   return getProjectStudioSeed(params.projectId);
 }
