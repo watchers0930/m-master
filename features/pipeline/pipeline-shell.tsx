@@ -112,8 +112,6 @@ export function PipelineShell() {
           onNameChange={source.setName}
           domain={source.domain}
           onDomainChange={source.setDomain}
-          industry={source.industry}
-          onIndustryChange={source.setIndustry}
           workingPath={source.workingPath}
           onWorkingPathChange={source.setWorkingPath}
           projectBusy={source.busy}

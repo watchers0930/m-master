@@ -28,8 +28,6 @@ type Props = {
   onNameChange: (v: string) => void;
   domain: string;
   onDomainChange: (v: string) => void;
-  industry: string;
-  onIndustryChange: (v: string) => void;
   workingPath: string;
   onWorkingPathChange: (v: string) => void;
   projectBusy: boolean;
@@ -87,7 +85,7 @@ export function SidebarPanel(props: Props) {
   const {
     projects, activeProject,
     name, onNameChange, domain, onDomainChange,
-    industry, onIndustryChange, workingPath, onWorkingPathChange,
+    workingPath, onWorkingPathChange,
     projectBusy, onCreateProject, onSelectProject,
     editingSummary, onEditingSummaryChange,
     editingAudience, onEditingAudienceChange,
@@ -135,7 +133,6 @@ export function SidebarPanel(props: Props) {
               <div className="sb-form">
                 <InputField id="sb-name" label="이름" value={name} onChange={onNameChange} placeholder="프로젝트 이름" />
                 <InputField id="sb-domain" label="도메인" value={domain} onChange={onDomainChange} placeholder="https://..." />
-                <InputField id="sb-industry" label="업종" value={industry} onChange={onIndustryChange} placeholder="예: SaaS" />
                 <InputField id="sb-path" label="작업 폴더" value={workingPath} onChange={onWorkingPathChange} placeholder="/path" />
                 <button className="button primary sb-btn-full" disabled={projectBusy || !name.trim()} onClick={onCreateProject}>
                   {projectBusy ? "생성 중…" : "프로젝트 생성"}
@@ -168,7 +165,18 @@ export function SidebarPanel(props: Props) {
               </div>
               <div className="field-group">
                 <label className="field-label">톤</label>
-                <input className="text-input" value={editingTone} onChange={(e) => onEditingToneChange(e.target.value)} />
+                <div className="sb-tone-grid">
+                  {TONE_PRESETS.map((preset) => (
+                    <button
+                      key={preset.key}
+                      type="button"
+                      className={`sb-tone-chip ${editingTone === preset.label ? "active" : ""}`}
+                      onClick={() => onEditingToneChange(preset.label)}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="field-group">
                 <label className="field-label">CTA</label>
@@ -258,15 +266,6 @@ export function SidebarPanel(props: Props) {
                   {preset.label}
                 </button>
               ))}
-            </div>
-            <div className="field-group">
-              <label className="field-label">직접 입력</label>
-              <input
-                className="text-input"
-                value={editingTone}
-                onChange={(e) => onEditingToneChange(e.target.value)}
-                placeholder="예: 전문적이면서 친근한"
-              />
             </div>
           </div>
         </details>
