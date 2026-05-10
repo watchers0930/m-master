@@ -6,10 +6,10 @@ import { useSourceRegistration } from "./hooks/use-source-registration";
 import { useContentGeneration } from "./hooks/use-content-generation";
 import { useAbTesting } from "./hooks/use-ab-testing";
 import { usePublishWorkflow } from "./hooks/use-publish-workflow";
-import { SourceRegistrationCard } from "./sections/source-registration-card";
-import { ContentGenerationCard } from "./sections/content-generation-card";
-import { AbTestingCard } from "./sections/ab-testing-card";
-import { VerifyPublishCard } from "./sections/verify-publish-card";
+import { useImageStudio } from "./hooks/use-image-studio";
+import { SidebarPanel } from "./sections/sidebar-panel";
+import { ContentPanel } from "./sections/content-panel";
+import { ImagePanel } from "./sections/image-panel";
 import type { ProjectDetail } from "./types";
 
 export function PipelineShell() {
@@ -31,6 +31,7 @@ export function PipelineShell() {
     onStudioUpdate: (studio) => {
       state.setStudio(studio);
       content.hydrateEditor(studio);
+      images.hydrateFromStudio(studio);
     },
     onError: state.setError,
   });
@@ -49,12 +50,19 @@ export function PipelineShell() {
     },
   });
 
+  const images = useImageStudio({
+    onStudioUpdate: (studio) => {
+      state.setStudio(studio);
+    },
+    onError: state.setError,
+  });
+
   // Initial load
   useEffect(() => {
     state.loadProjects();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // When project changes, hydrate context and load studio
+  // When project changes
   useEffect(() => {
     if (state.activeProject) {
       source.hydrateContextForm(state.activeProject);
@@ -62,10 +70,11 @@ export function PipelineShell() {
     }
   }, [state.activeProject]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // When studio loads, hydrate editor + load variants
+  // When studio loads
   useEffect(() => {
     if (state.studio) {
       content.hydrateEditor(state.studio);
+      images.hydrateFromStudio(state.studio);
       if (state.activeProject?.project?.id) {
         ab.loadVariantGroup(state.activeProject.project.id);
       }
@@ -74,29 +83,29 @@ export function PipelineShell() {
 
   const projectId = state.activeProject?.project?.id;
   const topic = state.studio?.draft?.topic || "";
+  const hasContent = (state.studio?.draft?.assets?.length ?? 0) > 0;
 
   return (
     <div className="app-shell">
-      <div className="pipeline-frame">
-        {/* Header */}
-        <header className="pipeline-header">
-          <div className="rule" />
-          <span className="eyebrow">M-MASTER PIPELINE</span>
-          <h1 className="brand-title">콘텐츠 파이프라인</h1>
-          <p className="brand-copy">블로그 → 파생 채널 → A/B 비교 → 검증 · 발행</p>
-        </header>
+      {/* Header */}
+      <header className="pipeline-header">
+        <div className="rule" />
+        <span className="eyebrow">M-MASTER</span>
+        <h1 className="brand-title">콘텐츠 파이프라인</h1>
+      </header>
 
-        {/* Error */}
-        {state.error && (
-          <div className="pipeline-error">
-            <p className="error-text">{state.error}</p>
-            <button className="button ghost" onClick={state.clearError}>닫기</button>
-          </div>
-        )}
+      {/* Error */}
+      {state.error && (
+        <div className="pipeline-error">
+          <p className="error-text">{state.error}</p>
+          <button className="button ghost" onClick={state.clearError}>닫기</button>
+        </div>
+      )}
 
-        {/* Section 1: Source Registration */}
-        <SourceRegistrationCard
-          locked={state.sectionLock.source}
+      {/* 3-column layout */}
+      <div className="pipeline-grid">
+        {/* Left: Sidebar controls */}
+        <SidebarPanel
           projects={state.projects}
           activeProject={state.activeProject}
           name={source.name}
@@ -107,12 +116,9 @@ export function PipelineShell() {
           onIndustryChange={source.setIndustry}
           workingPath={source.workingPath}
           onWorkingPathChange={source.setWorkingPath}
-          busy={source.busy}
+          projectBusy={source.busy}
           onCreateProject={source.handleCreateProject}
-          onSelectProject={(id) => {
-            state.loadProject(id);
-            state.loadStudio(id);
-          }}
+          onSelectProject={(id) => { state.loadProject(id); state.loadStudio(id); }}
           editingSummary={source.editingSummary}
           onEditingSummaryChange={source.setEditingSummary}
           editingAudience={source.editingAudience}
@@ -126,22 +132,33 @@ export function PipelineShell() {
           contextBusy={source.contextBusy}
           onApproveContext={() => projectId && source.handleApproveContext(projectId)}
           onSaveContextDraft={() => projectId && source.handleSaveContextDraft(projectId)}
-        />
-
-        {/* Section 2: Content Generation */}
-        <ContentGenerationCard
-          locked={state.sectionLock.generation}
-          studio={state.studio}
           topics={state.studio?.topics || state.activeProject?.topics || []}
           selectedTopicId={content.selectedTopicId}
           onSelectTopic={content.setSelectedTopicId}
           generateBusy={content.generateBusy}
-          onGenerate={() => {
-            if (projectId) {
-              content.handleGenerate(projectId, content.selectedTopicId || undefined);
-            }
-          }}
+          onGenerate={() => { if (projectId) content.handleGenerate(projectId, content.selectedTopicId || undefined); }}
+          topic={topic}
+          variantGroup={state.variantGroup}
+          abGenerateBusy={ab.generateBusy}
+          onGenerateVariants={(count) => { if (projectId) ab.handleGenerateVariants(projectId, topic, count); }}
+          adoptBusy={ab.adoptBusy}
+          onAdoptVariant={(id) => { if (projectId) ab.handleAdoptVariant(projectId, id); }}
           seoCompliance={content.seoCompliance}
+          studio={state.studio}
+          exportBusy={publish.exportBusy}
+          onExportAll={publish.handleExportAll}
+          publishBusy={publish.publishBusy}
+          publishPackage={publish.publishPackage}
+          onPreparePublish={publish.handlePreparePublish}
+          wordpressConfig={publish.wordpressConfig}
+          onWordPressConfigChange={publish.handleWordPressConfigChange}
+          settingsBusy={publish.settingsBusy}
+          onSaveWordPressDefaults={publish.handleSaveWordPressDefaults}
+        />
+
+        {/* Center: Content preview */}
+        <ContentPanel
+          studio={state.studio}
           activeChannel={content.activeChannel}
           onChannelChange={content.setActiveChannel}
           editingTitle={content.editingTitle}
@@ -153,66 +170,32 @@ export function PipelineShell() {
           editingHashtags={content.editingHashtags}
           onEditingHashtagsChange={content.setEditingHashtags}
           onUpdateSeo={content.updateSeoFromEditor}
+          seoCompliance={content.seoCompliance}
           saveBusy={content.saveBusy}
-          onSave={() => {
-            if (projectId && state.studio) {
-              content.handleSave(projectId, state.studio);
-            }
-          }}
-        />
-
-        {/* Section 3: A/B Testing */}
-        <AbTestingCard
-          locked={state.sectionLock.ab}
-          topic={topic}
+          onSave={() => { if (projectId && state.studio) content.handleSave(projectId, state.studio); }}
           variantGroup={state.variantGroup}
-          generateBusy={ab.generateBusy}
           adoptBusy={ab.adoptBusy}
-          onGenerateVariants={(count) => {
-            if (projectId) ab.handleGenerateVariants(projectId, topic, count);
-          }}
-          onAdoptVariant={(id) => {
-            if (projectId) ab.handleAdoptVariant(projectId, id);
-          }}
-        />
-
-        {/* Section 4: Verify & Publish */}
-        <VerifyPublishCard
-          locked={state.sectionLock.verify}
-          studio={state.studio}
-          exportBusy={publish.exportBusy}
+          onAdoptVariant={(id) => { if (projectId) ab.handleAdoptVariant(projectId, id); }}
           exportPreview={publish.exportPreview}
           onExportChannel={publish.handleExportChannel}
-          onExportAll={publish.handleExportAll}
-          onCopyExportPreview={publish.handleCopyExportPreview}
-          onDownloadExportContent={publish.handleDownloadExportContent}
-          onDownloadExportHashtags={publish.handleDownloadExportHashtags}
           onExportPreviewViewChange={publish.handleExportPreviewViewChange}
+          onCopyExportPreview={publish.handleCopyExportPreview}
           copyBusy={publish.copyBusy}
           copyStatus={publish.copyStatus}
-          publishBusy={publish.publishBusy}
-          publishPackage={publish.publishPackage}
-          publishDraft={publish.publishDraft}
-          onPublishDraftChange={publish.handlePublishDraftChange}
-          onCopyBlogPublishHtml={publish.handleCopyBlogPublishHtml}
-          onPreparePublish={publish.handlePreparePublish}
-          wordpressResult={publish.wordpressResult}
-          wordpressConfig={publish.wordpressConfig}
-          onWordPressConfigChange={publish.handleWordPressConfigChange}
-          settingsBusy={publish.settingsBusy}
-          onSaveWordPressDefaults={publish.handleSaveWordPressDefaults}
         />
 
-        {/* Progress bar */}
-        <div className="pipeline-progress">
-          <div className="pipeline-progress-track">
-            <div className={`pipeline-progress-node ${!state.sectionLock.source ? "done" : ""}`}>소스</div>
-            <div className={`pipeline-progress-node ${state.activeProject?.brandProfile?.approved ? "done" : ""}`}>콘텍스트</div>
-            <div className={`pipeline-progress-node ${(state.studio?.draft?.assets?.length ?? 0) > 0 ? "done" : ""}`}>콘텐츠</div>
-            <div className={`pipeline-progress-node ${state.variantGroup?.variants?.some(v => v.adopted) ? "done" : ""}`}>A/B</div>
-            <div className={`pipeline-progress-node ${state.studio?.review?.status === "ready" ? "done" : ""}`}>검증</div>
-          </div>
-        </div>
+        {/* Right: Image preview */}
+        <ImagePanel
+          projectId={projectId}
+          activeChannel={images.activeChannel}
+          onChannelChange={images.setActiveChannel}
+          currentStudio={images.currentStudio}
+          generateBusy={images.generateBusy}
+          selectBusy={images.selectBusy}
+          onGenerateImages={images.handleGenerateImages}
+          onSelectImage={images.handleSelectImage}
+          hasContent={hasContent}
+        />
       </div>
     </div>
   );
