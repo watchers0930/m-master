@@ -196,7 +196,7 @@ export function SidebarPanel(props: Props) {
       )}
 
       {/* ── 생성 ── */}
-      {isApproved && (
+      {activeProject && (
         <details className="sb-section" open>
           <summary className="sb-section-title">콘텐츠 생성</summary>
           <div className="sb-section-body">
@@ -245,7 +245,7 @@ export function SidebarPanel(props: Props) {
       )}
 
       {/* ── 톤 ── */}
-      {isApproved && (
+      {activeProject && (
         <details className="sb-section" open>
           <summary className="sb-section-title">콘텐츠 톤</summary>
           <div className="sb-section-body">

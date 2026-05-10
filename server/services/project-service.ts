@@ -126,12 +126,6 @@ function serializeProjectListItem(item: Awaited<ReturnType<typeof listProjects>>
       : null,
     topicCount: item._count.topics,
     contentJobCount: item._count.contentJobs,
-    topTopics: item.topics.slice(0, 3).map((topic) => ({
-      id: topic.id,
-      title: normalizeTopicTitle(topic.title, item.name),
-      intentType: topic.intentType,
-      score: topic.score,
-    })),
   };
 }
 
