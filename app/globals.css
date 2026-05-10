@@ -290,36 +290,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .sb-textarea { min-height: 56px; }
 .sb-btn-full { width: 100%; }
 
-/* Sidebar topic list */
-.sb-topic-list {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.sb-topic-chip {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  padding: 7px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--sidebar-border);
-  background: transparent;
-  color: var(--sidebar-fg);
-  text-align: left;
-  font-size: 13px;
-  transition: background 0.15s;
-}
-
-.sb-topic-chip:hover { background: var(--sidebar-hover); }
-
-.sb-topic-chip.active {
-  background: var(--sidebar-active);
-  border-color: var(--primary);
-  color: var(--primary-fg);
-}
-
 .sb-seo { margin-top: 2px; }
 
 .sb-sub-label {

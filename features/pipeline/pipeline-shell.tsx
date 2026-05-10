@@ -90,7 +90,7 @@ export function PipelineShell() {
   }, [state.activeProject?.project?.id, state.studio, syncStudioUi]);
 
   const projectId = state.activeProject?.project?.id;
-  const topic = state.studio?.draft?.topic || "";
+  const topic = content.topicInput.trim() || state.studio?.draft?.topic || "";
   const hasContent = (state.studio?.draft?.assets?.length ?? 0) > 0;
   const sidebarProps = {
     project: {

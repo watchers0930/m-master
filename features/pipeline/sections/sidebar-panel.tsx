@@ -232,7 +232,7 @@ export function SidebarPanel(props: Props) {
                 className="text-input"
                 value={topicInput}
                 onChange={(e) => onTopicInputChange(e.target.value)}
-                placeholder="생성할 콘텐츠의 테마를 입력하세요"
+                placeholder="이전 토픽 선택 대신 직접 입력하세요"
               />
             </div>
             <button className="button primary sb-btn-full" disabled={generateBusy || !topicInput.trim()} onClick={onGenerate}>
