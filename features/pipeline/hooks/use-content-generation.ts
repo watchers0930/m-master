@@ -97,6 +97,7 @@ export function useContentGeneration(params: {
   const [editingBody, setEditingBody] = useState("");
   const [editingCta, setEditingCta] = useState("");
   const [editingHashtags, setEditingHashtags] = useState("");
+  const [hashtagBusy, setHashtagBusy] = useState(false);
 
   const hydrateEditor = useCallback((studio: StudioDetail) => {
     const blogAsset = studio.draft.assets.find(a => a.channel === "blog");
@@ -155,6 +156,37 @@ export function useContentGeneration(params: {
     }
   }, [editingTitle, editingBody, editingCta, editingHashtags, onStudioUpdate, onError]);
 
+  const handleGenerateHashtags = useCallback(async () => {
+    if (!editingBody.trim() && !editingTitle.trim()) return;
+    setHashtagBusy(true);
+    try {
+      // Extract keywords from title + body for hashtag generation
+      const text = `${editingTitle} ${editingBody}`;
+      // Remove markdown syntax, numbers, short words
+      const words = text
+        .replace(/[#*\[\](){}|`>_~=\-+]/g, " ")
+        .replace(/https?:\/\/\S+/g, "")
+        .split(/\s+/)
+        .map((w) => w.replace(/[.,!?;:'"]/g, "").trim())
+        .filter((w) => w.length >= 2);
+
+      // Count frequency (skip common stopwords)
+      const stopwords = new Set(["그리고", "또한", "하는", "있는", "이런", "그런", "대한", "위한", "통해", "에서", "으로", "하고", "이를", "것을", "수가", "때문", "무엇", "어떤", "있다", "없다", "한다", "된다", "것이", "합니다", "입니다", "있습니다"]);
+      const freq = new Map<string, number>();
+      for (const w of words) {
+        if (stopwords.has(w) || /^\d+$/.test(w)) continue;
+        freq.set(w, (freq.get(w) || 0) + 1);
+      }
+
+      // Sort by frequency, pick top 6
+      const sorted = [...freq.entries()].sort((a, b) => b[1] - a[1]);
+      const topKeywords = sorted.slice(0, 6).map(([word]) => `#${word}`);
+      setEditingHashtags(topKeywords.join(" "));
+    } finally {
+      setHashtagBusy(false);
+    }
+  }, [editingTitle, editingBody]);
+
   return {
     selectedTopicId, setSelectedTopicId,
     generateBusy, saveBusy,
@@ -164,9 +196,11 @@ export function useContentGeneration(params: {
     editingBody, setEditingBody,
     editingCta, setEditingCta,
     editingHashtags, setEditingHashtags,
+    hashtagBusy,
     hydrateEditor,
     updateSeoFromEditor,
     handleGenerate,
     handleSave,
+    handleGenerateHashtags,
   };
 }

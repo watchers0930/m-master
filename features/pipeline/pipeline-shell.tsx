@@ -152,6 +152,10 @@ export function PipelineShell() {
           onPreparePublish={publish.handlePreparePublish}
           wordpressConfig={publish.wordpressConfig}
           onWordPressConfigChange={publish.handleWordPressConfigChange}
+          editingHashtags={content.editingHashtags}
+          onEditingHashtagsChange={content.setEditingHashtags}
+          hashtagBusy={content.hashtagBusy}
+          onGenerateHashtags={content.handleGenerateHashtags}
           settingsBusy={publish.settingsBusy}
           onSaveWordPressDefaults={publish.handleSaveWordPressDefaults}
         />

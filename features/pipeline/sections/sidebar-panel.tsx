@@ -11,6 +11,15 @@ import type {
   BlogPublishPackage,
 } from "../types";
 
+const TONE_PRESETS = [
+  { key: "professional", label: "전문적" },
+  { key: "friendly", label: "친근한" },
+  { key: "authoritative", label: "권위적" },
+  { key: "casual", label: "캐주얼" },
+  { key: "persuasive", label: "설득적" },
+  { key: "educational", label: "교육적" },
+] as const;
+
 type Props = {
   /* Project */
   projects: ProjectListItem[];
@@ -57,6 +66,11 @@ type Props = {
   seoCompliance: SeoComplianceResult | null;
   /* Review */
   studio: StudioDetail | null;
+  /* Tone & Hashtag */
+  editingHashtags: string;
+  onEditingHashtagsChange: (v: string) => void;
+  hashtagBusy: boolean;
+  onGenerateHashtags: () => void;
   /* Publish */
   exportBusy: boolean;
   onExportAll: () => void;
@@ -81,6 +95,7 @@ export function SidebarPanel(props: Props) {
     editingCta, onEditingCtaChange,
     editingBannedTerms, onEditingBannedTermsChange,
     contextBusy, onApproveContext, onSaveContextDraft,
+    editingHashtags, onEditingHashtagsChange, hashtagBusy, onGenerateHashtags,
     topics, selectedTopicId, onSelectTopic,
     generateBusy, onGenerate,
     topic, variantGroup, abGenerateBusy, onGenerateVariants, adoptBusy, onAdoptVariant,
@@ -224,6 +239,63 @@ export function SidebarPanel(props: Props) {
                 )}
               </div>
             )}
+          </div>
+        </details>
+      )}
+
+      {/* ── 톤 ── */}
+      {isApproved && (
+        <details className="sb-section" open>
+          <summary className="sb-section-title">콘텐츠 톤</summary>
+          <div className="sb-section-body">
+            <div className="sb-tone-grid">
+              {TONE_PRESETS.map((preset) => (
+                <button
+                  key={preset.key}
+                  className={`sb-tone-chip ${editingTone === preset.label ? "active" : ""}`}
+                  onClick={() => onEditingToneChange(preset.label)}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+            <div className="field-group">
+              <label className="field-label">직접 입력</label>
+              <input
+                className="text-input"
+                value={editingTone}
+                onChange={(e) => onEditingToneChange(e.target.value)}
+                placeholder="예: 전문적이면서 친근한"
+              />
+            </div>
+          </div>
+        </details>
+      )}
+
+      {/* ── 해시태그 ── */}
+      {hasContent && (
+        <details className="sb-section" open>
+          <summary className="sb-section-title">해시태그</summary>
+          <div className="sb-section-body">
+            <button
+              className="button primary sb-btn-full"
+              disabled={hashtagBusy}
+              onClick={onGenerateHashtags}
+            >
+              {hashtagBusy ? "생성 중…" : "해시태그 자동 생성"}
+            </button>
+            {editingHashtags && (
+              <div className="sb-hashtag-output">{editingHashtags}</div>
+            )}
+            <div className="field-group">
+              <label className="field-label">직접 편집</label>
+              <input
+                className="text-input"
+                value={editingHashtags}
+                onChange={(e) => onEditingHashtagsChange(e.target.value)}
+                placeholder="#키워드1 #키워드2"
+              />
+            </div>
           </div>
         </details>
       )}
