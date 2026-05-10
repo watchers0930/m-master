@@ -145,7 +145,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .pipeline-grid {
   flex: 1;
   display: grid;
-  grid-template-columns: 340px minmax(0, 1fr) 300px;
+  grid-template-columns: 400px minmax(0, 1fr) 320px;
   min-height: 0;
 }
 
@@ -181,7 +181,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   display: flex;
   align-items: center;
   width: 100%;
-  padding: 12px 20px;
+  padding: 16px 28px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -200,30 +200,31 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 }
 
 .sb-section-body {
-  padding: 0 20px 16px;
+  padding: 0 28px 24px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
 }
 
 .sb-form {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 /* Sidebar-specific form overrides */
 .sidebar-panel .field-label {
   color: var(--sidebar-muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .sidebar-panel .text-input {
   background: rgba(255, 255, 255, 0.06);
   border-color: var(--sidebar-border);
   color: var(--sidebar-fg);
-  height: 34px;
+  height: 40px;
   font-size: 13px;
+  padding: 0 14px;
 }
 
 .sidebar-panel .text-input:focus {
@@ -240,6 +241,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   border-color: var(--sidebar-border);
   color: var(--sidebar-fg);
   font-size: 13px;
+  padding: 12px 14px;
 }
 
 .sidebar-panel .text-area:focus {
@@ -278,8 +280,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .sb-active-project {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
+  gap: 6px;
+  padding: 14px 16px;
   border-radius: var(--radius);
   background: var(--sidebar-active);
   border: 1px solid var(--sidebar-border);
@@ -303,8 +305,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .sb-ab-section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding-top: 8px;
+  gap: 10px;
+  padding-top: 12px;
   border-top: 1px solid var(--sidebar-border);
 }
 
@@ -342,16 +344,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .sb-tone-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 4px;
+  gap: 8px;
 }
 
 .sb-tone-chip {
-  padding: 6px 8px;
+  padding: 10px 12px;
   border-radius: 6px;
   border: 1px solid var(--sidebar-border);
   background: transparent;
   color: var(--sidebar-muted);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   text-align: center;
   transition: background 0.15s, color 0.15s;
@@ -379,9 +381,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 /* Sidebar buttons */
 .sidebar-panel .button {
-  font-size: 12px;
-  min-height: 32px;
-  padding: 0 12px;
+  font-size: 13px;
+  min-height: 38px;
+  padding: 0 14px;
 }
 
 .sidebar-panel .button.primary {
@@ -420,12 +422,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 /* ═══ CENTER: Content Panel ═══ */
 .content-panel {
-  padding: 20px 24px;
+  padding: 28px 32px;
   overflow-y: auto;
   max-height: calc(100vh - 56px);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
   background: var(--background-subtle);
 }
 
@@ -504,7 +506,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .image-panel {
   border-left: 1px solid var(--border);
   background: var(--card);
-  padding: 20px 16px;
+  padding: 24px 20px;
   overflow-y: auto;
   max-height: calc(100vh - 56px);
   display: flex;
@@ -886,12 +888,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 /* ─── Responsive ─── */
 @media (max-width: 1100px) {
-  .pipeline-grid { grid-template-columns: 320px minmax(0, 1fr); }
+  .pipeline-grid { grid-template-columns: 360px minmax(0, 1fr); }
   .pipeline-desktop-image-panel { display: none; }
   .content-panel { max-height: none; }
   .pipeline-mobile-image-panel {
     display: block;
-    padding: 0 24px 24px;
+    padding: 0 32px 32px;
   }
   .pipeline-mobile-image-panel .image-panel {
     max-height: none;
@@ -903,6 +905,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 @media (max-width: 768px) {
   .pipeline-grid { grid-template-columns: 1fr; }
   .sidebar-panel { max-height: none; }
+  .content-panel { padding: 24px 20px; }
+  .sb-section-title { padding: 14px 20px; }
+  .sb-section-body { padding: 0 20px 20px; }
   .cp-meta-row { grid-template-columns: 1fr; }
   .derived-panel { grid-template-columns: 1fr; }
   .variant-comparison-grid { grid-template-columns: 1fr; }

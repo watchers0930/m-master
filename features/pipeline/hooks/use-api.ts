@@ -33,6 +33,17 @@ export async function apiPatch<T>(url: string, body: unknown): Promise<T> {
   return payload.data;
 }
 
+export async function apiPut<T>(url: string, body: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const payload: ApiResponse<T> = await res.json();
+  if (!payload.ok) throw new Error(payload.error.message);
+  return payload.data;
+}
+
 export async function apiDelete<T>(url: string): Promise<T> {
   const res = await fetch(url, { method: "DELETE" });
   const payload: ApiResponse<T> = await res.json();

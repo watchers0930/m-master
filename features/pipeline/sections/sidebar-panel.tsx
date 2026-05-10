@@ -271,26 +271,6 @@ export function SidebarPanel(props: Props) {
         </details>
       )}
 
-      {/* ── 톤 ── */}
-      {activeProject && (
-        <details className="sb-section" open>
-          <summary className="sb-section-title">콘텐츠 톤</summary>
-          <div className="sb-section-body">
-            <div className="sb-tone-grid">
-              {TONE_PRESETS.map((preset) => (
-                <button
-                  key={preset.key}
-                  className={`sb-tone-chip ${editingTone === preset.label ? "active" : ""}`}
-                  onClick={() => onEditingToneChange(preset.label)}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </details>
-      )}
-
       {/* ── 해시태그 ── */}
       {hasContent && (
         <details className="sb-section" open>

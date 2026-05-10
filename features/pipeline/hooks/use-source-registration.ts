@@ -1,7 +1,7 @@
 "use client";
 import { useState, useCallback } from "react";
 import type { SourceFileDraft, ProjectDetail, SourceAnalysisSummary, ProjectPreview } from "../types";
-import { apiPost, apiPatch, apiGet } from "./use-api";
+import { apiPost, apiPatch, apiPut, apiGet } from "./use-api";
 
 export function useSourceRegistration(params: {
   onProjectCreated: (project: ProjectDetail) => void;
@@ -85,10 +85,9 @@ export function useSourceRegistration(params: {
     setContextBusy(true);
     onError("");
     try {
-      const data = await apiPatch<{ project: ProjectDetail }>(
+      const data = await apiPut<{ project: ProjectDetail }>(
         `/api/projects/${projectId}/brand-profile`,
         {
-          action: "draft",
           summary: editingSummary,
           audience: editingAudience,
           tone: editingTone,

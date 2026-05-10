@@ -92,6 +92,12 @@ export function PipelineShell() {
   const projectId = state.activeProject?.project?.id;
   const topic = content.topicInput.trim() || state.studio?.draft?.topic || "";
   const hasContent = (state.studio?.draft?.assets?.length ?? 0) > 0;
+  const syncContextBeforeGeneration = async () => {
+    if (!projectId || !source.editingSummary.trim()) {
+      return;
+    }
+    await source.handleApproveContext(projectId);
+  };
   const sidebarProps = {
     project: {
       projects: state.projects,
@@ -136,8 +142,9 @@ export function PipelineShell() {
       topicInput: content.topicInput,
       onTopicInputChange: content.setTopicInput,
       generateBusy: content.generateBusy,
-      onGenerate: () => {
+      onGenerate: async () => {
         if (projectId) {
+          await syncContextBeforeGeneration();
           content.handleGenerate(projectId, undefined, content.topicInput.trim() || undefined);
         }
       },
@@ -148,8 +155,9 @@ export function PipelineShell() {
       variantGroup: state.variantGroup,
       abGenerateBusy: ab.generateBusy,
       adoptBusy: ab.adoptBusy,
-      onGenerateVariants: (count: number) => {
+      onGenerateVariants: async (count: number) => {
         if (projectId) {
+          await syncContextBeforeGeneration();
           ab.handleGenerateVariants(projectId, topic, count);
         }
       },
