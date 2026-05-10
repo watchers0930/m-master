@@ -1,3 +1,5 @@
+import type { SeoComplianceResult } from "@/features/pipeline/types";
+
 type ReviewInput = {
   summary: string;
   cta?: string | null;
@@ -36,8 +38,6 @@ const BRAND_KEYWORD_STOPWORDS = new Set([
   "잠재",
   "고객",
   "핵심",
-  "vestra",
-  "plum",
   "vercel",
   "app",
   "html",
@@ -247,5 +247,292 @@ export function buildReviewSummary(input: ReviewInput): ReviewSummary {
     },
     findings,
     status: findings.some((item) => item.severity === "warning") ? "needs-edit" : "ready",
+  };
+}
+
+export function buildSeoComplianceResult(blogAsset: {
+  title?: string | null;
+  body: string;
+  cta?: string | null;
+  hashtags?: string | null;
+  metaDescription?: string | null;
+}): SeoComplianceResult {
+  const items: SeoComplianceResult["items"] = [];
+  let totalScore = 100;
+
+  // 1. Title length <= 60 chars
+  const titleLength = (blogAsset.title || "").length;
+  if (titleLength === 0) {
+    items.push({
+      key: "title-length",
+      label: "제목 길이 (60자 이내)",
+      status: "fail",
+      detail: "제목이 비어 있습니다.",
+    });
+    totalScore -= 15;
+  } else if (titleLength <= 60) {
+    items.push({
+      key: "title-length",
+      label: "제목 길이 (60자 이내)",
+      status: "pass",
+      detail: `${titleLength}자`,
+    });
+  } else {
+    items.push({
+      key: "title-length",
+      label: "제목 길이 (60자 이내)",
+      status: "warn",
+      detail: `${titleLength}자 — 60자 이내로 줄이는 것을 권장합니다.`,
+    });
+    totalScore -= 8;
+  }
+
+  // 2. metaDescription exists and <= 155 chars
+  const metaDesc = blogAsset.metaDescription || "";
+  if (!metaDesc.trim()) {
+    items.push({
+      key: "meta-description",
+      label: "메타 설명 (155자 이내)",
+      status: "fail",
+      detail: "메타 설명이 없습니다.",
+    });
+    totalScore -= 12;
+  } else if (metaDesc.length <= 155) {
+    items.push({
+      key: "meta-description",
+      label: "메타 설명 (155자 이내)",
+      status: "pass",
+      detail: `${metaDesc.length}자`,
+    });
+  } else {
+    items.push({
+      key: "meta-description",
+      label: "메타 설명 (155자 이내)",
+      status: "warn",
+      detail: `${metaDesc.length}자 — 155자 이내로 줄이는 것을 권장합니다.`,
+    });
+    totalScore -= 6;
+  }
+
+  // 3. H1 count == 1 (## 도입 counts as H1 equivalent)
+  const h1Matches = blogAsset.body.match(/^## 도입/gm) || [];
+  const h1Count = h1Matches.length;
+  if (h1Count === 1) {
+    items.push({
+      key: "h1-count",
+      label: "H1 태그 (1개)",
+      status: "pass",
+      detail: "H1(## 도입) 1개 확인",
+    });
+  } else if (h1Count === 0) {
+    items.push({
+      key: "h1-count",
+      label: "H1 태그 (1개)",
+      status: "fail",
+      detail: "H1(## 도입) 태그가 없습니다.",
+    });
+    totalScore -= 10;
+  } else {
+    items.push({
+      key: "h1-count",
+      label: "H1 태그 (1개)",
+      status: "warn",
+      detail: `H1(## 도입)이 ${h1Count}개입니다. 1개를 권장합니다.`,
+    });
+    totalScore -= 5;
+  }
+
+  // 4. H2/H3 hierarchy present
+  const h2Matches = blogAsset.body.match(/^## /gm) || [];
+  const h3Matches = blogAsset.body.match(/^### /gm) || [];
+  const h2Count = h2Matches.length;
+  const h3Count = h3Matches.length;
+  if (h2Count >= 2) {
+    items.push({
+      key: "heading-hierarchy",
+      label: "H2/H3 계층 구조",
+      status: "pass",
+      detail: `H2 ${h2Count}개, H3 ${h3Count}개`,
+    });
+  } else {
+    items.push({
+      key: "heading-hierarchy",
+      label: "H2/H3 계층 구조",
+      status: "warn",
+      detail: `H2 ${h2Count}개 — 최소 2개 이상의 소제목을 권장합니다.`,
+    });
+    totalScore -= 8;
+  }
+
+  // 5. Keyword density 1-2% (extract keywords from title, check in body)
+  const titleKeywords = extractBrandKeywords(blogAsset.title || "", 3);
+  if (titleKeywords.length > 0) {
+    const bodyLength = blogAsset.body.length;
+    const totalKeywordChars = titleKeywords.reduce((sum, kw) => {
+      const regex = new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g");
+      const matches = blogAsset.body.match(regex) || [];
+      return sum + matches.length * kw.length;
+    }, 0);
+    const density = bodyLength > 0 ? (totalKeywordChars / bodyLength) * 100 : 0;
+
+    if (density >= 1 && density <= 2) {
+      items.push({
+        key: "keyword-density",
+        label: "키워드 밀도 (1-2%)",
+        status: "pass",
+        detail: `${density.toFixed(1)}%`,
+      });
+    } else if (density > 0 && density < 1) {
+      items.push({
+        key: "keyword-density",
+        label: "키워드 밀도 (1-2%)",
+        status: "warn",
+        detail: `${density.toFixed(1)}% — 키워드 빈도가 다소 낮습니다.`,
+      });
+      totalScore -= 5;
+    } else if (density > 2) {
+      items.push({
+        key: "keyword-density",
+        label: "키워드 밀도 (1-2%)",
+        status: "warn",
+        detail: `${density.toFixed(1)}% — 키워드가 과다합니다.`,
+      });
+      totalScore -= 5;
+    } else {
+      items.push({
+        key: "keyword-density",
+        label: "키워드 밀도 (1-2%)",
+        status: "fail",
+        detail: "제목 키워드가 본문에 나타나지 않습니다.",
+      });
+      totalScore -= 10;
+    }
+  } else {
+    items.push({
+      key: "keyword-density",
+      label: "키워드 밀도 (1-2%)",
+      status: "warn",
+      detail: "제목에서 키워드를 추출할 수 없습니다.",
+    });
+    totalScore -= 5;
+  }
+
+  // 6. Body length 1500-2500 chars
+  const bodyLength = blogAsset.body.length;
+  if (bodyLength >= 1500 && bodyLength <= 2500) {
+    items.push({
+      key: "body-length",
+      label: "본문 길이 (1500-2500자)",
+      status: "pass",
+      detail: `${bodyLength}자`,
+    });
+  } else if (bodyLength < 1500) {
+    items.push({
+      key: "body-length",
+      label: "본문 길이 (1500-2500자)",
+      status: bodyLength < 1000 ? "fail" : "warn",
+      detail: `${bodyLength}자 — 1500자 이상으로 보강을 권장합니다.`,
+    });
+    totalScore -= bodyLength < 1000 ? 15 : 8;
+  } else {
+    items.push({
+      key: "body-length",
+      label: "본문 길이 (1500-2500자)",
+      status: "warn",
+      detail: `${bodyLength}자 — 2500자 이내로 줄이는 것을 권장합니다.`,
+    });
+    totalScore -= 5;
+  }
+
+  // 7. Image cues [이미지 N] 3-5 count
+  const imageCues = blogAsset.body.match(/\[이미지\s+\d+\]/g) || [];
+  const imageCueCount = imageCues.length;
+  if (imageCueCount >= 3 && imageCueCount <= 5) {
+    items.push({
+      key: "image-cues",
+      label: "이미지 배치 (3-5개)",
+      status: "pass",
+      detail: `${imageCueCount}개`,
+    });
+  } else if (imageCueCount < 3) {
+    items.push({
+      key: "image-cues",
+      label: "이미지 배치 (3-5개)",
+      status: imageCueCount === 0 ? "fail" : "warn",
+      detail: `${imageCueCount}개 — 최소 3개 이상 배치를 권장합니다.`,
+    });
+    totalScore -= imageCueCount === 0 ? 12 : 6;
+  } else {
+    items.push({
+      key: "image-cues",
+      label: "이미지 배치 (3-5개)",
+      status: "warn",
+      detail: `${imageCueCount}개 — 5개 이내로 조정을 권장합니다.`,
+    });
+    totalScore -= 3;
+  }
+
+  // 8. Paragraph length (each paragraph <= 150 chars, 3-4 sentences)
+  const paragraphs = blogAsset.body
+    .split(/\n\n+/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0 && !p.startsWith("##") && !p.startsWith("[이미지") && !p.startsWith("- "));
+  const longParagraphs = paragraphs.filter((p) => p.length > 150);
+  if (paragraphs.length === 0) {
+    items.push({
+      key: "paragraph-length",
+      label: "문단 길이 (150자 이내)",
+      status: "warn",
+      detail: "문단을 구분할 수 없습니다.",
+    });
+    totalScore -= 5;
+  } else if (longParagraphs.length === 0) {
+    items.push({
+      key: "paragraph-length",
+      label: "문단 길이 (150자 이내)",
+      status: "pass",
+      detail: `전체 ${paragraphs.length}개 문단 모두 적정 길이`,
+    });
+  } else {
+    const ratio = longParagraphs.length / paragraphs.length;
+    items.push({
+      key: "paragraph-length",
+      label: "문단 길이 (150자 이내)",
+      status: ratio > 0.5 ? "fail" : "warn",
+      detail: `${paragraphs.length}개 문단 중 ${longParagraphs.length}개가 150자 초과`,
+    });
+    totalScore -= ratio > 0.5 ? 10 : 5;
+  }
+
+  // 9. Section count 3-5 (H2 sections)
+  const h2Sections = (blogAsset.body.match(/^## /gm) || []).length;
+  if (h2Sections >= 3 && h2Sections <= 5) {
+    items.push({
+      key: "section-count",
+      label: "섹션 수 (3-5개)",
+      status: "pass",
+      detail: `${h2Sections}개 섹션`,
+    });
+  } else if (h2Sections < 3) {
+    items.push({
+      key: "section-count",
+      label: "섹션 수 (3-5개)",
+      status: "warn",
+      detail: `${h2Sections}개 — 최소 3개 이상의 섹션을 권장합니다.`,
+    });
+    totalScore -= 6;
+  } else {
+    items.push({
+      key: "section-count",
+      label: "섹션 수 (3-5개)",
+      status: "warn",
+      detail: `${h2Sections}개 — 5개 이내로 정리를 권장합니다.`,
+    });
+    totalScore -= 3;
+  }
+
+  return {
+    score: clampScore(totalScore),
+    items,
   };
 }

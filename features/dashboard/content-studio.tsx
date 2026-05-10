@@ -317,7 +317,7 @@ export function ContentStudio({
                 placeholder={`${channelLabels[activeChannel]}용 이미지 콘셉트, 구도, 분위기를 입력하세요.`}
                 multiline
                 rows={4}
-                hint="시안을 생성한 뒤 대표 이미지를 적용하면 최종 검수 단계로 이어집니다."
+                hint="생성 버튼은 상위 콜백만 호출합니다. 실제 생성 연결은 상위 레이어에서 붙이면 됩니다."
               />
               <div className="image-studio-actions">
                 <StatusPill active>{channelLabels[activeChannel]}</StatusPill>

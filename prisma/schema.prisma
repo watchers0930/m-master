@@ -69,27 +69,32 @@ model ContentJob {
   externalPostId  String?
   externalPostUrl String?
   publishedAt     DateTime?
+  variantGroupId  String?
+  variantLabel    String?
+  adopted         Boolean        @default(false)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   project         Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   assets          ContentAsset[]
 
   @@index([projectId, status])
+  @@index([projectId, variantGroupId])
 }
 
 model ContentAsset {
-  id            String        @id @default(cuid())
-  contentJobId  String
-  channel       String
-  title         String?
-  body          String        @db.Text
-  cta           String?       @db.Text
-  hashtags      String?       @db.Text
-  version       Int           @default(1)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  contentJob    ContentJob    @relation(fields: [contentJobId], references: [id], onDelete: Cascade)
-  imageJobs     ImageJob[]
+  id              String        @id @default(cuid())
+  contentJobId    String
+  channel         String
+  title           String?
+  body            String        @db.Text
+  cta             String?       @db.Text
+  hashtags        String?       @db.Text
+  metaDescription String?       @db.Text
+  version         Int           @default(1)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  contentJob      ContentJob    @relation(fields: [contentJobId], references: [id], onDelete: Cascade)
+  imageJobs       ImageJob[]
 
   @@index([contentJobId, channel])
 }
