@@ -144,8 +144,9 @@ export function PipelineShell() {
       generateBusy: content.generateBusy,
       onGenerate: async () => {
         if (projectId) {
+          const requestedTopic = content.topicInput.trim();
           await syncContextBeforeGeneration();
-          content.handleGenerate(projectId, undefined, content.topicInput.trim() || undefined);
+          content.handleGenerate(projectId, undefined, requestedTopic || undefined);
         }
       },
       seoCompliance: content.seoCompliance,
@@ -157,8 +158,9 @@ export function PipelineShell() {
       adoptBusy: ab.adoptBusy,
       onGenerateVariants: async (count: number) => {
         if (projectId) {
+          const requestedTopic = content.topicInput.trim() || topic;
           await syncContextBeforeGeneration();
-          ab.handleGenerateVariants(projectId, topic, count);
+          ab.handleGenerateVariants(projectId, requestedTopic, count);
         }
       },
       onAdoptVariant: (id: string) => {
