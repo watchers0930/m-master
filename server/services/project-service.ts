@@ -1,11 +1,16 @@
+import crypto from "crypto";
 import { logger } from "../logger";
 import {
   approveBrandProfileVersion,
+  createContentJobVariant,
   createImageJobWithAssets,
   createOrUpdateContentJobWithAssets,
   createProjectWithSeeds,
   deleteProjectById,
+  adoptVariant,
+  getLatestVariantGroup,
   getProjectDetail,
+  getVariantGroup,
   listProjectBrandProfiles,
   listProjectContentJobs,
   listProjects,
@@ -18,7 +23,13 @@ import {
   updateLatestContentJobStatus,
 } from "../repositories/project-repository";
 import { buildContextDraft } from "./context-draft-service";
-import { buildGeneratedStudioSeed, type ContentGenerationProvider } from "./content-generation-service";
+import {
+  buildGeneratedStudioSeed,
+  buildVariantStudioSeed,
+  buildDerivedChannelAssets,
+  type ContentGenerationProvider,
+  type VariantAngle,
+} from "./content-generation-service";
 import { buildImageVariants } from "./image-studio-service";
 import { buildBlogHtml, buildBlogPublishPackage, createExportSlug } from "./blog-publish-service";
 import { buildReviewSummary } from "./review-service";
@@ -115,12 +126,6 @@ function serializeProjectListItem(item: Awaited<ReturnType<typeof listProjects>>
       : null,
     topicCount: item._count.topics,
     contentJobCount: item._count.contentJobs,
-    topTopics: item.topics.slice(0, 3).map((topic) => ({
-      id: topic.id,
-      title: normalizeTopicTitle(topic.title, item.name),
-      intentType: topic.intentType,
-      score: topic.score,
-    })),
   };
 }
 
@@ -521,6 +526,7 @@ export async function generateProjectContent(params: {
   topic?: string;
   topicId?: string;
   objective?: string;
+  derivationMode?: "blog-first";
 }) {
   const record = requireApprovedBrandProfile(await getProjectDetail(params.projectId), params.projectId);
 
@@ -536,6 +542,41 @@ export async function generateProjectContent(params: {
   }
 
   const normalizedTopic = normalizeTopicTitle(selectedTopic, record.project.name);
+
+  if (params.derivationMode === "blog-first") {
+    const blogGenerated = await buildGeneratedStudioSeed({
+      projectName: record.project.name,
+      industry: record.project.industry,
+      profile: record.brandProfile,
+      topics: [{ title: normalizedTopic, score: 10 }],
+    });
+    const blogAsset = blogGenerated.seed.assets.find((a) => a.channel === "blog")!;
+
+    const derived = await buildDerivedChannelAssets({
+      blogAsset: {
+        title: blogAsset.title,
+        body: blogAsset.body,
+        cta: blogAsset.cta,
+        hashtags: blogAsset.hashtags,
+      },
+      projectName: record.project.name,
+      industry: record.project.industry,
+      profile: record.brandProfile,
+    });
+
+    const combinedAssets = [blogAsset, ...derived.assets];
+
+    await createOrUpdateContentJobWithAssets({
+      projectId: params.projectId,
+      topic: normalizedTopic,
+      objective: params.objective || blogGenerated.seed.objective,
+      generationProvider: blogGenerated.provider,
+      assets: combinedAssets,
+    });
+
+    return getProjectStudioSeed(params.projectId);
+  }
+
   const generated = await buildGeneratedStudioSeed({
     projectName: record.project.name,
     industry: record.project.industry,
@@ -771,21 +812,71 @@ export async function generateProjectImages(params: {
     throw new ProjectImageNotFoundError(params.projectId);
   }
 
+  const variantCount = resolveImageVariantCount(params.channel, asset.body);
   const bundle = await buildImageVariants(record.project.name, {
     channel: params.channel,
     title: asset.title || record.latestContentJob.topic,
     body: asset.body,
     cta: asset.cta || record.brandProfile.cta || "자세히 보기",
-  }, params.prompt);
+  }, params.prompt, { variantCount });
 
-  await createImageJobWithAssets({
-    contentAssetId: asset.id,
-    channelPreset: `${params.channel}-${bundle.preset.width}x${bundle.preset.height}`,
-    prompt: bundle.prompt,
-    imageAssets: bundle.images,
-  });
+  try {
+    await createImageJobWithAssets({
+      contentAssetId: asset.id,
+      channelPreset: `${params.channel}-${bundle.preset.width}x${bundle.preset.height}`,
+      prompt: bundle.prompt,
+      imageAssets: bundle.images,
+    });
+  } catch (error) {
+    logger.error("project.images.persist.failed", {
+      projectId: params.projectId,
+      channel: params.channel,
+      error: error instanceof Error ? error.message : "unknown_error",
+    });
+
+    const studio = await getProjectStudioSeed(params.projectId);
+    const ephemeralImageGroup = {
+      channel: params.channel,
+      prompt: bundle.prompt,
+      variants: bundle.images.map((image, index) => ({
+        id: `temp-${params.channel}-${index + 1}`,
+        role: image.role,
+        url: image.composedPath || image.originalPath || "",
+        width: image.width,
+        height: image.height,
+        selected: image.selected ?? index === 0,
+      })),
+    };
+
+    return {
+      ...studio,
+      draft: {
+        ...studio.draft,
+        images: [
+          ...studio.draft.images.filter((group) => group.channel !== params.channel),
+          ephemeralImageGroup,
+        ],
+      },
+    };
+  }
 
   return getProjectStudioSeed(params.projectId);
+}
+
+function resolveImageVariantCount(
+  channel: "blog" | "instagram" | "facebook",
+  body: string,
+) {
+  if (channel !== "blog") {
+    return 3;
+  }
+
+  const imageCueCount = (body.match(/\[이미지\s+\d+\]/g) || []).length;
+  if (imageCueCount <= 0) {
+    return 3;
+  }
+
+  return Math.min(5, imageCueCount);
 }
 
 export async function selectProjectImage(params: {
@@ -815,4 +906,92 @@ export async function selectProjectImage(params: {
   }
 
   return getProjectStudioSeed(params.projectId);
+}
+
+export async function generateProjectContentVariants(
+  projectId: string,
+  topic?: string,
+  count?: number,
+) {
+  const record = requireApprovedBrandProfile(await getProjectDetail(projectId), projectId);
+
+  const selectedTopic = topic || record.topics[0]?.title;
+
+  if (!selectedTopic) {
+    throw new Error("배리언트 생성에 사용할 주제가 없습니다.");
+  }
+
+  const normalizedTopic = normalizeTopicTitle(selectedTopic, record.project.name);
+  const variantGroupId = crypto.randomUUID();
+  const variantCount = Math.max(2, Math.min(3, count ?? 3));
+  const angles: VariantAngle[] = ["practical", "data", "qa"];
+  const selectedAngles = angles.slice(0, variantCount);
+
+  const variantJobs = await Promise.all(
+    selectedAngles.map(async (angle) => {
+      const result = await buildVariantStudioSeed({
+        projectName: record.project.name,
+        industry: record.project.industry,
+        profile: record.brandProfile,
+        topics: [{ title: normalizedTopic, score: 10 }],
+        angle,
+      });
+
+      const created = await createContentJobVariant({
+        projectId,
+        topic: normalizedTopic,
+        objective: result.seed.objective,
+        generationProvider: result.provider,
+        variantGroupId,
+        variantLabel: result.variantLabel,
+        assets: result.seed.assets,
+      });
+
+      return created;
+    }),
+  );
+
+  logger.info("project.variants.generated", {
+    projectId,
+    variantGroupId,
+    variantCount: variantJobs.length,
+  });
+
+  const group = await getVariantGroup(projectId, variantGroupId);
+  return {
+    groupId: variantGroupId,
+    variants: group,
+  };
+}
+
+export async function getProjectVariantGroup(projectId: string) {
+  const record = await getProjectDetail(projectId);
+
+  if (!record) {
+    throw new ProjectNotFoundError(projectId);
+  }
+
+  const group = await getLatestVariantGroup(projectId);
+  return group;
+}
+
+export async function adoptProjectVariant(projectId: string, contentJobId: string) {
+  const record = await getProjectDetail(projectId);
+
+  if (!record) {
+    throw new ProjectNotFoundError(projectId);
+  }
+
+  const adopted = await adoptVariant(contentJobId);
+
+  if (!adopted) {
+    throw new ProjectContentNotFoundError(projectId);
+  }
+
+  logger.info("project.variant.adopted", {
+    projectId,
+    contentJobId,
+  });
+
+  return getProjectById(projectId);
 }

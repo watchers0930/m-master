@@ -703,6 +703,123 @@ export async function createImageJobWithAssets(params: {
   });
 }
 
+export async function createContentJobVariant(params: {
+  projectId: string;
+  topic: string;
+  objective?: string;
+  generationProvider?: string;
+  variantGroupId: string;
+  variantLabel: string;
+  assets: Array<{
+    channel: string;
+    title?: string;
+    body: string;
+    cta?: string;
+    hashtags?: string;
+    metaDescription?: string;
+  }>;
+}) {
+  return prisma.contentJob.create({
+    data: {
+      projectId: params.projectId,
+      topic: params.topic,
+      objective: params.objective,
+      generationProvider: params.generationProvider,
+      status: "generated",
+      variantGroupId: params.variantGroupId,
+      variantLabel: params.variantLabel,
+      adopted: false,
+      assets: {
+        create: params.assets.map((asset) => ({
+          channel: asset.channel,
+          title: asset.title,
+          body: asset.body,
+          cta: asset.cta,
+          hashtags: asset.hashtags,
+          metaDescription: asset.metaDescription,
+        })),
+      },
+    },
+    include: {
+      assets: {
+        orderBy: [{ createdAt: "asc" }],
+      },
+    },
+  });
+}
+
+export async function getVariantGroup(projectId: string, groupId: string) {
+  return prisma.contentJob.findMany({
+    where: {
+      projectId,
+      variantGroupId: groupId,
+    },
+    orderBy: [{ createdAt: "asc" }],
+    include: {
+      assets: {
+        orderBy: [{ createdAt: "asc" }],
+        include: {
+          imageJobs: {
+            orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+            include: {
+              imageAssets: {
+                orderBy: [{ createdAt: "asc" }],
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function adoptVariant(contentJobId: string) {
+  return prisma.$transaction(async (tx) => {
+    const target = await tx.contentJob.findUnique({
+      where: { id: contentJobId },
+    });
+
+    if (!target || !target.variantGroupId) {
+      return null;
+    }
+
+    await tx.contentJob.updateMany({
+      where: {
+        projectId: target.projectId,
+        variantGroupId: target.variantGroupId,
+      },
+      data: { adopted: false },
+    });
+
+    return tx.contentJob.update({
+      where: { id: contentJobId },
+      data: { adopted: true },
+      include: {
+        assets: {
+          orderBy: [{ createdAt: "asc" }],
+        },
+      },
+    });
+  });
+}
+
+export async function getLatestVariantGroup(projectId: string) {
+  const latest = await prisma.contentJob.findFirst({
+    where: {
+      projectId,
+      variantGroupId: { not: null },
+    },
+    orderBy: [{ createdAt: "desc" }],
+    select: { variantGroupId: true },
+  });
+
+  if (!latest?.variantGroupId) {
+    return [];
+  }
+
+  return getVariantGroup(projectId, latest.variantGroupId);
+}
+
 export async function selectImageAssetForContentAsset(params: {
   contentAssetId: string;
   imageAssetId: string;

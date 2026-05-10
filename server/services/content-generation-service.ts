@@ -105,6 +105,7 @@ type GeneratedAsset = {
   body: string;
   cta: string;
   hashtags: string;
+  metaDescription?: string;
 };
 
 type GeneratedStudioPayload = {
@@ -118,6 +119,7 @@ type GeneratedChannelPayload = {
   body?: string;
   cta?: string;
   hashtags?: string;
+  metaDescription?: string;
 };
 
 function canUseOpenAiText() {
@@ -279,13 +281,19 @@ function normalizeAsset(
     body = ensureCtaPresence(body, cta);
   }
 
-  return {
+  const result: GeneratedAsset = {
     channel,
     title: cleanLine(asset?.title || fallback.title, 300) || fallback.title,
     body,
     cta,
     hashtags: normalizeHashtagList(asset?.hashtags || fallback.hashtags || ""),
   };
+
+  if (channel === "blog" && asset?.metaDescription) {
+    result.metaDescription = cleanLine(asset.metaDescription, 155);
+  }
+
+  return result;
 }
 
 function buildSharedContext(params: {
@@ -326,7 +334,12 @@ function buildChannelPrompt(params: {
     params.channel === "blog"
       ? [
           "- 출력은 반드시 JSON만 반환한다.",
-          "- blog는 네이버 블로그용 초안으로 작성한다.",
+          "- blog는 네이버 블로그에 바로 게시할 수 있는 완성형 본문으로 작성한다.",
+          "- 프롬프트, 스크립트, 작업지시서, 작성 가이드처럼 쓰지 않는다.",
+          "- '이 글은', '아래 기준', '작성 원칙', '초안', '예시', '정리한다' 같은 메타 설명을 본문에 넣지 않는다.",
+          "- 실제 블로그 글처럼 독자에게 바로 설명하는 서술형 문장으로 쓴다.",
+          "- 도입부는 독자가 검색해서 들어온 상황을 전제로 문제와 기대효과를 자연스럽게 설명한다.",
+          "- 기능 나열보다 실제 사용 장면, 판단 포인트, 적용 효과를 중심으로 풀어 쓴다.",
           '- 소제목은 "## 도입", "## 1. ...", "## 2. ...", "## 3. ...", "## 마무리" 형식을 우선 사용한다.',
           "- [이미지 1]부터 [이미지 5]까지 자연스럽게 배치한다.",
           "- 5개 섹션 안팎으로 구성하고, 각 문단은 2~3문장 정도로 짧게 끊는다.",
@@ -334,6 +347,12 @@ function buildChannelPrompt(params: {
           "- 너무 짧게 끝내지 말고, 실무 적용 포인트나 체크 포인트를 포함한다.",
           "- 브랜드 요약 문장을 그대로 길게 복사하지 말고, 핵심 의미만 자연스럽게 풀어서 쓴다.",
           "- 같은 표현을 반복해서 붙이지 말고, URL이나 도메인 문자열을 본문에 여러 번 반복하지 않는다.",
+          "- 톤 필드는 반드시 반영한다. 딱딱한 설명보다 선택한 톤의 어휘와 문장 리듬이 드러나야 한다.",
+          "- title은 60자 이내, 핵심 키워드를 앞배치한다.",
+          "- meta_description은 155자 이내 요약을 함께 작성한다. JSON에 \"metaDescription\" 필드로 반환한다.",
+          "- H1 1개 + H2/H3 계층 구조를 유지한다.",
+          "- 키워드 밀도 1-2%를 목표로 한다.",
+          "- 본문에 [이미지 N]을 3-5개 배치하고 각각 alt/caption 용도 설명을 함께 쓴다.",
         ]
       : params.channel === "instagram"
         ? [
@@ -352,7 +371,8 @@ function buildChannelPrompt(params: {
           ];
 
   return `
-너는 한국어 콘텐츠 마케터다. 아래 브랜드 컨텍스트를 기준으로 ${params.channel} 채널 초안을 작성한다.
+너는 한국어 콘텐츠 마케터이자 실무형 블로그 에디터다. 아래 브랜드 컨텍스트를 기준으로 ${params.channel} 채널 원고를 작성한다.
+특히 blog는 사람이 바로 읽고 게시할 수 있는 실제 블로그 글이어야 하며, 작성 지시문처럼 보이면 안 된다.
 
 ${shared}
 
@@ -368,7 +388,7 @@ ${industryHints.join("\n")}
   "title": "string",
   "body": "string",
   "cta": "string",
-  "hashtags": "#a, #b"
+  "hashtags": "#a, #b"${params.channel === "blog" ? ',\n  "metaDescription": "string"' : ""}
 }
 
 [참고용 기본 목표]
@@ -441,15 +461,21 @@ export async function buildGeneratedStudioSeed(params: {
           }),
         )) as GeneratedChannelPayload;
 
+        const generatedAsset: GeneratedAsset = {
+          channel,
+          title: payload.title || fallbackAsset.title,
+          body: payload.body || fallbackAsset.body,
+          cta: payload.cta || fallbackAsset.cta,
+          hashtags: payload.hashtags || fallbackAsset.hashtags,
+        };
+
+        if (channel === "blog" && payload.metaDescription) {
+          generatedAsset.metaDescription = payload.metaDescription;
+        }
+
         return {
           objective: payload.objective,
-          asset: {
-            channel,
-            title: payload.title || fallbackAsset.title,
-            body: payload.body || fallbackAsset.body,
-            cta: payload.cta || fallbackAsset.cta,
-            hashtags: payload.hashtags || fallbackAsset.hashtags,
-          } satisfies GeneratedAsset,
+          asset: generatedAsset,
         };
       }),
     );
@@ -487,6 +513,258 @@ export async function buildGeneratedStudioSeed(params: {
     return {
       provider: "fallback" as const,
       seed: fallback,
+    };
+  }
+}
+
+export type VariantAngle = "practical" | "data" | "qa";
+
+const VARIANT_ANGLE_INSTRUCTIONS: Record<VariantAngle, string> = {
+  practical:
+    "실제 운영 사례, 적용 경험담, 현장에서 바로 확인한 결과를 중심으로 전개한다. 추상적 설명 대신 구체적 실행 단계를 보여준다.",
+  data:
+    "수치, 비율, 비교 데이터를 앞세운다. '30% 절감', '2배 단축' 같은 정량 표현을 활용하고, 통계와 그래프 설명을 본문 흐름에 포함한다.",
+  qa:
+    "독자가 자주 묻는 질문을 소제목으로 사용하고, 바로 답변 구조로 전개한다. 'Q. ~?', 'A. ~' 형식이 아니라 질문형 소제목 + 답변 문단 구조를 쓴다.",
+};
+
+const VARIANT_ANGLE_LABELS: Record<VariantAngle, string> = {
+  practical: "실무 사례",
+  data: "데이터 중심",
+  qa: "Q&A 구조",
+};
+
+function buildDerivedChannelPrompt(params: {
+  channel: "instagram" | "facebook";
+  blogContent: { title: string; body: string; cta: string; hashtags: string };
+  profile: BrandProfileSeed;
+}) {
+  const channelRules =
+    params.channel === "instagram"
+      ? [
+          "- 출력은 반드시 JSON만 반환한다.",
+          "- instagram은 5장 카드뉴스 초안처럼 작성한다.",
+          "- 각 줄은 1장씩 쓰고, 각 장은 한 문장 위주로 짧고 명확하게 쓴다.",
+          "- 브랜드 핵심 요약과 CTA 문맥이 직접 드러나야 한다.",
+          "- 도메인/URL 반복은 최소화한다.",
+        ]
+      : [
+          "- 출력은 반드시 JSON만 반환한다.",
+          "- facebook은 링크 포스트형 짧은 문안으로 작성한다.",
+          "- 3~5개의 짧은 문단으로 나누고, 첫 문단에서 주제를 바로 설명한다.",
+          "- 브랜드 핵심 요약과 CTA 문맥이 직접 드러나야 한다.",
+          "- 과장 없이 읽기 좋은 한국어 문장으로 쓴다.",
+        ];
+
+  return `
+너는 한국어 콘텐츠 마케터다. 아래 블로그 원문을 기반으로 ${params.channel} 채널에 맞게 변환한다.
+블로그 원문을 독립적으로 다시 작성하지 말고, 원문의 핵심 메시지와 구조를 ${params.channel} 형식에 맞춰 재구성한다.
+
+[블로그 원문]
+제목: ${params.blogContent.title}
+본문: ${params.blogContent.body.slice(0, 2000)}
+CTA: ${params.blogContent.cta}
+
+[브랜드 톤]
+- 톤: ${params.profile.tone || ""}
+- CTA 방향: ${params.profile.cta || ""}
+
+[작성 원칙]
+${channelRules.join("\n")}
+- hashtags는 쉼표로 구분된 해시태그 문자열로 작성한다.
+- hashtags는 브랜드/주제/업종에 맞게 4~6개로 작성한다.
+
+[JSON 스키마]
+{
+  "title": "string",
+  "body": "string",
+  "cta": "string",
+  "hashtags": "#a, #b"
+}
+`.trim();
+}
+
+export async function buildDerivedChannelAssets(params: {
+  blogAsset: { title: string; body: string; cta: string; hashtags: string };
+  projectName: string;
+  industry?: string | null;
+  profile: BrandProfileSeed;
+}): Promise<{ provider: ContentGenerationProvider; assets: GeneratedAsset[] }> {
+  const fallbackSeed = buildStudioSeed({
+    projectName: params.projectName,
+    industry: params.industry,
+    profile: params.profile,
+    topics: [{ title: params.blogAsset.title, score: 10 }],
+  });
+
+  if (!canUseOpenAiText()) {
+    return {
+      provider: "fallback",
+      assets: [
+        normalizeAsset(
+          "instagram",
+          undefined,
+          fallbackSeed.assets.find((a) => a.channel === "instagram")!,
+          params.profile,
+        ),
+        normalizeAsset(
+          "facebook",
+          undefined,
+          fallbackSeed.assets.find((a) => a.channel === "facebook")!,
+          params.profile,
+        ),
+      ],
+    };
+  }
+
+  try {
+    const channels: Array<"instagram" | "facebook"> = ["instagram", "facebook"];
+    const derivedAssets = await Promise.all(
+      channels.map(async (channel) => {
+        const fallbackAsset = fallbackSeed.assets.find((a) => a.channel === channel)!;
+        const payload = (await requestOpenAiDraft(
+          buildDerivedChannelPrompt({
+            channel,
+            blogContent: params.blogAsset,
+            profile: params.profile,
+          }),
+        )) as GeneratedChannelPayload;
+
+        return normalizeAsset(
+          channel,
+          {
+            channel,
+            title: payload.title || fallbackAsset.title,
+            body: payload.body || fallbackAsset.body,
+            cta: payload.cta || fallbackAsset.cta,
+            hashtags: payload.hashtags || fallbackAsset.hashtags,
+          },
+          fallbackAsset,
+          params.profile,
+        );
+      }),
+    );
+
+    return {
+      provider: "openai",
+      assets: derivedAssets,
+    };
+  } catch (error) {
+    logger.error("content.derivation.openai.failed", {
+      projectName: params.projectName,
+      error: error instanceof Error ? error.message : "unknown_error",
+    });
+    return {
+      provider: "fallback",
+      assets: [
+        normalizeAsset(
+          "instagram",
+          undefined,
+          fallbackSeed.assets.find((a) => a.channel === "instagram")!,
+          params.profile,
+        ),
+        normalizeAsset(
+          "facebook",
+          undefined,
+          fallbackSeed.assets.find((a) => a.channel === "facebook")!,
+          params.profile,
+        ),
+      ],
+    };
+  }
+}
+
+export async function buildVariantStudioSeed(params: {
+  projectName: string;
+  industry?: string | null;
+  profile: BrandProfileSeed;
+  topics: TopicSeed[];
+  angle: VariantAngle;
+}): Promise<{ provider: ContentGenerationProvider; seed: StudioSeed; variantLabel: string }> {
+  const fallback = buildStudioSeed(params);
+  const variantLabel = VARIANT_ANGLE_LABELS[params.angle];
+
+  if (!canUseOpenAiText()) {
+    return {
+      provider: "fallback",
+      seed: fallback,
+      variantLabel,
+    };
+  }
+
+  try {
+    const blogFallbackAsset = fallback.assets.find((a) => a.channel === "blog")!;
+    const angleInstruction = VARIANT_ANGLE_INSTRUCTIONS[params.angle];
+
+    const blogPrompt = buildChannelPrompt({
+      channel: "blog",
+      projectName: params.projectName,
+      industry: params.industry,
+      topic: fallback.topic,
+      profile: params.profile,
+      fallbackAsset: blogFallbackAsset,
+      fallbackObjective: fallback.objective,
+    });
+
+    const enhancedBlogPrompt = blogPrompt.replace(
+      "[작성 원칙]",
+      `[작성 관점]\n- ${angleInstruction}\n\n[작성 원칙]`,
+    );
+
+    const blogPayload = (await requestOpenAiDraft(enhancedBlogPrompt)) as GeneratedChannelPayload;
+    const blogAsset: GeneratedAsset = {
+      channel: "blog",
+      title: blogPayload.title || blogFallbackAsset.title,
+      body: blogPayload.body || blogFallbackAsset.body,
+      cta: blogPayload.cta || blogFallbackAsset.cta,
+      hashtags: blogPayload.hashtags || blogFallbackAsset.hashtags,
+    };
+
+    if (blogPayload.metaDescription) {
+      blogAsset.metaDescription = blogPayload.metaDescription;
+    }
+
+    const normalizedBlog = normalizeAsset("blog", blogAsset, blogFallbackAsset, params.profile);
+
+    const derived = await buildDerivedChannelAssets({
+      blogAsset: {
+        title: normalizedBlog.title,
+        body: normalizedBlog.body,
+        cta: normalizedBlog.cta,
+        hashtags: normalizedBlog.hashtags,
+      },
+      projectName: params.projectName,
+      industry: params.industry,
+      profile: params.profile,
+    });
+
+    const objective = blogPayload.objective
+      ? cleanLine(blogPayload.objective, 1000)
+      : fallback.objective;
+
+    return {
+      provider: "openai",
+      seed: {
+        topic: fallback.topic,
+        objective: objective || fallback.objective,
+        assets: [
+          normalizedBlog,
+          ...derived.assets,
+        ],
+      },
+      variantLabel,
+    };
+  } catch (error) {
+    logger.error("content.variant.openai.failed", {
+      projectName: params.projectName,
+      angle: params.angle,
+      topic: fallback.topic,
+      error: error instanceof Error ? error.message : "unknown_error",
+    });
+    return {
+      provider: "fallback",
+      seed: fallback,
+      variantLabel,
     };
   }
 }

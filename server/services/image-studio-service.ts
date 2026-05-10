@@ -25,7 +25,7 @@ const PRESET_MAP: Record<ImageChannel, { width: number; height: number; label: s
 const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1-mini";
 const OPENAI_API_URL = "https://api.openai.com/v1/images/generations";
 const OPENAI_IMAGE_QUALITY = "low";
-const OPENAI_VARIANT_COUNT = 1;
+const DEFAULT_IMAGE_VARIANT_COUNT = 3;
 const VARIANT_DIRECTIONS = [
   "제품 핵심 메시지를 정면으로 전달하는 선명한 히어로형 구도",
   "신뢰감 있는 카드형 정보 구조와 여백 중심의 에디토리얼 구도",
@@ -98,14 +98,19 @@ function buildSvgVariant(params: {
   `);
 }
 
-function buildSvgImageVariants(projectName: string, asset: AssetSeed, promptOverride?: string) {
+function buildSvgImageVariants(
+  projectName: string,
+  asset: AssetSeed,
+  promptOverride?: string,
+  variantCount: number = DEFAULT_IMAGE_VARIANT_COUNT,
+) {
   const preset = PRESET_MAP[asset.channel];
   const prompt = promptOverride?.trim() || buildImagePrompt(projectName, asset);
 
   return {
     prompt,
     preset,
-    images: [0, 1, 2].map((variantIndex): ImageVariantRecord => ({
+    images: Array.from({ length: variantCount }, (_, variantIndex): ImageVariantRecord => ({
       role: `variant-${variantIndex + 1}`,
       originalPath: buildSvgVariant({
         projectName,
@@ -179,14 +184,19 @@ async function generateOpenAiVariant(params: {
   } satisfies ImageVariantRecord;
 }
 
-async function buildOpenAiImageVariants(projectName: string, asset: AssetSeed, promptOverride?: string) {
+async function buildOpenAiImageVariants(
+  projectName: string,
+  asset: AssetSeed,
+  promptOverride?: string,
+  variantCount: number = DEFAULT_IMAGE_VARIANT_COUNT,
+) {
   const preset = PRESET_MAP[asset.channel];
   const prompt = promptOverride?.trim() || buildImagePrompt(projectName, asset);
 
   const images = await Promise.all(
-    VARIANT_DIRECTIONS.slice(0, OPENAI_VARIANT_COUNT).map((direction, index) =>
+    Array.from({ length: variantCount }, (_, index) =>
       generateOpenAiVariant({
-        prompt: `${prompt} ${direction}. 텍스트는 이미지에 직접 넣지 말고, 배경 비주얼과 분위기만 만든다.`,
+        prompt: `${prompt} ${VARIANT_DIRECTIONS[index % VARIANT_DIRECTIONS.length]}. 텍스트는 이미지에 직접 넣지 말고, 배경 비주얼과 분위기만 만든다.`,
         channel: asset.channel,
         role: `variant-${index + 1}`,
         selected: index === 0,
@@ -203,14 +213,21 @@ async function buildOpenAiImageVariants(projectName: string, asset: AssetSeed, p
   };
 }
 
-export async function buildImageVariants(projectName: string, asset: AssetSeed, promptOverride?: string) {
+export async function buildImageVariants(
+  projectName: string,
+  asset: AssetSeed,
+  promptOverride?: string,
+  options?: { variantCount?: number },
+) {
+  const variantCount = Math.max(1, options?.variantCount ?? DEFAULT_IMAGE_VARIANT_COUNT);
+
   if (!canUseOpenAiImage()) {
-    return buildSvgImageVariants(projectName, asset, promptOverride);
+    return buildSvgImageVariants(projectName, asset, promptOverride, variantCount);
   }
 
   try {
-    return await buildOpenAiImageVariants(projectName, asset, promptOverride);
+    return await buildOpenAiImageVariants(projectName, asset, promptOverride, variantCount);
   } catch {
-    return buildSvgImageVariants(projectName, asset, promptOverride);
+    return buildSvgImageVariants(projectName, asset, promptOverride, variantCount);
   }
 }
