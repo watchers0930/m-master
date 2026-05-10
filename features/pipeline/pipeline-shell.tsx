@@ -19,10 +19,7 @@ export function PipelineShell() {
     onProjectCreated: (project: ProjectDetail) => {
       state.setActiveProject(project);
       state.loadProjects();
-      if (project.project?.id) {
-        source.hydrateContextForm(project);
-        state.loadStudio(project.project.id);
-      }
+      source.hydrateContextForm(project);
     },
     onError: state.setError,
   });
