@@ -48,6 +48,8 @@ type Props = {
   onApproveContext: () => void;
   onSaveContextDraft: () => void;
   /* Generation */
+  topicInput: string;
+  onTopicInputChange: (v: string) => void;
   generateBusy: boolean;
   onGenerate: () => void;
   /* A/B */
@@ -91,7 +93,7 @@ export function SidebarPanel(props: Props) {
     editingBannedTerms, onEditingBannedTermsChange,
     contextBusy, onApproveContext, onSaveContextDraft,
     editingHashtags, onEditingHashtagsChange, hashtagBusy, onGenerateHashtags,
-    generateBusy, onGenerate,
+    topicInput, onTopicInputChange, generateBusy, onGenerate,
     topic, variantGroup, abGenerateBusy, onGenerateVariants, adoptBusy, onAdoptVariant,
     seoCompliance,
     studio,
@@ -127,7 +129,7 @@ export function SidebarPanel(props: Props) {
                 </div>
               )}
               <div className="sb-form">
-                <InputField id="sb-name" label="이름" value={name} onChange={onNameChange} placeholder="프로젝트 이름" />
+                <InputField id="sb-name" label="프로젝트명" value={name} onChange={onNameChange} placeholder="프로젝트명" />
                 <InputField id="sb-domain" label="도메인" value={domain} onChange={onDomainChange} placeholder="https://..." />
                 <InputField id="sb-path" label="작업 폴더" value={workingPath} onChange={onWorkingPathChange} placeholder="/path" />
                 <button className="button primary sb-btn-full" disabled={projectBusy || !name.trim()} onClick={onCreateProject}>
@@ -198,7 +200,16 @@ export function SidebarPanel(props: Props) {
         <details className="sb-section" open>
           <summary className="sb-section-title">콘텐츠 생성</summary>
           <div className="sb-section-body">
-            <button className="button primary sb-btn-full" disabled={generateBusy} onClick={onGenerate}>
+            <div className="field-group">
+              <label className="field-label">토픽</label>
+              <input
+                className="text-input"
+                value={topicInput}
+                onChange={(e) => onTopicInputChange(e.target.value)}
+                placeholder="생성할 콘텐츠의 테마를 입력하세요"
+              />
+            </div>
+            <button className="button primary sb-btn-full" disabled={generateBusy || !topicInput.trim()} onClick={onGenerate}>
               {generateBusy ? "생성 중…" : "전체 생성"}
             </button>
 

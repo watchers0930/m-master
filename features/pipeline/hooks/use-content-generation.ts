@@ -87,6 +87,7 @@ export function useContentGeneration(params: {
 }) {
   const { onStudioUpdate, onError } = params;
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [topicInput, setTopicInput] = useState("");
   const [generateBusy, setGenerateBusy] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
   const [seoCompliance, setSeoCompliance] = useState<SeoComplianceResult | null>(null);
@@ -190,6 +191,7 @@ export function useContentGeneration(params: {
 
   return {
     selectedTopicId, setSelectedTopicId,
+    topicInput, setTopicInput,
     generateBusy, saveBusy,
     seoCompliance,
     activeChannel, setActiveChannel,
