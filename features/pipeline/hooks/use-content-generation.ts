@@ -100,6 +100,7 @@ export function useContentGeneration(params: {
   const [hashtagBusy, setHashtagBusy] = useState(false);
 
   const hydrateEditor = useCallback((studio: StudioDetail) => {
+    if (!studio?.draft?.assets) return;
     const blogAsset = studio.draft.assets.find(a => a.channel === "blog");
     if (blogAsset) {
       setEditingTitle(blogAsset.title);

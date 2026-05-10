@@ -49,8 +49,8 @@ export function usePipelineState() {
   const loadStudio = useCallback(async (projectId: string) => {
     setLoading(true);
     try {
-      const data = await apiGet<StudioDetail>(`/api/projects/${projectId}/studio`);
-      setStudio(data);
+      const data = await apiGet<{ studio: StudioDetail }>(`/api/projects/${projectId}/studio`);
+      setStudio(data.studio);
     } catch (e) {
       setError(e instanceof Error ? e.message : "스튜디오 로드 실패");
     } finally {

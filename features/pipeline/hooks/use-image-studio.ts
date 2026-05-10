@@ -30,9 +30,9 @@ export function useImageStudio({ onStudioUpdate, onError }: Options) {
   const handleGenerateImages = useCallback(async (projectId: string, channel: ChannelKey, prompt?: string) => {
     setGenerateBusy(true);
     try {
-      const res = await apiPost<StudioDetail>(`/api/projects/${projectId}/images`, { channel, prompt });
-      onStudioUpdate(res);
-      hydrateFromStudio(res);
+      const res = await apiPost<{ studio: StudioDetail }>(`/api/projects/${projectId}/images`, { channel, prompt });
+      onStudioUpdate(res.studio);
+      hydrateFromStudio(res.studio);
     } catch (e: unknown) {
       onError(e instanceof Error ? e.message : "이미지 생성 실패");
     } finally {
@@ -43,9 +43,9 @@ export function useImageStudio({ onStudioUpdate, onError }: Options) {
   const handleSelectImage = useCallback(async (projectId: string, channel: ChannelKey, imageAssetId: string) => {
     setSelectBusy(true);
     try {
-      const res = await apiPatch<StudioDetail>(`/api/projects/${projectId}/images`, { channel, imageAssetId });
-      onStudioUpdate(res);
-      hydrateFromStudio(res);
+      const res = await apiPatch<{ studio: StudioDetail }>(`/api/projects/${projectId}/images`, { channel, imageAssetId });
+      onStudioUpdate(res.studio);
+      hydrateFromStudio(res.studio);
     } catch (e: unknown) {
       onError(e instanceof Error ? e.message : "이미지 선택 실패");
     } finally {
