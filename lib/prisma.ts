@@ -32,6 +32,13 @@ function withServerlessPoolSettings(url?: string) {
       parsed.searchParams.set("pool_timeout", "30");
     }
 
+    if (
+      (parsed.hostname.includes("-pooler.") || parsed.hostname.includes("-pooler-")) &&
+      !parsed.searchParams.has("pgbouncer")
+    ) {
+      parsed.searchParams.set("pgbouncer", "true");
+    }
+
     return parsed.toString();
   } catch {
     return url;
