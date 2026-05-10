@@ -16,8 +16,30 @@ const directDatabaseUrl =
   process.env.DATABASE_URL_UNPOOLED ||
   process.env.POSTGRES_URL_NON_POOLING;
 
+function withServerlessPoolSettings(url?: string) {
+  if (!url) {
+    return undefined;
+  }
+
+  try {
+    const parsed = new URL(url);
+
+    if (!parsed.searchParams.has("connection_limit")) {
+      parsed.searchParams.set("connection_limit", "1");
+    }
+
+    if (!parsed.searchParams.has("pool_timeout")) {
+      parsed.searchParams.set("pool_timeout", "30");
+    }
+
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 const runtimeDatabaseUrl = process.env.VERCEL
-  ? pooledDatabaseUrl || directDatabaseUrl
+  ? withServerlessPoolSettings(pooledDatabaseUrl) || directDatabaseUrl
   : directDatabaseUrl || pooledDatabaseUrl;
 
 export const prisma =
