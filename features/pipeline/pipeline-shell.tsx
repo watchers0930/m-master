@@ -18,7 +18,6 @@ export function PipelineShell() {
   const source = useSourceRegistration({
     onProjectCreated: (project: ProjectDetail) => {
       state.setActiveProject(project);
-      state.loadProjects();
       source.hydrateContextForm(project);
     },
     onError: state.setError,
@@ -67,11 +66,6 @@ export function PipelineShell() {
     }
   });
 
-  // Initial load
-  useEffect(() => {
-    state.loadProjects();
-  }, [state.loadProjects]);
-
   // When project changes
   useEffect(() => {
     if (state.activeProject) {
@@ -97,7 +91,6 @@ export function PipelineShell() {
   };
   const sidebarProps = {
     project: {
-      projects: state.projects,
       activeProject: state.activeProject,
       name: source.name,
       onNameChange: source.setName,
@@ -107,10 +100,6 @@ export function PipelineShell() {
       onWorkingPathChange: source.setWorkingPath,
       projectBusy: source.busy,
       onCreateProject: source.handleCreateProject,
-      onSelectProject: (id: string) => {
-        state.loadProject(id);
-        state.loadStudio(id);
-      },
     },
     context: {
       editingSummary: source.editingSummary,

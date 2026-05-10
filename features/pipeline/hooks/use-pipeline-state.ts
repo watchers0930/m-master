@@ -1,7 +1,6 @@
 "use client";
 import { useState, useCallback } from "react";
 import type {
-  ProjectListItem,
   ProjectDetail,
   StudioDetail,
   PipelineSectionLock,
@@ -10,7 +9,6 @@ import type {
 import { apiGet } from "./use-api";
 
 export function usePipelineState() {
-  const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [activeProject, setActiveProject] = useState<ProjectDetail | null>(null);
   const [studio, setStudio] = useState<StudioDetail | null>(null);
   const [variantGroup, setVariantGroup] = useState<VariantGroup | null>(null);
@@ -24,15 +22,6 @@ export function usePipelineState() {
     ab: !studio?.draft?.assets?.length,
     verify: !studio?.draft?.assets?.length && !variantGroup?.variants?.some(v => v.adopted),
   };
-
-  const loadProjects = useCallback(async () => {
-    try {
-      const data = await apiGet<{ projects: ProjectListItem[] }>("/api/projects");
-      setProjects(data.projects);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "프로젝트 목록 로드 실패");
-    }
-  }, []);
 
   const loadProject = useCallback(async (projectId: string) => {
     setLoading(true);
@@ -65,19 +54,16 @@ export function usePipelineState() {
   const clearError = useCallback(() => setError(""), []);
 
   return {
-    projects,
     activeProject,
     studio,
     variantGroup,
     error,
     loading,
     sectionLock,
-    setProjects,
     setActiveProject,
     setStudio,
     setVariantGroup,
     setError,
-    loadProjects,
     loadProject,
     loadStudio,
     reloadProject,

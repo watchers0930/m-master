@@ -2,7 +2,6 @@
 
 import { InputField } from "@/components/ui/input-field";
 import type {
-  ProjectListItem,
   ProjectDetail,
   SeoComplianceResult,
   VariantGroup,
@@ -22,7 +21,6 @@ const TONE_PRESETS = [
 
 type Props = {
   project: {
-    projects: ProjectListItem[];
     activeProject: ProjectDetail | null;
     name: string;
     onNameChange: (v: string) => void;
@@ -32,7 +30,6 @@ type Props = {
     onWorkingPathChange: (v: string) => void;
     projectBusy: boolean;
     onCreateProject: () => void;
-    onSelectProject: (id: string) => void;
   };
   context: {
     editingSummary: string;
@@ -89,10 +86,10 @@ type Props = {
 
 export function SidebarPanel(props: Props) {
   const {
-    projects, activeProject,
+    activeProject,
     name, onNameChange, domain, onDomainChange,
     workingPath, onWorkingPathChange,
-    projectBusy, onCreateProject, onSelectProject,
+    projectBusy, onCreateProject,
   } = props.project;
   const {
     editingHashtags,
