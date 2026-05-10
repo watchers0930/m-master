@@ -48,9 +48,6 @@ type Props = {
   onApproveContext: () => void;
   onSaveContextDraft: () => void;
   /* Generation */
-  topics: Array<{ id: string; title: string; score?: number | null }>;
-  selectedTopicId: string | null;
-  onSelectTopic: (id: string) => void;
   generateBusy: boolean;
   onGenerate: () => void;
   /* A/B */
@@ -94,7 +91,6 @@ export function SidebarPanel(props: Props) {
     editingBannedTerms, onEditingBannedTermsChange,
     contextBusy, onApproveContext, onSaveContextDraft,
     editingHashtags, onEditingHashtagsChange, hashtagBusy, onGenerateHashtags,
-    topics, selectedTopicId, onSelectTopic,
     generateBusy, onGenerate,
     topic, variantGroup, abGenerateBusy, onGenerateVariants, adoptBusy, onAdoptVariant,
     seoCompliance,
@@ -202,20 +198,6 @@ export function SidebarPanel(props: Props) {
         <details className="sb-section" open>
           <summary className="sb-section-title">콘텐츠 생성</summary>
           <div className="sb-section-body">
-            {topics.length > 0 && (
-              <div className="sb-topic-list">
-                {topics.map((t) => (
-                  <button
-                    key={t.id}
-                    className={`sb-topic-chip ${selectedTopicId === t.id ? "active" : ""}`}
-                    onClick={() => onSelectTopic(t.id)}
-                  >
-                    {t.title}
-                    {t.score != null && <span className="fine-print">{t.score}점</span>}
-                  </button>
-                ))}
-              </div>
-            )}
             <button className="button primary sb-btn-full" disabled={generateBusy} onClick={onGenerate}>
               {generateBusy ? "생성 중…" : "전체 생성"}
             </button>

@@ -130,9 +130,6 @@ export function PipelineShell() {
           contextBusy={source.contextBusy}
           onApproveContext={() => projectId && source.handleApproveContext(projectId)}
           onSaveContextDraft={() => projectId && source.handleSaveContextDraft(projectId)}
-          topics={state.studio?.topics || state.activeProject?.topics || []}
-          selectedTopicId={content.selectedTopicId}
-          onSelectTopic={content.setSelectedTopicId}
           generateBusy={content.generateBusy}
           onGenerate={() => { if (projectId) content.handleGenerate(projectId, content.selectedTopicId || undefined); }}
           topic={topic}
