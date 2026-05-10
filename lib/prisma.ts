@@ -4,21 +4,21 @@ const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
-// Vercel/Neon environments may expose multiple Postgres URLs.
-// Prefer direct/non-pooling URLs at runtime to avoid pooled connection failures
-// taking down all project APIs.
-const runtimeDatabaseUrl =
-  process.env.DIRECT_URL ||
-  process.env.POSTGRES_URL_NON_POOLING ||
-  process.env.DATABASE_URL_UNPOOLED ||
+// Vercel preview/production should prefer pooled Neon URLs.
+// Local tooling can still fall back to direct/non-pooling URLs if needed.
+const pooledDatabaseUrl =
   process.env.POSTGRES_PRISMA_URL ||
   process.env.DATABASE_URL ||
   process.env.POSTGRES_URL;
 
-if (runtimeDatabaseUrl) {
-  process.env.DATABASE_URL = runtimeDatabaseUrl;
-  process.env.DIRECT_URL = process.env.DIRECT_URL || runtimeDatabaseUrl;
-}
+const directDatabaseUrl =
+  process.env.DIRECT_URL ||
+  process.env.DATABASE_URL_UNPOOLED ||
+  process.env.POSTGRES_URL_NON_POOLING;
+
+const runtimeDatabaseUrl = process.env.VERCEL
+  ? pooledDatabaseUrl || directDatabaseUrl
+  : directDatabaseUrl || pooledDatabaseUrl;
 
 export const prisma =
   globalForPrisma.prisma ??
