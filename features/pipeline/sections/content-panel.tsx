@@ -12,36 +12,35 @@ import type {
 } from "../types";
 
 type Props = {
-  studio: StudioDetail | null;
-  /* Channel */
-  activeChannel: ChannelKey;
-  onChannelChange: (ch: ChannelKey) => void;
-  /* Blog editor */
-  editingTitle: string;
-  onEditingTitleChange: (v: string) => void;
-  editingBody: string;
-  onEditingBodyChange: (v: string) => void;
-  editingCta: string;
-  onEditingCtaChange: (v: string) => void;
-  editingHashtags: string;
-  onEditingHashtagsChange: (v: string) => void;
-  onUpdateSeo: () => void;
-  /* SEO */
-  seoCompliance: SeoComplianceResult | null;
-  /* Save */
-  saveBusy: boolean;
-  onSave: () => void;
-  /* Variants */
-  variantGroup: VariantGroup | null;
-  adoptBusy: string | null;
-  onAdoptVariant: (id: string) => void;
-  /* Export preview */
-  exportPreview: ExportPreviewState;
-  onExportChannel: (ch: ChannelKey) => void;
-  onExportPreviewViewChange: (view: ChannelKey | "json") => void;
-  onCopyExportPreview: () => void;
-  copyBusy: boolean;
-  copyStatus: string | null;
+  content: {
+    studio: StudioDetail | null;
+    activeChannel: ChannelKey;
+    onChannelChange: (ch: ChannelKey) => void;
+    editingTitle: string;
+    onEditingTitleChange: (v: string) => void;
+    editingBody: string;
+    onEditingBodyChange: (v: string) => void;
+    editingCta: string;
+    onEditingCtaChange: (v: string) => void;
+    editingHashtags: string;
+    onEditingHashtagsChange: (v: string) => void;
+    onUpdateSeo: () => void;
+    seoCompliance: SeoComplianceResult | null;
+    saveBusy: boolean;
+    onSave: () => void;
+  };
+  variants: {
+    variantGroup: VariantGroup | null;
+    adoptBusy: string | null;
+    onAdoptVariant: (id: string) => void;
+  };
+  exportState: {
+    exportPreview: ExportPreviewState;
+    onExportPreviewViewChange: (view: ChannelKey | "json") => void;
+    onCopyExportPreview: () => void;
+    copyBusy: boolean;
+    copyStatus: string | null;
+  };
 };
 
 export function ContentPanel(props: Props) {
@@ -55,10 +54,15 @@ export function ContentPanel(props: Props) {
     onUpdateSeo,
     seoCompliance,
     saveBusy, onSave,
-    variantGroup, adoptBusy, onAdoptVariant,
-    exportPreview, onExportChannel, onExportPreviewViewChange,
-    onCopyExportPreview, copyBusy, copyStatus,
-  } = props;
+  } = props.content;
+  const { variantGroup, adoptBusy, onAdoptVariant } = props.variants;
+  const {
+    exportPreview,
+    onExportPreviewViewChange,
+    onCopyExportPreview,
+    copyBusy,
+    copyStatus,
+  } = props.exportState;
 
   const hasAssets = (studio?.draft?.assets?.length ?? 0) > 0;
   const hasVariants = (variantGroup?.variants?.length ?? 0) > 0;

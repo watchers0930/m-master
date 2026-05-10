@@ -9,15 +9,17 @@ const CHANNEL_LABELS: Record<ChannelKey, string> = {
 };
 
 type Props = {
-  projectId: string | undefined;
-  activeChannel: ChannelKey;
-  onChannelChange: (ch: ChannelKey) => void;
-  currentStudio: ImageStudioState | null;
-  generateBusy: boolean;
-  selectBusy: boolean;
-  onGenerateImages: (projectId: string, channel: ChannelKey) => void;
-  onSelectImage: (projectId: string, channel: ChannelKey, imageAssetId: string) => void;
-  hasContent: boolean;
+  image: {
+    projectId: string | undefined;
+    activeChannel: ChannelKey;
+    onChannelChange: (ch: ChannelKey) => void;
+    currentStudio: ImageStudioState | null;
+    generateBusy: boolean;
+    selectBusy: boolean;
+    onGenerateImages: (projectId: string, channel: ChannelKey) => void;
+    onSelectImage: (projectId: string, channel: ChannelKey, imageAssetId: string) => void;
+    hasContent: boolean;
+  };
 };
 
 export function ImagePanel(props: Props) {
@@ -28,7 +30,7 @@ export function ImagePanel(props: Props) {
     generateBusy, selectBusy,
     onGenerateImages, onSelectImage,
     hasContent,
-  } = props;
+  } = props.image;
 
   const variants = currentStudio?.variants ?? [];
 

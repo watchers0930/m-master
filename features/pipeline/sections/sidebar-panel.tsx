@@ -21,63 +21,69 @@ const TONE_PRESETS = [
 ] as const;
 
 type Props = {
-  /* Project */
-  projects: ProjectListItem[];
-  activeProject: ProjectDetail | null;
-  name: string;
-  onNameChange: (v: string) => void;
-  domain: string;
-  onDomainChange: (v: string) => void;
-  workingPath: string;
-  onWorkingPathChange: (v: string) => void;
-  projectBusy: boolean;
-  onCreateProject: () => void;
-  onSelectProject: (id: string) => void;
-  /* Context */
-  editingSummary: string;
-  onEditingSummaryChange: (v: string) => void;
-  editingAudience: string;
-  onEditingAudienceChange: (v: string) => void;
-  editingTone: string;
-  onEditingToneChange: (v: string) => void;
-  editingCta: string;
-  onEditingCtaChange: (v: string) => void;
-  editingBannedTerms: string;
-  onEditingBannedTermsChange: (v: string) => void;
-  contextBusy: boolean;
-  onApproveContext: () => void;
-  onSaveContextDraft: () => void;
-  /* Generation */
-  topicInput: string;
-  onTopicInputChange: (v: string) => void;
-  generateBusy: boolean;
-  onGenerate: () => void;
-  /* A/B */
-  topic: string;
-  variantGroup: VariantGroup | null;
-  abGenerateBusy: boolean;
-  onGenerateVariants: (count: number) => void;
-  adoptBusy: string | null;
-  onAdoptVariant: (id: string) => void;
-  /* SEO */
-  seoCompliance: SeoComplianceResult | null;
-  /* Review */
-  studio: StudioDetail | null;
-  /* Tone & Hashtag */
-  editingHashtags: string;
-  onEditingHashtagsChange: (v: string) => void;
-  hashtagBusy: boolean;
-  onGenerateHashtags: () => void;
-  /* Publish */
-  exportBusy: boolean;
-  onExportAll: () => void;
-  publishBusy: boolean;
-  publishPackage: BlogPublishPackage | null;
-  onPreparePublish: () => void;
-  wordpressConfig: WordPressPublishConfig;
-  onWordPressConfigChange: (field: keyof WordPressPublishConfig, value: string) => void;
-  settingsBusy: boolean;
-  onSaveWordPressDefaults: () => void;
+  project: {
+    projects: ProjectListItem[];
+    activeProject: ProjectDetail | null;
+    name: string;
+    onNameChange: (v: string) => void;
+    domain: string;
+    onDomainChange: (v: string) => void;
+    workingPath: string;
+    onWorkingPathChange: (v: string) => void;
+    projectBusy: boolean;
+    onCreateProject: () => void;
+    onSelectProject: (id: string) => void;
+  };
+  context: {
+    editingSummary: string;
+    onEditingSummaryChange: (v: string) => void;
+    editingAudience: string;
+    onEditingAudienceChange: (v: string) => void;
+    editingTone: string;
+    onEditingToneChange: (v: string) => void;
+    editingCta: string;
+    onEditingCtaChange: (v: string) => void;
+    editingBannedTerms: string;
+    onEditingBannedTermsChange: (v: string) => void;
+    contextBusy: boolean;
+    onApproveContext: () => void;
+    onSaveContextDraft: () => void;
+  };
+  generation: {
+    topicInput: string;
+    onTopicInputChange: (v: string) => void;
+    generateBusy: boolean;
+    onGenerate: () => void;
+    seoCompliance: SeoComplianceResult | null;
+  };
+  abTesting: {
+    topic: string;
+    variantGroup: VariantGroup | null;
+    abGenerateBusy: boolean;
+    adoptBusy: string | null;
+    onGenerateVariants: (count: number) => void;
+    onAdoptVariant: (id: string) => void;
+  };
+  review: {
+    studio: StudioDetail | null;
+  };
+  hashtags: {
+    editingHashtags: string;
+    onEditingHashtagsChange: (v: string) => void;
+    hashtagBusy: boolean;
+    onGenerateHashtags: () => void;
+  };
+  publish: {
+    exportBusy: boolean;
+    onExportAll: () => void;
+    publishBusy: boolean;
+    publishPackage: BlogPublishPackage | null;
+    onPreparePublish: () => void;
+    wordpressConfig: WordPressPublishConfig;
+    onWordPressConfigChange: (field: keyof WordPressPublishConfig, value: string) => void;
+    settingsBusy: boolean;
+    onSaveWordPressDefaults: () => void;
+  };
 };
 
 export function SidebarPanel(props: Props) {
@@ -86,22 +92,42 @@ export function SidebarPanel(props: Props) {
     name, onNameChange, domain, onDomainChange,
     workingPath, onWorkingPathChange,
     projectBusy, onCreateProject, onSelectProject,
-    editingSummary, onEditingSummaryChange,
-    editingAudience, onEditingAudienceChange,
-    editingTone, onEditingToneChange,
-    editingCta, onEditingCtaChange,
-    editingBannedTerms, onEditingBannedTermsChange,
-    contextBusy, onApproveContext, onSaveContextDraft,
-    editingHashtags, onEditingHashtagsChange, hashtagBusy, onGenerateHashtags,
-    topicInput, onTopicInputChange, generateBusy, onGenerate,
-    topic, variantGroup, abGenerateBusy, onGenerateVariants, adoptBusy, onAdoptVariant,
-    seoCompliance,
-    studio,
-    exportBusy, onExportAll,
-    publishBusy, publishPackage, onPreparePublish,
-    wordpressConfig, onWordPressConfigChange,
-    settingsBusy, onSaveWordPressDefaults,
-  } = props;
+  } = props.project;
+  const {
+    editingHashtags,
+    onEditingHashtagsChange,
+    hashtagBusy,
+    onGenerateHashtags,
+  } = props.hashtags;
+  const { topicInput, onTopicInputChange, generateBusy, onGenerate, seoCompliance } = props.generation;
+  const { topic, variantGroup, abGenerateBusy, adoptBusy, onGenerateVariants, onAdoptVariant } = props.abTesting;
+  const { studio } = props.review;
+  const {
+    exportBusy,
+    onExportAll,
+    publishBusy,
+    publishPackage,
+    onPreparePublish,
+    wordpressConfig,
+    onWordPressConfigChange,
+    settingsBusy,
+    onSaveWordPressDefaults,
+  } = props.publish;
+  const {
+    editingSummary,
+    onEditingSummaryChange,
+    editingAudience,
+    onEditingAudienceChange,
+    editingTone,
+    onEditingToneChange,
+    editingCta,
+    onEditingCtaChange,
+    editingBannedTerms,
+    onEditingBannedTermsChange,
+    contextBusy,
+    onApproveContext,
+    onSaveContextDraft,
+  } = props.context;
 
   const bp = activeProject?.brandProfile;
   const isApproved = bp?.approved === true;
