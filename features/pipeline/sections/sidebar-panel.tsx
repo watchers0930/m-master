@@ -41,6 +41,7 @@ type Props = {
     onEditingAudienceChange: (v: string) => void;
     editingTone: string;
     onEditingToneChange: (v: string) => void;
+    onTonePresetSelect: (v: string) => void;
     editingCta: string;
     onEditingCtaChange: (v: string) => void;
     editingBannedTerms: string;
@@ -120,6 +121,7 @@ export function SidebarPanel(props: Props) {
     onEditingAudienceChange,
     editingTone,
     onEditingToneChange,
+    onTonePresetSelect,
     editingCta,
     onEditingCtaChange,
     editingBannedTerms,
@@ -204,13 +206,14 @@ export function SidebarPanel(props: Props) {
                     <button
                       key={preset.key}
                       type="button"
-                      className={`sb-tone-chip ${editingTone === preset.label ? "active" : ""}`}
-                      onClick={() => onEditingToneChange(preset.label)}
+                      className={`sb-tone-chip ${editingTone.includes(preset.label) ? "active" : ""}`}
+                      onClick={() => onTonePresetSelect(preset.label)}
                     >
                       {preset.label}
                     </button>
                   ))}
                 </div>
+                <span className="fine-print">현재 톤: {editingTone || "선택 안 됨"}</span>
               </div>
               <div className="field-group">
                 <label className="field-label">CTA</label>

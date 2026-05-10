@@ -81,18 +81,27 @@ export function useSourceRegistration(params: {
     }
   }, [editingSummary, editingAudience, editingTone, editingCta, editingBannedTerms, onProjectCreated, onError]);
 
-  const handleSaveContextDraft = useCallback(async (projectId: string) => {
+  const handleSaveContextDraftWithOverrides = useCallback(async (
+    projectId: string,
+    overrides?: Partial<{
+      summary: string;
+      audience: string;
+      tone: string;
+      cta: string;
+      bannedTerms: string;
+    }>,
+  ) => {
     setContextBusy(true);
     onError("");
     try {
       const data = await apiPut<{ project: ProjectDetail }>(
         `/api/projects/${projectId}/brand-profile`,
         {
-          summary: editingSummary,
-          audience: editingAudience,
-          tone: editingTone,
-          cta: editingCta,
-          bannedTerms: editingBannedTerms,
+          summary: overrides?.summary ?? editingSummary,
+          audience: overrides?.audience ?? editingAudience,
+          tone: overrides?.tone ?? editingTone,
+          cta: overrides?.cta ?? editingCta,
+          bannedTerms: overrides?.bannedTerms ?? editingBannedTerms,
         }
       );
       onProjectCreated(data.project);
@@ -102,6 +111,10 @@ export function useSourceRegistration(params: {
       setContextBusy(false);
     }
   }, [editingSummary, editingAudience, editingTone, editingCta, editingBannedTerms, onProjectCreated, onError]);
+
+  const handleSaveContextDraft = useCallback(async (projectId: string) => {
+    return handleSaveContextDraftWithOverrides(projectId);
+  }, [handleSaveContextDraftWithOverrides]);
 
   return {
     name, setName,
@@ -120,5 +133,6 @@ export function useSourceRegistration(params: {
     hydrateContextForm,
     handleApproveContext,
     handleSaveContextDraft,
+    handleSaveContextDraftWithOverrides,
   };
 }

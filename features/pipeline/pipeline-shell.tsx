@@ -119,6 +119,12 @@ export function PipelineShell() {
       onEditingAudienceChange: source.setEditingAudience,
       editingTone: source.editingTone,
       onEditingToneChange: source.setEditingTone,
+      onTonePresetSelect: (tone: string) => {
+        source.setEditingTone(tone);
+        if (projectId) {
+          void source.handleSaveContextDraftWithOverrides(projectId, { tone });
+        }
+      },
       editingCta: source.editingCta,
       onEditingCtaChange: source.setEditingCta,
       editingBannedTerms: source.editingBannedTerms,
