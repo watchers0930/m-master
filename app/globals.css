@@ -476,6 +476,20 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   gap: 12px;
 }
 
+.cp-derived-channel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cp-derived-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .cp-export {
   display: flex;
   flex-direction: column;
@@ -772,24 +786,30 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 3px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
 }
 
 .seo-checklist-item {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 6px;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 14px;
   border-radius: 6px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .seo-item-pass { background: rgba(22, 163, 74, 0.06); color: var(--success); }
 .seo-item-warn { background: rgba(217, 119, 6, 0.06); color: var(--warning); }
 .seo-item-fail { background: rgba(220, 38, 38, 0.06); color: var(--destructive); }
 .seo-checklist-icon { font-weight: 700; font-size: 12px; }
+.seo-checklist-label {
+  min-width: 0;
+  white-space: nowrap;
+}
 .seo-checklist-detail { margin-left: auto; opacity: 0.7; }
 
 /* Derived Channel Panel */

@@ -296,12 +296,6 @@ export function DashboardShell() {
   }
 
   useEffect(() => {
-    void loadProjects().catch((loadError: unknown) => {
-      setError(loadError instanceof Error ? loadError.message : "프로젝트 목록을 불러오지 못했습니다.");
-    });
-  }, []);
-
-  useEffect(() => {
     setFolderSupported(typeof window !== "undefined" && typeof window.showDirectoryPicker === "function");
   }, []);
 

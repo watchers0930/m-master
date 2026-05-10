@@ -30,8 +30,11 @@ type Props = {
     onSave: () => void;
   };
   variants: {
+    topic: string;
     variantGroup: VariantGroup | null;
+    generateBusy: boolean;
     adoptBusy: string | null;
+    onGenerateVariants: (count: number) => void;
     onAdoptVariant: (id: string) => void;
   };
   exportState: {
@@ -55,7 +58,7 @@ export function ContentPanel(props: Props) {
     seoCompliance,
     saveBusy, onSave,
   } = props.content;
-  const { variantGroup, adoptBusy, onAdoptVariant } = props.variants;
+  const { topic, variantGroup, generateBusy, adoptBusy, onGenerateVariants, onAdoptVariant } = props.variants;
   const {
     exportPreview,
     onExportPreviewViewChange,
@@ -136,7 +139,22 @@ export function ContentPanel(props: Props) {
           </button>
         </div>
       ) : (
-        <DerivedChannelPanel assets={studio?.draft?.assets ?? []} />
+        <div className="cp-derived-channel">
+          <div className="cp-derived-actions">
+            <span className="eyebrow">
+              {activeChannel === "instagram" ? "인스타 A/B 테스트" : "페이스북 A/B 테스트"}
+            </span>
+            <div className="button-row">
+              <button className="button ghost" disabled={generateBusy || !topic} onClick={() => onGenerateVariants(2)}>
+                {generateBusy ? "생성 중…" : "2개 생성"}
+              </button>
+              <button className="button ghost" disabled={generateBusy || !topic} onClick={() => onGenerateVariants(3)}>
+                3개 생성
+              </button>
+            </div>
+          </div>
+          <DerivedChannelPanel assets={studio?.draft?.assets ?? []} />
+        </div>
       )}
 
       {/* A/B Variant comparison */}

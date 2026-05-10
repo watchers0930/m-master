@@ -812,12 +812,13 @@ export async function generateProjectImages(params: {
     throw new ProjectImageNotFoundError(params.projectId);
   }
 
+  const variantCount = resolveImageVariantCount(params.channel, asset.body);
   const bundle = await buildImageVariants(record.project.name, {
     channel: params.channel,
     title: asset.title || record.latestContentJob.topic,
     body: asset.body,
     cta: asset.cta || record.brandProfile.cta || "자세히 보기",
-  }, params.prompt);
+  }, params.prompt, { variantCount });
 
   try {
     await createImageJobWithAssets({
@@ -860,6 +861,22 @@ export async function generateProjectImages(params: {
   }
 
   return getProjectStudioSeed(params.projectId);
+}
+
+function resolveImageVariantCount(
+  channel: "blog" | "instagram" | "facebook",
+  body: string,
+) {
+  if (channel !== "blog") {
+    return 3;
+  }
+
+  const imageCueCount = (body.match(/\[이미지\s+\d+\]/g) || []).length;
+  if (imageCueCount <= 0) {
+    return 3;
+  }
+
+  return Math.min(5, imageCueCount);
 }
 
 export async function selectProjectImage(params: {

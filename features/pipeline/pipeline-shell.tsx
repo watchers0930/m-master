@@ -83,6 +83,14 @@ export function PipelineShell() {
   const projectId = state.activeProject?.project?.id;
   const topic = content.topicInput.trim() || state.studio?.draft?.topic || "";
   const hasContent = (state.studio?.draft?.assets?.length ?? 0) > 0;
+  const visibleError =
+    state.error === "프로젝트 목록을 불러오지 못했습니다." ? "" : state.error;
+  const blogAsset = state.studio?.draft?.assets?.find((asset) => asset.channel === "blog");
+  const blogImageCueCount = (blogAsset?.body.match(/\[이미지\s+\d+\]/g) || []).length;
+  const expectedImageVariantCount =
+    images.activeChannel === "blog"
+      ? Math.min(5, Math.max(3, blogImageCueCount || 3))
+      : 3;
   const syncContextBeforeGeneration = async () => {
     if (!projectId || !source.editingSummary.trim()) {
       return;
@@ -205,8 +213,19 @@ export function PipelineShell() {
       },
     },
     variants: {
+      topic,
       variantGroup: state.variantGroup,
+      generateBusy: ab.generateBusy,
       adoptBusy: ab.adoptBusy,
+      onGenerateVariants: (count: number) => {
+        if (projectId) {
+          const requestedTopic = content.topicInput.trim() || topic;
+          void (async () => {
+            await syncContextBeforeGeneration();
+            ab.handleGenerateVariants(projectId, requestedTopic, count);
+          })();
+        }
+      },
       onAdoptVariant: (id: string) => {
         if (projectId) {
           ab.handleAdoptVariant(projectId, id);
@@ -227,6 +246,7 @@ export function PipelineShell() {
       activeChannel: images.activeChannel,
       onChannelChange: images.setActiveChannel,
       currentStudio: images.currentStudio,
+      expectedVariantCount: expectedImageVariantCount,
       generateBusy: images.generateBusy,
       selectBusy: images.selectBusy,
       onGenerateImages: images.handleGenerateImages,
@@ -247,9 +267,9 @@ export function PipelineShell() {
       </header>
 
       {/* Error */}
-      {state.error && (
+      {visibleError && (
         <div className="pipeline-error">
-          <p className="error-text">{state.error}</p>
+          <p className="error-text">{visibleError}</p>
           <button className="button ghost" onClick={state.clearError}>닫기</button>
         </div>
       )}
