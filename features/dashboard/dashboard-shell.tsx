@@ -196,6 +196,59 @@ export function DashboardShell() {
     setCurrentStep(step);
   }
 
+  function applyProjectDetail(nextProject: ProjectDetail) {
+    setActiveProject(nextProject);
+    publishWorkflow.hydratePublishResult(nextProject);
+  }
+
+  function applyStudioDetail(nextStudio: StudioDetail, nextProject?: ProjectDetail | null) {
+    const topicSource = nextProject ?? activeProject;
+    const matchedTopic =
+      topicSource?.topics.find((topic) => topic.title === nextStudio.draft.topic) ||
+      topicSource?.topics[0] ||
+      null;
+
+    setStudio(nextStudio);
+    setSelectedTopicId(matchedTopic?.id ?? null);
+    setImageStudios(toImageStudios(nextStudio));
+  }
+
+  async function loadProjectDetail(projectId: string) {
+    const response = await fetch(`/api/projects/${projectId}`, { cache: "no-store" });
+    const payload = await parseJson<ApiResponse<{ project: ProjectDetail }>>(response);
+
+    if (!payload.ok) {
+      throw new Error(payload.error.message);
+    }
+
+    applyProjectDetail(payload.data.project);
+    return payload.data.project;
+  }
+
+  async function loadProjectStudio(projectId: string, nextProject?: ProjectDetail | null) {
+    const response = await fetch(`/api/projects/${projectId}/studio`, { cache: "no-store" });
+    const payload = await parseJson<ApiResponse<{ studio: StudioDetail }>>(response);
+
+    if (!payload.ok) {
+      throw new Error(payload.error.message);
+    }
+
+    applyStudioDetail(payload.data.studio, nextProject);
+    return payload.data.studio;
+  }
+
+  async function loadProjectHistory(projectId: string) {
+    const response = await fetch(`/api/projects/${projectId}/history`, { cache: "no-store" });
+    const payload = await parseJson<ApiResponse<{ history: ProjectActivityItem[] }>>(response);
+
+    if (!payload.ok) {
+      throw new Error(payload.error.message);
+    }
+
+    setHistory(payload.data.history);
+    return payload.data.history;
+  }
+
   async function loadProjects() {
     const response = await fetch("/api/projects", { cache: "no-store" });
     const payload = await parseJson<ApiResponse<{ projects: ProjectListItem[] }>>(response);
@@ -211,39 +264,12 @@ export function DashboardShell() {
   }
 
   async function loadProject(projectId: string) {
-    const [detailResponse, studioResponse, historyResponse] = await Promise.all([
-      fetch(`/api/projects/${projectId}`, { cache: "no-store" }),
-      fetch(`/api/projects/${projectId}/studio`, { cache: "no-store" }),
-      fetch(`/api/projects/${projectId}/history`, { cache: "no-store" }),
+    const [nextProject] = await Promise.all([
+      loadProjectDetail(projectId),
+      loadProjectHistory(projectId),
     ]);
-
-    const detailPayload = await parseJson<ApiResponse<{ project: ProjectDetail }>>(detailResponse);
-    const studioPayload = await parseJson<ApiResponse<{ studio: StudioDetail }>>(studioResponse);
-    const historyPayload = await parseJson<ApiResponse<{ history: ProjectActivityItem[] }>>(historyResponse);
-
-    if (!detailPayload.ok) {
-      throw new Error(detailPayload.error.message);
-    }
-
-    if (!studioPayload.ok) {
-      throw new Error(studioPayload.error.message);
-    }
-
-    if (!historyPayload.ok) {
-      throw new Error(historyPayload.error.message);
-    }
-
-    const nextProject = detailPayload.data.project;
-    const nextStudio = studioPayload.data.studio;
-    const matchedTopic = nextProject.topics.find((topic) => topic.title === nextStudio.draft.topic) || nextProject.topics[0];
-
-    setActiveProject(nextProject);
-    setStudio(nextStudio);
-    setSelectedTopicId(matchedTopic?.id ?? null);
-    setHistory(historyPayload.data.history);
-    setImageStudios(toImageStudios(nextStudio));
+    await loadProjectStudio(projectId, nextProject);
     publishWorkflow.resetPublishState();
-    publishWorkflow.hydratePublishResult(nextProject);
   }
 
   async function requestPreview() {
@@ -397,7 +423,7 @@ export function DashboardShell() {
         throw new Error(payload.error.message);
       }
 
-      setActiveProject(payload.data.project);
+      applyProjectDetail(payload.data.project);
       await loadProjects();
       setCurrentStep(3);
     } catch (approveError) {
@@ -435,8 +461,8 @@ export function DashboardShell() {
         throw new Error(payload.error.message);
       }
 
-      setActiveProject(payload.data.project);
-      await loadProject(activeProject.project.id);
+      applyProjectDetail(payload.data.project);
+      await loadProjectHistory(activeProject.project.id);
       await loadProjects();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "컨텍스트 임시 저장에 실패했습니다.");
@@ -463,8 +489,9 @@ export function DashboardShell() {
         throw new Error(payload.error.message);
       }
 
-      setActiveProject(payload.data.project);
-      await loadProject(activeProject.project.id);
+      applyProjectDetail(payload.data.project);
+      setSelectedTopicId(payload.data.project.topics[0]?.id ?? null);
+      await loadProjectHistory(activeProject.project.id);
       await loadProjects();
       setCurrentStep(2);
     } catch (regenerateError) {
@@ -507,8 +534,11 @@ export function DashboardShell() {
         throw new Error(payload.error.message);
       }
 
-      setStudio(payload.data.studio);
-      await loadProject(activeProject.project.id);
+      applyStudioDetail(payload.data.studio);
+      await Promise.all([
+        loadProjectDetail(activeProject.project.id),
+        loadProjectHistory(activeProject.project.id),
+      ]);
       setCurrentStep(4);
     } catch (generationError) {
       setError(generationError instanceof Error ? generationError.message : "콘텐츠 초안 생성에 실패했습니다.");
@@ -619,8 +649,7 @@ export function DashboardShell() {
         throw new Error(payload.error.message);
       }
 
-      setActiveProject(payload.data.project);
-      await loadProject(activeProject.project.id);
+      applyProjectDetail(payload.data.project);
       await loadProjects();
     } catch (settingsError) {
       setError(settingsError instanceof Error ? settingsError.message : "프로젝트 설정 저장에 실패했습니다.");
@@ -712,9 +741,7 @@ export function DashboardShell() {
         throw new Error(payload.error.message);
       }
 
-      setStudio(payload.data.studio);
-      setImageStudios(toImageStudios(payload.data.studio));
-      await loadProject(activeProject.project.id);
+      applyStudioDetail(payload.data.studio);
       setCurrentStep(6);
     } catch (imageError) {
       setError(imageError instanceof Error ? imageError.message : "이미지 생성에 실패했습니다.");
@@ -753,9 +780,7 @@ export function DashboardShell() {
         throw new Error(payload.error.message);
       }
 
-      setStudio(payload.data.studio);
-      setImageStudios(toImageStudios(payload.data.studio));
-      await loadProject(activeProject.project.id);
+      applyStudioDetail(payload.data.studio);
     } catch (selectError) {
       setError(selectError instanceof Error ? selectError.message : "이미지 선택 적용에 실패했습니다.");
     } finally {
@@ -796,8 +821,11 @@ export function DashboardShell() {
         throw new Error(payload.error.message);
       }
 
-      setStudio(payload.data.studio);
-      await loadProject(activeProject.project.id);
+      applyStudioDetail(payload.data.studio);
+      await Promise.all([
+        loadProjectDetail(activeProject.project.id),
+        loadProjectHistory(activeProject.project.id),
+      ]);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "콘텐츠 초안 저장에 실패했습니다.");
     } finally {
