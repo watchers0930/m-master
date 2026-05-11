@@ -2,7 +2,7 @@ import type { Prisma, Project } from "@prisma/client";
 
 import { prisma } from "../../lib/prisma";
 
-export type ProjectDetailRecord = {
+type ProjectDetailBaseRecord = {
   project: Project;
   brandProfile: {
     id: string;
@@ -25,6 +25,25 @@ export type ProjectDetailRecord = {
     rationale: string | null;
     createdAt: Date;
   }>;
+};
+
+export type ProjectOverviewRecord = ProjectDetailBaseRecord & {
+  latestContentJob: {
+    id: string;
+    topic: string;
+    objective: string | null;
+    status: string;
+    generationProvider: string | null;
+    publishProvider: string | null;
+    externalPostId: string | null;
+    externalPostUrl: string | null;
+    publishedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  } | null;
+};
+
+export type ProjectStudioRecord = ProjectDetailBaseRecord & {
   latestContentJob: {
     id: string;
     topic: string;
@@ -174,7 +193,52 @@ export async function listProjects() {
   });
 }
 
-export async function getProjectDetail(projectId: string): Promise<ProjectDetailRecord | null> {
+export async function getProjectOverview(projectId: string): Promise<ProjectOverviewRecord | null> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+  });
+
+  if (!project) {
+    return null;
+  }
+
+  const [brandProfile, topics, latestContentJob] = await Promise.all([
+    prisma.brandProfile.findFirst({
+      where: { projectId },
+      orderBy: [{ version: "desc" }, { createdAt: "desc" }],
+    }),
+    prisma.topicCandidate.findMany({
+      where: { projectId },
+      orderBy: [{ score: "desc" }, { createdAt: "asc" }],
+    }),
+    prisma.contentJob.findFirst({
+      where: { projectId },
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        topic: true,
+        objective: true,
+        status: true,
+        generationProvider: true,
+        publishProvider: true,
+        externalPostId: true,
+        externalPostUrl: true,
+        publishedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    }),
+  ]);
+
+  return {
+    project,
+    brandProfile,
+    topics,
+    latestContentJob,
+  };
+}
+
+export async function getProjectStudio(projectId: string): Promise<ProjectStudioRecord | null> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
@@ -758,16 +822,6 @@ export async function getVariantGroup(projectId: string, groupId: string) {
     include: {
       assets: {
         orderBy: [{ createdAt: "asc" }],
-        include: {
-          imageJobs: {
-            orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
-            include: {
-              imageAssets: {
-                orderBy: [{ createdAt: "asc" }],
-              },
-            },
-          },
-        },
       },
     },
   });
