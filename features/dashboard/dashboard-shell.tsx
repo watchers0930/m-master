@@ -202,11 +202,11 @@ export function DashboardShell() {
   }
 
   function applyStudioDetail(nextStudio: StudioDetail, nextProject?: ProjectDetail | null) {
+    const topicSource = nextProject ?? activeProject;
     const matchedTopic =
-      nextProject?.topics.find((topic) => topic.title === nextStudio.draft.topic) ||
-      activeProject?.topics.find((topic) => topic.title === nextStudio.draft.topic) ||
-      nextProject?.topics[0] ||
-      activeProject?.topics[0];
+      topicSource?.topics.find((topic) => topic.title === nextStudio.draft.topic) ||
+      topicSource?.topics[0] ||
+      null;
 
     setStudio(nextStudio);
     setSelectedTopicId(matchedTopic?.id ?? null);
