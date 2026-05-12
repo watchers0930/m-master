@@ -58,9 +58,9 @@ Context-aware marketing platform.
 
 ## Image generation
 
-- `OPENAI_API_KEY`: enables GPT image generation for the image studio
+- `OPENAI_API_KEY`: enables OpenAI image generation for the image studio
 - `OPENAI_TEXT_MODEL`: optional override for GPT draft generation, defaults to `gpt-5.4-mini`
-- `OPENAI_IMAGE_MODEL`: optional override, defaults to `gpt-image-1-mini`
-- cost-optimized default: `low` quality and `1` variant per request
+- `OPENAI_IMAGE_MODEL`: optional override, defaults to `dall-e-3`
+- default image path uses `dall-e-3` with `1` variant per request
 - if the API key is missing or the OpenAI request fails, the app falls back to the built-in SVG generator
 - channel draft generation also uses the same `OPENAI_API_KEY`; if the request fails, it falls back to the built-in rule-based draft generator
