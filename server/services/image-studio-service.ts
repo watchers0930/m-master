@@ -22,9 +22,8 @@ const PRESET_MAP: Record<ImageChannel, { width: number; height: number; label: s
   facebook: { width: 1200, height: 630, label: "Facebook Link" },
 };
 
-const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1-mini";
+const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "dall-e-3";
 const OPENAI_API_URL = "https://api.openai.com/v1/images/generations";
-const OPENAI_IMAGE_QUALITY = "low";
 const DEFAULT_IMAGE_VARIANT_COUNT = 3;
 const VARIANT_DIRECTIONS = [
   "제품 핵심 메시지를 정면으로 전달하는 선명한 히어로형 구도",
@@ -137,6 +136,7 @@ async function generateOpenAiVariant(params: {
   width: number;
   height: number;
 }) {
+  const usesDallE = OPENAI_IMAGE_MODEL.startsWith("dall-e");
   const response = await fetch(OPENAI_API_URL, {
     method: "POST",
     headers: {
@@ -147,9 +147,7 @@ async function generateOpenAiVariant(params: {
       model: OPENAI_IMAGE_MODEL,
       prompt: params.prompt,
       size: toOpenAiSize(params.channel),
-      quality: OPENAI_IMAGE_QUALITY,
-      background: "opaque",
-      output_format: "png",
+      ...(usesDallE ? { response_format: "b64_json" } : { quality: "low", background: "opaque", output_format: "png" }),
     }),
   });
 
