@@ -20,11 +20,18 @@ const TONE_PRESETS = [
 ] as const;
 
 function buildMonthlyRecommendedTopics(project: ProjectDetail | null) {
+  const month = new Date().getMonth() + 1;
+
   if (!project) {
-    return [];
+    return [
+      `${month}월에 바로 적용하는 콘텐츠 운영 체크리스트`,
+      `전환이 나는 랜딩페이지 카피 구조 정리`,
+      `브랜드 메시지를 고객 언어로 바꾸는 방법`,
+      `블로그 글 하나로 SNS 콘텐츠까지 확장하는 순서`,
+      `실무자가 바로 쓰는 마케팅 자동화 흐름 가이드`,
+    ];
   }
 
-  const month = new Date().getMonth() + 1;
   const projectName = project.project.name;
   const keywords = project.sourceAnalysis?.keywordHints?.slice(0, 3) ?? [];
   const primaryKeyword = keywords[0];
@@ -171,6 +178,27 @@ export function SidebarPanel(props: Props) {
       <details className="sb-section" open>
         <summary className="sb-section-title">프로젝트</summary>
         <div className="sb-section-body">
+          {recommendedTopics.length > 0 && (
+            <div className="field-group">
+              <div className="sb-topic-head">
+                <label className="field-label">이달의 추천 토픽</label>
+                <span className="fine-print">{recommendedTopics.length}개</span>
+              </div>
+              <div className="sb-topic-list">
+                {recommendedTopics.map((item, index) => (
+                  <button
+                    key={`${item}-${index}`}
+                    type="button"
+                    className={`sb-topic-item ${topicInput.trim() === item ? "active" : ""}`}
+                    onClick={() => onTopicInputChange(item)}
+                  >
+                    <span className="sb-topic-index">{index + 1}</span>
+                    <span className="sb-topic-copy">{item}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {!activeProject ? (
             <>
               <div className="field-group">
@@ -198,27 +226,6 @@ export function SidebarPanel(props: Props) {
                 <span className="fine-print">{activeProject.project.domain || "도메인 없음"}</span>
                 {isApproved && <span className="status-pill active">콘텍스트 승인됨</span>}
               </div>
-              {recommendedTopics.length > 0 && (
-                <div className="field-group">
-                  <div className="sb-topic-head">
-                    <label className="field-label">이달의 추천 토픽</label>
-                    <span className="fine-print">{recommendedTopics.length}개</span>
-                  </div>
-                  <div className="sb-topic-list">
-                    {recommendedTopics.map((item, index) => (
-                      <button
-                        key={`${item}-${index}`}
-                        type="button"
-                        className={`sb-topic-item ${topicInput.trim() === item ? "active" : ""}`}
-                        onClick={() => onTopicInputChange(item)}
-                      >
-                        <span className="sb-topic-index">{index + 1}</span>
-                        <span className="sb-topic-copy">{item}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
               <div className="field-group">
                 <label className="field-label">토픽</label>
                 <input
