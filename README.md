@@ -58,9 +58,10 @@ Context-aware marketing platform.
 
 ## Image generation
 
-- `OPENAI_API_KEY`: enables OpenAI image generation for the image studio
+- `UNSPLASH_ACCESS_KEY`: if set, the image studio prefers Unsplash hotlinked images
+- `OPENAI_API_KEY`: used for text generation and image fallback when Unsplash is unavailable
 - `OPENAI_TEXT_MODEL`: optional override for GPT draft generation, defaults to `gpt-5.4-mini`
 - `OPENAI_IMAGE_MODEL`: optional override, defaults to `dall-e-3`
-- default image path uses `dall-e-3` with `1` variant per request
+- default image path prefers Unsplash and falls back to `dall-e-3`
 - if the API key is missing or the OpenAI request fails, the app falls back to the built-in SVG generator
 - channel draft generation also uses the same `OPENAI_API_KEY`; if the request fails, it falls back to the built-in rule-based draft generator

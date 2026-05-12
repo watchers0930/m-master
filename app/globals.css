@@ -254,6 +254,68 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   color: rgba(255, 255, 255, 0.25);
 }
 
+.sb-topic-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sb-topic-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sb-topic-item {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  align-items: start;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--sidebar-border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--sidebar-fg);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+
+.sb-topic-item:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.sb-topic-item.active {
+  border-color: var(--primary);
+  background: rgba(0, 113, 227, 0.16);
+}
+
+.sb-topic-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--sidebar-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sb-topic-item.active .sb-topic-index {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--sidebar-fg);
+}
+
+.sb-topic-copy {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 /* ═══════════════════════════════════════
    Marketing Page
    ═══════════════════════════════════════ */

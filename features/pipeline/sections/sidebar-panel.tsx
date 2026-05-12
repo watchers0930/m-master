@@ -19,6 +19,35 @@ const TONE_PRESETS = [
   { key: "educational", label: "교육적" },
 ] as const;
 
+function buildMonthlyRecommendedTopics(project: ProjectDetail | null) {
+  if (!project) {
+    return [];
+  }
+
+  const month = new Date().getMonth() + 1;
+  const projectName = project.project.name;
+  const keywords = project.sourceAnalysis?.keywordHints?.slice(0, 3) ?? [];
+  const primaryKeyword = keywords[0];
+  const secondaryKeyword = keywords[1];
+  const audience = project.brandProfile?.audience?.split(",")[0]?.trim();
+  const cta = project.brandProfile?.cta?.trim();
+
+  const candidates = [
+    ...project.topics.map((topic) => topic.title),
+    primaryKeyword ? `${month}월 ${primaryKeyword} 실무 체크리스트` : "",
+    primaryKeyword ? `${projectName}로 ${primaryKeyword} 성과를 만드는 실행 순서` : "",
+    primaryKeyword && secondaryKeyword ? `${primaryKeyword}와 ${secondaryKeyword}를 함께 설계할 때 놓치기 쉬운 포인트` : "",
+    audience ? `${audience}가 ${projectName}를 도입하기 전에 가장 많이 묻는 질문 7가지` : "",
+    cta ? `${projectName} 콘텐츠에서 ${cta} 전환율을 높이는 카피 구조` : "",
+    `${month}월에 바로 써먹는 ${projectName} 운영 아이디어 5가지`,
+    `${projectName} 핵심 기능을 고객 언어로 다시 설명하는 방법`,
+  ]
+    .map((item) => item.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  return candidates.filter((item, index) => candidates.indexOf(item) === index).slice(0, 5);
+}
+
 type Props = {
   project: {
     activeProject: ProjectDetail | null;
@@ -134,6 +163,7 @@ export function SidebarPanel(props: Props) {
   const scores = review?.scores;
   const hasContent = (studio?.draft?.assets?.length ?? 0) > 0;
   const adoptedVariant = variantGroup?.variants?.find((v) => v.adopted);
+  const recommendedTopics = buildMonthlyRecommendedTopics(activeProject);
 
   return (
     <aside className="sidebar-panel">
@@ -168,6 +198,27 @@ export function SidebarPanel(props: Props) {
                 <span className="fine-print">{activeProject.project.domain || "도메인 없음"}</span>
                 {isApproved && <span className="status-pill active">콘텍스트 승인됨</span>}
               </div>
+              {recommendedTopics.length > 0 && (
+                <div className="field-group">
+                  <div className="sb-topic-head">
+                    <label className="field-label">이달의 추천 토픽</label>
+                    <span className="fine-print">{recommendedTopics.length}개</span>
+                  </div>
+                  <div className="sb-topic-list">
+                    {recommendedTopics.map((item, index) => (
+                      <button
+                        key={`${item}-${index}`}
+                        type="button"
+                        className={`sb-topic-item ${topicInput.trim() === item ? "active" : ""}`}
+                        onClick={() => onTopicInputChange(item)}
+                      >
+                        <span className="sb-topic-index">{index + 1}</span>
+                        <span className="sb-topic-copy">{item}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="field-group">
                 <label className="field-label">토픽</label>
                 <input

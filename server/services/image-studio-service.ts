@@ -16,6 +16,16 @@ type ImageVariantRecord = {
   selected: boolean;
 };
 
+type UnsplashRandomPhoto = {
+  width?: number;
+  height?: number;
+  urls?: {
+    regular?: string;
+    full?: string;
+    raw?: string;
+  };
+};
+
 const PRESET_MAP: Record<ImageChannel, { width: number; height: number; label: string }> = {
   blog: { width: 1200, height: 628, label: "Blog Hero" },
   instagram: { width: 1080, height: 1080, label: "Instagram Square" },
@@ -24,6 +34,8 @@ const PRESET_MAP: Record<ImageChannel, { width: number; height: number; label: s
 
 const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "dall-e-3";
 const OPENAI_API_URL = "https://api.openai.com/v1/images/generations";
+const UNSPLASH_API_URL = "https://api.unsplash.com/photos/random";
+const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY?.trim() || "";
 const DEFAULT_IMAGE_VARIANT_COUNT = 3;
 const VARIANT_DIRECTIONS = [
   "제품 핵심 메시지를 정면으로 전달하는 선명한 히어로형 구도",
@@ -55,6 +67,36 @@ function toOpenAiSize(channel: ImageChannel) {
 
 function canUseOpenAiImage() {
   return Boolean(process.env.OPENAI_API_KEY?.trim());
+}
+
+function canUseUnsplashImage() {
+  return Boolean(UNSPLASH_ACCESS_KEY);
+}
+
+function extractPromptKeywords(value: string, maxItems: number = 4) {
+  return [...new Set(
+    value
+      .replace(/https?:\/\/\S+/gi, " ")
+      .replace(/[^a-zA-Z0-9가-힣\s]/g, " ")
+      .split(/\s+/)
+      .map((token) => token.trim())
+      .filter((token) => token.length >= 2),
+  )].slice(0, maxItems);
+}
+
+function buildUnsplashQuery(projectName: string, asset: AssetSeed) {
+  const prompt = `${asset.title} ${asset.body} ${asset.cta}`.trim();
+  const keywords = extractPromptKeywords(prompt, 5);
+  const base = keywords.length > 0 ? keywords.join(" ") : `${projectName} ${asset.channel}`;
+  return toSentence(base, 80);
+}
+
+function toUnsplashOrientation(channel: ImageChannel) {
+  if (channel === "instagram") {
+    return "squarish";
+  }
+
+  return "landscape";
 }
 
 function buildSvgVariant(params: {
@@ -182,6 +224,65 @@ async function generateOpenAiVariant(params: {
   } satisfies ImageVariantRecord;
 }
 
+async function buildUnsplashImageVariants(
+  projectName: string,
+  asset: AssetSeed,
+  promptOverride?: string,
+  variantCount: number = DEFAULT_IMAGE_VARIANT_COUNT,
+) {
+  const preset = PRESET_MAP[asset.channel];
+  const prompt = promptOverride?.trim() || buildImagePrompt(projectName, asset);
+  const query = buildUnsplashQuery(projectName, asset);
+  const url = new URL(UNSPLASH_API_URL);
+  url.searchParams.set("query", query);
+  url.searchParams.set("count", String(Math.max(1, Math.min(variantCount, 5))));
+  url.searchParams.set("orientation", toUnsplashOrientation(asset.channel));
+  url.searchParams.set("content_filter", "high");
+  url.searchParams.set("client_id", UNSPLASH_ACCESS_KEY);
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Accept: "application/json",
+      "Accept-Version": "v1",
+    },
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Unsplash image request failed: ${response.status} ${detail}`);
+  }
+
+  const payload = (await response.json()) as UnsplashRandomPhoto | UnsplashRandomPhoto[];
+  const photos = Array.isArray(payload) ? payload : [payload];
+  const images = photos
+    .map((photo, index) => {
+      const path = photo.urls?.regular || photo.urls?.full || photo.urls?.raw;
+      if (!path) {
+        return null;
+      }
+
+      return {
+        role: `variant-${index + 1}`,
+        originalPath: path,
+        composedPath: path,
+        width: photo.width ?? preset.width,
+        height: photo.height ?? preset.height,
+        selected: index === 0,
+      } satisfies ImageVariantRecord;
+    })
+    .filter((item): item is ImageVariantRecord => Boolean(item));
+
+  if (images.length === 0) {
+    throw new Error("Unsplash image response did not include usable image URLs.");
+  }
+
+  return {
+    prompt,
+    preset,
+    images,
+  };
+}
+
 async function buildOpenAiImageVariants(
   projectName: string,
   asset: AssetSeed,
@@ -218,6 +319,14 @@ export async function buildImageVariants(
   options?: { variantCount?: number },
 ) {
   const variantCount = Math.max(1, options?.variantCount ?? DEFAULT_IMAGE_VARIANT_COUNT);
+
+  if (canUseUnsplashImage()) {
+    try {
+      return await buildUnsplashImageVariants(projectName, asset, promptOverride, variantCount);
+    } catch {
+      // Fall through to existing generators when Unsplash is unavailable.
+    }
+  }
 
   if (!canUseOpenAiImage()) {
     return buildSvgImageVariants(projectName, asset, promptOverride, variantCount);
