@@ -4,8 +4,8 @@ const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
-// Vercel runtime should prefer direct/non-pooling URLs when available.
-// This avoids pooled endpoint outages or stale pooler env vars taking down APIs.
+// Vercel preview/production should prefer pooled Neon URLs.
+// Local tooling can still fall back to direct/non-pooling URLs if needed.
 const pooledDatabaseUrl =
   process.env.POSTGRES_PRISMA_URL ||
   process.env.DATABASE_URL ||
@@ -46,7 +46,7 @@ function withServerlessPoolSettings(url?: string) {
 }
 
 const runtimeDatabaseUrl = process.env.VERCEL
-  ? directDatabaseUrl || withServerlessPoolSettings(pooledDatabaseUrl)
+  ? withServerlessPoolSettings(pooledDatabaseUrl) || directDatabaseUrl
   : directDatabaseUrl || pooledDatabaseUrl;
 
 export const prisma =
