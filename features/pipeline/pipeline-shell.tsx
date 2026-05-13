@@ -175,8 +175,10 @@ export function PipelineShell() {
       settingsBusy: publish.settingsBusy,
       onSaveWordPressDefaults: publish.handleSaveWordPressDefaults,
     },
-    studio: {
+    review: {
       studio: state.studio,
+    },
+    hashtags: {
       editingHashtags: content.editingHashtags,
       onEditingHashtagsChange: content.setEditingHashtags,
       hashtagBusy: content.hashtagBusy,
@@ -197,110 +199,79 @@ export function PipelineShell() {
 
       <div className="pipeline-grid">
         <SidebarPanel
-          projects={state.projects}
-          activeProject={sidebarProps.project.activeProject}
-          name={sidebarProps.project.name}
-          onNameChange={sidebarProps.project.onNameChange}
-          domain={sidebarProps.project.domain}
-          onDomainChange={sidebarProps.project.onDomainChange}
-          workingPath={sidebarProps.project.workingPath}
-          onWorkingPathChange={sidebarProps.project.onWorkingPathChange}
-          projectBusy={sidebarProps.project.projectBusy}
-          onCreateProject={sidebarProps.project.onCreateProject}
-          onSelectProject={(id) => state.loadProject(id)}
-          editingSummary={sidebarProps.context.editingSummary}
-          onEditingSummaryChange={sidebarProps.context.onEditingSummaryChange}
-          editingAudience={sidebarProps.context.editingAudience}
-          onEditingAudienceChange={sidebarProps.context.onEditingAudienceChange}
-          editingTone={sidebarProps.context.editingTone}
-          onEditingToneChange={sidebarProps.context.onEditingToneChange}
-          editingCta={sidebarProps.context.editingCta}
-          onEditingCtaChange={sidebarProps.context.onEditingCtaChange}
-          editingBannedTerms={sidebarProps.context.editingBannedTerms}
-          onEditingBannedTermsChange={sidebarProps.context.onEditingBannedTermsChange}
-          contextBusy={sidebarProps.context.contextBusy}
-          onApproveContext={sidebarProps.context.onApproveContext}
-          onSaveContextDraft={sidebarProps.context.onSaveContextDraft}
-          topicInput={sidebarProps.generation.topicInput}
-          onTopicInputChange={sidebarProps.generation.onTopicInputChange}
-          generateBusy={sidebarProps.generation.generateBusy}
-          onGenerate={sidebarProps.generation.onGenerate}
-          topic={sidebarProps.abTesting.topic}
-          variantGroup={sidebarProps.abTesting.variantGroup}
-          abGenerateBusy={sidebarProps.abTesting.abGenerateBusy}
-          onGenerateVariants={sidebarProps.abTesting.onGenerateVariants}
-          adoptBusy={sidebarProps.abTesting.adoptBusy}
-          onAdoptVariant={sidebarProps.abTesting.onAdoptVariant}
-          seoCompliance={sidebarProps.generation.seoCompliance}
-          studio={sidebarProps.studio.studio}
-          exportBusy={sidebarProps.publish.exportBusy}
-          onExportAll={sidebarProps.publish.onExportAll}
-          publishBusy={sidebarProps.publish.publishBusy}
-          publishPackage={sidebarProps.publish.publishPackage}
-          onPreparePublish={sidebarProps.publish.onPreparePublish}
-          wordpressConfig={sidebarProps.publish.wordpressConfig}
-          onWordPressConfigChange={sidebarProps.publish.onWordPressConfigChange}
-          editingHashtags={sidebarProps.studio.editingHashtags}
-          onEditingHashtagsChange={sidebarProps.studio.onEditingHashtagsChange}
-          hashtagBusy={sidebarProps.studio.hashtagBusy}
-          onGenerateHashtags={sidebarProps.studio.onGenerateHashtags}
-          settingsBusy={sidebarProps.publish.settingsBusy}
-          onSaveWordPressDefaults={sidebarProps.publish.onSaveWordPressDefaults}
+          project={sidebarProps.project}
+          context={sidebarProps.context}
+          generation={sidebarProps.generation}
+          abTesting={sidebarProps.abTesting}
+          review={sidebarProps.review}
+          hashtags={sidebarProps.hashtags}
+          publish={sidebarProps.publish}
         />
 
         <ContentPanel
-          studio={state.studio}
-          activeChannel={content.activeChannel}
-          onChannelChange={content.setActiveChannel}
-          editingTitle={content.editingTitle}
-          onEditingTitleChange={content.setEditingTitle}
-          editingBody={content.editingBody}
-          onEditingBodyChange={content.setEditingBody}
-          editingCta={content.editingCta}
-          onEditingCtaChange={content.setEditingCta}
-          editingHashtags={content.editingHashtags}
-          onEditingHashtagsChange={content.setEditingHashtags}
-          onUpdateSeo={content.updateSeoFromEditor}
-          seoCompliance={content.seoCompliance}
-          saveBusy={content.saveBusy}
-          onSave={() => {
-            if (projectId && state.studio) {
-              content.handleSave(projectId, state.studio);
-            }
+          content={{
+            studio: state.studio,
+            activeChannel: content.activeChannel,
+            onChannelChange: content.setActiveChannel,
+            editingTitle: content.editingTitle,
+            onEditingTitleChange: content.setEditingTitle,
+            editingBody: content.editingBody,
+            onEditingBodyChange: content.setEditingBody,
+            editingCta: content.editingCta,
+            onEditingCtaChange: content.setEditingCta,
+            editingHashtags: content.editingHashtags,
+            onEditingHashtagsChange: content.setEditingHashtags,
+            onUpdateSeo: content.updateSeoFromEditor,
+            seoCompliance: content.seoCompliance,
+            saveBusy: content.saveBusy,
+            onSave: () => {
+              if (projectId && state.studio) {
+                content.handleSave(projectId, state.studio);
+              }
+            },
           }}
-          variantGroup={state.variantGroup}
-          adoptBusy={ab.adoptBusy}
-          onAdoptVariant={(id) => {
-            if (projectId) {
-              ab.handleAdoptVariant(projectId, id);
-            }
+          variants={{
+            topic,
+            variantGroup: state.variantGroup,
+            generateBusy: ab.generateBusy,
+            adoptBusy: ab.adoptBusy,
+            onGenerateVariants: (count) => {
+              if (projectId) {
+                ab.handleGenerateVariants(projectId, topic, count);
+              }
+            },
+            onAdoptVariant: (id) => {
+              if (projectId) {
+                ab.handleAdoptVariant(projectId, id);
+              }
+            },
           }}
-          exportPreview={publish.exportPreview}
-          onExportChannel={publish.handleExportChannel}
-          onExportPreviewViewChange={publish.handleExportPreviewViewChange}
-          onCopyExportPreview={publish.handleCopyExportPreview}
-          copyBusy={publish.copyBusy}
-          copyStatus={publish.copyStatus}
+          exportState={{
+            exportPreview: publish.exportPreview,
+            onExportPreviewViewChange: publish.handleExportPreviewViewChange,
+            onCopyExportPreview: publish.handleCopyExportPreview,
+            copyBusy: publish.copyBusy,
+            copyStatus: publish.copyStatus,
+          }}
         />
 
         <ImagePanel
-          projectId={projectId}
-          activeChannel={images.activeChannel}
-          onChannelChange={images.setActiveChannel}
-          currentStudio={images.currentStudio}
-          generateBusy={images.generateBusy}
-          selectBusy={images.selectBusy}
-          onGenerateImages={() => {
-            if (projectId) {
-              images.handleGenerateImages(projectId, expectedImageVariantCount);
-            }
+          image={{
+            projectId,
+            activeChannel: images.activeChannel,
+            onChannelChange: images.setActiveChannel,
+            currentStudio: images.currentStudio,
+            expectedVariantCount: expectedImageVariantCount,
+            generateBusy: images.generateBusy,
+            selectBusy: images.selectBusy,
+            onGenerateImages: (id, channel) => {
+              images.handleGenerateImages(id, channel);
+            },
+            onSelectImage: (id, channel, imageAssetId) => {
+              images.handleSelectImage(id, channel, imageAssetId);
+            },
+            hasContent,
           }}
-          onSelectImage={(imageAssetId) => {
-            if (projectId) {
-              images.handleSelectImage(projectId, imageAssetId);
-            }
-          }}
-          hasContent={hasContent}
         />
       </div>
     </div>
