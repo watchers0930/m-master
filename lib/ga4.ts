@@ -1,4 +1,6 @@
 export interface Ga4OverviewResponse {
+  source: string;
+  sourceLabel: string;
   propertyId: string | null;
   rangeDays: number;
   generatedAt: string;
@@ -66,28 +68,98 @@ interface Ga4RunReportResponse {
 }
 
 interface Ga4OAuthConfig {
+  source: string;
+  sourceLabel: string;
   propertyId: string;
   clientId: string;
   clientSecret: string;
   refreshToken: string;
 }
 
+interface Ga4SourceOption {
+  id: string;
+  label: string;
+}
+
+const GA4_SOURCE_OPTIONS: Array<{ id: string; label: string; envPrefix: string }> = [
+  { id: "m-master", label: "m-master", envPrefix: "GA4_SOURCE_M_MASTER" },
+  { id: "vestra", label: "vestra", envPrefix: "GA4_SOURCE_VESTRA" },
+];
+
 const GA4_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GA4_DATA_API_BASE = "https://analyticsdata.googleapis.com/v1beta";
 
-function getGa4Config(): Ga4OAuthConfig {
+function readSourceConfig(source: { id: string; label: string; envPrefix: string }): Ga4OAuthConfig | null {
+  const propertyId = process.env[`${source.envPrefix}_PROPERTY_ID`]?.trim();
+  const clientId = process.env[`${source.envPrefix}_OAUTH_CLIENT_ID`]?.trim();
+  const clientSecret = process.env[`${source.envPrefix}_OAUTH_CLIENT_SECRET`]?.trim();
+  const refreshToken = process.env[`${source.envPrefix}_OAUTH_REFRESH_TOKEN`]?.trim();
+
+  if (!propertyId || !clientId || !clientSecret || !refreshToken) {
+    return null;
+  }
+
+  return {
+    source: source.id,
+    sourceLabel: source.label,
+    propertyId,
+    clientId,
+    clientSecret,
+    refreshToken,
+  };
+}
+
+function readLegacyConfig(): Ga4OAuthConfig | null {
   const propertyId = process.env.GA4_PROPERTY_ID?.trim();
   const clientId = process.env.GA4_OAUTH_CLIENT_ID?.trim();
   const clientSecret = process.env.GA4_OAUTH_CLIENT_SECRET?.trim();
   const refreshToken = process.env.GA4_OAUTH_REFRESH_TOKEN?.trim();
 
   if (!propertyId || !clientId || !clientSecret || !refreshToken) {
-    throw new Error(
-      "GA4 OAuth 환경변수(GA4_PROPERTY_ID, GA4_OAUTH_CLIENT_ID, GA4_OAUTH_CLIENT_SECRET, GA4_OAUTH_REFRESH_TOKEN)가 설정되지 않았습니다.",
-    );
+    return null;
   }
 
-  return { propertyId, clientId, clientSecret, refreshToken };
+  return {
+    source: "m-master",
+    sourceLabel: "m-master",
+    propertyId,
+    clientId,
+    clientSecret,
+    refreshToken,
+  };
+}
+
+function getDefaultGa4SourceId() {
+  const requested = process.env.GA4_DEFAULT_SOURCE?.trim();
+  if (requested && GA4_SOURCE_OPTIONS.some((source) => source.id === requested)) {
+    return requested;
+  }
+  return "m-master";
+}
+
+function getGa4Config(sourceId?: string): Ga4OAuthConfig {
+  const multiSourceConfigs = GA4_SOURCE_OPTIONS.map(readSourceConfig).filter((value): value is Ga4OAuthConfig => Boolean(value));
+  const defaultSourceId = sourceId || getDefaultGa4SourceId();
+
+  if (multiSourceConfigs.length > 0) {
+    const selected = multiSourceConfigs.find((config) => config.source === defaultSourceId);
+    if (!selected) {
+      throw new Error(`GA4 source '${defaultSourceId}' 가 설정되지 않았습니다.`);
+    }
+    return selected;
+  }
+
+  const legacyConfig = readLegacyConfig();
+  if (legacyConfig) {
+    if (defaultSourceId !== "m-master") {
+      throw new Error(`GA4 source '${defaultSourceId}' 가 설정되지 않았습니다.`);
+    }
+    return legacyConfig;
+  }
+
+  throw new Error(
+    "GA4 OAuth 환경변수(GA4_PROPERTY_ID, GA4_OAUTH_CLIENT_ID, GA4_OAUTH_CLIENT_SECRET, GA4_OAUTH_REFRESH_TOKEN 또는 GA4_SOURCE_* 세트)가 설정되지 않았습니다.",
+  );
 }
 
 async function getGa4AccessToken(config: Ga4OAuthConfig): Promise<string> {
@@ -171,17 +243,30 @@ function buildDateRange(rangeDays: number) {
   return { startDate: toIsoDate(startDate), endDate: toIsoDate(endDate) };
 }
 
-export function isGa4Configured(): boolean {
-  return Boolean(
-    process.env.GA4_PROPERTY_ID?.trim() &&
-      process.env.GA4_OAUTH_CLIENT_ID?.trim() &&
-      process.env.GA4_OAUTH_CLIENT_SECRET?.trim() &&
-      process.env.GA4_OAUTH_REFRESH_TOKEN?.trim(),
-  );
+export function listGa4Sources(): Ga4SourceOption[] {
+  const multiSourceConfigs = GA4_SOURCE_OPTIONS.map(readSourceConfig).filter((value): value is Ga4OAuthConfig => Boolean(value));
+  if (multiSourceConfigs.length > 0) {
+    return multiSourceConfigs.map((config) => ({ id: config.source, label: config.sourceLabel }));
+  }
+
+  return readLegacyConfig() ? [{ id: "m-master", label: "m-master" }] : [];
 }
 
-export async function fetchGa4Overview(rangeDays: number): Promise<Ga4OverviewResponse> {
-  const config = getGa4Config();
+export function isGa4Configured(sourceId?: string): boolean {
+  if (sourceId) {
+    try {
+      getGa4Config(sourceId);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  return listGa4Sources().length > 0;
+}
+
+export async function fetchGa4Overview(rangeDays: number, sourceId?: string): Promise<Ga4OverviewResponse> {
+  const config = getGa4Config(sourceId);
   const accessToken = await getGa4AccessToken(config);
   const dateRange = buildDateRange(rangeDays);
 
@@ -260,6 +345,8 @@ export async function fetchGa4Overview(rangeDays: number): Promise<Ga4OverviewRe
   const bounceRate = metricNumber(summaryRow, 6) * 100;
 
   return {
+    source: config.source,
+    sourceLabel: config.sourceLabel,
     propertyId: config.propertyId,
     rangeDays,
     generatedAt: new Date().toISOString(),
