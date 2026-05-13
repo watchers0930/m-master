@@ -1075,6 +1075,101 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   gap: 16px;
 }
 
+.mk-compare-grid,
+.mk-audience-grid,
+.mk-deliverable-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.mk-compare-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.mk-audience-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.mk-deliverable-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.mk-compare-card,
+.mk-audience-card,
+.mk-deliverable-card {
+  border-radius: 24px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.05);
+}
+
+.mk-compare-card,
+.mk-audience-card {
+  padding: 24px;
+}
+
+.mk-compare-card.featured {
+  background: linear-gradient(180deg, rgba(219, 234, 254, 0.72), rgba(255, 255, 255, 0.96));
+  border-color: rgba(37, 99, 235, 0.24);
+  box-shadow: 0 18px 44px rgba(37, 99, 235, 0.12);
+}
+
+.mk-compare-label,
+.mk-audience-name {
+  margin: 0 0 16px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.mk-compare-row + .mk-compare-row {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.mk-compare-row span,
+.mk-deliverable-card span {
+  display: block;
+  color: #1d4ed8;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mk-compare-row strong,
+.mk-deliverable-card strong {
+  display: block;
+  margin-top: 10px;
+  font-size: 18px;
+  line-height: 1.45;
+  letter-spacing: -0.03em;
+}
+
+.mk-audience-pain,
+.mk-audience-gain {
+  margin: 0;
+  font-size: 15px;
+}
+
+.mk-audience-pain {
+  color: rgba(8, 17, 31, 0.72);
+}
+
+.mk-audience-gain {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.mk-deliverable-card {
+  min-height: 170px;
+  padding: 22px;
+}
+
 .mk-card {
   min-height: 220px;
   padding: 24px;
@@ -1178,11 +1273,30 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   margin-top: 24px;
 }
 
+.mk-closing-points {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.mk-closing-points div {
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 @media (max-width: 1080px) {
   .mk-hero,
   .mk-output-shell,
   .mk-card-grid,
-  .mk-steps {
+  .mk-steps,
+  .mk-compare-grid,
+  .mk-audience-grid,
+  .mk-deliverable-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1219,7 +1333,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
     grid-template-columns: 1fr;
   }
 
+  .mk-closing-points {
+    flex-direction: column;
+  }
+
   .mk-card,
+  .mk-compare-card,
+  .mk-audience-card,
+  .mk-deliverable-card,
   .mk-output-copy,
   .mk-output-list,
   .mk-closing-card {

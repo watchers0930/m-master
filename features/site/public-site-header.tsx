@@ -22,7 +22,7 @@ export function PublicSiteHeader({ active }: PublicSiteHeaderProps) {
         </a>
         <a
           className={active === "analytics" ? "public-site-nav-link active" : "public-site-nav-link"}
-          href="/analytics"
+          href="/"
         >
           방문자 분석
           <span>GA4</span>
