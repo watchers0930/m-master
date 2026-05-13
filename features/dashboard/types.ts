@@ -217,6 +217,15 @@ export type ExportBundle = {
     content: string;
     hashtags: string;
     hashtagsFilename?: string;
+    tracking: {
+      baseUrl: string | null;
+      trackedUrl: string | null;
+      campaign: string;
+      source: string;
+      medium: string;
+      content: string;
+      note?: string;
+    };
   }>;
 };
 
