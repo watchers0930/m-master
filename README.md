@@ -11,12 +11,10 @@ Context-aware marketing platform.
 
 ## Deployment workflow
 
-- `test` branch: all routine development goes here
-- `production` branch: production deployment branch, update only by explicit promotion
+- `production` branch: all routine development and deployment happen here
 
 ## GitHub Actions deployment
 
-- pushes to `test` deploy to the Vercel preview target and rebind `tm-master.vercel.app`
 - pushes to `production` deploy to the Vercel production target and rebind `m-master.vercel.app`
 - Vercel Git auto-deploy should stay disabled to avoid duplicate deployments
 
@@ -28,24 +26,21 @@ Context-aware marketing platform.
 
 - GitHub Actions is the deployment entry point
 - local CLI direct deploys should be avoided except for emergency maintenance
-- `tm-master.vercel.app` is the fixed test domain
 - `m-master.vercel.app` is the fixed production domain
 
 ## Promotion checklist
 
-1. Work only on `test`
+1. Work only on `production`
 2. Run local verification: at minimum `npm run build`
-3. Push `test` and wait for the preview deploy
-4. Verify `tm-master.vercel.app`
-5. Create a `test -> production` PR
-6. Merge the PR to trigger production deploy
-7. Verify `m-master.vercel.app`
+3. Push `production`
+4. Wait for the GitHub Actions production deploy
+5. Verify `m-master.vercel.app`
 
 ### If production promotion is not clean
 
 - Do not force-push `production`
-- If `test -> production` cannot merge cleanly, create a temporary alignment branch from the latest `origin/production`
-- Apply the tested `test` content onto that branch
+- If a direct `production` push is blocked by branch protection or branch divergence, create a temporary alignment branch from the latest `origin/production`
+- Apply the verified content onto that branch
 - Open a clean PR from the alignment branch into `production`
 - If the production deploy workflow does not auto-start after merge, run `deploy.yml` with `workflow_dispatch` on `production`
 
