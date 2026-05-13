@@ -1,5 +1,10 @@
-import { PipelineShell } from "@/features/pipeline/pipeline-shell";
+import { CmsShowcasePage } from "@/features/cms/cms-showcase-page";
+import { getCmsPublicSections } from "@/server/services/cms-service";
 
-export default function HomePage() {
-  return <PipelineShell />;
+export const dynamic = "force-dynamic";
+
+export default async function HomePage() {
+  const sections = await getCmsPublicSections();
+
+  return <CmsShowcasePage sections={sections} />;
 }
