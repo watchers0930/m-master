@@ -161,7 +161,6 @@ function getGa4Config(sourceId?: string): Ga4OAuthConfig {
     "GA4 OAuth 환경변수(GA4_PROPERTY_ID, GA4_OAUTH_CLIENT_ID, GA4_OAUTH_CLIENT_SECRET, GA4_OAUTH_REFRESH_TOKEN 또는 GA4_SOURCE_* 세트)가 설정되지 않았습니다.",
   );
 }
-
 async function getGa4AccessToken(config: Ga4OAuthConfig): Promise<string> {
   const body = new URLSearchParams({
     client_id: config.clientId,
