@@ -2718,7 +2718,27 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .analytics-toolbar-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
+}
+
+.analytics-source-toggle,
+.analytics-source-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.analytics-source-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .analytics-filter-button {

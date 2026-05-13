@@ -1,5 +1,5 @@
 import { jsonError, jsonOk } from "@/lib/api-response";
-import { fetchGa4Overview, isGa4Configured } from "@/lib/ga4";
+import { fetchGa4Overview, isGa4Configured, listGa4Sources } from "@/lib/ga4";
 import { logger } from "@/server/logger";
 
 function clampRangeDays(value: number) {
@@ -8,20 +8,26 @@ function clampRangeDays(value: number) {
 }
 
 export async function GET(request: Request) {
-  if (!isGa4Configured()) {
+  const url = new URL(request.url);
+  const sourceId = url.searchParams.get("source")?.trim() || undefined;
+
+  if (!isGa4Configured(sourceId)) {
+    const configuredSources = listGa4Sources();
     return jsonError(
-      "GA4 환경변수가 설정되지 않았습니다. GA4_PROPERTY_ID, GA4_OAUTH_CLIENT_ID, GA4_OAUTH_CLIENT_SECRET, GA4_OAUTH_REFRESH_TOKEN을 확인하세요.",
+      configuredSources.length > 0
+        ? `GA4 source '${sourceId || "unknown"}' 가 설정되지 않았습니다.`
+        : "GA4 환경변수가 설정되지 않았습니다. GA4_PROPERTY_ID, GA4_OAUTH_CLIENT_ID, GA4_OAUTH_CLIENT_SECRET, GA4_OAUTH_REFRESH_TOKEN 또는 GA4_SOURCE_* 세트를 확인하세요.",
       503,
     );
   }
 
   try {
-    const url = new URL(request.url);
     const rangeDays = clampRangeDays(Number(url.searchParams.get("days") || 30));
-    const overview = await fetchGa4Overview(rangeDays);
+    const overview = await fetchGa4Overview(rangeDays, sourceId);
     return jsonOk(overview);
   } catch (error) {
     logger.error("analytics.overview.failed", {
+      sourceId: sourceId || "default",
       error: error instanceof Error ? error.message : "unknown_error",
     });
 

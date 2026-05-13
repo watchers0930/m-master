@@ -10,6 +10,11 @@ const RANGE_OPTIONS = [
   { value: 90, label: "90일" },
 ];
 
+const SOURCE_OPTIONS = [
+  { value: "m-master", label: "m-master" },
+  { value: "vestra", label: "vestra" },
+] as const;
+
 type ApiOk<T> = {
   ok: true;
   data: T;
@@ -55,6 +60,7 @@ function RankingCard(props: { title: string; rows: Array<{ label: string; count:
 
 export function AnalyticsDashboard() {
   const [days, setDays] = useState(30);
+  const [source, setSource] = useState<(typeof SOURCE_OPTIONS)[number]["value"]>("m-master");
   const [data, setData] = useState<Ga4OverviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -70,7 +76,11 @@ export function AnalyticsDashboard() {
       }
 
       try {
-        const response = await fetch(`/api/analytics/overview?days=${days}`, { cache: "no-store" });
+        const params = new URLSearchParams({
+          days: String(days),
+          source,
+        });
+        const response = await fetch(`/api/analytics/overview?${params.toString()}`, { cache: "no-store" });
         const payload = (await response.json()) as ApiResponse<Ga4OverviewResponse>;
 
         if (!payload.ok) {
@@ -98,7 +108,7 @@ export function AnalyticsDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [days, refreshing]);
+  }, [days, refreshing, source]);
 
   const maxSessions = Math.max(...(data?.trend.map((item) => item.sessions) ?? [1]), 1);
 
@@ -107,10 +117,22 @@ export function AnalyticsDashboard() {
       <div className="analytics-toolbar-card">
         <div>
           <h2>GA4 방문자 통계</h2>
-          <p>Vestra에서 쓰던 OAuth 기반 GA4 조회 구조를 그대로 적용했습니다.</p>
-          {data?.propertyId ? <span>GA4 Property ID: {data.propertyId}</span> : null}
+          <p>사이트별 GA4 속성을 선택해 같은 분석 화면에서 조회합니다.</p>
+          {data?.propertyId ? <span>{data.sourceLabel} · GA4 Property ID: {data.propertyId}</span> : null}
         </div>
         <div className="analytics-toolbar-actions">
+          <div className="analytics-source-toggle" role="tablist" aria-label="GA4 source">
+            {SOURCE_OPTIONS.map((option) => (
+              <button
+                className={source === option.value ? "analytics-filter-button active" : "analytics-filter-button"}
+                key={option.value}
+                onClick={() => setSource(option.value)}
+                type="button"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
           {RANGE_OPTIONS.map((option) => (
             <button
               className={days === option.value ? "analytics-filter-button active" : "analytics-filter-button"}
@@ -162,6 +184,10 @@ export function AnalyticsDashboard() {
               subLabel={`최근 ${data.rangeDays}일`}
               value={`${data.overview.bounceRate}%`}
             />
+          </div>
+
+          <div className="analytics-source-badge-row">
+            <span className="analytics-source-badge">조회 소스: {data.sourceLabel}</span>
           </div>
 
           <div className="analytics-report-card">
