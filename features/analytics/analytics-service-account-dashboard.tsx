@@ -63,6 +63,7 @@ export function AnalyticsServiceAccountDashboard() {
     fileName: string;
     clientEmail: string;
     projectId: string;
+    propertyId: string;
   } | null>(null);
   const [data, setData] = useState<Ga4OverviewResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -143,6 +144,7 @@ export function AnalyticsServiceAccountDashboard() {
       const parsed = JSON.parse(text) as Ga4ServiceAccountJson;
       const clientEmail = parsed.client_email?.trim();
       const projectId = parsed.project_id?.trim();
+      const extractedPropertyId = String(parsed.property_id ?? parsed.ga4_property_id ?? "").trim();
       const privateKey = parsed.private_key?.trim();
 
       if ((parsed.type && parsed.type !== "service_account") || !clientEmail || !privateKey) {
@@ -150,10 +152,14 @@ export function AnalyticsServiceAccountDashboard() {
       }
 
       setServiceAccountJsonText(text);
+      if (extractedPropertyId) {
+        setPropertyId(extractedPropertyId);
+      }
       setServiceAccountMeta({
         fileName: file.name,
         clientEmail,
         projectId: projectId || "-",
+        propertyId: extractedPropertyId || "-",
       });
       setConnected(false);
       setError(null);
@@ -370,7 +376,10 @@ export function AnalyticsServiceAccountDashboard() {
               placeholder="GA4 속성 ID 숫자"
               value={propertyId}
             />
-            <p>GA4 관리 &gt; 속성 &gt; 속성 ID 기준입니다.</p>
+            <p>
+              표준 서비스 계정 JSON에는 보통 Property ID가 없습니다.
+              업로드한 JSON 안에 `property_id` 또는 `ga4_property_id`가 있으면 자동 입력됩니다.
+            </p>
           </div>
 
           <div className="analytics-setting-block">
@@ -386,6 +395,7 @@ export function AnalyticsServiceAccountDashboard() {
               <div className="analytics-setting-json">
                 <pre>{`{
   "file_name": "${serviceAccountMeta.fileName}",
+  "property_id": "${serviceAccountMeta.propertyId}",
   "project_id": "${serviceAccountMeta.projectId}",
   "client_email": "${serviceAccountMeta.clientEmail}",
   "private_key": "••••••••"

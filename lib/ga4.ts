@@ -84,6 +84,8 @@ export interface Ga4ServiceAccountJson {
   project_id?: string;
   client_email?: string;
   private_key?: string;
+  property_id?: string | number;
+  ga4_property_id?: string | number;
 }
 
 const GA4_TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -118,7 +120,7 @@ export function isGa4Configured(): boolean {
 
 export function parseGa4ServiceAccountJson(input: string | Ga4ServiceAccountJson): Ga4ServiceAccountInput {
   const parsed = typeof input === "string" ? (JSON.parse(input) as Ga4ServiceAccountJson) : input;
-  const propertyId = "";
+  const propertyId = String(parsed.property_id ?? parsed.ga4_property_id ?? "").trim();
   const clientEmail = parsed.client_email?.trim();
   const privateKey = parsed.private_key?.trim();
   const projectId = parsed.project_id?.trim() || null;
