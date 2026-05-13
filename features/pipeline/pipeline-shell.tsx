@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useEffectEvent } from "react";
+import { AppHeader } from "@/features/site/app-header";
 import { usePipelineState } from "./hooks/use-pipeline-state";
 import { useSourceRegistration } from "./hooks/use-source-registration";
 import { useContentGeneration } from "./hooks/use-content-generation";
@@ -66,14 +67,12 @@ export function PipelineShell() {
     }
   });
 
-  // When project changes
   useEffect(() => {
     if (state.activeProject) {
       syncProjectUi(state.activeProject);
     }
   }, [state.activeProject, syncProjectUi]);
 
-  // When studio loads
   useEffect(() => {
     if (state.studio) {
       syncStudioUi(state.activeProject?.project?.id, state.studio);
@@ -83,20 +82,18 @@ export function PipelineShell() {
   const projectId = state.activeProject?.project?.id;
   const topic = content.topicInput.trim() || state.studio?.draft?.topic || "";
   const hasContent = (state.studio?.draft?.assets?.length ?? 0) > 0;
-  const visibleError =
-    state.error === "프로젝트 목록을 불러오지 못했습니다." ? "" : state.error;
+  const visibleError = state.error === "프로젝트 목록을 불러오지 못했습니다." ? "" : state.error;
   const blogAsset = state.studio?.draft?.assets?.find((asset) => asset.channel === "blog");
   const blogImageCueCount = (blogAsset?.body.match(/\[이미지\s+\d+\]/g) || []).length;
   const expectedImageVariantCount =
-    images.activeChannel === "blog"
-      ? Math.min(5, Math.max(3, blogImageCueCount || 3))
-      : 3;
+    images.activeChannel === "blog" ? Math.min(5, Math.max(3, blogImageCueCount || 3)) : 3;
   const syncContextBeforeGeneration = async () => {
     if (!projectId || !source.editingSummary.trim()) {
       return;
     }
     await source.handleApproveContext(projectId);
   };
+
   const sidebarProps = {
     project: {
       activeProject: state.activeProject,
@@ -155,28 +152,17 @@ export function PipelineShell() {
       topic,
       variantGroup: state.variantGroup,
       abGenerateBusy: ab.generateBusy,
-      adoptBusy: ab.adoptBusy,
-      onGenerateVariants: async (count: number) => {
+      onGenerateVariants: (count: number) => {
         if (projectId) {
-          const requestedTopic = content.topicInput.trim() || topic;
-          await syncContextBeforeGeneration();
-          ab.handleGenerateVariants(projectId, requestedTopic, count);
+          ab.handleGenerateVariants(projectId, topic, count);
         }
       },
+      adoptBusy: ab.adoptBusy,
       onAdoptVariant: (id: string) => {
         if (projectId) {
           ab.handleAdoptVariant(projectId, id);
         }
       },
-    },
-    review: {
-      studio: state.studio,
-    },
-    hashtags: {
-      editingHashtags: content.editingHashtags,
-      onEditingHashtagsChange: content.setEditingHashtags,
-      hashtagBusy: content.hashtagBusy,
-      onGenerateHashtags: content.handleGenerateHashtags,
     },
     publish: {
       exportBusy: publish.exportBusy,
@@ -189,84 +175,21 @@ export function PipelineShell() {
       settingsBusy: publish.settingsBusy,
       onSaveWordPressDefaults: publish.handleSaveWordPressDefaults,
     },
-  };
-  const contentPanelProps = {
-    content: {
+    review: {
       studio: state.studio,
-      activeChannel: content.activeChannel,
-      onChannelChange: content.setActiveChannel,
-      editingTitle: content.editingTitle,
-      onEditingTitleChange: content.setEditingTitle,
-      editingBody: content.editingBody,
-      onEditingBodyChange: content.setEditingBody,
-      editingCta: content.editingCta,
-      onEditingCtaChange: content.setEditingCta,
+    },
+    hashtags: {
       editingHashtags: content.editingHashtags,
       onEditingHashtagsChange: content.setEditingHashtags,
-      onUpdateSeo: content.updateSeoFromEditor,
-      seoCompliance: content.seoCompliance,
-      saveBusy: content.saveBusy,
-      onSave: () => {
-        if (projectId && state.studio) {
-          content.handleSave(projectId, state.studio);
-        }
-      },
-    },
-    variants: {
-      topic,
-      variantGroup: state.variantGroup,
-      generateBusy: ab.generateBusy,
-      adoptBusy: ab.adoptBusy,
-      onGenerateVariants: (count: number) => {
-        if (projectId) {
-          const requestedTopic = content.topicInput.trim() || topic;
-          void (async () => {
-            await syncContextBeforeGeneration();
-            ab.handleGenerateVariants(projectId, requestedTopic, count);
-          })();
-        }
-      },
-      onAdoptVariant: (id: string) => {
-        if (projectId) {
-          ab.handleAdoptVariant(projectId, id);
-        }
-      },
-    },
-    exportState: {
-      exportPreview: publish.exportPreview,
-      onExportPreviewViewChange: publish.handleExportPreviewViewChange,
-      onCopyExportPreview: publish.handleCopyExportPreview,
-      copyBusy: publish.copyBusy,
-      copyStatus: publish.copyStatus,
-    },
-  };
-  const imagePanelProps = {
-    image: {
-      projectId,
-      activeChannel: images.activeChannel,
-      onChannelChange: images.setActiveChannel,
-      currentStudio: images.currentStudio,
-      expectedVariantCount: expectedImageVariantCount,
-      generateBusy: images.generateBusy,
-      selectBusy: images.selectBusy,
-      onGenerateImages: images.handleGenerateImages,
-      onSelectImage: images.handleSelectImage,
-      hasContent,
+      hashtagBusy: content.hashtagBusy,
+      onGenerateHashtags: content.handleGenerateHashtags,
     },
   };
 
   return (
     <div className="app-shell">
-      {/* Header */}
-      <header className="pipeline-header">
-        <div className="pipeline-header-left">
-          <div className="rule" />
-          <span className="eyebrow">M-MASTER</span>
-          <h1 className="brand-title">콘텐츠 파이프라인</h1>
-        </div>
-      </header>
+      <AppHeader active="content" />
 
-      {/* Error */}
       {visibleError && (
         <div className="pipeline-error">
           <p className="error-text">{visibleError}</p>
@@ -274,23 +197,82 @@ export function PipelineShell() {
         </div>
       )}
 
-      {/* 3-column layout */}
       <div className="pipeline-grid">
-        {/* Left: Sidebar controls */}
-        <SidebarPanel {...sidebarProps} />
+        <SidebarPanel
+          project={sidebarProps.project}
+          context={sidebarProps.context}
+          generation={sidebarProps.generation}
+          abTesting={sidebarProps.abTesting}
+          review={sidebarProps.review}
+          hashtags={sidebarProps.hashtags}
+          publish={sidebarProps.publish}
+        />
 
-        {/* Center: Content preview */}
-        <div className="pipeline-main-column">
-          <ContentPanel {...contentPanelProps} />
-          <div className="pipeline-mobile-image-panel">
-            <ImagePanel {...imagePanelProps} />
-          </div>
-        </div>
+        <ContentPanel
+          content={{
+            studio: state.studio,
+            activeChannel: content.activeChannel,
+            onChannelChange: content.setActiveChannel,
+            editingTitle: content.editingTitle,
+            onEditingTitleChange: content.setEditingTitle,
+            editingBody: content.editingBody,
+            onEditingBodyChange: content.setEditingBody,
+            editingCta: content.editingCta,
+            onEditingCtaChange: content.setEditingCta,
+            editingHashtags: content.editingHashtags,
+            onEditingHashtagsChange: content.setEditingHashtags,
+            onUpdateSeo: content.updateSeoFromEditor,
+            seoCompliance: content.seoCompliance,
+            saveBusy: content.saveBusy,
+            onSave: () => {
+              if (projectId && state.studio) {
+                content.handleSave(projectId, state.studio);
+              }
+            },
+          }}
+          variants={{
+            topic,
+            variantGroup: state.variantGroup,
+            generateBusy: ab.generateBusy,
+            adoptBusy: ab.adoptBusy,
+            onGenerateVariants: (count) => {
+              if (projectId) {
+                ab.handleGenerateVariants(projectId, topic, count);
+              }
+            },
+            onAdoptVariant: (id) => {
+              if (projectId) {
+                ab.handleAdoptVariant(projectId, id);
+              }
+            },
+          }}
+          exportState={{
+            exportPreview: publish.exportPreview,
+            onExportPreviewViewChange: publish.handleExportPreviewViewChange,
+            onCopyExportPreview: publish.handleCopyExportPreview,
+            copyBusy: publish.copyBusy,
+            copyStatus: publish.copyStatus,
+          }}
+        />
 
-        {/* Right: Image preview */}
-        <div className="pipeline-desktop-image-panel">
-          <ImagePanel {...imagePanelProps} />
-        </div>
+        <ImagePanel
+          image={{
+            projectId,
+            activeChannel: images.activeChannel,
+            onChannelChange: images.setActiveChannel,
+            currentStudio: images.currentStudio,
+            expectedVariantCount: expectedImageVariantCount,
+            generateBusy: images.generateBusy,
+            selectBusy: images.selectBusy,
+            onGenerateImages: (id, channel) => {
+              images.handleGenerateImages(id, channel);
+            },
+            onSelectImage: (id, channel, imageAssetId) => {
+              images.handleSelectImage(id, channel, imageAssetId);
+            },
+            hasContent,
+          }}
+        />
       </div>
     </div>
   );
