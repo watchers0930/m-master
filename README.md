@@ -11,15 +11,12 @@ Context-aware marketing platform.
 
 ## Deployment workflow
 
-- `test` branch: all routine development goes here
-- `production` branch: production deployment branch, update only by explicit promotion
+- `production` branch: all routine development and deployment happen here
 
 ## GitHub Actions deployment
 
-- `test` is the integration branch only
-- `production` is the only deployment branch
-- production deploys target `m-master.vercel.app`
-- Vercel Git auto-deploy should stay disabled to avoid duplicate deployments when using the release script
+- pushes to `production` deploy to the Vercel production target and rebind `m-master.vercel.app`
+- Vercel Git auto-deploy should stay disabled to avoid duplicate deployments
 
 ### Required repository secret
 
@@ -27,8 +24,8 @@ Context-aware marketing platform.
 
 ## Vercel strategy
 
-- GitHub Actions and the shared release script are the deployment entry points
-- `test` is kept for promotion staging, not for a separate test account
+- GitHub Actions is the deployment entry point
+- local CLI direct deploys should be avoided except for emergency maintenance
 - `m-master.vercel.app` is the fixed production domain
 
 ## CMS routes
@@ -42,19 +39,17 @@ Context-aware marketing platform.
 
 ## Promotion checklist
 
-1. Work only on `test`
+1. Work only on `production`
 2. Run local verification: at minimum `npm run build`
-3. Push `test`
-4. Review the diff that will be promoted to `production`
-5. Merge `test -> production`
-6. Run `deploy marketing` to push, merge, and deploy production in one flow
-7. Verify `m-master.vercel.app`
+3. Push `production`
+4. Wait for the GitHub Actions production deploy
+5. Verify `m-master.vercel.app`
 
 ### If production promotion is not clean
 
 - Do not force-push `production`
-- If `test -> production` cannot merge cleanly, create a temporary alignment branch from the latest `origin/production`
-- Apply the tested `test` content onto that branch
+- If a direct `production` push is blocked by branch protection or branch divergence, create a temporary alignment branch from the latest `origin/production`
+- Apply the verified content onto that branch
 - Open a clean PR from the alignment branch into `production`
 - If the production deploy workflow does not auto-start after merge, run `deploy.yml` with `workflow_dispatch` on `production`
 
