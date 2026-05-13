@@ -564,6 +564,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   background: #ffffff;
 }
 
+.analytics-setting-input,
+.analytics-file-input {
+  background: #ffffff;
+}
+
 .analytics-setting-value {
   padding: 16px 18px;
   font-size: 16px;
@@ -586,6 +591,37 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   font-family: var(--font-mono);
   font-size: 14px;
   line-height: 1.7;
+}
+
+.analytics-file-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #d8e2f0;
+  border-radius: 16px;
+  color: #5a6984;
+}
+
+.analytics-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.analytics-empty-row {
+  text-align: center;
+  color: #8c98ac;
+}
+
+.analytics-chart-bars-dynamic {
+  position: relative;
+}
+
+.analytics-chart-empty {
+  position: absolute;
+  inset: 50% 0 auto;
+  transform: translateY(-50%);
+  text-align: center;
 }
 
 .analytics-help-box {
