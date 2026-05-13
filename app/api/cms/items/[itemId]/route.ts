@@ -1,4 +1,5 @@
 import { jsonError, jsonOk } from "../../../../../lib/api-response";
+import { revalidatePath } from "next/cache";
 import { logger } from "../../../../../server/logger";
 import {
   CmsItemNotFoundError,
@@ -25,6 +26,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       itemId,
       ...input,
     });
+    revalidatePath("/");
+    revalidatePath("/cms");
 
     return jsonOk({ sections });
   } catch (error) {
@@ -50,6 +53,8 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
   try {
     const sections = await removeCmsItem(itemId);
+    revalidatePath("/");
+    revalidatePath("/cms");
     return jsonOk({ sections });
   } catch (error) {
     if (error instanceof CmsItemNotFoundError) {

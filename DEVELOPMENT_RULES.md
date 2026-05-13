@@ -6,14 +6,14 @@
 
 - 모든 일상 개발은 반드시 `test` 브랜치에서 시작한다.
 - `production` 브랜치에는 직접 기능 개발을 하지 않는다.
-- `test` 푸시는 항상 테스트 배포 `tm-master.vercel.app`에서 먼저 검증한다.
+- `test`는 통합 브랜치로만 사용하고 별도 테스트 배포 계정은 두지 않는다.
 - 운영 반영은 반드시 `production` 브랜치 머지를 통해서만 진행한다.
 - `production` 반영은 명시적인 승인과 확인 없이 진행하지 않는다.
-- 로컬에서 `vercel --prod`로 직접 운영 배포하지 않는다.
+- 운영 배포는 공용 `deploy` 명령의 `push -> merge -> 운영배포` 흐름으로만 진행한다.
 
 ## 2. Pull Request
 
-- `production`으로 가는 변경은 반드시 PR로 올린다.
+- `production`으로 가는 변경은 가능하면 PR로 기록하되, 공용 릴리스 명령을 쓸 때는 로컬 머지 기록이 기준이 된다.
 - PR에는 변경 목적, 영향 범위, 테스트 결과를 반드시 적는다.
 - UI 변경 PR에는 화면 캡처 또는 테스트 도메인 링크를 남긴다.
 - 데이터 모델 변경 PR에는 마이그레이션 영향과 롤백 방법을 적는다.
@@ -24,7 +24,7 @@
 - 다른 프로젝트 DB와 테이블을 공유하거나 섞지 않는다.
 - 스키마 변경은 반드시 Prisma 스키마 기준으로 관리한다.
 - 운영 데이터에 직접 수작업 수정이 필요하면 먼저 백업 가능성과 영향 범위를 확인한다.
-- 대량 수정, 삭제, 구조 변경은 테스트 배포에서 먼저 검증한다.
+- 대량 수정, 삭제, 구조 변경은 로컬 또는 승인된 검증 절차에서 먼저 검증한다.
 
 ## 4. 비밀정보와 환경변수
 
@@ -73,7 +73,7 @@
 ## 8. 품질 검증
 
 - 새 기능은 최소한 로컬 실행 또는 빌드 검증 후 올린다.
-- 배포 전에는 `test` 도메인에서 실제 흐름을 한 번 끝까지 확인한다.
+- 배포 전에는 `test` 브랜치 diff와 운영 영향 범위를 확인한다.
 - 실패한 배포를 무시하고 다음 작업으로 넘어가지 않는다.
 - 에러 로그가 있으면 증상만 고치지 말고 원인을 확인한다.
 - 관측 가능하게 만든다. 로그, 에러, 상태를 확인할 수 있어야 한다.
@@ -99,7 +99,7 @@
 
 ## 11. 이 프로젝트 전용 고급 규칙
 
-- 운영은 `production`에서만 하고, 검증은 `test`에서만 한다.
+- 운영은 `production`에서만 하고, `test`는 승격 전 통합 브랜치로만 사용한다.
 - DB 스키마 변경은 리뷰 없이 금지한다.
 - AI 결과물은 검수 레이어 없이 바로 발행하지 않는다.
 - 브랜드 컨텍스트 추출 결과는 사용자 승인 전 확정하지 않는다.
@@ -122,20 +122,20 @@
 1. `test`에서 작업한다.
 2. 로컬 검증을 한다.
 3. `test`에 푸시한다.
-4. `tm-master.vercel.app`에서 확인한다.
-5. PR로 `production` 승격을 요청한다.
-6. 승인 후 `production` 머지로 운영 반영한다.
+4. `test -> production` 머지를 준비한다.
+5. 승인 후 `test`를 `production`에 머지한다.
+6. `deploy marketing`으로 운영 배포한다.
 
 ## 14. 승격 체크리스트
 
 1. `test` 브랜치 HEAD가 배포 대상 최신 커밋인지 확인한다.
 2. `git status`가 의도한 변경만 포함하는지 확인한다.
 3. `npm run build`를 통과시킨다.
-4. `origin/test` 푸시 후 GitHub Actions preview 배포 성공을 확인한다.
-5. `tm-master.vercel.app`에서 실제 사용자 흐름을 확인한다.
-6. `test -> production` PR을 생성한다.
-7. 저장소 정책에 맞는 방식으로 머지한다.
-8. production deploy workflow 성공을 확인한다.
+4. `origin/test` 푸시 후 승격 대상 diff를 다시 확인한다.
+5. `test -> production` 머지를 진행한다.
+6. 저장소 정책상 필요하면 PR을 남기고, 아니면 로컬 머지 후 push 한다.
+7. `deploy marketing` 명령으로 `test push -> production merge/push -> 운영배포`를 실행한다.
+8. production deploy workflow 또는 CLI 배포 성공을 확인한다.
 9. `m-master.vercel.app` 응답과 주요 화면을 확인한다.
 
 ## 15. 승격 예외 처리
@@ -143,4 +143,4 @@
 - `production` 직접 push나 force push는 하지 않는다.
 - `test -> production` PR이 충돌나면, 최신 `origin/production` 기준 임시 정렬 브랜치를 만든다.
 - 임시 정렬 브랜치에 검증된 `test` 내용을 반영한 뒤 `production`으로 새 PR을 만든다.
-- PR 머지 후 production deploy가 자동으로 뜨지 않으면 `deploy.yml`을 `production` 기준으로 수동 실행한다.
+- PR 머지 후 운영 배포가 자동으로 뜨지 않으면 `deploy marketing` 또는 `deploy.yml`을 `production` 기준으로 실행한다.

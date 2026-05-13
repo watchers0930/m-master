@@ -1,4 +1,5 @@
 import type { CmsSectionDto } from "@/types/cms";
+import { PublicSiteHeader } from "@/features/site/public-site-header";
 
 function getSectionEyebrow(key: string) {
   if (key === "platform-development") {
@@ -11,6 +12,8 @@ function getSectionEyebrow(key: string) {
 export function CmsShowcasePage({ sections }: { sections: CmsSectionDto[] }) {
   return (
     <main className="showcase-shell">
+      <PublicSiteHeader active="content" />
+
       <section className="showcase-hero">
         <div className="showcase-hero-copy">
           <p className="showcase-kicker">CMS Managed Showcase</p>

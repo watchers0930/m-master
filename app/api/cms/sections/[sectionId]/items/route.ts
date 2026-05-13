@@ -1,4 +1,5 @@
 import { jsonError, jsonOk } from "../../../../../../lib/api-response";
+import { revalidatePath } from "next/cache";
 import { logger } from "../../../../../../server/logger";
 import {
   addCmsItem,
@@ -24,6 +25,8 @@ export async function POST(request: Request, context: RouteContext) {
       sectionId,
       ...input,
     });
+    revalidatePath("/");
+    revalidatePath("/cms");
 
     return jsonOk({ sections }, { status: 201 });
   } catch (error) {
