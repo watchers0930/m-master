@@ -11,7 +11,9 @@ Context-aware marketing platform.
 
 ## Deployment workflow
 
-- `production` branch: all routine development and deployment happen here
+- `production` is the only release branch
+- routine changes should start from the latest `origin/production` in a short-lived working branch
+- deployment happens only after that branch is merged back into `production`
 
 ## GitHub Actions deployment
 
@@ -39,18 +41,20 @@ Context-aware marketing platform.
 
 ## Promotion checklist
 
-1. Work only on `production`
-2. Run local verification: at minimum `npm run build`
-3. Push `production`
-4. Wait for the GitHub Actions production deploy
-5. Verify `m-master.vercel.app`
+1. Create a short-lived branch from the latest `origin/production`
+2. Keep the change scoped to one purpose
+3. Run local verification: at minimum `npm run build`
+4. Open a PR into `production` immediately after verification
+5. Merge the PR to trigger the GitHub Actions production deploy
+6. Verify `m-master.vercel.app`
 
 ### If production promotion is not clean
 
 - Do not force-push `production`
-- If a direct `production` push is blocked by branch protection or branch divergence, create a temporary alignment branch from the latest `origin/production`
-- Apply the verified content onto that branch
-- Open a clean PR from the alignment branch into `production`
+- Do not keep long-lived working branches
+- If the branch drifts from `origin/production`, recreate a fresh branch from the latest `origin/production`
+- Cherry-pick or re-apply only the verified commits
+- Open a clean PR into `production`
 - If the production deploy workflow does not auto-start after merge, run `deploy.yml` with `workflow_dispatch` on `production`
 
 ## Database

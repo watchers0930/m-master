@@ -1,3 +1,5 @@
+import { createSign } from "node:crypto";
+
 export interface Ga4OverviewResponse {
   propertyId: string | null;
   rangeDays: number;
@@ -28,6 +30,11 @@ export interface Ga4OverviewResponse {
   topChannels: Array<{
     label: string;
     count: number;
+  }>;
+  topSources: Array<{
+    source: string;
+    medium: string;
+    sessions: number;
   }>;
   topRegions: Array<{
     label: string;
@@ -65,37 +72,102 @@ interface Ga4RunReportResponse {
   rows?: Ga4ReportRow[];
 }
 
-interface Ga4OAuthConfig {
+export interface Ga4ServiceAccountInput {
   propertyId: string;
-  clientId: string;
-  clientSecret: string;
-  refreshToken: string;
+  clientEmail: string;
+  privateKey: string;
+  projectId?: string | null;
+}
+
+export interface Ga4ServiceAccountJson {
+  type?: string;
+  project_id?: string;
+  client_email?: string;
+  private_key?: string;
 }
 
 const GA4_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GA4_DATA_API_BASE = "https://analyticsdata.googleapis.com/v1beta";
+const GA4_SCOPE = "https://www.googleapis.com/auth/analytics.readonly";
 
-function getGa4Config(): Ga4OAuthConfig {
-  const propertyId = process.env.GA4_PROPERTY_ID?.trim();
-  const clientId = process.env.GA4_OAUTH_CLIENT_ID?.trim();
-  const clientSecret = process.env.GA4_OAUTH_CLIENT_SECRET?.trim();
-  const refreshToken = process.env.GA4_OAUTH_REFRESH_TOKEN?.trim();
-
-  if (!propertyId || !clientId || !clientSecret || !refreshToken) {
-    throw new Error(
-      "GA4 OAuth 환경변수(GA4_PROPERTY_ID, GA4_OAUTH_CLIENT_ID, GA4_OAUTH_CLIENT_SECRET, GA4_OAUTH_REFRESH_TOKEN)가 설정되지 않았습니다.",
-    );
-  }
-
-  return { propertyId, clientId, clientSecret, refreshToken };
+function normalizePrivateKey(value: string): string {
+  return value.replace(/\\n/g, "\n").trim();
 }
 
-async function getGa4AccessToken(config: Ga4OAuthConfig): Promise<string> {
+function getGa4EnvConfig(): Ga4ServiceAccountInput | null {
+  const propertyId = process.env.GA4_PROPERTY_ID?.trim();
+  const clientEmail = process.env.GA4_SERVICE_ACCOUNT_CLIENT_EMAIL?.trim();
+  const privateKey = process.env.GA4_SERVICE_ACCOUNT_PRIVATE_KEY?.trim();
+  const projectId = process.env.GA4_SERVICE_ACCOUNT_PROJECT_ID?.trim() || null;
+
+  if (!propertyId || !clientEmail || !privateKey) {
+    return null;
+  }
+
+  return {
+    propertyId,
+    clientEmail,
+    privateKey: normalizePrivateKey(privateKey),
+    projectId,
+  };
+}
+
+export function isGa4Configured(): boolean {
+  return Boolean(getGa4EnvConfig());
+}
+
+export function parseGa4ServiceAccountJson(input: string | Ga4ServiceAccountJson): Ga4ServiceAccountInput {
+  const parsed = typeof input === "string" ? (JSON.parse(input) as Ga4ServiceAccountJson) : input;
+  const propertyId = "";
+  const clientEmail = parsed.client_email?.trim();
+  const privateKey = parsed.private_key?.trim();
+  const projectId = parsed.project_id?.trim() || null;
+
+  if (parsed.type && parsed.type !== "service_account") {
+    throw new Error("GA4 서비스 계정 JSON만 업로드할 수 있습니다.");
+  }
+
+  if (!clientEmail || !privateKey) {
+    throw new Error("서비스 계정 JSON에 client_email 또는 private_key가 없습니다.");
+  }
+
+  return {
+    propertyId,
+    clientEmail,
+    privateKey: normalizePrivateKey(privateKey),
+    projectId,
+  };
+}
+
+function base64UrlEncode(value: string): string {
+  return Buffer.from(value).toString("base64url");
+}
+
+function buildServiceAccountJwt(config: Ga4ServiceAccountInput): string {
+  const now = Math.floor(Date.now() / 1000);
+  const header = base64UrlEncode(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const payload = base64UrlEncode(
+    JSON.stringify({
+      iss: config.clientEmail,
+      scope: GA4_SCOPE,
+      aud: GA4_TOKEN_URL,
+      exp: now + 3600,
+      iat: now,
+    }),
+  );
+
+  const signer = createSign("RSA-SHA256");
+  signer.update(`${header}.${payload}`);
+  signer.end();
+
+  const signature = signer.sign(config.privateKey, "base64url");
+  return `${header}.${payload}.${signature}`;
+}
+
+async function getGa4AccessToken(config: Ga4ServiceAccountInput): Promise<string> {
   const body = new URLSearchParams({
-    client_id: config.clientId,
-    client_secret: config.clientSecret,
-    refresh_token: config.refreshToken,
-    grant_type: "refresh_token",
+    grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+    assertion: buildServiceAccountJwt(config),
   });
 
   const response = await fetch(GA4_TOKEN_URL, {
@@ -107,12 +179,12 @@ async function getGa4AccessToken(config: Ga4OAuthConfig): Promise<string> {
 
   if (!response.ok) {
     const detail = await response.text().catch(() => "");
-    throw new Error(`GA4 OAuth 토큰 갱신 실패 (${response.status}) ${detail.slice(0, 300)}`);
+    throw new Error(`GA4 서비스 계정 토큰 발급 실패 (${response.status}) ${detail.slice(0, 300)}`);
   }
 
   const json = (await response.json()) as { access_token?: string };
   if (!json.access_token) {
-    throw new Error("GA4 OAuth 응답에 access_token이 없습니다.");
+    throw new Error("GA4 토큰 응답에 access_token이 없습니다.");
   }
 
   return json.access_token;
@@ -171,84 +243,105 @@ function buildDateRange(rangeDays: number) {
   return { startDate: toIsoDate(startDate), endDate: toIsoDate(endDate) };
 }
 
-export function isGa4Configured(): boolean {
-  return Boolean(
-    process.env.GA4_PROPERTY_ID?.trim() &&
-      process.env.GA4_OAUTH_CLIENT_ID?.trim() &&
-      process.env.GA4_OAUTH_CLIENT_SECRET?.trim() &&
-      process.env.GA4_OAUTH_REFRESH_TOKEN?.trim(),
-  );
-}
+export async function fetchGa4Overview(
+  rangeDays: number,
+  providedConfig?: Ga4ServiceAccountInput,
+): Promise<Ga4OverviewResponse> {
+  const baseConfig = providedConfig ?? getGa4EnvConfig();
+  if (!baseConfig) {
+    throw new Error(
+      "GA4 서비스 계정 설정이 없습니다. Property ID와 서비스 계정 JSON을 업로드하거나 서버 환경변수를 확인하세요.",
+    );
+  }
 
-export async function fetchGa4Overview(rangeDays: number): Promise<Ga4OverviewResponse> {
-  const config = getGa4Config();
+  const config = {
+    ...baseConfig,
+    privateKey: normalizePrivateKey(baseConfig.privateKey),
+  };
+
   const accessToken = await getGa4AccessToken(config);
   const dateRange = buildDateRange(rangeDays);
 
-  const [summaryReport, trendReport, pagesReport, channelsReport, regionsReport, citiesReport, devicesReport, browsersReport] =
-    await Promise.all([
-      runReport(accessToken, config.propertyId, {
-        dateRanges: [dateRange],
-        metrics: [
-          { name: "totalUsers" },
-          { name: "newUsers" },
-          { name: "sessions" },
-          { name: "engagedSessions" },
-          { name: "screenPageViews" },
-          { name: "averageSessionDuration" },
-          { name: "bounceRate" },
-        ],
-      }),
-      runReport(accessToken, config.propertyId, {
-        dateRanges: [dateRange],
-        dimensions: [{ name: "date" }],
-        metrics: [{ name: "screenPageViews" }, { name: "totalUsers" }, { name: "sessions" }],
-        orderBys: [{ dimension: { dimensionName: "date" } }],
-        limit: 400,
-      }),
-      runReport(accessToken, config.propertyId, {
-        dateRanges: [dateRange],
-        dimensions: [{ name: "pagePath" }, { name: "pageTitle" }],
-        metrics: [{ name: "screenPageViews" }, { name: "totalUsers" }],
-        orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
-        limit: 12,
-      }),
-      runReport(accessToken, config.propertyId, {
-        dateRanges: [dateRange],
-        dimensions: [{ name: "sessionDefaultChannelGroup" }],
-        metrics: [{ name: "sessions" }],
-        orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-        limit: 10,
-      }),
-      runReport(accessToken, config.propertyId, {
-        dateRanges: [dateRange],
-        dimensions: [{ name: "country" }, { name: "region" }],
-        metrics: [{ name: "sessions" }],
-        orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-        limit: 10,
-      }),
-      runReport(accessToken, config.propertyId, {
-        dateRanges: [dateRange],
-        dimensions: [{ name: "region" }, { name: "city" }],
-        metrics: [{ name: "sessions" }],
-        orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-        limit: 10,
-      }),
-      runReport(accessToken, config.propertyId, {
-        dateRanges: [dateRange],
-        dimensions: [{ name: "deviceCategory" }],
-        metrics: [{ name: "sessions" }],
-        orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-        limit: 10,
-      }),
-      runReport(accessToken, config.propertyId, {
-        dateRanges: [dateRange],
-        dimensions: [{ name: "browser" }],
-        metrics: [{ name: "sessions" }],
-        orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-        limit: 10,
-      }),
-    ]);
+  const [
+    summaryReport,
+    trendReport,
+    pagesReport,
+    channelsReport,
+    sourcesReport,
+    regionsReport,
+    citiesReport,
+    devicesReport,
+    browsersReport,
+  ] = await Promise.all([
+    runReport(accessToken, config.propertyId, {
+      dateRanges: [dateRange],
+      metrics: [
+        { name: "totalUsers" },
+        { name: "newUsers" },
+        { name: "sessions" },
+        { name: "engagedSessions" },
+        { name: "screenPageViews" },
+        { name: "averageSessionDuration" },
+        { name: "bounceRate" },
+      ],
+    }),
+    runReport(accessToken, config.propertyId, {
+      dateRanges: [dateRange],
+      dimensions: [{ name: "date" }],
+      metrics: [{ name: "screenPageViews" }, { name: "totalUsers" }, { name: "sessions" }],
+      orderBys: [{ dimension: { dimensionName: "date" } }],
+      limit: 400,
+    }),
+    runReport(accessToken, config.propertyId, {
+      dateRanges: [dateRange],
+      dimensions: [{ name: "pagePath" }, { name: "pageTitle" }],
+      metrics: [{ name: "screenPageViews" }, { name: "totalUsers" }],
+      orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
+      limit: 20,
+    }),
+    runReport(accessToken, config.propertyId, {
+      dateRanges: [dateRange],
+      dimensions: [{ name: "sessionDefaultChannelGroup" }],
+      metrics: [{ name: "sessions" }],
+      orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+      limit: 10,
+    }),
+    runReport(accessToken, config.propertyId, {
+      dateRanges: [dateRange],
+      dimensions: [{ name: "sessionSource" }, { name: "sessionMedium" }],
+      metrics: [{ name: "sessions" }],
+      orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+      limit: 12,
+    }),
+    runReport(accessToken, config.propertyId, {
+      dateRanges: [dateRange],
+      dimensions: [{ name: "country" }, { name: "region" }],
+      metrics: [{ name: "sessions" }],
+      orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+      limit: 10,
+    }),
+    runReport(accessToken, config.propertyId, {
+      dateRanges: [dateRange],
+      dimensions: [{ name: "region" }, { name: "city" }],
+      metrics: [{ name: "sessions" }],
+      orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+      limit: 10,
+    }),
+    runReport(accessToken, config.propertyId, {
+      dateRanges: [dateRange],
+      dimensions: [{ name: "deviceCategory" }],
+      metrics: [{ name: "sessions" }],
+      orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+      limit: 10,
+    }),
+    runReport(accessToken, config.propertyId, {
+      dateRanges: [dateRange],
+      dimensions: [{ name: "browser" }],
+      metrics: [{ name: "sessions" }],
+      orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+      limit: 10,
+    }),
+  ]);
 
   const summaryRow = summaryReport.rows?.[0];
   const totalUsers = metricNumber(summaryRow, 0);
@@ -290,6 +383,11 @@ export async function fetchGa4Overview(rangeDays: number): Promise<Ga4OverviewRe
       label: dimensionText(row, 0) || "Unassigned",
       count: metricNumber(row, 0),
     })),
+    topSources: (sourcesReport.rows || []).map((row) => ({
+      source: dimensionText(row, 0) || "(direct)",
+      medium: dimensionText(row, 1) || "(none)",
+      sessions: metricNumber(row, 0),
+    })),
     topRegions: (regionsReport.rows || []).map((row) => ({
       label: [dimensionText(row, 0), dimensionText(row, 1)].filter(Boolean).join(" / ") || "미상",
       count: metricNumber(row, 0),
@@ -307,8 +405,9 @@ export async function fetchGa4Overview(rangeDays: number): Promise<Ga4OverviewRe
       count: metricNumber(row, 0),
     })),
     notes: [
-      "이 화면은 Google Analytics 4 Data API 집계값을 OAuth 사용자 토큰으로 조회합니다.",
-      "GA4 권한, OAuth 동의, refresh token 상태가 잘못되면 API에서 오류가 반환됩니다.",
+      "이 화면은 Google Analytics 4 Data API 집계값을 서비스 계정 JSON으로 조회합니다.",
+      "업로드된 JSON은 서버에 저장하지 않고 요청 시점에만 사용합니다.",
+      "서비스 계정 이메일을 해당 GA4 속성 사용자로 추가해야 조회됩니다.",
     ],
   };
 }
