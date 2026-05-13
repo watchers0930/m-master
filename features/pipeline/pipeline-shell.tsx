@@ -41,7 +41,9 @@ export function PipelineShell() {
   const publish = usePublishWorkflow({
     projectId: state.activeProject?.project?.id,
     onError: state.setError,
-    reloadProject: state.loadProject,
+    reloadProject: async (projectId: string) => {
+      await state.reloadProject(projectId);
+    },
   });
 
   const images = useImageStudio({

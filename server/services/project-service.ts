@@ -9,8 +9,7 @@ import {
   deleteProjectById,
   adoptVariant,
   getLatestVariantGroup,
-  getProjectOverview,
-  getProjectStudio,
+  getProjectDetail,
   getVariantGroup,
   listProjectBrandProfiles,
   listProjectContentJobs,
@@ -85,15 +84,11 @@ function isLegacyContentShape(params: {
   );
 }
 
-function requireApprovedBrandProfile<
-  T extends
-    | Awaited<ReturnType<typeof getProjectOverview>>
-    | Awaited<ReturnType<typeof getProjectStudio>>,
->(
-  record: T,
+function requireApprovedBrandProfile(
+  record: Awaited<ReturnType<typeof getProjectDetail>>,
   projectId: string,
-): NonNullable<T> & {
-  brandProfile: NonNullable<NonNullable<T>["brandProfile"]>;
+): NonNullable<Awaited<ReturnType<typeof getProjectDetail>>> & {
+  brandProfile: NonNullable<NonNullable<Awaited<ReturnType<typeof getProjectDetail>>>["brandProfile"]>;
 } {
   if (!record || !record.brandProfile) {
     throw new ProjectNotFoundError(projectId);
@@ -103,8 +98,8 @@ function requireApprovedBrandProfile<
     throw new ProjectContextApprovalRequiredError(projectId);
   }
 
-  return record as NonNullable<T> & {
-    brandProfile: NonNullable<NonNullable<T>["brandProfile"]>;
+  return record as NonNullable<Awaited<ReturnType<typeof getProjectDetail>>> & {
+    brandProfile: NonNullable<NonNullable<Awaited<ReturnType<typeof getProjectDetail>>>["brandProfile"]>;
   };
 }
 
@@ -134,7 +129,7 @@ function serializeProjectListItem(item: Awaited<ReturnType<typeof listProjects>>
   };
 }
 
-function serializeProjectDetail(record: NonNullable<Awaited<ReturnType<typeof getProjectOverview>>>) {
+function serializeProjectDetail(record: NonNullable<Awaited<ReturnType<typeof getProjectDetail>>>) {
   return {
     project: {
       id: record.project.id,
@@ -186,6 +181,36 @@ function serializeProjectDetail(record: NonNullable<Awaited<ReturnType<typeof ge
           publishedAt: record.latestContentJob.publishedAt?.toISOString() ?? null,
           createdAt: record.latestContentJob.createdAt,
           updatedAt: record.latestContentJob.updatedAt,
+          assets: record.latestContentJob.assets.map((asset) => ({
+            id: asset.id,
+            channel: asset.channel,
+            title: asset.title,
+            body: asset.body,
+            cta: asset.cta,
+            version: asset.version,
+            createdAt: asset.createdAt,
+            updatedAt: asset.updatedAt,
+            imageJobs: asset.imageJobs.map((job) => ({
+              id: job.id,
+              channelPreset: job.channelPreset,
+              prompt: job.prompt,
+              status: job.status,
+              createdAt: job.createdAt,
+              updatedAt: job.updatedAt,
+              imageAssets: job.imageAssets.map((imageAsset) => ({
+                id: imageAsset.id,
+                role: imageAsset.role,
+                originalPath: imageAsset.originalPath,
+                composedPath: imageAsset.composedPath,
+                width: imageAsset.width,
+                height: imageAsset.height,
+                selected: imageAsset.selected,
+                version: imageAsset.version,
+                createdAt: imageAsset.createdAt,
+                updatedAt: imageAsset.updatedAt,
+              })),
+            })),
+          })),
         }
       : null,
   };
@@ -235,7 +260,7 @@ export async function getProjectList() {
 }
 
 export async function deleteProject(projectId: string) {
-  const record = await getProjectOverview(projectId);
+  const record = await getProjectDetail(projectId);
 
   if (!record) {
     throw new ProjectNotFoundError(projectId);
@@ -254,7 +279,7 @@ export async function saveProjectSettings(params: {
   wordpressCategoryNames?: string;
   wordpressTagNames?: string;
 }) {
-  const record = await getProjectOverview(params.projectId);
+  const record = await getProjectDetail(params.projectId);
 
   if (!record) {
     throw new ProjectNotFoundError(params.projectId);
@@ -274,7 +299,7 @@ export async function saveProjectSettings(params: {
 }
 
 export async function getProjectById(projectId: string) {
-  const record = await getProjectOverview(projectId);
+  const record = await getProjectDetail(projectId);
 
   if (!record) {
     logger.error("project.get.not_found", { projectId });
@@ -285,7 +310,7 @@ export async function getProjectById(projectId: string) {
 }
 
 export async function getProjectStudioSeed(projectId: string) {
-  const record = await getProjectStudio(projectId);
+  const record = await getProjectDetail(projectId);
 
   if (!record || !record.brandProfile) {
     logger.error("project.studio.not_found", { projectId });
@@ -444,7 +469,7 @@ export async function saveProjectContextDraft(params: {
   cta?: string;
   bannedTerms?: string;
 }) {
-  const record = await getProjectOverview(params.projectId);
+  const record = await getProjectDetail(params.projectId);
 
   if (!record) {
     throw new ProjectNotFoundError(params.projectId);
@@ -455,7 +480,7 @@ export async function saveProjectContextDraft(params: {
 }
 
 export async function regenerateProjectContextDraft(projectId: string) {
-  const record = await getProjectOverview(projectId);
+  const record = await getProjectDetail(projectId);
 
   if (!record) {
     throw new ProjectNotFoundError(projectId);
@@ -503,7 +528,7 @@ export async function generateProjectContent(params: {
   objective?: string;
   derivationMode?: "blog-first";
 }) {
-  const record = requireApprovedBrandProfile(await getProjectOverview(params.projectId), params.projectId);
+  const record = requireApprovedBrandProfile(await getProjectDetail(params.projectId), params.projectId);
 
   const selectedTopic =
     (params.topicId
@@ -583,7 +608,7 @@ export async function saveProjectContentDraft(params: {
     hashtags?: string;
   }>;
 }) {
-  const record = requireApprovedBrandProfile(await getProjectOverview(params.projectId), params.projectId);
+  const record = requireApprovedBrandProfile(await getProjectDetail(params.projectId), params.projectId);
 
   const normalizedTopic = normalizeTopicTitle(params.topic, record.project.name);
 
@@ -598,7 +623,7 @@ export async function saveProjectContentDraft(params: {
 }
 
 export async function getProjectActivity(projectId: string) {
-  const record = await getProjectOverview(projectId);
+  const record = await getProjectDetail(projectId);
 
   if (!record) {
     throw new ProjectNotFoundError(projectId);
@@ -637,7 +662,7 @@ export async function getProjectActivity(projectId: string) {
 }
 
 export async function exportProjectContent(projectId: string) {
-  requireApprovedBrandProfile(await getProjectOverview(projectId), projectId);
+  requireApprovedBrandProfile(await getProjectDetail(projectId), projectId);
   const studio = await getProjectStudioSeed(projectId);
 
   if (!studio.draft.assets.length) {
@@ -688,7 +713,7 @@ export async function markProjectReadyForPublish(
     };
   },
 ) {
-  const record = requireApprovedBrandProfile(await getProjectStudio(projectId), projectId);
+  const record = requireApprovedBrandProfile(await getProjectDetail(projectId), projectId);
   const latestContentJob = record.latestContentJob;
 
   if (!latestContentJob) {
@@ -775,7 +800,7 @@ export async function generateProjectImages(params: {
   channel: "blog" | "instagram" | "facebook";
   prompt?: string;
 }) {
-  const record = requireApprovedBrandProfile(await getProjectStudio(params.projectId), params.projectId);
+  const record = requireApprovedBrandProfile(await getProjectDetail(params.projectId), params.projectId);
 
   if (!record.latestContentJob) {
     throw new ProjectNotFoundError(params.projectId);
@@ -859,7 +884,7 @@ export async function selectProjectImage(params: {
   channel: "blog" | "instagram" | "facebook";
   imageAssetId: string;
 }) {
-  const record = requireApprovedBrandProfile(await getProjectStudio(params.projectId), params.projectId);
+  const record = requireApprovedBrandProfile(await getProjectDetail(params.projectId), params.projectId);
 
   if (!record.latestContentJob) {
     throw new ProjectNotFoundError(params.projectId);
@@ -888,7 +913,7 @@ export async function generateProjectContentVariants(
   topic?: string,
   count?: number,
 ) {
-  const record = requireApprovedBrandProfile(await getProjectOverview(projectId), projectId);
+  const record = requireApprovedBrandProfile(await getProjectDetail(projectId), projectId);
 
   const selectedTopic = topic || record.topics[0]?.title;
 
@@ -940,7 +965,7 @@ export async function generateProjectContentVariants(
 }
 
 export async function getProjectVariantGroup(projectId: string) {
-  const record = await getProjectOverview(projectId);
+  const record = await getProjectDetail(projectId);
 
   if (!record) {
     throw new ProjectNotFoundError(projectId);
@@ -951,7 +976,7 @@ export async function getProjectVariantGroup(projectId: string) {
 }
 
 export async function adoptProjectVariant(projectId: string, contentJobId: string) {
-  const record = await getProjectOverview(projectId);
+  const record = await getProjectDetail(projectId);
 
   if (!record) {
     throw new ProjectNotFoundError(projectId);
