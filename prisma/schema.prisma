@@ -27,6 +27,45 @@ model Project {
   contentJobs            ContentJob[]
 }
 
+model CmsSection {
+  id          String    @id @default(cuid())
+  key         String    @unique
+  title       String
+  description String?   @db.Text
+  visible     Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  items       CmsItem[]
+
+  @@index([visible, sortOrder])
+}
+
+model CmsItem {
+  id          String     @id @default(cuid())
+  sectionId   String
+  slug        String
+  title       String
+  subtitle    String?
+  clientName  String?
+  periodLabel String?
+  summary     String     @db.Text
+  body        String?    @db.Text
+  tags        String?    @db.Text
+  imageUrl    String?
+  linkUrl     String?
+  status      String     @default("published")
+  featured    Boolean    @default(false)
+  visible     Boolean    @default(true)
+  sortOrder   Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  section     CmsSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([sectionId, slug])
+  @@index([sectionId, visible, sortOrder])
+}
+
 model BrandProfile {
   id           String   @id @default(cuid())
   projectId    String
