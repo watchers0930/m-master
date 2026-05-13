@@ -4,15 +4,35 @@ import { useEffect, useState } from "react";
 
 import type { Ga4OverviewResponse } from "@/lib/ga4";
 
+type Ga4HealthResponse = {
+  generatedAt: string;
+  rangeDays: number;
+  globalIssue?: string;
+  sources: Array<{
+    source: string;
+    sourceLabel: string;
+    propertyId: string | null;
+    configured: boolean;
+    status: "healthy" | "no-data" | "error" | "not-configured";
+    checkedAt: string;
+    issues: string[];
+    overview?: {
+      totalUsers: number;
+      sessions: number;
+      views: number;
+    };
+  }>;
+};
+
 const RANGE_OPTIONS = [
   { value: 7, label: "7일" },
   { value: 30, label: "30일" },
   { value: 90, label: "90일" },
 ];
 
-const SOURCE_OPTIONS = [
-  { value: "m-master", label: "m-master" },
-  { value: "vestra", label: "vestra" },
+const DEFAULT_SOURCE_OPTIONS = [
+  { value: "m-master", label: "m-master", configured: true },
+  { value: "vestra", label: "vestra", configured: true },
 ] as const;
 
 type ApiOk<T> = {
@@ -60,11 +80,74 @@ function RankingCard(props: { title: string; rows: Array<{ label: string; count:
 
 export function AnalyticsDashboard() {
   const [days, setDays] = useState(30);
-  const [source, setSource] = useState<(typeof SOURCE_OPTIONS)[number]["value"]>("m-master");
+  const [source, setSource] = useState<string>("m-master");
+  const [sourceOptions, setSourceOptions] = useState<Array<{ value: string; label: string; configured: boolean }>>(
+    [...DEFAULT_SOURCE_OPTIONS],
+  );
   const [data, setData] = useState<Ga4OverviewResponse | null>(null);
+  const [health, setHealth] = useState<Ga4HealthResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [healthLoading, setHealthLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadHealth() {
+      if (!cancelled) {
+        setHealthLoading(true);
+      }
+
+      try {
+        const response = await fetch("/api/analytics/health?days=7", { cache: "no-store" });
+        const payload = (await response.json()) as ApiResponse<Ga4HealthResponse>;
+
+        if (!payload.ok) {
+          throw new Error(payload.error.message);
+        }
+
+        if (!cancelled) {
+          setHealth(payload.data);
+          const nextOptions = payload.data.sources.map((item) => ({
+            value: item.source,
+            label: item.sourceLabel,
+            configured: item.configured,
+          }));
+
+          if (nextOptions.length > 0) {
+            setSourceOptions(nextOptions);
+            const active = nextOptions.find((item) => item.value === source && item.configured);
+            if (!active) {
+              const fallback = nextOptions.find((item) => item.configured) || nextOptions[0];
+              if (fallback) {
+                setSource(fallback.value);
+              }
+            }
+          }
+        }
+      } catch (loadError) {
+        if (!cancelled) {
+          setHealth({
+            generatedAt: new Date().toISOString(),
+            rangeDays: 7,
+            globalIssue: loadError instanceof Error ? loadError.message : "GA4 상태를 불러오지 못했습니다.",
+            sources: [],
+          });
+        }
+      } finally {
+        if (!cancelled) {
+          setHealthLoading(false);
+        }
+      }
+    }
+
+    void loadHealth();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshing, source]);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,6 +194,7 @@ export function AnalyticsDashboard() {
   }, [days, refreshing, source]);
 
   const maxSessions = Math.max(...(data?.trend.map((item) => item.sessions) ?? [1]), 1);
+  const activeHealth = health?.sources.find((item) => item.source === source) ?? null;
 
   return (
     <section className="analytics-section analytics-dashboard-shell">
@@ -122,11 +206,12 @@ export function AnalyticsDashboard() {
         </div>
         <div className="analytics-toolbar-actions">
           <div className="analytics-source-toggle" role="tablist" aria-label="GA4 source">
-            {SOURCE_OPTIONS.map((option) => (
+            {sourceOptions.map((option) => (
               <button
                 className={source === option.value ? "analytics-filter-button active" : "analytics-filter-button"}
                 key={option.value}
                 onClick={() => setSource(option.value)}
+                disabled={!option.configured}
                 type="button"
               >
                 {option.label}
@@ -155,9 +240,44 @@ export function AnalyticsDashboard() {
 
       {loading ? <p className="analytics-loading-copy">GA4 통계를 불러오는 중입니다.</p> : null}
       {error ? <p className="analytics-error-copy">{error}</p> : null}
+      {health?.globalIssue ? <p className="analytics-error-copy">{health.globalIssue}</p> : null}
+
+      <div className="analytics-health-grid">
+        {healthLoading ? (
+          <p className="analytics-loading-copy">GA4 소스 상태를 점검하는 중입니다.</p>
+        ) : (
+          health?.sources.map((item) => (
+            <article className={`analytics-health-card status-${item.status}`} key={item.source}>
+              <div className="analytics-health-head">
+                <strong>{item.sourceLabel}</strong>
+                <span>{item.status === "healthy" ? "정상" : item.status === "no-data" ? "무데이터" : item.status === "error" ? "오류" : "미설정"}</span>
+              </div>
+              <p>GA4 Property ID: {item.propertyId || "미설정"}</p>
+              {item.overview ? (
+                <div className="analytics-health-metrics">
+                  <span>사용자 {item.overview.totalUsers.toLocaleString()}</span>
+                  <span>세션 {item.overview.sessions.toLocaleString()}</span>
+                  <span>뷰 {item.overview.views.toLocaleString()}</span>
+                </div>
+              ) : null}
+              {item.issues.map((issue) => (
+                <p className="analytics-health-issue" key={issue}>{issue}</p>
+              ))}
+            </article>
+          ))
+        )}
+      </div>
 
       {!loading && !error && data ? (
         <>
+          {activeHealth?.issues.length ? (
+            <div className="analytics-warning-card">
+              <strong>{activeHealth.sourceLabel} 점검 필요</strong>
+              {activeHealth.issues.map((issue) => (
+                <p key={issue}>{issue}</p>
+              ))}
+            </div>
+          ) : null}
           <div className="analytics-dashboard-grid">
             <StatCard
               label="총 사용자"

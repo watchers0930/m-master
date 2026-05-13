@@ -50,6 +50,29 @@ export interface Ga4OverviewResponse {
   notes: string[];
 }
 
+export interface Ga4SourceHealth {
+  source: string;
+  sourceLabel: string;
+  propertyId: string | null;
+  configured: boolean;
+  status: "healthy" | "no-data" | "error" | "not-configured";
+  rangeDays: number;
+  checkedAt: string;
+  issues: string[];
+  overview?: {
+    totalUsers: number;
+    sessions: number;
+    views: number;
+  };
+}
+
+export interface Ga4HealthResponse {
+  generatedAt: string;
+  rangeDays: number;
+  sources: Ga4SourceHealth[];
+  globalIssue?: string;
+}
+
 interface Ga4MetricValue {
   value: string;
 }
@@ -161,6 +184,17 @@ function getGa4Config(sourceId?: string): Ga4OAuthConfig {
     "GA4 OAuth 환경변수(GA4_PROPERTY_ID, GA4_OAUTH_CLIENT_ID, GA4_OAUTH_CLIENT_SECRET, GA4_OAUTH_REFRESH_TOKEN 또는 GA4_SOURCE_* 세트)가 설정되지 않았습니다.",
   );
 }
+
+function getGa4ConfigMap() {
+  const multiSourceConfigs = GA4_SOURCE_OPTIONS.map(readSourceConfig).filter((value): value is Ga4OAuthConfig => Boolean(value));
+
+  if (multiSourceConfigs.length > 0) {
+    return new Map(multiSourceConfigs.map((config) => [config.source, config]));
+  }
+
+  const legacyConfig = readLegacyConfig();
+  return new Map(legacyConfig ? [[legacyConfig.source, legacyConfig]] : []);
+}
 async function getGa4AccessToken(config: Ga4OAuthConfig): Promise<string> {
   const body = new URLSearchParams({
     client_id: config.clientId,
@@ -249,6 +283,80 @@ export function listGa4Sources(): Ga4SourceOption[] {
   }
 
   return readLegacyConfig() ? [{ id: "m-master", label: "m-master" }] : [];
+}
+
+function buildHealthIssues(overview: Ga4OverviewResponse) {
+  const issues: string[] = [];
+
+  if (overview.overview.sessions === 0 && overview.overview.views === 0) {
+    issues.push("최근 조회 구간에 세션과 페이지뷰가 없습니다. 태그 차단, 속성 불일치, 미수집 상태를 확인해야 합니다.");
+  }
+
+  if (overview.topPages.length === 0) {
+    issues.push("상위 페이지 데이터가 비어 있습니다. page_view 수집 여부를 함께 확인하세요.");
+  }
+
+  return issues;
+}
+
+export async function fetchGa4Health(rangeDays = 7): Promise<Ga4HealthResponse> {
+  const configMap = getGa4ConfigMap();
+  const sources = await Promise.all(
+    GA4_SOURCE_OPTIONS.map(async (sourceOption) => {
+      const config = configMap.get(sourceOption.id) || null;
+
+      if (!config) {
+        return {
+          source: sourceOption.id,
+          sourceLabel: sourceOption.label,
+          propertyId: null,
+          configured: false,
+          status: "not-configured" as const,
+          rangeDays,
+          checkedAt: new Date().toISOString(),
+          issues: ["이 소스의 GA4 OAuth 환경변수가 설정되지 않았습니다."],
+        };
+      }
+
+      try {
+        const overview = await fetchGa4Overview(rangeDays, sourceOption.id);
+        const issues = buildHealthIssues(overview);
+
+        return {
+          source: sourceOption.id,
+          sourceLabel: sourceOption.label,
+          propertyId: overview.propertyId,
+          configured: true,
+          status: issues.length > 0 ? ("no-data" as const) : ("healthy" as const),
+          rangeDays,
+          checkedAt: new Date().toISOString(),
+          issues,
+          overview: {
+            totalUsers: overview.overview.totalUsers,
+            sessions: overview.overview.sessions,
+            views: overview.overview.views,
+          },
+        };
+      } catch (error) {
+        return {
+          source: sourceOption.id,
+          sourceLabel: sourceOption.label,
+          propertyId: config.propertyId,
+          configured: true,
+          status: "error" as const,
+          rangeDays,
+          checkedAt: new Date().toISOString(),
+          issues: [error instanceof Error ? error.message : "GA4 헬스체크 중 오류가 발생했습니다."],
+        };
+      }
+    }),
+  );
+
+  return {
+    generatedAt: new Date().toISOString(),
+    rangeDays,
+    sources,
+  };
 }
 
 export function isGa4Configured(sourceId?: string): boolean {

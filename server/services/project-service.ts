@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { logger } from "../logger";
+import { buildContentTrackingPackage } from "../../lib/content-tracking";
 import {
   approveBrandProfileVersion,
   createContentJobVariant,
@@ -662,7 +663,7 @@ export async function getProjectActivity(projectId: string) {
 }
 
 export async function exportProjectContent(projectId: string) {
-  requireApprovedBrandProfile(await getProjectDetail(projectId), projectId);
+  const record = requireApprovedBrandProfile(await getProjectDetail(projectId), projectId);
   const studio = await getProjectStudioSeed(projectId);
 
   if (!studio.draft.assets.length) {
@@ -670,6 +671,7 @@ export async function exportProjectContent(projectId: string) {
   }
 
   const slug = createExportSlug(studio.project.name);
+  const contentJobId = record.latestContentJob?.id ?? null;
   const channels = studio.draft.assets.map((asset) => ({
     channel: asset.channel,
     filename: asset.channel === "blog" ? `${slug}-blog.html` : `${slug}-${asset.channel}.txt`,
@@ -685,6 +687,13 @@ export async function exportProjectContent(projectId: string) {
           })
         : [asset.title, "", asset.body, "", "CTA", asset.cta].filter(Boolean).join("\n"),
     hashtags: asset.channel === "blog" ? "" : asset.hashtags || "",
+    tracking: buildContentTrackingPackage({
+      domain: record.project.domain,
+      projectName: studio.project.name,
+      topic: studio.draft.topic,
+      contentJobId,
+      channel: asset.channel,
+    }),
   }));
 
   return {
