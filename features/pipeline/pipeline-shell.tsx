@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { AppHeader } from "@/features/site/app-header";
 import { usePipelineState } from "./hooks/use-pipeline-state";
 import { useSourceRegistration } from "./hooks/use-source-registration";
 import { useContentGeneration } from "./hooks/use-content-generation";
@@ -87,12 +88,7 @@ export function PipelineShell() {
 
   return (
     <div className="app-shell">
-      {/* Header */}
-      <header className="pipeline-header">
-        <div className="rule" />
-        <span className="eyebrow">M-MASTER</span>
-        <h1 className="brand-title">콘텐츠 파이프라인</h1>
-      </header>
+      <AppHeader active="content" />
 
       {/* Error */}
       {state.error && (
