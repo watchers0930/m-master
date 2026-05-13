@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PublicSiteHeader } from "@/features/site/public-site-header";
 
 const pillars = [
   {
@@ -32,28 +33,76 @@ const outputs = [
   "SNS 파생 카피와 이미지 가이드",
 ];
 
+const comparisons = [
+  {
+    label: "일반 AI 카피 툴",
+    input: "브랜드 설명을 사람이 길게 입력해야 함",
+    output: "채널별 초안은 빠르지만 맥락 품질 편차가 큼",
+  },
+  {
+    label: "대행사 수작업 운영",
+    input: "자료 취합과 브리프 정리에 시간이 많이 듦",
+    output: "품질은 높지만 반복 비용과 리드타임이 큼",
+  },
+  {
+    label: "m-master",
+    input: "폴더와 도메인을 읽고 승인 가능한 브랜드 프로필부터 생성",
+    output: "블로그 원문부터 SNS, 발행 준비까지 한 흐름으로 연결",
+  },
+];
+
+const audiences = [
+  {
+    name: "1인 마케터",
+    pain: "브랜드 자료는 쌓여 있는데 매번 처음부터 카피를 다시 써야 합니다.",
+    gain: "승인된 브랜드 프로필을 재사용해 주제 선정부터 발행 준비까지 시간을 줄입니다.",
+  },
+  {
+    name: "창업팀",
+    pain: "제품 문서와 소개 자료는 많지만 마케팅 전담 조직이 없습니다.",
+    gain: "기존 자료를 바로 읽혀 블로그와 SNS 운영 루틴을 빠르게 세웁니다.",
+  },
+  {
+    name: "에이전시",
+    pain: "고객사마다 브리프 형식이 달라 온보딩 품질이 흔들립니다.",
+    gain: "폴더 기반 분석과 승인 플로우로 고객사별 컨텍스트 셋업을 표준화합니다.",
+  },
+];
+
+const deliverables = [
+  "승인 가능한 브랜드 요약과 타깃 정의",
+  "톤앤매너, CTA, 금지 표현 규칙",
+  "주제 추천과 블로그 초안",
+  "인스타그램 카드뉴스형 카피",
+  "페이스북 링크 포스트형 문안",
+  "복사, HTML 내보내기, 발행 준비 데이터",
+];
+
 export const metadata: Metadata = {
   title: "Marketing | m-master",
-  description: "문서와 도메인을 읽어 브랜드 컨텍스트를 만들고, 블로그에서 SNS까지 한 번에 전개하는 컨텍스트 기반 마케팅 플랫폼",
+  description:
+    "문서와 도메인을 읽어 브랜드 컨텍스트를 만들고, 블로그에서 SNS까지 한 번에 전개하는 컨텍스트 기반 마케팅 플랫폼",
 };
 
 export default function MarketingPage() {
   return (
     <main className="mk-page">
+      <PublicSiteHeader active="content" />
+
       <section className="mk-hero">
         <div className="mk-hero-copy">
           <p className="mk-eyebrow">Context-Aware Marketing Platform</p>
-          <h1>설명보다 맥락이 먼저인 마케팅 운영 화면</h1>
+          <h1>설명보다 먼저, 브랜드 맥락을 읽는 마케팅 운영</h1>
           <p className="mk-lede">
             흩어진 소개서, 제안서, 웹사이트, 기존 게시물을 읽어 브랜드 컨텍스트를 자동으로 만들고,
             그 위에서 블로그와 SNS 콘텐츠를 일관되게 전개합니다.
           </p>
           <div className="mk-hero-actions">
-            <a className="mk-button mk-button-primary" href="/">
-              파이프라인 열기
+            <a className="mk-button mk-button-primary" href="/studio">
+              스튜디오 열기
             </a>
-            <a className="mk-button mk-button-secondary" href="/marketing">
-              공개 소개 페이지
+            <a className="mk-button mk-button-secondary" href="/">
+              공개 쇼케이스 보기
             </a>
           </div>
           <div className="mk-proof">
@@ -115,6 +164,28 @@ export default function MarketingPage() {
 
       <section className="mk-section">
         <div className="mk-section-head">
+          <p className="mk-eyebrow">Positioning</p>
+          <h2>카피 생성기가 아니라, 브랜드 컨텍스트를 운영 가능한 자산으로 만드는 시스템입니다.</h2>
+        </div>
+        <div className="mk-compare-grid">
+          {comparisons.map((item) => (
+            <article className={`mk-compare-card${item.label === "m-master" ? " featured" : ""}`} key={item.label}>
+              <p className="mk-compare-label">{item.label}</p>
+              <div className="mk-compare-row">
+                <span>입력 방식</span>
+                <strong>{item.input}</strong>
+              </div>
+              <div className="mk-compare-row">
+                <span>운영 결과</span>
+                <strong>{item.output}</strong>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="mk-section">
+        <div className="mk-section-head">
           <p className="mk-eyebrow">Why It Wins</p>
           <h2>브랜드를 잘 설명하는 사람보다, 자료를 잘 쌓아둔 팀이 강해집니다.</h2>
         </div>
@@ -123,6 +194,22 @@ export default function MarketingPage() {
             <article className="mk-card" key={item.title}>
               <h3>{item.title}</h3>
               <p>{item.body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="mk-section">
+        <div className="mk-section-head">
+          <p className="mk-eyebrow">Best Fit</p>
+          <h2>자료는 충분하지만 운영 루틴이 부족한 팀에서 가장 빠르게 효과가 납니다.</h2>
+        </div>
+        <div className="mk-audience-grid">
+          {audiences.map((item) => (
+            <article className="mk-audience-card" key={item.name}>
+              <p className="mk-audience-name">{item.name}</p>
+              <p className="mk-audience-pain">{item.pain}</p>
+              <p className="mk-audience-gain">{item.gain}</p>
             </article>
           ))}
         </div>
@@ -168,6 +255,21 @@ export default function MarketingPage() {
         </div>
       </section>
 
+      <section className="mk-section">
+        <div className="mk-section-head">
+          <p className="mk-eyebrow">Deliverables</p>
+          <h2>도입 직후 필요한 건 많지 않습니다. 대신 바로 써먹을 운영 산출물이 남아야 합니다.</h2>
+        </div>
+        <div className="mk-deliverable-grid">
+          {deliverables.map((item, index) => (
+            <div className="mk-deliverable-card" key={item}>
+              <span>{String(index + 1).padStart(2, "0")}</span>
+              <strong>{item}</strong>
+            </div>
+          ))}
+        </div>
+      </section>
+
       <section className="mk-section mk-closing">
         <div className="mk-closing-card">
           <p className="mk-eyebrow">For Lean Teams</p>
@@ -175,8 +277,13 @@ export default function MarketingPage() {
           <p>
             1인 마케터, 창업팀, 다수 고객사를 다루는 에이전시가 가장 빠르게 효율을 얻도록 설계했습니다.
           </p>
+          <div className="mk-closing-points">
+            <div>폴더 기반 온보딩</div>
+            <div>승인 가능한 브랜드 프로필</div>
+            <div>블로그·인스타·페이스북 동시 운영</div>
+          </div>
           <a className="mk-button mk-button-primary" href="/">
-            m-master 실행
+            공개 쇼케이스에서 확인
           </a>
         </div>
       </section>

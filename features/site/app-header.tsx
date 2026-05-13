@@ -15,7 +15,7 @@ export function AppHeader({ active, title = "콘텐츠 파이프라인" }: AppHe
             콘텐츠생성
           </a>
           <span className="pipeline-header-divider">|</span>
-          <a className={active === "analytics" ? "pipeline-header-link active" : "pipeline-header-link"} href="/analytics">
+          <a className={active === "analytics" ? "pipeline-header-link active" : "pipeline-header-link"} href="/">
             방문자 분석
           </a>
         </nav>
