@@ -61,6 +61,7 @@ type ContentStudioProps = {
   onPreparePublish: () => Promise<void>;
   onSaveWordPressDefaults: () => Promise<void>;
   onCopyExportPreview?: () => Promise<void>;
+  onCopyTrackingLink?: () => Promise<void>;
   onDownloadExportContent?: () => Promise<void>;
   onDownloadExportHashtags?: () => Promise<void>;
   onCopyBlogPublishHtml?: () => Promise<void>;
@@ -126,6 +127,7 @@ export function ContentStudio({
   onPreparePublish,
   onSaveWordPressDefaults,
   onCopyExportPreview,
+  onCopyTrackingLink,
   onDownloadExportContent,
   onDownloadExportHashtags,
   onCopyBlogPublishHtml,
@@ -425,6 +427,7 @@ export function ContentStudio({
           onPreparePublish={onPreparePublish}
           onSaveWordPressDefaults={onSaveWordPressDefaults}
           onCopyExportPreview={onCopyExportPreview}
+          onCopyTrackingLink={onCopyTrackingLink}
           onDownloadExportContent={onDownloadExportContent}
           onDownloadExportHashtags={onDownloadExportHashtags}
           onCopyBlogPublishHtml={onCopyBlogPublishHtml}

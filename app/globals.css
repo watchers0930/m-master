@@ -2894,6 +2894,114 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   color: #b91c1c;
 }
 
+.analytics-health-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.analytics-health-card,
+.analytics-warning-card,
+.export-tracking-card {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.analytics-health-card {
+  padding: 18px 20px;
+}
+
+.analytics-health-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.analytics-health-head strong,
+.analytics-warning-card strong,
+.export-tracking-card strong {
+  color: #0f172a;
+}
+
+.analytics-health-head span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.analytics-health-card.status-healthy .analytics-health-head span {
+  background: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+}
+
+.analytics-health-card.status-no-data .analytics-health-head span,
+.analytics-health-card.status-not-configured .analytics-health-head span {
+  background: rgba(217, 119, 6, 0.12);
+  color: #b45309;
+}
+
+.analytics-health-card.status-error .analytics-health-head span {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}
+
+.analytics-health-card p,
+.analytics-warning-card p,
+.analytics-health-metrics span,
+.export-tracking-card p,
+.export-tracking-meta span {
+  color: #64748b;
+}
+
+.analytics-health-card p,
+.analytics-health-issue,
+.analytics-warning-card p {
+  margin: 10px 0 0;
+}
+
+.analytics-health-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.analytics-health-metrics span,
+.export-tracking-meta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.analytics-health-issue {
+  font-size: 13px;
+}
+
+.analytics-warning-card,
+.export-tracking-card {
+  margin-top: 20px;
+  padding: 18px 20px;
+}
+
+.export-tracking-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
 .analytics-dashboard-grid,
 .analytics-ranking-grid {
   display: grid;
@@ -3225,7 +3333,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .analytics-dashboard-grid,
   .analytics-ranking-grid,
   .analytics-report-insights,
-  .analytics-report-summary {
+  .analytics-report-summary,
+  .analytics-health-grid {
     grid-template-columns: 1fr;
   }
 

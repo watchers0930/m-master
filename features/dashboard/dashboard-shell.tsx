@@ -974,6 +974,7 @@ export function DashboardShell() {
                 onPreparePublish={publishWorkflow.handlePreparePublish}
                 onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
                 onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
+                onCopyTrackingLink={publishWorkflow.handleCopyTrackingLink}
                 onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
                 onDownloadExportHashtags={publishWorkflow.handleDownloadExportHashtags}
                 onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}
@@ -1024,6 +1025,7 @@ export function DashboardShell() {
                 onPreparePublish={publishWorkflow.handlePreparePublish}
                 onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
                 onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
+                onCopyTrackingLink={publishWorkflow.handleCopyTrackingLink}
                 onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
                 onDownloadExportHashtags={publishWorkflow.handleDownloadExportHashtags}
                 onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}
@@ -1074,6 +1076,7 @@ export function DashboardShell() {
                 onPreparePublish={publishWorkflow.handlePreparePublish}
                 onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
                 onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
+                onCopyTrackingLink={publishWorkflow.handleCopyTrackingLink}
                 onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
                 onDownloadExportHashtags={publishWorkflow.handleDownloadExportHashtags}
                 onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}
@@ -1124,6 +1127,7 @@ export function DashboardShell() {
                 onPreparePublish={publishWorkflow.handlePreparePublish}
                 onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
                 onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
+                onCopyTrackingLink={publishWorkflow.handleCopyTrackingLink}
                 onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
                 onDownloadExportHashtags={publishWorkflow.handleDownloadExportHashtags}
                 onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}

@@ -31,6 +31,7 @@ type PublishPanelProps = {
   onPreparePublish: () => Promise<void>;
   onSaveWordPressDefaults: () => Promise<void>;
   onCopyExportPreview?: () => Promise<void>;
+  onCopyTrackingLink?: () => Promise<void>;
   onDownloadExportContent?: () => Promise<void>;
   onDownloadExportHashtags?: () => Promise<void>;
   onCopyBlogPublishHtml?: () => Promise<void>;
@@ -64,6 +65,7 @@ export function PublishPanel({
   onPreparePublish,
   onSaveWordPressDefaults,
   onCopyExportPreview,
+  onCopyTrackingLink,
   onDownloadExportContent,
   onDownloadExportHashtags,
   onCopyBlogPublishHtml,
@@ -177,6 +179,14 @@ export function PublishPanel({
           </button>
           <button
             className="button ghost"
+            disabled={copyBusy || !activeExportChannel || !activeExportChannel.tracking.trackedUrl}
+            type="button"
+            onClick={() => void onCopyTrackingLink?.()}
+          >
+            추적 링크 복사
+          </button>
+          <button
+            className="button ghost"
             disabled={exportBusy || !exportPreview.bundle || exportPreview.activeView === "json"}
             type="button"
             onClick={() => void onDownloadExportContent?.()}
@@ -255,6 +265,20 @@ export function PublishPanel({
                   </>
                 )}
               </div>
+              {activeExportChannel ? (
+                <div className="export-tracking-card">
+                  <strong>성과 추적 링크</strong>
+                  <p className="fine-print">
+                    {activeExportChannel.tracking.trackedUrl || activeExportChannel.tracking.note || "추적 링크를 만들지 못했습니다."}
+                  </p>
+                  <div className="export-tracking-meta">
+                    <span>source {activeExportChannel.tracking.source}</span>
+                    <span>medium {activeExportChannel.tracking.medium}</span>
+                    <span>campaign {activeExportChannel.tracking.campaign}</span>
+                    <span>content {activeExportChannel.tracking.content}</span>
+                  </div>
+                </div>
+              ) : null}
               <div className="export-preview-body">
                 {exportPreview.activeView === "json"
                   ? JSON.stringify(exportPreview.bundle, null, 2)
