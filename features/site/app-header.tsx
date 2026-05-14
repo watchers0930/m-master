@@ -1,5 +1,5 @@
 type AppHeaderProps = {
-  active: "home" | "content" | "analytics";
+  active: "content" | "analytics";
   title?: string;
 };
 
@@ -11,15 +11,11 @@ export function AppHeader({ active, title = "콘텐츠 파이프라인" }: AppHe
         <span className="eyebrow">M-MASTER</span>
         <h1 className="brand-title">{title}</h1>
         <nav aria-label="콘텐츠 메뉴" className="pipeline-header-nav">
-          <a className={active === "home" ? "pipeline-header-link active" : "pipeline-header-link"} href="/">
-            홈
-          </a>
-          <span className="pipeline-header-divider">|</span>
           <a className={active === "content" ? "pipeline-header-link active" : "pipeline-header-link"} href="/studio">
             콘텐츠생성
           </a>
           <span className="pipeline-header-divider">|</span>
-          <a className={active === "analytics" ? "pipeline-header-link active" : "pipeline-header-link"} href="/analytics">
+          <a className={active === "analytics" ? "pipeline-header-link active" : "pipeline-header-link"} href="/">
             방문자 분석
           </a>
         </nav>
