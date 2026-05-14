@@ -8,6 +8,11 @@ export type CreateProjectInput = {
 
 export type UpdateProjectSettingsInput = {
   industry?: string;
+  analyticsSourceType?: "ga4" | "external";
+  analyticsSourceId?: string;
+  analyticsSourceLabel?: string;
+  analyticsEndpointUrl?: string;
+  analyticsAccessKey?: string | null;
   wordpressSiteUrl?: string;
   wordpressUsername?: string;
   wordpressStatus?: "draft" | "publish";
@@ -184,6 +189,11 @@ export async function parseUpdateProjectSettingsInput(request: Request): Promise
   const inputRecord = body as Record<string, unknown>;
   const wordpressStatus = normalizeOptionalString(inputRecord.wordpressStatus);
   const industry = normalizeOptionalString(inputRecord.industry);
+  const analyticsSourceType = normalizeOptionalString(inputRecord.analyticsSourceType);
+  const analyticsSourceId = normalizeOptionalString(inputRecord.analyticsSourceId);
+  const analyticsSourceLabel = normalizeOptionalString(inputRecord.analyticsSourceLabel);
+  const analyticsEndpointUrl = normalizeOptionalString(inputRecord.analyticsEndpointUrl);
+  const analyticsAccessKey = normalizeOptionalString(inputRecord.analyticsAccessKey);
 
   if (wordpressStatus && wordpressStatus !== "draft" && wordpressStatus !== "publish") {
     throw new ProjectValidationError("워드프레스 게시 상태는 draft 또는 publish만 허용됩니다.");
@@ -193,8 +203,25 @@ export async function parseUpdateProjectSettingsInput(request: Request): Promise
     throw new ProjectValidationError("업종 분류 값이 올바르지 않습니다.");
   }
 
+  if (analyticsSourceType && analyticsSourceType !== "ga4" && analyticsSourceType !== "external") {
+    throw new ProjectValidationError("분석 소스 타입은 ga4 또는 external만 허용됩니다.");
+  }
+
+  if (analyticsSourceLabel && analyticsSourceLabel.length > 120) {
+    throw new ProjectValidationError("분석 소스 이름은 120자 이하여야 합니다.");
+  }
+
+  if (analyticsSourceId && analyticsSourceId.length > 120) {
+    throw new ProjectValidationError("분석 소스 ID는 120자 이하여야 합니다.");
+  }
+
   return {
     industry,
+    analyticsSourceType: analyticsSourceType as "ga4" | "external" | undefined,
+    analyticsSourceId: analyticsSourceId?.slice(0, 120),
+    analyticsSourceLabel: analyticsSourceLabel?.slice(0, 120),
+    analyticsEndpointUrl: analyticsEndpointUrl ? normalizeWebsiteTarget(analyticsEndpointUrl) : undefined,
+    analyticsAccessKey: analyticsAccessKey?.slice(0, 2000) || null,
     wordpressSiteUrl: normalizeWebsiteTarget(normalizeOptionalString(inputRecord.wordpressSiteUrl)),
     wordpressUsername: normalizeOptionalString(inputRecord.wordpressUsername)?.slice(0, 120),
     wordpressStatus: wordpressStatus as "draft" | "publish" | undefined,

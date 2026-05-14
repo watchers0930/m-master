@@ -15,6 +15,12 @@ model Project {
   industry               String?
   workingPath            String?
   status                 String         @default("active")
+  analyticsSourceType    String?
+  analyticsSourceId      String?
+  analyticsSourceLabel   String?
+  analyticsEndpointUrl   String?
+  analyticsAccessKey     String?        @db.Text
+  analyticsConnectedAt   DateTime?
   wordpressSiteUrl       String?
   wordpressUsername      String?
   wordpressStatus        String?
@@ -25,6 +31,7 @@ model Project {
   brandProfiles          BrandProfile[]
   topics                 TopicCandidate[]
   contentJobs            ContentJob[]
+  contentPlans           ContentPlan[]
 }
 
 model CmsSection {
@@ -118,6 +125,44 @@ model ContentJob {
 
   @@index([projectId, status])
   @@index([projectId, variantGroupId])
+}
+
+model ContentPlan {
+  id             String            @id @default(cuid())
+  projectId      String
+  monthKey       String
+  status         String            @default("draft")
+  basisSummary   String?           @db.Text
+  autoGenerate   Boolean           @default(false)
+  generatedAt    DateTime?
+  lastExecutedAt DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items          ContentPlanItem[]
+
+  @@unique([projectId, monthKey])
+  @@index([projectId, monthKey])
+}
+
+model ContentPlanItem {
+  id             String      @id @default(cuid())
+  contentPlanId  String
+  sortOrder      Int         @default(0)
+  weekLabel      String
+  topic          String
+  intentType     String?
+  objective      String?     @db.Text
+  rationale      String?     @db.Text
+  status         String      @default("planned")
+  contentJobId   String?
+  generatedAt    DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  contentPlan    ContentPlan @relation(fields: [contentPlanId], references: [id], onDelete: Cascade)
+
+  @@index([contentPlanId, sortOrder])
+  @@index([contentPlanId, status])
 }
 
 model ContentAsset {

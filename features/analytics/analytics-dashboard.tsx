@@ -2,6 +2,12 @@
 
 import { useEffect, useState } from "react";
 
+import {
+  normalizeCustomSourceInput,
+  parseTrackingKey,
+  slugifyAnalyticsSource,
+  type CustomAnalyticsSourceInput,
+} from "@/lib/external-analytics";
 import type { Ga4OverviewResponse } from "@/lib/ga4";
 
 type Ga4HealthResponse = {
@@ -36,9 +42,11 @@ const RANGE_OPTIONS = [
 ];
 
 const DEFAULT_SOURCE_OPTIONS = [
-  { value: "m-master", label: "m-master", configured: true },
-  { value: "vestra", label: "vestra", configured: true },
-] as const;
+  { value: "m-master", label: "m-master", configured: true, kind: "built-in" as const },
+  { value: "vestra", label: "vestra", configured: true, kind: "built-in" as const },
+];
+
+const CUSTOM_SOURCE_STORAGE_KEY = "m-master-custom-analytics-sources";
 
 type ApiOk<T> = {
   ok: true;
@@ -53,6 +61,34 @@ type ApiError = {
 };
 
 type ApiResponse<T> = ApiOk<T> | ApiError;
+
+type SourceOption = {
+  value: string;
+  label: string;
+  configured: boolean;
+  kind: "built-in" | "custom";
+};
+
+function loadCustomSources() {
+  if (typeof window === "undefined") return [] as CustomAnalyticsSourceInput[];
+
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_SOURCE_STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw) as CustomAnalyticsSourceInput[];
+    return Array.isArray(parsed)
+      ? parsed.map((item) => normalizeCustomSourceInput(item))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomSources(items: CustomAnalyticsSourceInput[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(CUSTOM_SOURCE_STORAGE_KEY, JSON.stringify(items));
+}
 
 function StatCard(props: { label: string; value: string; subLabel: string }) {
   return (
@@ -86,15 +122,26 @@ function RankingCard(props: { title: string; rows: Array<{ label: string; count:
 export function AnalyticsDashboard() {
   const [days, setDays] = useState(30);
   const [source, setSource] = useState<string>("m-master");
-  const [sourceOptions, setSourceOptions] = useState<Array<{ value: string; label: string; configured: boolean }>>(
+  const [sourceOptions, setSourceOptions] = useState<SourceOption[]>(
     [...DEFAULT_SOURCE_OPTIONS],
   );
+  const [customSources, setCustomSources] = useState<CustomAnalyticsSourceInput[]>([]);
   const [data, setData] = useState<AnalyticsOverviewResponse | null>(null);
   const [health, setHealth] = useState<Ga4HealthResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [healthLoading, setHealthLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [sourceNameInput, setSourceNameInput] = useState("");
+  const [trackingKeyInput, setTrackingKeyInput] = useState("");
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [savingCustomSource, setSavingCustomSource] = useState(false);
+
+  useEffect(() => {
+    const nextCustomSources = loadCustomSources();
+    setCustomSources(nextCustomSources);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -114,11 +161,19 @@ export function AnalyticsDashboard() {
 
         if (!cancelled) {
           setHealth(payload.data);
-          const nextOptions = payload.data.sources.map((item) => ({
+          const builtInOptions = payload.data.sources.map((item) => ({
             value: item.source,
             label: item.sourceLabel,
             configured: item.configured,
+            kind: "built-in" as const,
           }));
+          const customOptions = customSources.map((item) => ({
+            value: item.id || slugifyAnalyticsSource(item.label),
+            label: item.label,
+            configured: true,
+            kind: "custom" as const,
+          }));
+          const nextOptions = [...builtInOptions, ...customOptions];
 
           if (nextOptions.length > 0) {
             setSourceOptions(nextOptions);
@@ -152,7 +207,7 @@ export function AnalyticsDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [refreshing, source]);
+  }, [customSources, refreshing, source]);
 
   useEffect(() => {
     let cancelled = false;
@@ -164,12 +219,28 @@ export function AnalyticsDashboard() {
       }
 
       try {
-        const params = new URLSearchParams({
-          days: String(days),
-          source,
-        });
-        const response = await fetch(`/api/analytics/overview?${params.toString()}`, { cache: "no-store" });
-        const payload = (await response.json()) as ApiResponse<AnalyticsOverviewResponse>;
+        const customSource = customSources.find((item) => (item.id || slugifyAnalyticsSource(item.label)) === source);
+        const payload = customSource
+          ? await (async () => {
+              const response = await fetch("/api/analytics/external-overview", {
+                method: "POST",
+                cache: "no-store",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  days,
+                  source: customSource,
+                }),
+              });
+              return (await response.json()) as ApiResponse<AnalyticsOverviewResponse>;
+            })()
+          : await (async () => {
+              const params = new URLSearchParams({
+                days: String(days),
+                source,
+              });
+              const response = await fetch(`/api/analytics/overview?${params.toString()}`, { cache: "no-store" });
+              return (await response.json()) as ApiResponse<AnalyticsOverviewResponse>;
+            })();
 
         if (!payload.ok) {
           throw new Error(payload.error.message);
@@ -196,7 +267,75 @@ export function AnalyticsDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [days, refreshing, source]);
+  }, [customSources, days, refreshing, source]);
+
+  function resetModal() {
+    setSourceNameInput("");
+    setTrackingKeyInput("");
+    setModalError(null);
+    setSavingCustomSource(false);
+  }
+
+  function handleOpenModal() {
+    resetModal();
+    setIsModalOpen(true);
+  }
+
+  function handleCloseModal() {
+    resetModal();
+    setIsModalOpen(false);
+  }
+
+  function handleDeleteCustomSource(sourceId: string) {
+    const nextSources = customSources.filter((item) => (item.id || slugifyAnalyticsSource(item.label)) !== sourceId);
+    setCustomSources(nextSources);
+    saveCustomSources(nextSources);
+    if (source === sourceId) {
+      setSource("m-master");
+    }
+  }
+
+  async function handleSaveCustomSource() {
+    setSavingCustomSource(true);
+    setModalError(null);
+
+    try {
+      const parsed = parseTrackingKey(trackingKeyInput, sourceNameInput.trim());
+      const nextSource: CustomAnalyticsSourceInput = {
+        ...parsed,
+        label: sourceNameInput.trim() || parsed.label,
+      };
+      const normalized = normalizeCustomSourceInput(nextSource);
+      const exists = customSources.some((item) => (item.id || slugifyAnalyticsSource(item.label)) === normalized.id);
+      const nextSources = exists
+        ? customSources.map((item) => ((item.id || slugifyAnalyticsSource(item.label)) === normalized.id ? normalized : item))
+        : [...customSources, normalized];
+
+      const response = await fetch("/api/analytics/external-overview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          days,
+          source: normalized,
+        }),
+      });
+      const payload = (await response.json()) as ApiResponse<AnalyticsOverviewResponse>;
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      setCustomSources(nextSources);
+      saveCustomSources(nextSources);
+      setSource(normalized.id || slugifyAnalyticsSource(normalized.label));
+      setRefreshing(true);
+      handleCloseModal();
+    } catch (saveError) {
+      setModalError(saveError instanceof Error ? saveError.message : "방문자 추적 키 저장에 실패했습니다.");
+    } finally {
+      setSavingCustomSource(false);
+    }
+  }
 
   const maxSessions = Math.max(...(data?.trend.map((item) => item.sessions) ?? [1]), 1);
   const activeHealth = health?.sources.find((item) => item.source === source) ?? null;
@@ -227,6 +366,13 @@ export function AnalyticsDashboard() {
               </button>
             ))}
           </div>
+          <button
+            className="analytics-filter-button"
+            onClick={handleOpenModal}
+            type="button"
+          >
+            방문자 추적 추가
+          </button>
           {RANGE_OPTIONS.map((option) => (
             <button
               className={days === option.value ? "analytics-filter-button active" : "analytics-filter-button"}
@@ -247,7 +393,21 @@ export function AnalyticsDashboard() {
         </div>
       </div>
 
-      {loading ? <p className="analytics-loading-copy">GA4 통계를 불러오는 중입니다.</p> : null}
+      {customSources.length > 0 ? (
+        <div className="analytics-custom-source-list">
+          {customSources.map((item) => {
+            const sourceId = item.id || slugifyAnalyticsSource(item.label);
+            return (
+              <div className="analytics-custom-source-chip" key={sourceId}>
+                <span>{item.label}</span>
+                <button onClick={() => handleDeleteCustomSource(sourceId)} type="button">삭제</button>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {loading ? <p className="analytics-loading-copy">방문자 통계를 불러오는 중입니다.</p> : null}
       {error ? <p className="analytics-error-copy">{error}</p> : null}
       {health?.globalIssue ? <p className="analytics-error-copy">{health.globalIssue}</p> : null}
 
@@ -388,6 +548,50 @@ export function AnalyticsDashboard() {
             </div>
           </div>
         </>
+      ) : null}
+
+      {isModalOpen ? (
+        <div className="analytics-modal-backdrop" role="presentation" onClick={handleCloseModal}>
+          <div className="analytics-modal-card" role="dialog" aria-modal="true" aria-labelledby="analytics-modal-title" onClick={(event) => event.stopPropagation()}>
+            <div className="analytics-modal-head">
+              <div>
+                <p className="analytics-kicker">Tracking</p>
+                <h3 id="analytics-modal-title">방문자 추적 소스 추가</h3>
+              </div>
+              <button className="analytics-modal-close" onClick={handleCloseModal} type="button">닫기</button>
+            </div>
+            <label className="analytics-modal-field">
+              <span>프로젝트 이름</span>
+              <input
+                onChange={(event) => setSourceNameInput(event.target.value)}
+                placeholder="예: clio"
+                type="text"
+                value={sourceNameInput}
+              />
+            </label>
+            <label className="analytics-modal-field">
+              <span>방문자 추적 키</span>
+              <textarea
+                onChange={(event) => setTrackingKeyInput(event.target.value)}
+                placeholder="https://project.vercel.app/api/public/analytics/overview 또는 JSON 키"
+                rows={5}
+                value={trackingKeyInput}
+              />
+            </label>
+            <p className="analytics-modal-help">
+              현재는 공개 집계 URL 또는 JSON 키 형식을 지원합니다.
+            </p>
+            {modalError ? <p className="analytics-error-copy">{modalError}</p> : null}
+            <div className="analytics-modal-actions">
+              <button className="analytics-filter-button" onClick={handleCloseModal} type="button">
+                취소
+              </button>
+              <button className="analytics-filter-button active" disabled={savingCustomSource} onClick={() => void handleSaveCustomSource()} type="button">
+                {savingCustomSource ? "저장 중" : "저장"}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </section>
   );

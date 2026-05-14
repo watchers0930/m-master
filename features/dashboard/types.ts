@@ -70,6 +70,12 @@ export type ProjectDetail = {
     industry?: string | null;
     workingPath?: string | null;
     status: string;
+    analyticsSourceType?: string | null;
+    analyticsSourceId?: string | null;
+    analyticsSourceLabel?: string | null;
+    analyticsEndpointUrl?: string | null;
+    analyticsAccessKey?: string | null;
+    analyticsConnectedAt?: string | null;
     wordpressSiteUrl?: string | null;
     wordpressUsername?: string | null;
     wordpressStatus?: string | null;
@@ -108,6 +114,27 @@ export type ProjectDetail = {
     externalPostId?: string | null;
     externalPostUrl?: string | null;
     publishedAt?: string | null;
+  } | null;
+  latestContentPlan?: {
+    id: string;
+    monthKey: string;
+    status: string;
+    basisSummary?: string | null;
+    autoGenerate: boolean;
+    generatedAt?: string | null;
+    lastExecutedAt?: string | null;
+    items: Array<{
+      id: string;
+      sortOrder: number;
+      weekLabel: string;
+      topic: string;
+      intentType?: string | null;
+      objective?: string | null;
+      rationale?: string | null;
+      status: string;
+      contentJobId?: string | null;
+      generatedAt?: string | null;
+    }>;
   } | null;
   sourceAnalysis?: SourceAnalysisSummary | null;
 };

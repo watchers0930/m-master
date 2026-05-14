@@ -154,6 +154,7 @@ export function DashboardShell() {
   const [files, setFiles] = useState<SourceFileDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [planBusy, setPlanBusy] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
   const [folderSupported, setFolderSupported] = useState<boolean | null>(null);
 
@@ -585,6 +586,36 @@ export function DashboardShell() {
     });
   }
 
+  function handleProjectAnalyticsFieldChange(
+    field: "analyticsSourceType" | "analyticsSourceId" | "analyticsSourceLabel" | "analyticsEndpointUrl" | "analyticsAccessKey",
+    value: string,
+  ) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      const nextProject = {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          [field]: value,
+        },
+      };
+
+      if (field === "analyticsSourceType") {
+        if (value === "ga4") {
+          nextProject.project.analyticsEndpointUrl = "";
+          nextProject.project.analyticsAccessKey = "";
+        } else {
+          nextProject.project.analyticsSourceId = "";
+        }
+      }
+
+      return nextProject;
+    });
+  }
+
   async function handleSaveProjectSettings() {
     if (!activeProject?.project.id) {
       return;
@@ -599,6 +630,11 @@ export function DashboardShell() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           industry: activeProject.project.industry || "general",
+          analyticsSourceType: activeProject.project.analyticsSourceType || "ga4",
+          analyticsSourceId: activeProject.project.analyticsSourceId || "",
+          analyticsSourceLabel: activeProject.project.analyticsSourceLabel || "",
+          analyticsEndpointUrl: activeProject.project.analyticsEndpointUrl || "",
+          analyticsAccessKey: activeProject.project.analyticsAccessKey || "",
           wordpressSiteUrl: activeProject.project.wordpressSiteUrl,
           wordpressUsername: activeProject.project.wordpressUsername,
           wordpressStatus: activeProject.project.wordpressStatus,
@@ -620,6 +656,63 @@ export function DashboardShell() {
       setError(settingsError instanceof Error ? settingsError.message : "프로젝트 설정 저장에 실패했습니다.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleGenerateMonthlyPlan(autoGenerate: boolean) {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setPlanBusy(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/monthly-plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ autoGenerate }),
+      });
+      const payload = await parseJson<ApiResponse<{ plan: ProjectDetail["latestContentPlan"] }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      await loadProject(activeProject.project.id);
+      await loadProjects();
+      setCurrentStep(3);
+    } catch (planError) {
+      setError(planError instanceof Error ? planError.message : "월간 계획 생성에 실패했습니다.");
+    } finally {
+      setPlanBusy(false);
+    }
+  }
+
+  async function handleRunMonthlyPlan() {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setPlanBusy(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/monthly-plan`, {
+        method: "PATCH",
+      });
+      const payload = await parseJson<ApiResponse<{ result: { planId: string } }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      await loadProject(activeProject.project.id);
+      setCurrentStep(4);
+    } catch (runError) {
+      setError(runError instanceof Error ? runError.message : "월간 계획 실행에 실패했습니다.");
+    } finally {
+      setPlanBusy(false);
     }
   }
 
@@ -928,11 +1021,15 @@ export function DashboardShell() {
                 projects={projects}
                 activeProject={activeProject}
                 loading={loading}
+                planBusy={planBusy}
                 onSelectProject={loadProject}
                 onDeleteProject={handleDeleteProject}
                 onRegenerateContext={handleRegenerateContext}
                 onProjectIndustryChange={handleProjectIndustryChange}
+                onProjectAnalyticsFieldChange={handleProjectAnalyticsFieldChange}
                 onSaveProjectSettings={handleSaveProjectSettings}
+                onGenerateMonthlyPlan={handleGenerateMonthlyPlan}
+                onRunMonthlyPlan={handleRunMonthlyPlan}
                 onBrandProfileChange={handleBrandProfileChange}
                 onSaveContext={handleSaveContext}
                 onApproveContext={handleApproveContext}

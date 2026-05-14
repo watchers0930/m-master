@@ -132,6 +132,12 @@ export type ProjectDetail = {
     industry?: string | null;
     workingPath?: string | null;
     status: string;
+    analyticsSourceType?: string | null;
+    analyticsSourceId?: string | null;
+    analyticsSourceLabel?: string | null;
+    analyticsEndpointUrl?: string | null;
+    analyticsAccessKey?: string | null;
+    analyticsConnectedAt?: string | null;
     wordpressSiteUrl?: string | null;
     wordpressUsername?: string | null;
     wordpressStatus?: string | null;
