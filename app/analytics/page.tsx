@@ -1,5 +1,5 @@
-import { AnalyticsPageShell } from "@/features/analytics/analytics-page-shell";
+import { redirect } from "next/navigation";
 
-export default function AnalyticsPage() {
-  return <AnalyticsPageShell />;
+export default function LegacyAnalyticsPage() {
+  redirect("/studio/analytics");
 }

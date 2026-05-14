@@ -1,9 +1,9 @@
 type AppHeaderProps = {
-  active: "home" | "content" | "analytics";
+  active: "content" | "analytics" | "operations";
   title?: string;
 };
 
-export function AppHeader({ active, title = "콘텐츠 파이프라인" }: AppHeaderProps) {
+export function AppHeader({ active, title = "콘텐츠 스튜디오" }: AppHeaderProps) {
   return (
     <header className="pipeline-header">
       <div className="pipeline-header-left">
@@ -11,7 +11,7 @@ export function AppHeader({ active, title = "콘텐츠 파이프라인" }: AppHe
         <span className="eyebrow">M-MASTER</span>
         <h1 className="brand-title">{title}</h1>
         <nav aria-label="콘텐츠 메뉴" className="pipeline-header-nav">
-          <a className={active === "home" ? "pipeline-header-link active" : "pipeline-header-link"} href="/">
+          <a className="pipeline-header-link" href="/">
             홈
           </a>
           <span className="pipeline-header-divider">|</span>
@@ -19,7 +19,11 @@ export function AppHeader({ active, title = "콘텐츠 파이프라인" }: AppHe
             콘텐츠생성
           </a>
           <span className="pipeline-header-divider">|</span>
-          <a className={active === "analytics" ? "pipeline-header-link active" : "pipeline-header-link"} href="/analytics">
+          <a className={active === "operations" ? "pipeline-header-link active" : "pipeline-header-link"} href="/studio/operations">
+            운영보드
+          </a>
+          <span className="pipeline-header-divider">|</span>
+          <a className={active === "analytics" ? "pipeline-header-link active" : "pipeline-header-link"} href="/studio/analytics">
             방문자 분석
           </a>
         </nav>
