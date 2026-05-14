@@ -2,6 +2,8 @@ export interface Ga4OverviewResponse {
   source: string;
   sourceLabel: string;
   propertyId: string | null;
+  provider?: "ga4" | "first-party";
+  providerLabel?: string;
   rangeDays: number;
   generatedAt: string;
   overview: {
@@ -455,6 +457,8 @@ export async function fetchGa4Overview(rangeDays: number, sourceId?: string): Pr
     source: config.source,
     sourceLabel: config.sourceLabel,
     propertyId: config.propertyId,
+    provider: "ga4",
+    providerLabel: "GA4",
     rangeDays,
     generatedAt: new Date().toISOString(),
     overview: {

@@ -24,6 +24,11 @@ type Ga4HealthResponse = {
   }>;
 };
 
+type AnalyticsOverviewResponse = Ga4OverviewResponse & {
+  provider?: "ga4" | "first-party";
+  providerLabel?: string;
+};
+
 const RANGE_OPTIONS = [
   { value: 7, label: "7일" },
   { value: 30, label: "30일" },
@@ -84,7 +89,7 @@ export function AnalyticsDashboard() {
   const [sourceOptions, setSourceOptions] = useState<Array<{ value: string; label: string; configured: boolean }>>(
     [...DEFAULT_SOURCE_OPTIONS],
   );
-  const [data, setData] = useState<Ga4OverviewResponse | null>(null);
+  const [data, setData] = useState<AnalyticsOverviewResponse | null>(null);
   const [health, setHealth] = useState<Ga4HealthResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [healthLoading, setHealthLoading] = useState(true);
@@ -164,7 +169,7 @@ export function AnalyticsDashboard() {
           source,
         });
         const response = await fetch(`/api/analytics/overview?${params.toString()}`, { cache: "no-store" });
-        const payload = (await response.json()) as ApiResponse<Ga4OverviewResponse>;
+        const payload = (await response.json()) as ApiResponse<AnalyticsOverviewResponse>;
 
         if (!payload.ok) {
           throw new Error(payload.error.message);
@@ -200,9 +205,13 @@ export function AnalyticsDashboard() {
     <section className="analytics-section analytics-dashboard-shell">
       <div className="analytics-toolbar-card">
         <div>
-          <h2>GA4 방문자 통계</h2>
-          <p>사이트별 GA4 속성을 선택해 같은 분석 화면에서 조회합니다.</p>
-          {data?.propertyId ? <span>{data.sourceLabel} · GA4 Property ID: {data.propertyId}</span> : null}
+          <h2>방문자 통계</h2>
+          <p>사이트별 집계 소스를 선택해 같은 분석 화면에서 조회합니다.</p>
+          <span>
+            {data?.sourceLabel || "소스 선택"}
+            {data?.providerLabel ? ` · ${data.providerLabel}` : ""}
+            {data?.propertyId ? ` · GA4 Property ID: ${data.propertyId}` : ""}
+          </span>
         </div>
         <div className="analytics-toolbar-actions">
           <div className="analytics-source-toggle" role="tablist" aria-label="GA4 source">
