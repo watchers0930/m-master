@@ -1,4 +1,29 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+const ADMIN_EMAIL = "marketing@master";
+const ADMIN_PASSWORD = "1111";
+
 export default function HomePage() {
+  const router = useRouter();
+  const [email, setEmail] = useState(ADMIN_EMAIL);
+  const [password, setPassword] = useState(ADMIN_PASSWORD);
+  const [error, setError] = useState("");
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (email.trim() !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
+      setError("이메일 또는 비밀번호가 올바르지 않습니다.");
+      return;
+    }
+
+    setError("");
+    router.push("/studio");
+  }
+
   return (
     <main
       style={{
@@ -32,13 +57,14 @@ export default function HomePage() {
           BMI C&amp;S 마케팅
         </h1>
 
-        <form style={{ display: "grid", gap: "14px" }}>
+        <form onSubmit={handleSubmit} style={{ display: "grid", gap: "14px" }}>
           <label style={{ display: "grid", gap: "6px", color: "#4c5a72", fontWeight: 600 }}>
             이메일
             <input
               type="text"
               name="email"
-              defaultValue="marketing@master"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
               style={{
                 height: "48px",
                 padding: "0 14px",
@@ -54,7 +80,8 @@ export default function HomePage() {
             <input
               type="password"
               name="password"
-              defaultValue="1111"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
               style={{
                 height: "48px",
                 padding: "0 14px",
@@ -64,6 +91,12 @@ export default function HomePage() {
               }}
             />
           </label>
+
+          {error ? (
+            <p style={{ margin: 0, color: "#dc2626", fontSize: "13px", fontWeight: 600 }}>
+              {error}
+            </p>
+          ) : null}
 
           <button
             type="submit"
