@@ -1,5 +1,6 @@
 import { jsonError, jsonOk } from "@/lib/api-response";
-import { fetchGa4Overview, isGa4Configured, listGa4Sources } from "@/lib/ga4";
+import { isGa4Configured, listGa4Sources } from "@/lib/ga4";
+import { fetchSourceOverview } from "@/lib/source-analytics";
 import { logger } from "@/server/logger";
 
 function clampRangeDays(value: number) {
@@ -23,7 +24,7 @@ export async function GET(request: Request) {
 
   try {
     const rangeDays = clampRangeDays(Number(url.searchParams.get("days") || 30));
-    const overview = await fetchGa4Overview(rangeDays, sourceId);
+    const overview = await fetchSourceOverview(rangeDays, sourceId);
     return jsonOk(overview);
   } catch (error) {
     logger.error("analytics.overview.failed", {
