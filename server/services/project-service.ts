@@ -9,17 +9,22 @@ import {
   createProjectWithSeeds,
   deleteProjectById,
   adoptVariant,
+  getLatestContentPlan,
   getLatestVariantGroup,
   getProjectDetail,
   getVariantGroup,
+  listProjectsWithAnalyticsSources,
   listProjectBrandProfiles,
   listProjectContentJobs,
   listProjects,
+  markContentPlanExecuted,
+  markContentPlanItemGenerated,
   replaceProjectTopics,
   saveBrandProfileDraft,
   saveLatestContentJobPublishResult,
   saveLatestContentJobAssets,
   selectImageAssetForContentAsset,
+  upsertContentPlan,
   updateProjectSettings,
   updateLatestContentJobStatus,
 } from "../repositories/project-repository";
@@ -37,6 +42,8 @@ import { buildReviewSummary } from "./review-service";
 import { analyzeSourceFiles } from "./source-analysis-service";
 import { buildStudioSeed } from "./studio-seed-service";
 import { buildTopicRecommendations, normalizeTopicTitle } from "./topic-recommendation-service";
+import { buildMonthlyContentPlan } from "./content-plan-service";
+import { fetchAnalyticsForSourceConfig, type AnalyticsSourceConfig } from "../../lib/source-analytics";
 import { fetchWebsiteSource } from "./website-source-service";
 import { publishToWordPress, WordPressPublishError } from "./wordpress-publish-service";
 import type { CreateProjectInput } from "../validators/project-validator";
@@ -139,6 +146,12 @@ function serializeProjectDetail(record: NonNullable<Awaited<ReturnType<typeof ge
       industry: record.project.industry,
       workingPath: record.project.workingPath,
       status: record.project.status,
+      analyticsSourceType: record.project.analyticsSourceType,
+      analyticsSourceId: record.project.analyticsSourceId,
+      analyticsSourceLabel: record.project.analyticsSourceLabel,
+      analyticsEndpointUrl: record.project.analyticsEndpointUrl,
+      analyticsAccessKey: record.project.analyticsAccessKey,
+      analyticsConnectedAt: record.project.analyticsConnectedAt,
       wordpressSiteUrl: record.project.wordpressSiteUrl,
       wordpressUsername: record.project.wordpressUsername,
       wordpressStatus: record.project.wordpressStatus,
@@ -214,6 +227,29 @@ function serializeProjectDetail(record: NonNullable<Awaited<ReturnType<typeof ge
           })),
         }
       : null,
+    latestContentPlan: record.latestContentPlan
+      ? {
+          id: record.latestContentPlan.id,
+          monthKey: record.latestContentPlan.monthKey,
+          status: record.latestContentPlan.status,
+          basisSummary: record.latestContentPlan.basisSummary,
+          autoGenerate: record.latestContentPlan.autoGenerate,
+          generatedAt: record.latestContentPlan.generatedAt?.toISOString() ?? null,
+          lastExecutedAt: record.latestContentPlan.lastExecutedAt?.toISOString() ?? null,
+          items: record.latestContentPlan.items.map((item) => ({
+            id: item.id,
+            sortOrder: item.sortOrder,
+            weekLabel: item.weekLabel,
+            topic: item.topic,
+            intentType: item.intentType,
+            objective: item.objective,
+            rationale: item.rationale,
+            status: item.status,
+            contentJobId: item.contentJobId,
+            generatedAt: item.generatedAt?.toISOString() ?? null,
+          })),
+        }
+      : null,
   };
 }
 
@@ -274,6 +310,11 @@ export async function deleteProject(projectId: string) {
 export async function saveProjectSettings(params: {
   projectId: string;
   industry?: string;
+  analyticsSourceType?: string;
+  analyticsSourceId?: string;
+  analyticsSourceLabel?: string;
+  analyticsEndpointUrl?: string;
+  analyticsAccessKey?: string | null;
   wordpressSiteUrl?: string;
   wordpressUsername?: string;
   wordpressStatus?: "draft" | "publish";
@@ -289,6 +330,11 @@ export async function saveProjectSettings(params: {
   await updateProjectSettings({
     projectId: params.projectId,
     industry: params.industry,
+    analyticsSourceType: params.analyticsSourceType,
+    analyticsSourceId: params.analyticsSourceId,
+    analyticsSourceLabel: params.analyticsSourceLabel,
+    analyticsEndpointUrl: params.analyticsEndpointUrl,
+    analyticsAccessKey: params.analyticsAccessKey,
     wordpressSiteUrl: params.wordpressSiteUrl,
     wordpressUsername: params.wordpressUsername,
     wordpressStatus: params.wordpressStatus,
@@ -297,6 +343,266 @@ export async function saveProjectSettings(params: {
   });
 
   return getProjectById(params.projectId);
+}
+
+function getCurrentMonthKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+function getCurrentWeekOfMonth(date = new Date()) {
+  return Math.min(4, Math.max(1, Math.ceil(date.getDate() / 7)));
+}
+
+function normalizeAnalyticsSourceType(value?: string | null): "ga4" | "external" {
+  return value === "ga4" ? "ga4" : "external";
+}
+
+function buildAnalyticsSourceConfig(record: {
+  analyticsSourceType?: string | null;
+  analyticsSourceId?: string | null;
+  analyticsSourceLabel?: string | null;
+  analyticsEndpointUrl?: string | null;
+  analyticsAccessKey?: string | null;
+}): AnalyticsSourceConfig {
+  const type = normalizeAnalyticsSourceType(record.analyticsSourceType);
+  const label = record.analyticsSourceLabel?.trim();
+
+  if (!label) {
+    throw new Error("프로젝트에 연결된 분석 소스 이름이 없습니다.");
+  }
+
+  if (type === "ga4") {
+    const sourceId = record.analyticsSourceId?.trim();
+    if (!sourceId) {
+      throw new Error("GA4 소스 ID가 비어 있습니다.");
+    }
+
+    return {
+      type: "ga4",
+      sourceId,
+      label,
+    };
+  }
+
+  const endpointUrl = record.analyticsEndpointUrl?.trim();
+  if (!endpointUrl) {
+    throw new Error("외부 집계 엔드포인트 URL이 비어 있습니다.");
+  }
+
+  return {
+    type: "external",
+    sourceId: record.analyticsSourceId?.trim() || undefined,
+    label,
+    endpointUrl,
+    accessKey: record.analyticsAccessKey?.trim() || undefined,
+  };
+}
+
+export async function generateMonthlyProjectPlan(projectId: string, autoGenerate = false) {
+  const record = await getProjectDetail(projectId);
+
+  if (!record || !record.brandProfile) {
+    throw new ProjectNotFoundError(projectId);
+  }
+
+  if (!record.project.analyticsSourceLabel) {
+    throw new Error("프로젝트에 연결된 분석 소스가 없습니다.");
+  }
+
+  const analyticsOverview = await fetchAnalyticsForSourceConfig(30, buildAnalyticsSourceConfig(record.project));
+
+  const plan = buildMonthlyContentPlan({
+    monthKey: getCurrentMonthKey(),
+    projectName: record.project.name,
+    industry: record.project.industry || "general",
+    brandSummary: record.brandProfile.summary,
+    cta: record.brandProfile.cta || null,
+    analyticsOverview,
+    topics: record.topics.map((topic) => ({
+      title: normalizeTopicTitle(topic.title, record.project.name),
+      intentType: topic.intentType || undefined,
+      score: topic.score || undefined,
+      rationale: topic.rationale || undefined,
+    })),
+  });
+
+  const savedPlan = await upsertContentPlan({
+    projectId,
+    monthKey: plan.monthKey,
+    status: autoGenerate ? "scheduled" : "draft",
+    basisSummary: plan.basisSummary,
+    autoGenerate,
+    items: plan.items,
+  });
+
+  logger.info("project.monthly_plan.generated", {
+    projectId,
+    monthKey: plan.monthKey,
+    analyticsSource: record.project.analyticsSourceLabel,
+    itemCount: plan.items.length,
+  });
+
+  return savedPlan;
+}
+
+export async function runMonthlyProjectPlan(
+  projectId: string,
+  options?: {
+    onlyDueItems?: boolean;
+  },
+) {
+  const record = await getProjectDetail(projectId);
+
+  if (!record || !record.brandProfile) {
+    throw new ProjectNotFoundError(projectId);
+  }
+
+  const plan = await getLatestContentPlan(projectId);
+  if (!plan) {
+    throw new Error("실행할 월간 계획이 없습니다.");
+  }
+
+  const currentWeek = getCurrentWeekOfMonth();
+  const runnableItems = plan.items.filter((entry) => {
+    if (entry.status !== "planned") {
+      return false;
+    }
+
+    if (!options?.onlyDueItems) {
+      return true;
+    }
+
+    return entry.sortOrder <= currentWeek;
+  });
+  const generatedItems: Array<{ itemId: string; contentJobId: string; topic: string }> = [];
+
+  for (const item of runnableItems) {
+    const generated = await buildGeneratedStudioSeed({
+      projectName: record.project.name,
+      industry: record.project.industry,
+      profile: {
+        summary: record.brandProfile.summary,
+        audience: record.brandProfile.audience,
+        tone: record.brandProfile.tone,
+        cta: record.brandProfile.cta,
+        bannedTerms: record.brandProfile.bannedTerms,
+      },
+      topics: [
+        {
+          title: item.topic,
+          score: 10,
+        },
+        ...record.topics.map((topic) => ({
+          title: topic.title,
+          score: topic.score,
+        })),
+      ],
+    });
+
+    const contentJob = await createOrUpdateContentJobWithAssets({
+      projectId,
+      topic: item.topic,
+      objective: item.objective || undefined,
+      generationProvider: generated.provider,
+      assets: generated.seed.assets,
+    });
+
+    await markContentPlanItemGenerated({
+      contentPlanItemId: item.id,
+      contentJobId: contentJob.id,
+    });
+
+    generatedItems.push({
+      itemId: item.id,
+      contentJobId: contentJob.id,
+      topic: item.topic,
+    });
+  }
+
+  const allItemsHandled = plan.items.every(
+    (entry) => entry.status === "generated" || generatedItems.some((generatedItem) => generatedItem.itemId === entry.id),
+  );
+
+  if (allItemsHandled) {
+    await markContentPlanExecuted(plan.id);
+  }
+
+  logger.info("project.monthly_plan.executed", {
+    projectId,
+    contentPlanId: plan.id,
+    onlyDueItems: Boolean(options?.onlyDueItems),
+    dueWeek: currentWeek,
+    generatedCount: generatedItems.length,
+  });
+
+  return {
+    planId: plan.id,
+    generatedItems,
+  };
+}
+
+export async function runAutomaticMonthlyPlans() {
+  const currentMonthKey = getCurrentMonthKey();
+  const projects = await listProjectsWithAnalyticsSources();
+  const results: Array<{
+    projectId: string;
+    action: "generated" | "executed" | "skipped" | "failed";
+    detail?: string;
+    generatedCount?: number;
+  }> = [];
+
+  for (const project of projects) {
+    try {
+      const latestPlan = await getLatestContentPlan(project.id);
+
+      if (!latestPlan || latestPlan.monthKey !== currentMonthKey) {
+        await generateMonthlyProjectPlan(project.id, true);
+        results.push({
+          projectId: project.id,
+          action: "generated",
+          detail: `${currentMonthKey} 계획 생성`,
+        });
+      }
+
+      const currentPlan = await getLatestContentPlan(project.id);
+      if (!currentPlan?.autoGenerate) {
+        results.push({
+          projectId: project.id,
+          action: "skipped",
+          detail: "자동 생성 비활성화",
+        });
+        continue;
+      }
+
+      const executed = await runMonthlyProjectPlan(project.id, { onlyDueItems: true });
+      results.push({
+        projectId: project.id,
+        action: "executed",
+        generatedCount: executed.generatedItems.length,
+        detail: `${getCurrentWeekOfMonth()}주차까지 실행`,
+      });
+    } catch (error) {
+      logger.error("project.monthly_plan.auto.failed", {
+        projectId: project.id,
+        error: error instanceof Error ? error.message : "unknown_error",
+      });
+
+      results.push({
+        projectId: project.id,
+        action: "failed",
+        detail: error instanceof Error ? error.message : "unknown_error",
+      });
+    }
+  }
+
+  return {
+    monthKey: currentMonthKey,
+    checkedProjects: projects.length,
+    results,
+  };
 }
 
 export async function getProjectById(projectId: string) {

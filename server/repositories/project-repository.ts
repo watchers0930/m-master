@@ -69,6 +69,31 @@ export type ProjectDetailRecord = {
       }>;
     }>;
   } | null;
+  latestContentPlan: {
+    id: string;
+    monthKey: string;
+    status: string;
+    basisSummary: string | null;
+    autoGenerate: boolean;
+    generatedAt: Date | null;
+    lastExecutedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    items: Array<{
+      id: string;
+      sortOrder: number;
+      weekLabel: string;
+      topic: string;
+      intentType: string | null;
+      objective: string | null;
+      rationale: string | null;
+      status: string;
+      contentJobId: string | null;
+      generatedAt: Date | null;
+      createdAt: Date;
+      updatedAt: Date;
+    }>;
+  } | null;
 };
 
 const projectSummaryInclude = {
@@ -148,6 +173,11 @@ export async function createProjectWithSeeds(params: {
 export async function updateProjectSettings(params: {
   projectId: string;
   industry?: string;
+  analyticsSourceType?: string;
+  analyticsSourceId?: string;
+  analyticsSourceLabel?: string;
+  analyticsEndpointUrl?: string;
+  analyticsAccessKey?: string | null;
   wordpressSiteUrl?: string;
   wordpressUsername?: string;
   wordpressStatus?: string;
@@ -158,6 +188,12 @@ export async function updateProjectSettings(params: {
     where: { id: params.projectId },
     data: {
       industry: params.industry,
+      analyticsSourceType: params.analyticsSourceType,
+      analyticsSourceId: params.analyticsSourceId,
+      analyticsSourceLabel: params.analyticsSourceLabel,
+      analyticsEndpointUrl: params.analyticsEndpointUrl,
+      analyticsAccessKey: params.analyticsAccessKey,
+      analyticsConnectedAt: params.analyticsSourceLabel ? new Date() : null,
       wordpressSiteUrl: params.wordpressSiteUrl,
       wordpressUsername: params.wordpressUsername,
       wordpressStatus: params.wordpressStatus,
@@ -183,7 +219,7 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
     return null;
   }
 
-  const [brandProfile, topics, latestContentJob] = await Promise.all([
+  const [brandProfile, topics, latestContentJob, latestContentPlan] = await Promise.all([
     prisma.brandProfile.findFirst({
       where: { projectId },
       orderBy: [{ version: "desc" }, { createdAt: "desc" }],
@@ -211,6 +247,15 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
         },
       },
     }),
+    prisma.contentPlan.findFirst({
+      where: { projectId },
+      orderBy: [{ monthKey: "desc" }, { updatedAt: "desc" }],
+      include: {
+        items: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        },
+      },
+    }),
   ]);
 
   return {
@@ -218,6 +263,7 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
     brandProfile,
     topics,
     latestContentJob,
+    latestContentPlan,
   };
 }
 
@@ -616,6 +662,132 @@ export async function listProjectContentJobs(projectId: string) {
       assets: {
         orderBy: [{ createdAt: "asc" }],
       },
+    },
+  });
+}
+
+export async function upsertContentPlan(params: {
+  projectId: string;
+  monthKey: string;
+  status?: string;
+  basisSummary?: string;
+  autoGenerate?: boolean;
+  items: Array<{
+    sortOrder: number;
+    weekLabel: string;
+    topic: string;
+    intentType?: string;
+    objective?: string;
+    rationale?: string;
+    status?: string;
+  }>;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const plan = await tx.contentPlan.upsert({
+      where: {
+        projectId_monthKey: {
+          projectId: params.projectId,
+          monthKey: params.monthKey,
+        },
+      },
+      update: {
+        status: params.status || "draft",
+        basisSummary: params.basisSummary,
+        autoGenerate: params.autoGenerate ?? false,
+        generatedAt: new Date(),
+      },
+      create: {
+        projectId: params.projectId,
+        monthKey: params.monthKey,
+        status: params.status || "draft",
+        basisSummary: params.basisSummary,
+        autoGenerate: params.autoGenerate ?? false,
+        generatedAt: new Date(),
+      },
+    });
+
+    await tx.contentPlanItem.deleteMany({
+      where: { contentPlanId: plan.id },
+    });
+
+    if (params.items.length > 0) {
+      await tx.contentPlanItem.createMany({
+        data: params.items.map((item) => ({
+          contentPlanId: plan.id,
+          sortOrder: item.sortOrder,
+          weekLabel: item.weekLabel,
+          topic: item.topic,
+          intentType: item.intentType,
+          objective: item.objective,
+          rationale: item.rationale,
+          status: item.status || "planned",
+        })),
+      });
+    }
+
+    return tx.contentPlan.findUniqueOrThrow({
+      where: { id: plan.id },
+      include: {
+        items: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        },
+      },
+    });
+  });
+}
+
+export async function getLatestContentPlan(projectId: string) {
+  return prisma.contentPlan.findFirst({
+    where: { projectId },
+    orderBy: [{ monthKey: "desc" }, { updatedAt: "desc" }],
+    include: {
+      items: {
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      },
+    },
+  });
+}
+
+export async function listProjectsWithAnalyticsSources() {
+  return prisma.project.findMany({
+    where: {
+      analyticsSourceLabel: {
+        not: null,
+      },
+    },
+    select: {
+      id: true,
+      name: true,
+      analyticsSourceType: true,
+      analyticsSourceId: true,
+      analyticsSourceLabel: true,
+      analyticsEndpointUrl: true,
+      analyticsAccessKey: true,
+    },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+  });
+}
+
+export async function markContentPlanItemGenerated(params: {
+  contentPlanItemId: string;
+  contentJobId: string;
+}) {
+  return prisma.contentPlanItem.update({
+    where: { id: params.contentPlanItemId },
+    data: {
+      status: "generated",
+      contentJobId: params.contentJobId,
+      generatedAt: new Date(),
+    },
+  });
+}
+
+export async function markContentPlanExecuted(contentPlanId: string) {
+  return prisma.contentPlan.update({
+    where: { id: contentPlanId },
+    data: {
+      status: "executed",
+      lastExecutedAt: new Date(),
     },
   });
 }

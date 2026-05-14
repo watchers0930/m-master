@@ -3316,6 +3316,109 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   color: #1d4ed8;
 }
 
+.analytics-custom-source-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 18px;
+}
+
+.analytics-custom-source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.analytics-custom-source-chip button {
+  border: none;
+  background: transparent;
+  color: #b91c1c;
+  cursor: pointer;
+  font: inherit;
+}
+
+.analytics-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.analytics-modal-card {
+  width: min(560px, 100%);
+  padding: 24px;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.22);
+}
+
+.analytics-modal-head,
+.analytics-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.analytics-modal-head {
+  margin-bottom: 18px;
+}
+
+.analytics-modal-head h3 {
+  margin: 4px 0 0;
+  font-size: 24px;
+  line-height: 1.2;
+  color: #0f172a;
+}
+
+.analytics-modal-close {
+  border: none;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  font: inherit;
+}
+
+.analytics-modal-field {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.analytics-modal-field span,
+.analytics-modal-help {
+  color: #475569;
+  font-size: 13px;
+}
+
+.analytics-modal-field input,
+.analytics-modal-field textarea {
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 16px;
+  background: #f8fafc;
+  color: #0f172a;
+  font: inherit;
+}
+
+.analytics-modal-field textarea {
+  resize: vertical;
+}
+
+.analytics-modal-help {
+  margin: 0 0 18px;
+}
+
 @media (max-width: 1180px) {
   .cms-admin-grid {
     grid-template-columns: 1fr;
@@ -3386,5 +3489,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .public-site-nav-link {
     flex: 1 1 100%;
     justify-content: space-between;
+  }
+
+  .analytics-modal-backdrop {
+    padding: 16px;
+  }
+
+  .analytics-modal-card {
+    padding: 20px;
+  }
+
+  .analytics-modal-head,
+  .analytics-modal-actions {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

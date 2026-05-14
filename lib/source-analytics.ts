@@ -1,4 +1,5 @@
 import { fetchGa4Overview, type Ga4OverviewResponse } from "@/lib/ga4";
+import { adaptFirstPartyOverview, isFirstPartyOverviewResponse, isGa4OverviewResponse } from "@/lib/external-analytics";
 
 interface VestraPublicOverviewResponse {
   source: "vestra";
@@ -54,6 +55,20 @@ interface VestraPublicOverviewResponse {
 const SOURCE_PUBLIC_OVERVIEW_URLS: Record<string, string | undefined> = {
   vestra: "https://vestra-plum.vercel.app/api/public/analytics/overview",
 };
+
+export type AnalyticsSourceConfig =
+  | {
+      type: "ga4";
+      sourceId: string;
+      label: string;
+    }
+  | {
+      type: "external";
+      sourceId?: string;
+      label: string;
+      endpointUrl: string;
+      accessKey?: string;
+    };
 
 function shouldUseFallback(sourceId: string | undefined, overview: Ga4OverviewResponse) {
   return sourceId === "vestra" && overview.overview.sessions === 0 && overview.overview.views === 0;
@@ -142,4 +157,50 @@ export async function fetchSourceOverview(rangeDays: number, sourceId?: string):
 
   const fallbackOverview = await fetchFallbackOverview(sourceId || "", rangeDays);
   return fallbackOverview || ga4Overview;
+}
+
+export async function fetchAnalyticsForSourceConfig(
+  rangeDays: number,
+  config: AnalyticsSourceConfig,
+): Promise<Ga4OverviewResponse> {
+  if (config.type === "ga4") {
+    return fetchSourceOverview(rangeDays, config.sourceId);
+  }
+
+  const response = await fetch(`${config.endpointUrl}?days=${rangeDays}`, {
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      ...(config.accessKey ? { "x-analytics-key": config.accessKey } : {}),
+    },
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`외부 집계 소스 조회 실패 (${response.status}) ${detail.slice(0, 300)}`);
+  }
+
+  const json = await response.json() as unknown;
+
+  if (isGa4OverviewResponse(json)) {
+    return {
+      ...json,
+      source: config.sourceId || json.source,
+      sourceLabel: config.label,
+    };
+  }
+
+  if (isFirstPartyOverviewResponse(json)) {
+    return adaptFirstPartyOverview(
+      {
+        id: config.sourceId,
+        label: config.label,
+        endpointUrl: config.endpointUrl,
+        accessKey: config.accessKey || null,
+      },
+      json,
+    );
+  }
+
+  throw new Error("지원하지 않는 집계 응답 형식입니다.");
 }
