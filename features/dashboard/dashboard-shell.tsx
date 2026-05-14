@@ -6,10 +6,15 @@ import { ProjectIntakeForm } from "@/features/dashboard/project-intake-form";
 import { ProjectOverview } from "@/features/dashboard/project-overview";
 import { usePublishWorkflow } from "@/features/dashboard/use-publish-workflow";
 import type {
+  AutomationReadinessReport,
   ChannelKey,
+  CredentialHealthReport,
   EditableBrandProfileField,
   ImageStudioState,
   ImageStudioVariant,
+  ProjectOperatorRole,
+  ProjectOperatorSession,
+  ProjectOperatorSummary,
   ProjectActivityItem,
   ProjectDetail,
   ProjectListItem,
@@ -156,6 +161,19 @@ export function DashboardShell() {
   const [loading, setLoading] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
   const [folderSupported, setFolderSupported] = useState<boolean | null>(null);
+  const [automationReadiness, setAutomationReadiness] = useState<AutomationReadinessReport | null>(null);
+  const [projectWordpressAppPassword, setProjectWordpressAppPassword] = useState("");
+  const [projectMetaAccessToken, setProjectMetaAccessToken] = useState("");
+  const [projectOperationsAlertWebhook, setProjectOperationsAlertWebhook] = useState("");
+  const [operatorSession, setOperatorSession] = useState<ProjectOperatorSession | null>(null);
+  const [operators, setOperators] = useState<ProjectOperatorSummary[]>([]);
+  const [credentialHealth, setCredentialHealth] = useState<CredentialHealthReport | null>(null);
+  const [operatorLoginName, setOperatorLoginName] = useState("");
+  const [operatorLoginKey, setOperatorLoginKey] = useState("");
+  const [operatorBootstrapSecret, setOperatorBootstrapSecret] = useState("");
+  const [newOperatorName, setNewOperatorName] = useState("");
+  const [newOperatorKey, setNewOperatorKey] = useState("");
+  const [newOperatorRole, setNewOperatorRole] = useState<ProjectOperatorRole>("operator");
 
   const currentImageStudio = imageStudios[activeChannel];
   const contextApproved = Boolean(activeProject?.brandProfile?.approved);
@@ -198,6 +216,9 @@ export function DashboardShell() {
 
   function applyProjectDetail(nextProject: ProjectDetail) {
     setActiveProject(nextProject);
+    setProjectWordpressAppPassword("");
+    setProjectMetaAccessToken("");
+    setProjectOperationsAlertWebhook("");
     publishWorkflow.hydratePublishResult(nextProject);
   }
 
@@ -249,6 +270,72 @@ export function DashboardShell() {
     return payload.data.history;
   }
 
+  async function loadAutomationReadiness(projectId: string) {
+    const response = await fetch(`/api/projects/${projectId}/automation-readiness`, { cache: "no-store" });
+    const payload = await parseJson<ApiResponse<{ readiness: AutomationReadinessReport }>>(response);
+
+    if (!payload.ok) {
+      throw new Error(payload.error.message);
+    }
+
+    setAutomationReadiness(payload.data.readiness);
+    return payload.data.readiness;
+  }
+
+  async function loadOperatorSession(projectId: string) {
+    const response = await fetch(`/api/projects/${projectId}/operators/session`, { cache: "no-store" });
+    const payload = await parseJson<ApiResponse<{ operator: ProjectOperatorSession | null }>>(response);
+
+    if (!payload.ok) {
+      throw new Error(payload.error.message);
+    }
+
+    setOperatorSession(payload.data.operator);
+    return payload.data.operator;
+  }
+
+  async function loadOperators(projectId: string) {
+    const response = await fetch(`/api/projects/${projectId}/operators`, { cache: "no-store" });
+    const payload = await parseJson<ApiResponse<{ operators: ProjectOperatorSummary[]; bootstrapRequired: boolean }>>(response);
+
+    if (!payload.ok) {
+      if (response.status === 401 || response.status === 403) {
+        setOperators([]);
+        return [];
+      }
+
+      throw new Error(payload.error.message);
+    }
+
+    setOperators(payload.data.operators);
+    return payload.data.operators;
+  }
+
+  async function loadCredentialHealth(projectId: string) {
+    const response = await fetch(`/api/projects/${projectId}/credential-checks`, { cache: "no-store" });
+    const payload = await parseJson<ApiResponse<{ health: CredentialHealthReport }>>(response);
+
+    if (!payload.ok) {
+      if (response.status === 401 || response.status === 403) {
+        setCredentialHealth(null);
+        return null;
+      }
+
+      throw new Error(payload.error.message);
+    }
+
+    setCredentialHealth(payload.data.health);
+    return payload.data.health;
+  }
+
+  async function loadOperationsContext(projectId: string) {
+    await Promise.allSettled([
+      loadOperatorSession(projectId),
+      loadOperators(projectId),
+      loadCredentialHealth(projectId),
+    ]);
+  }
+
   async function loadProjects() {
     const response = await fetch("/api/projects", { cache: "no-store" });
     const payload = await parseJson<ApiResponse<{ projects: ProjectListItem[] }>>(response);
@@ -267,8 +354,10 @@ export function DashboardShell() {
     const [nextProject] = await Promise.all([
       loadProjectDetail(projectId),
       loadProjectHistory(projectId),
+      loadAutomationReadiness(projectId),
     ]);
     await loadProjectStudio(projectId, nextProject);
+    await loadOperationsContext(projectId);
     publishWorkflow.resetPublishState();
   }
 
@@ -621,6 +710,298 @@ export function DashboardShell() {
     });
   }
 
+  function handleProjectGa4PropertyIdChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          ga4PropertyId: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectWordpressSiteUrlChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          wordpressSiteUrl: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectWordpressUsernameChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          wordpressUsername: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectWordpressStatusChange(value: "draft" | "publish") {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          wordpressStatus: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectWordpressCategoryNamesChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          wordpressCategoryNames: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectWordpressTagNamesChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          wordpressTagNames: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectFacebookPageIdChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          facebookPageId: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectInstagramBusinessAccountIdChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          instagramBusinessAccountId: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectMetaTokenExpiresAtChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          metaTokenExpiresAt: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectAlertPolicyModeChange(
+    value: "disabled" | "all" | "critical-only" | "failures-only" | "failures-and-review",
+  ) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          alertPolicyMode: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectAlertQuietHoursStartChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          alertQuietHoursStart: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectAlertQuietHoursEndChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          alertQuietHoursEnd: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectAlertTimezoneChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          alertTimezone: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectAlertOnBlockedReadinessChange(value: boolean) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          alertOnBlockedReadiness: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectAutomationModeChange(value: "draft-only" | "approved-auto-publish" | "full-auto") {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          automationMode: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectAutomationRequireReviewChange(value: boolean) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          automationRequireReview: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectAutomationMinOverallScoreChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      const numeric = Number(value);
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          automationMinOverallScore: Number.isFinite(numeric) ? numeric : 0,
+        },
+      };
+    });
+  }
+
+  function handleProjectAutomationMinRiskScoreChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      const numeric = Number(value);
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          automationMinRiskScore: Number.isFinite(numeric) ? numeric : 0,
+        },
+      };
+    });
+  }
+
   async function handleSaveProjectSettings() {
     if (!activeProject?.project.id) {
       return;
@@ -635,11 +1016,27 @@ export function DashboardShell() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           industry: activeProject.project.industry || "general",
+          ga4PropertyId: activeProject.project.ga4PropertyId,
           wordpressSiteUrl: activeProject.project.wordpressSiteUrl,
           wordpressUsername: activeProject.project.wordpressUsername,
+          wordpressAppPassword: projectWordpressAppPassword || undefined,
           wordpressStatus: activeProject.project.wordpressStatus,
           wordpressCategoryNames: activeProject.project.wordpressCategoryNames,
           wordpressTagNames: activeProject.project.wordpressTagNames,
+          metaAccessToken: projectMetaAccessToken || undefined,
+          metaTokenExpiresAt: activeProject.project.metaTokenExpiresAt || undefined,
+          facebookPageId: activeProject.project.facebookPageId,
+          instagramBusinessAccountId: activeProject.project.instagramBusinessAccountId,
+          operationsAlertWebhook: projectOperationsAlertWebhook || undefined,
+          alertPolicyMode: activeProject.project.alertPolicyMode,
+          alertQuietHoursStart: activeProject.project.alertQuietHoursStart,
+          alertQuietHoursEnd: activeProject.project.alertQuietHoursEnd,
+          alertTimezone: activeProject.project.alertTimezone,
+          alertOnBlockedReadiness: activeProject.project.alertOnBlockedReadiness,
+          automationMode: activeProject.project.automationMode,
+          automationRequireReview: activeProject.project.automationRequireReview,
+          automationMinOverallScore: activeProject.project.automationMinOverallScore,
+          automationMinRiskScore: activeProject.project.automationMinRiskScore,
         }),
       });
 
@@ -650,9 +1047,220 @@ export function DashboardShell() {
       }
 
       applyProjectDetail(payload.data.project);
+      await loadAutomationReadiness(activeProject.project.id);
+      await loadCredentialHealth(activeProject.project.id);
       await loadProjects();
     } catch (settingsError) {
       setError(settingsError instanceof Error ? settingsError.message : "프로젝트 설정 저장에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleOperatorLogin() {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/operators/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: operatorLoginName,
+          accessKey: operatorLoginKey,
+        }),
+      });
+      const payload = await parseJson<ApiResponse<{ operator: ProjectOperatorSession }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      setOperatorSession(payload.data.operator);
+      setOperatorLoginKey("");
+      await Promise.allSettled([
+        loadOperators(activeProject.project.id),
+        loadCredentialHealth(activeProject.project.id),
+        loadAutomationReadiness(activeProject.project.id),
+      ]);
+    } catch (sessionError) {
+      setError(sessionError instanceof Error ? sessionError.message : "운영자 로그인에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleOperatorLogout() {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      await fetch(`/api/projects/${activeProject.project.id}/operators/session`, {
+        method: "DELETE",
+      });
+      setOperatorSession(null);
+      setOperators([]);
+      setCredentialHealth(null);
+    } catch (sessionError) {
+      setError(sessionError instanceof Error ? sessionError.message : "운영자 로그아웃에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleBootstrapOperator() {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/operators`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: operatorLoginName,
+          accessKey: operatorLoginKey,
+          role: "owner",
+          bootstrapSecret: operatorBootstrapSecret,
+        }),
+      });
+      const payload = await parseJson<ApiResponse<{ operator: ProjectOperatorSummary }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      const sessionResponse = await fetch(`/api/projects/${activeProject.project.id}/operators/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: operatorLoginName,
+          accessKey: operatorLoginKey,
+        }),
+      });
+      const sessionPayload = await parseJson<ApiResponse<{ operator: ProjectOperatorSession }>>(sessionResponse);
+
+      if (!sessionPayload.ok) {
+        throw new Error(sessionPayload.error.message);
+      }
+
+      setOperatorSession(sessionPayload.data.operator);
+      setOperatorLoginKey("");
+      await Promise.allSettled([
+        loadOperators(activeProject.project.id),
+        loadCredentialHealth(activeProject.project.id),
+        loadAutomationReadiness(activeProject.project.id),
+      ]);
+    } catch (bootstrapError) {
+      setError(bootstrapError instanceof Error ? bootstrapError.message : "초기 owner 등록에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCreateOperator() {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/operators`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newOperatorName,
+          accessKey: newOperatorKey,
+          role: newOperatorRole,
+        }),
+      });
+      const payload = await parseJson<ApiResponse<{ operator: ProjectOperatorSummary }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      setNewOperatorName("");
+      setNewOperatorKey("");
+      setNewOperatorRole("operator");
+      await loadOperators(activeProject.project.id);
+    } catch (operatorError) {
+      setError(operatorError instanceof Error ? operatorError.message : "운영자 추가에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleUpdateOperator(operatorId: string, patch: { role?: ProjectOperatorRole; active?: boolean }) {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/operators`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operatorId,
+          ...patch,
+        }),
+      });
+      const payload = await parseJson<ApiResponse<{ operator: ProjectOperatorSummary }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      await loadOperators(activeProject.project.id);
+    } catch (operatorError) {
+      setError(operatorError instanceof Error ? operatorError.message : "운영자 수정에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRunCredentialCheck(service: "wordpress" | "meta" | "ga4" | "alerts") {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/credential-checks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service }),
+      });
+      const payload = await parseJson<ApiResponse<{ run: unknown }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      await Promise.allSettled([
+        loadCredentialHealth(activeProject.project.id),
+        loadAutomationReadiness(activeProject.project.id),
+      ]);
+    } catch (checkError) {
+      setError(checkError instanceof Error ? checkError.message : "자격증명 점검 실행에 실패했습니다.");
     } finally {
       setLoading(false);
     }
@@ -966,6 +1574,52 @@ export function DashboardShell() {
                 onDeleteProject={handleDeleteProject}
                 onRegenerateContext={handleRegenerateContext}
                 onProjectIndustryChange={handleProjectIndustryChange}
+                onProjectGa4PropertyIdChange={handleProjectGa4PropertyIdChange}
+                onProjectWordpressSiteUrlChange={handleProjectWordpressSiteUrlChange}
+                onProjectWordpressUsernameChange={handleProjectWordpressUsernameChange}
+                projectWordpressAppPassword={projectWordpressAppPassword}
+                onProjectWordpressAppPasswordChange={setProjectWordpressAppPassword}
+                onProjectWordpressStatusChange={handleProjectWordpressStatusChange}
+                onProjectWordpressCategoryNamesChange={handleProjectWordpressCategoryNamesChange}
+                onProjectWordpressTagNamesChange={handleProjectWordpressTagNamesChange}
+                projectMetaAccessToken={projectMetaAccessToken}
+                onProjectMetaAccessTokenChange={setProjectMetaAccessToken}
+                onProjectMetaTokenExpiresAtChange={handleProjectMetaTokenExpiresAtChange}
+                onProjectFacebookPageIdChange={handleProjectFacebookPageIdChange}
+                onProjectInstagramBusinessAccountIdChange={handleProjectInstagramBusinessAccountIdChange}
+                projectOperationsAlertWebhook={projectOperationsAlertWebhook}
+                onProjectOperationsAlertWebhookChange={setProjectOperationsAlertWebhook}
+                onProjectAlertPolicyModeChange={handleProjectAlertPolicyModeChange}
+                onProjectAlertQuietHoursStartChange={handleProjectAlertQuietHoursStartChange}
+                onProjectAlertQuietHoursEndChange={handleProjectAlertQuietHoursEndChange}
+                onProjectAlertTimezoneChange={handleProjectAlertTimezoneChange}
+                onProjectAlertOnBlockedReadinessChange={handleProjectAlertOnBlockedReadinessChange}
+                onProjectAutomationModeChange={handleProjectAutomationModeChange}
+                onProjectAutomationRequireReviewChange={handleProjectAutomationRequireReviewChange}
+                onProjectAutomationMinOverallScoreChange={handleProjectAutomationMinOverallScoreChange}
+                onProjectAutomationMinRiskScoreChange={handleProjectAutomationMinRiskScoreChange}
+                automationReadiness={automationReadiness}
+                operatorSession={operatorSession}
+                operators={operators}
+                credentialHealth={credentialHealth}
+                operatorLoginName={operatorLoginName}
+                onOperatorLoginNameChange={setOperatorLoginName}
+                operatorLoginKey={operatorLoginKey}
+                onOperatorLoginKeyChange={setOperatorLoginKey}
+                operatorBootstrapSecret={operatorBootstrapSecret}
+                onOperatorBootstrapSecretChange={setOperatorBootstrapSecret}
+                onOperatorLogin={handleOperatorLogin}
+                onOperatorLogout={handleOperatorLogout}
+                onOperatorBootstrap={handleBootstrapOperator}
+                newOperatorName={newOperatorName}
+                onNewOperatorNameChange={setNewOperatorName}
+                newOperatorKey={newOperatorKey}
+                onNewOperatorKeyChange={setNewOperatorKey}
+                newOperatorRole={newOperatorRole}
+                onNewOperatorRoleChange={setNewOperatorRole}
+                onCreateOperator={handleCreateOperator}
+                onUpdateOperator={handleUpdateOperator}
+                onRunCredentialCheck={handleRunCredentialCheck}
                 onSaveProjectSettings={handleSaveProjectSettings}
                 onBrandProfileChange={handleBrandProfileChange}
                 onSaveContext={handleSaveContext}

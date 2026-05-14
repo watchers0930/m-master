@@ -1,6 +1,7 @@
 "use client";
 
 import { InputField } from "@/components/ui/input-field";
+import { OperationsBoard } from "../components/operations-board";
 import type {
   ProjectListItem,
   ProjectDetail,
@@ -9,6 +10,13 @@ import type {
   StudioDetail,
   WordPressPublishConfig,
   BlogPublishPackage,
+  MonthlyContentPlan,
+  AutomationReadinessReport,
+  ChannelPublicationSummary,
+  AutomationRunSummary,
+  AutomationReviewResolution,
+  BulkOperationHistoryItem,
+  BulkOperationReport,
 } from "../types";
 
 const TONE_PRESETS = [
@@ -52,6 +60,11 @@ type Props = {
   onTopicInputChange: (v: string) => void;
   generateBusy: boolean;
   onGenerate: () => void;
+  contentPlan: MonthlyContentPlan | null;
+  planBusy: boolean;
+  onGenerateContentPlan: () => void;
+  selectedPlannedTopicId: string | null;
+  onSelectPlannedTopic: (itemId: string, topicTitle: string) => void;
   /* A/B */
   topic: string;
   variantGroup: VariantGroup | null;
@@ -75,9 +88,33 @@ type Props = {
   publishPackage: BlogPublishPackage | null;
   onPreparePublish: () => void;
   wordpressConfig: WordPressPublishConfig;
-  onWordPressConfigChange: (field: keyof WordPressPublishConfig, value: string) => void;
+  onWordPressConfigChange: (
+    field: keyof WordPressPublishConfig,
+    value: WordPressPublishConfig[keyof WordPressPublishConfig],
+  ) => void;
   settingsBusy: boolean;
   onSaveWordPressDefaults: () => void;
+  publications: ChannelPublicationSummary[];
+  failedPublications: ChannelPublicationSummary[];
+  publishedPublications: ChannelPublicationSummary[];
+  readiness: AutomationReadinessReport | null;
+  automationBusy: boolean;
+  automationRun: AutomationRunSummary | null;
+  automationFeedback: AutomationReviewResolution | null;
+  publicationFeedback: string | null;
+  bulkReport: BulkOperationReport | null;
+  bulkReportHistory: BulkOperationHistoryItem[];
+  reviewQueue: MonthlyContentPlan["items"];
+  readyQueue: MonthlyContentPlan["items"];
+  failedQueue: MonthlyContentPlan["items"];
+  publishedQueue: MonthlyContentPlan["items"];
+  onRunAutomation: () => void;
+  onApproveReview: (planItemId: string) => void;
+  onRetryPlanItem: (planItemId: string) => void;
+  onRetryPublication: (publicationId: string) => void;
+  onBulkApproveReview: (planItemIds: string[]) => void;
+  onBulkRetryPlanItems: (planItemIds: string[]) => void;
+  onBulkRetryPublications: (publicationIds: string[]) => void;
 };
 
 export function SidebarPanel(props: Props) {
@@ -94,6 +131,7 @@ export function SidebarPanel(props: Props) {
     contextBusy, onApproveContext, onSaveContextDraft,
     editingHashtags, onEditingHashtagsChange, hashtagBusy, onGenerateHashtags,
     topicInput, onTopicInputChange, generateBusy, onGenerate,
+    contentPlan, planBusy, onGenerateContentPlan, selectedPlannedTopicId, onSelectPlannedTopic,
     topic, variantGroup, abGenerateBusy, onGenerateVariants, adoptBusy, onAdoptVariant,
     seoCompliance,
     studio,
@@ -101,6 +139,23 @@ export function SidebarPanel(props: Props) {
     publishBusy, publishPackage, onPreparePublish,
     wordpressConfig, onWordPressConfigChange,
     settingsBusy, onSaveWordPressDefaults,
+    publications, failedPublications, publishedPublications,
+    readiness,
+    automationBusy,
+    automationRun,
+    automationFeedback, publicationFeedback, bulkReport,
+    bulkReportHistory,
+    reviewQueue,
+    readyQueue,
+    failedQueue,
+    publishedQueue,
+    onRunAutomation,
+    onApproveReview,
+    onRetryPlanItem,
+    onRetryPublication,
+    onBulkApproveReview,
+    onBulkRetryPlanItems,
+    onBulkRetryPublications,
   } = props;
 
   const bp = activeProject?.brandProfile;
@@ -200,6 +255,50 @@ export function SidebarPanel(props: Props) {
         <details className="sb-section" open>
           <summary className="sb-section-title">콘텐츠 생성</summary>
           <div className="sb-section-body">
+            <div className="sb-plan-card">
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div>
+                  <strong style={{ display: "block" }}>월간 마케팅 계획</strong>
+                  <span className="fine-print">
+                    {contentPlan ? `${contentPlan.monthKey} 계획` : "GA4와 승인된 콘텍스트를 바탕으로 이번 달 발행 계획을 만듭니다."}
+                  </span>
+                </div>
+                <button className="button ghost" disabled={!isApproved || planBusy} onClick={onGenerateContentPlan}>
+                  {planBusy ? "생성 중…" : contentPlan ? "다시 생성" : "계획 생성"}
+                </button>
+              </div>
+              {!isApproved && (
+                <p className="fine-print">월간 계획은 브랜드 콘텍스트 승인 후 생성할 수 있습니다.</p>
+              )}
+              {contentPlan?.basisSummary && (
+                <p className="fine-print" style={{ marginTop: 8 }}>{contentPlan.basisSummary}</p>
+              )}
+              {contentPlan?.items?.length ? (
+                <div className="topic-chip-wrap" style={{ marginTop: 12 }}>
+                  {contentPlan.items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`topic-chip selectable ${selectedPlannedTopicId === item.id ? "active" : ""}`}
+                      onClick={() => onSelectPlannedTopic(item.id, item.topic)}
+                    >
+                      <strong>{item.weekLabel}</strong>
+                      <span className="fine-print">
+                        {item.publishAt ? item.publishAt.slice(5, 10) : "일정 미정"} · {item.intentType || "general"}
+                      </span>
+                      <span className="fine-print">{item.topic}</span>
+                      <span className="fine-print">
+                        상태: {item.status}
+                        {typeof item.attemptCount === "number" ? ` · 시도 ${item.attemptCount}회` : ""}
+                      </span>
+                      {item.lastError ? (
+                        <span className="fine-print" style={{ color: "#d64d49" }}>{item.lastError}</span>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
             <div className="field-group">
               <label className="field-label">토픽</label>
               <input
@@ -329,12 +428,24 @@ export function SidebarPanel(props: Props) {
                 <label className="field-label">앱 비밀번호</label>
                 <input className="text-input" type="password" value={wordpressConfig.appPassword} onChange={(e) => onWordPressConfigChange("appPassword", e.target.value)} />
               </div>
+              <div className="field-group">
+                <label className="field-label">Meta Access Token</label>
+                <input className="text-input" type="password" value={wordpressConfig.metaAccessToken} onChange={(e) => onWordPressConfigChange("metaAccessToken", e.target.value)} placeholder="Meta Graph access token" />
+              </div>
+              <div className="field-group">
+                <label className="field-label">Facebook Page ID</label>
+                <input className="text-input" value={wordpressConfig.facebookPageId} onChange={(e) => onWordPressConfigChange("facebookPageId", e.target.value)} placeholder="예: 1234567890" />
+              </div>
+              <div className="field-group">
+                <label className="field-label">Instagram Business Account ID</label>
+                <input className="text-input" value={wordpressConfig.instagramBusinessAccountId} onChange={(e) => onWordPressConfigChange("instagramBusinessAccountId", e.target.value)} placeholder="예: 1784..." />
+              </div>
               <div className="button-row">
                 <button className="button primary" disabled={publishBusy} onClick={onPreparePublish}>
                   {publishBusy ? "처리 중…" : publishPackage ? "WP 발행" : "발행 준비"}
                 </button>
                 <button className="button ghost" disabled={settingsBusy} onClick={onSaveWordPressDefaults}>
-                  {settingsBusy ? "저장 중…" : "설정 저장"}
+                  {settingsBusy ? "저장 중…" : "채널/정책 저장"}
                 </button>
               </div>
               <button className="button ghost sb-btn-full" disabled={exportBusy} onClick={onExportAll}>
@@ -342,6 +453,40 @@ export function SidebarPanel(props: Props) {
               </button>
             </div>
           </div>
+        </details>
+      )}
+
+      {activeProject && (
+        <details className="sb-section" open>
+          <summary className="sb-section-title">자동화 운영</summary>
+          <OperationsBoard
+            projectId={activeProject.project.id}
+            wordpressConfig={wordpressConfig}
+            onWordPressConfigChange={onWordPressConfigChange}
+            settingsBusy={settingsBusy}
+            onSaveWordPressDefaults={onSaveWordPressDefaults}
+            publications={publications}
+            failedPublications={failedPublications}
+            publishedPublications={publishedPublications}
+            readiness={readiness}
+            automationBusy={automationBusy}
+                automationRun={automationRun}
+                automationFeedback={automationFeedback}
+                publicationFeedback={publicationFeedback}
+                bulkReport={bulkReport}
+                bulkReportHistory={bulkReportHistory}
+                reviewQueue={reviewQueue}
+            readyQueue={readyQueue}
+            failedQueue={failedQueue}
+            publishedQueue={publishedQueue}
+            onRunAutomation={onRunAutomation}
+            onApproveReview={onApproveReview}
+            onRetryPlanItem={onRetryPlanItem}
+            onRetryPublication={onRetryPublication}
+            onBulkApproveReview={onBulkApproveReview}
+            onBulkRetryPlanItems={onBulkRetryPlanItems}
+            onBulkRetryPublications={onBulkRetryPublications}
+          />
         </details>
       )}
     </aside>

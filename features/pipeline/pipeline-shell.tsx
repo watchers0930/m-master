@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AppHeader } from "@/features/site/app-header";
 import { usePipelineState } from "./hooks/use-pipeline-state";
 import { useSourceRegistration } from "./hooks/use-source-registration";
@@ -8,13 +8,20 @@ import { useContentGeneration } from "./hooks/use-content-generation";
 import { useAbTesting } from "./hooks/use-ab-testing";
 import { usePublishWorkflow } from "./hooks/use-publish-workflow";
 import { useImageStudio } from "./hooks/use-image-studio";
+import { apiPost } from "./hooks/use-api";
 import { SidebarPanel } from "./sections/sidebar-panel";
 import { ContentPanel } from "./sections/content-panel";
 import { ImagePanel } from "./sections/image-panel";
-import type { ProjectDetail } from "./types";
+import type { AutomationReviewResolution, AutomationRunSummary, BulkOperationReport, MonthlyContentPlan, ProjectDetail } from "./types";
 
 export function PipelineShell() {
   const state = usePipelineState();
+  const [planBusy, setPlanBusy] = useState(false);
+  const [automationBusy, setAutomationBusy] = useState(false);
+  const [automationRun, setAutomationRun] = useState<AutomationRunSummary | null>(null);
+  const [automationFeedback, setAutomationFeedback] = useState<AutomationReviewResolution | null>(null);
+  const [publicationFeedback, setPublicationFeedback] = useState<string | null>(null);
+  const [bulkReport, setBulkReport] = useState<BulkOperationReport | null>(null);
 
   const source = useSourceRegistration({
     onProjectCreated: (project: ProjectDetail) => {
@@ -23,6 +30,9 @@ export function PipelineShell() {
       if (project.project?.id) {
         source.hydrateContextForm(project);
         state.loadStudio(project.project.id);
+        state.loadContentPlan(project.project.id);
+        state.loadPublications(project.project.id);
+        state.loadBulkOperationHistory(project.project.id);
       }
     },
     onError: state.setError,
@@ -85,6 +95,143 @@ export function PipelineShell() {
   const projectId = state.activeProject?.project?.id;
   const topic = state.studio?.draft?.topic || "";
   const hasContent = (state.studio?.draft?.assets?.length ?? 0) > 0;
+  const reviewQueue = state.contentPlan?.items.filter((item) => item.status === "needs_review") || [];
+  const readyQueue = state.contentPlan?.items.filter((item) => item.status === "ready_to_publish") || [];
+  const failedQueue = state.contentPlan?.items.filter((item) => item.status === "failed") || [];
+  const publishedQueue = state.contentPlan?.items.filter((item) => item.status === "published").slice(0, 5) || [];
+  const failedPublications = state.publications.filter((publication) => publication.status === "failed").slice(0, 8);
+  const publishedPublications = state.publications.filter((publication) => publication.status === "published").slice(0, 8);
+
+  async function persistBulkReport(report: BulkOperationReport, durationMs: number) {
+    if (!projectId) {
+      return;
+    }
+
+    await apiPost<{ run: { id: string } }>(`/api/projects/${projectId}/automation-batch-runs`, {
+      ...report,
+      actorLabel: "operator",
+      executionSource: "studio",
+      durationMs,
+    });
+  }
+
+  async function runBulkPlanAction(planItemIds: string[], action: "approve" | "retry") {
+    if (!projectId || planItemIds.length === 0) {
+      return;
+    }
+
+    setAutomationBusy(true);
+    state.setError("");
+    setPublicationFeedback(null);
+    setBulkReport(null);
+
+    try {
+      const startedAt = Date.now();
+      let completed = 0;
+      let failed = 0;
+      const items: BulkOperationReport["items"] = [];
+
+      for (const planItemId of planItemIds) {
+        try {
+          const data = await apiPost<{ resolution: AutomationReviewResolution }>(`/api/projects/${projectId}/automation`, {
+            action,
+            planItemId,
+            executionSource: "studio",
+            skipAuditLog: true,
+          });
+          setAutomationFeedback(data.resolution);
+          completed += 1;
+          items.push({
+            id: planItemId,
+            label: data.resolution.planItemId,
+            status: "success",
+            message: data.resolution.message,
+          });
+        } catch (error) {
+          failed += 1;
+          items.push({
+            id: planItemId,
+            label: planItemId,
+            status: "failed",
+            message: error instanceof Error ? error.message : "처리에 실패했습니다.",
+          });
+        }
+      }
+
+      const report: BulkOperationReport = {
+        kind: action === "approve" ? "plan_approve" : "plan_retry",
+        label: action === "approve" ? "검토 큐 일괄 승인 결과" : "계획 항목 일괄 재실행 결과",
+        completed,
+        failed,
+        items,
+      };
+      setBulkReport(report);
+      await persistBulkReport(report, Date.now() - startedAt).catch(() => null);
+      await state.reloadProject(projectId);
+    } finally {
+      setAutomationBusy(false);
+    }
+  }
+
+  async function runBulkPublicationRetry(publicationIds: string[]) {
+    if (!projectId || publicationIds.length === 0) {
+      return;
+    }
+
+    setAutomationBusy(true);
+    state.setError("");
+    setAutomationFeedback(null);
+    setPublicationFeedback(null);
+    setBulkReport(null);
+
+    try {
+      const startedAt = Date.now();
+      let completed = 0;
+      let failed = 0;
+      const items: BulkOperationReport["items"] = [];
+
+      for (const publicationId of publicationIds) {
+        try {
+          const data = await apiPost<{ publication: { channel: string; provider: string } }>(
+            `/api/projects/${projectId}/publications`,
+            {
+              publicationId,
+              executionSource: "studio",
+              skipAuditLog: true,
+            },
+          );
+          completed += 1;
+          items.push({
+            id: publicationId,
+            label: `${data.publication.channel} · ${data.publication.provider}`,
+            status: "success",
+            message: "채널 재시도 성공",
+          });
+        } catch (error) {
+          failed += 1;
+          items.push({
+            id: publicationId,
+            label: publicationId,
+            status: "failed",
+            message: error instanceof Error ? error.message : "채널 재시도 실패",
+          });
+        }
+      }
+
+      const report: BulkOperationReport = {
+        kind: "publication_retry",
+        label: "채널 실패 이력 일괄 재시도 결과",
+        completed,
+        failed,
+        items,
+      };
+      setBulkReport(report);
+      await persistBulkReport(report, Date.now() - startedAt).catch(() => null);
+      await state.reloadProject(projectId);
+    } finally {
+      setAutomationBusy(false);
+    }
+  }
 
   return (
     <div className="app-shell">
@@ -112,7 +259,7 @@ export function PipelineShell() {
           onWorkingPathChange={source.setWorkingPath}
           projectBusy={source.busy}
           onCreateProject={source.handleCreateProject}
-          onSelectProject={(id) => { state.loadProject(id); state.loadStudio(id); }}
+          onSelectProject={(id) => { state.reloadProject(id); }}
           editingSummary={source.editingSummary}
           onEditingSummaryChange={source.setEditingSummary}
           editingAudience={source.editingAudience}
@@ -129,7 +276,46 @@ export function PipelineShell() {
           topicInput={content.topicInput}
           onTopicInputChange={content.setTopicInput}
           generateBusy={content.generateBusy}
-          onGenerate={() => { if (projectId) content.handleGenerate(projectId, undefined, content.topicInput.trim() || undefined); }}
+          onGenerate={() => {
+            if (projectId) {
+              const selectedPlanItem = state.contentPlan?.items.find((item) => item.id === content.selectedTopicId);
+              void content.handleGenerate(
+                projectId,
+                undefined,
+                content.topicInput.trim() || undefined,
+                content.selectedTopicId || undefined,
+                selectedPlanItem?.objective || undefined,
+              ).then(() => state.loadContentPlan(projectId));
+            }
+          }}
+          contentPlan={state.contentPlan}
+          planBusy={planBusy}
+          onGenerateContentPlan={async () => {
+            if (!projectId) {
+              return;
+            }
+
+            setPlanBusy(true);
+            state.setError("");
+
+            try {
+              const data = await apiPost<{ plan: MonthlyContentPlan }>(`/api/projects/${projectId}/content-plan`, {});
+              state.setContentPlan(data.plan);
+              if (data.plan.items[0]) {
+                content.setSelectedTopicId(data.plan.items[0].id);
+                content.setTopicInput(data.plan.items[0].topic);
+              }
+            } catch (error) {
+              state.setError(error instanceof Error ? error.message : "월간 계획 생성에 실패했습니다.");
+            } finally {
+              setPlanBusy(false);
+            }
+          }}
+          selectedPlannedTopicId={content.selectedTopicId}
+          onSelectPlannedTopic={(itemId, topicTitle) => {
+            content.setSelectedTopicId(itemId);
+            content.setTopicInput(topicTitle);
+          }}
           topic={topic}
           variantGroup={state.variantGroup}
           abGenerateBusy={ab.generateBusy}
@@ -151,6 +337,137 @@ export function PipelineShell() {
           onGenerateHashtags={content.handleGenerateHashtags}
           settingsBusy={publish.settingsBusy}
           onSaveWordPressDefaults={publish.handleSaveWordPressDefaults}
+          publications={state.publications}
+          failedPublications={failedPublications}
+          publishedPublications={publishedPublications}
+          readiness={state.automationReadiness}
+          automationBusy={automationBusy}
+          automationRun={automationRun}
+          automationFeedback={automationFeedback}
+          publicationFeedback={publicationFeedback}
+          bulkReport={bulkReport}
+          bulkReportHistory={state.bulkOperationHistory}
+          reviewQueue={reviewQueue}
+          readyQueue={readyQueue}
+          failedQueue={failedQueue}
+          publishedQueue={publishedQueue}
+          onRunAutomation={async () => {
+            if (!projectId) {
+              return;
+            }
+
+            setAutomationBusy(true);
+            state.setError("");
+            setAutomationFeedback(null);
+            setPublicationFeedback(null);
+            setBulkReport(null);
+
+            try {
+              const data = await apiPost<{ run: AutomationRunSummary }>(`/api/projects/${projectId}/automation`, {
+                executionSource: "studio",
+              });
+              setAutomationRun(data.run);
+              await state.reloadProject(projectId);
+            } catch (error) {
+              state.setError(error instanceof Error ? error.message : "프로젝트 자동 실행에 실패했습니다.");
+            } finally {
+              setAutomationBusy(false);
+            }
+          }}
+          onApproveReview={(planItemId) => {
+            if (!projectId) {
+              return;
+            }
+
+            setAutomationBusy(true);
+            state.setError("");
+            setPublicationFeedback(null);
+            setBulkReport(null);
+
+            void apiPost<{ resolution: AutomationReviewResolution }>(`/api/projects/${projectId}/automation`, {
+              action: "approve",
+              planItemId,
+              executionSource: "studio",
+            })
+              .then(async (data) => {
+                setAutomationFeedback(data.resolution);
+                await state.reloadProject(projectId);
+              })
+              .catch((error) => {
+                state.setError(error instanceof Error ? error.message : "검토 승인 처리에 실패했습니다.");
+              })
+              .finally(() => {
+                setAutomationBusy(false);
+              });
+          }}
+          onRetryPlanItem={(planItemId) => {
+            if (!projectId) {
+              return;
+            }
+
+            setAutomationBusy(true);
+            state.setError("");
+            setPublicationFeedback(null);
+            setBulkReport(null);
+
+            void apiPost<{ resolution: AutomationReviewResolution }>(`/api/projects/${projectId}/automation`, {
+              action: "retry",
+              planItemId,
+              executionSource: "studio",
+            })
+              .then(async (data) => {
+                setAutomationFeedback(data.resolution);
+                await state.reloadProject(projectId);
+              })
+              .catch((error) => {
+                state.setError(error instanceof Error ? error.message : "자동화 재실행에 실패했습니다.");
+              })
+              .finally(() => {
+                setAutomationBusy(false);
+              });
+          }}
+          onRetryPublication={(publicationId) => {
+            if (!projectId) {
+              return;
+            }
+
+            setAutomationBusy(true);
+            state.setError("");
+            setAutomationFeedback(null);
+            setPublicationFeedback(null);
+            setBulkReport(null);
+
+            void apiPost<{ publication: { channel: string; provider: string; externalPostUrl?: string | null } }>(
+              `/api/projects/${projectId}/publications`,
+              {
+                publicationId,
+                executionSource: "studio",
+              },
+            )
+              .then(async (data) => {
+                setPublicationFeedback(
+                  `${data.publication.channel} · ${data.publication.provider} 재시도를 완료했습니다.${
+                    data.publication.externalPostUrl ? ` ${data.publication.externalPostUrl}` : ""
+                  }`,
+                );
+                await state.reloadProject(projectId);
+              })
+              .catch((error) => {
+                state.setError(error instanceof Error ? error.message : "채널 재시도에 실패했습니다.");
+              })
+              .finally(() => {
+                setAutomationBusy(false);
+              });
+          }}
+          onBulkApproveReview={(planItemIds) => {
+            void runBulkPlanAction(planItemIds, "approve");
+          }}
+          onBulkRetryPlanItems={(planItemIds) => {
+            void runBulkPlanAction(planItemIds, "retry");
+          }}
+          onBulkRetryPublications={(publicationIds) => {
+            void runBulkPublicationRetry(publicationIds);
+          }}
         />
 
         {/* Center: Content preview */}

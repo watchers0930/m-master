@@ -84,6 +84,13 @@ export function usePublishWorkflow(params: {
     status: "draft",
     categoryNames: "",
     tagNames: "",
+    metaAccessToken: "",
+    facebookPageId: "",
+    instagramBusinessAccountId: "",
+    automationMode: "draft-only",
+    automationRequireReview: true,
+    automationMinOverallScore: "75",
+    automationMinRiskScore: "80",
   });
   const [settingsBusy, setSettingsBusy] = useState(false);
 
@@ -97,14 +104,21 @@ export function usePublishWorkflow(params: {
       bodyHtml: "",
     });
     setWordpressResult(null);
-    setWordpressConfig({
-      siteUrl: "",
-      username: "",
-      appPassword: "",
-      status: "draft",
-      categoryNames: "",
-      tagNames: "",
-    });
+      setWordpressConfig({
+        siteUrl: "",
+        username: "",
+        appPassword: "",
+        status: "draft",
+        categoryNames: "",
+        tagNames: "",
+        metaAccessToken: "",
+        facebookPageId: "",
+        instagramBusinessAccountId: "",
+        automationMode: "draft-only",
+        automationRequireReview: true,
+        automationMinOverallScore: "75",
+        automationMinRiskScore: "80",
+      });
     setExportPreview({
       bundle: null,
       activeView: "blog",
@@ -123,6 +137,13 @@ export function usePublishWorkflow(params: {
         status: project.wordpressStatus === "publish" ? "publish" : "draft",
         categoryNames: project.wordpressCategoryNames || "",
         tagNames: project.wordpressTagNames || "",
+        metaAccessToken: current.metaAccessToken,
+        facebookPageId: project.facebookPageId || "",
+        instagramBusinessAccountId: project.instagramBusinessAccountId || "",
+        automationMode: project.automationMode || "draft-only",
+        automationRequireReview: project.automationRequireReview ?? true,
+        automationMinOverallScore: String(project.automationMinOverallScore ?? 75),
+        automationMinRiskScore: String(project.automationMinRiskScore ?? 80),
       }));
     }
 
@@ -304,7 +325,10 @@ export function usePublishWorkflow(params: {
     }
   }
 
-  function handleWordPressConfigChange(field: keyof WordPressPublishConfig, value: string) {
+  function handleWordPressConfigChange(
+    field: keyof WordPressPublishConfig,
+    value: WordPressPublishConfig[keyof WordPressPublishConfig],
+  ) {
     setWordpressConfig((current) => ({
       ...current,
       [field]: value,
@@ -404,9 +428,17 @@ export function usePublishWorkflow(params: {
         body: JSON.stringify({
           wordpressSiteUrl: wordpressConfig.siteUrl,
           wordpressUsername: wordpressConfig.username,
+          wordpressAppPassword: wordpressConfig.appPassword,
           wordpressStatus: wordpressConfig.status,
           wordpressCategoryNames: wordpressConfig.categoryNames,
           wordpressTagNames: wordpressConfig.tagNames,
+          metaAccessToken: wordpressConfig.metaAccessToken,
+          facebookPageId: wordpressConfig.facebookPageId,
+          instagramBusinessAccountId: wordpressConfig.instagramBusinessAccountId,
+          automationMode: wordpressConfig.automationMode,
+          automationRequireReview: wordpressConfig.automationRequireReview,
+          automationMinOverallScore: wordpressConfig.automationMinOverallScore,
+          automationMinRiskScore: wordpressConfig.automationMinRiskScore,
         }),
       });
       const payload = await parseJson<ApiResponse<{ project: ProjectDetail }>>(response);

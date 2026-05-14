@@ -25,7 +25,9 @@ export async function POST(request: Request, context: RouteContext) {
       projectId,
       topic: input.topic,
       topicId: input.topicId,
+      planItemId: input.planItemId,
       objective: input.objective,
+      derivationMode: input.derivationMode,
     });
 
     return jsonOk({ studio }, { status: 201 });

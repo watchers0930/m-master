@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import type { Prisma, Project } from "@prisma/client";
 
 import { prisma } from "../../lib/prisma";
@@ -37,6 +38,19 @@ export type ProjectDetailRecord = {
     publishedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
+    publications: Array<{
+      id: string;
+      channel: string;
+      provider: string;
+      status: string;
+      externalPostId: string | null;
+      externalPostUrl: string | null;
+      payloadSummary: string | null;
+      errorMessage: string | null;
+      publishedAt: Date | null;
+      createdAt: Date;
+      updatedAt: Date;
+    }>;
     assets: Array<{
       id: string;
       channel: string;
@@ -69,6 +83,79 @@ export type ProjectDetailRecord = {
       }>;
     }>;
   } | null;
+};
+
+export type ContentPlanRecord = {
+  id: string;
+  projectId: string;
+  monthKey: string;
+  status: string;
+  basisSummary: string | null;
+  autoGenerate: boolean;
+  generatedAt: Date | null;
+  lastExecutedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  items: Array<{
+    id: string;
+    sortOrder: number;
+    weekLabel: string;
+    publishAt: Date | null;
+    topic: string;
+    intentType: string | null;
+    objective: string | null;
+    rationale: string | null;
+    status: string;
+    attemptCount: number;
+    lastError: string | null;
+    reviewSnapshot: string | null;
+    lastProcessedAt: Date | null;
+    contentJobId: string | null;
+    generatedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }>;
+};
+
+export type AutomationBatchRunRecord = {
+  id: string;
+  projectId: string;
+  kind: string;
+  label: string;
+  actorLabel: string | null;
+  executionSource: string | null;
+  durationMs: number | null;
+  completedCount: number;
+  failedCount: number;
+  itemsSnapshot: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type ProjectOperatorRecord = {
+  id: string;
+  projectId: string;
+  name: string;
+  role: string;
+  active: boolean;
+  lastUsedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type CredentialCheckRunRecord = {
+  id: string;
+  projectId: string;
+  service: string;
+  kind: string;
+  status: string;
+  actorLabel: string | null;
+  summary: string;
+  detail: string | null;
+  expiresAt: Date | null;
+  checkedAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 const projectSummaryInclude = {
@@ -148,21 +235,53 @@ export async function createProjectWithSeeds(params: {
 export async function updateProjectSettings(params: {
   projectId: string;
   industry?: string;
+  ga4PropertyId?: string;
   wordpressSiteUrl?: string;
   wordpressUsername?: string;
+  wordpressAppPasswordEncrypted?: string | null;
   wordpressStatus?: string;
   wordpressCategoryNames?: string;
   wordpressTagNames?: string;
+  metaAccessTokenEncrypted?: string | null;
+  metaTokenExpiresAt?: Date | null;
+  facebookPageId?: string;
+  instagramBusinessAccountId?: string;
+  operationsAlertWebhookEncrypted?: string | null;
+  alertPolicyMode?: string;
+  alertQuietHoursStart?: string;
+  alertQuietHoursEnd?: string;
+  alertTimezone?: string;
+  alertOnBlockedReadiness?: boolean;
+  automationMode?: string;
+  automationRequireReview?: boolean;
+  automationMinOverallScore?: number;
+  automationMinRiskScore?: number;
 }) {
   return prisma.project.update({
     where: { id: params.projectId },
     data: {
       industry: params.industry,
+      ga4PropertyId: params.ga4PropertyId,
       wordpressSiteUrl: params.wordpressSiteUrl,
       wordpressUsername: params.wordpressUsername,
+      wordpressAppPasswordEncrypted: params.wordpressAppPasswordEncrypted,
       wordpressStatus: params.wordpressStatus,
       wordpressCategoryNames: params.wordpressCategoryNames,
       wordpressTagNames: params.wordpressTagNames,
+      metaAccessTokenEncrypted: params.metaAccessTokenEncrypted,
+      metaTokenExpiresAt: params.metaTokenExpiresAt,
+      facebookPageId: params.facebookPageId,
+      instagramBusinessAccountId: params.instagramBusinessAccountId,
+      operationsAlertWebhookEncrypted: params.operationsAlertWebhookEncrypted,
+      alertPolicyMode: params.alertPolicyMode,
+      alertQuietHoursStart: params.alertQuietHoursStart,
+      alertQuietHoursEnd: params.alertQuietHoursEnd,
+      alertTimezone: params.alertTimezone,
+      alertOnBlockedReadiness: params.alertOnBlockedReadiness,
+      automationMode: params.automationMode,
+      automationRequireReview: params.automationRequireReview,
+      automationMinOverallScore: params.automationMinOverallScore,
+      automationMinRiskScore: params.automationMinRiskScore,
     },
   });
 }
@@ -196,6 +315,9 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
       where: { projectId },
       orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
       include: {
+        publications: {
+          orderBy: [{ createdAt: "desc" }],
+        },
         assets: {
           orderBy: [{ createdAt: "asc" }],
           include: {
@@ -613,9 +735,250 @@ export async function listProjectContentJobs(projectId: string) {
     where: { projectId },
     orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
     include: {
+      publications: {
+        orderBy: [{ createdAt: "desc" }],
+      },
       assets: {
         orderBy: [{ createdAt: "asc" }],
       },
+    },
+  });
+}
+
+export async function getProjectContentPlan(projectId: string, monthKey: string): Promise<ContentPlanRecord | null> {
+  return prisma.contentPlan.findUnique({
+    where: {
+      projectId_monthKey: {
+        projectId,
+        monthKey,
+      },
+    },
+    include: {
+      items: {
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      },
+    },
+  });
+}
+
+export async function getLatestProjectContentPlan(projectId: string): Promise<ContentPlanRecord | null> {
+  return prisma.contentPlan.findFirst({
+    where: { projectId },
+    orderBy: [{ monthKey: "desc" }, { updatedAt: "desc" }],
+    include: {
+      items: {
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      },
+    },
+  });
+}
+
+export async function saveProjectContentPlan(params: {
+  projectId: string;
+  monthKey: string;
+  status: string;
+  basisSummary?: string;
+  autoGenerate?: boolean;
+  generatedAt?: Date | null;
+  lastExecutedAt?: Date | null;
+  items: Array<{
+    sortOrder: number;
+    weekLabel: string;
+    publishAt?: Date | null;
+    topic: string;
+    intentType?: string;
+    objective?: string;
+    rationale?: string;
+    status?: string;
+    contentJobId?: string | null;
+    generatedAt?: Date | null;
+  }>;
+}) {
+  return prisma.$transaction(async (tx) => {
+    const now = new Date();
+    const existing = await tx.contentPlan.findUnique({
+      where: {
+        projectId_monthKey: {
+          projectId: params.projectId,
+          monthKey: params.monthKey,
+        },
+      },
+      select: { id: true },
+    });
+
+    const planId = existing?.id ?? crypto.randomUUID();
+
+    await tx.contentPlan.upsert({
+      where: {
+        projectId_monthKey: {
+          projectId: params.projectId,
+          monthKey: params.monthKey,
+        },
+      },
+      create: {
+        id: planId,
+        projectId: params.projectId,
+        monthKey: params.monthKey,
+        status: params.status,
+        basisSummary: params.basisSummary,
+        autoGenerate: params.autoGenerate ?? false,
+        generatedAt: params.generatedAt ?? null,
+        lastExecutedAt: params.lastExecutedAt ?? null,
+        updatedAt: now,
+      },
+      update: {
+        status: params.status,
+        basisSummary: params.basisSummary,
+        autoGenerate: params.autoGenerate ?? false,
+        generatedAt: params.generatedAt ?? null,
+        lastExecutedAt: params.lastExecutedAt ?? null,
+        updatedAt: now,
+      },
+    });
+
+    await tx.contentPlanItem.deleteMany({
+      where: { contentPlanId: planId },
+    });
+
+    if (params.items.length > 0) {
+      await tx.contentPlanItem.createMany({
+        data: params.items.map((item) => ({
+          id: crypto.randomUUID(),
+          contentPlanId: planId,
+          sortOrder: item.sortOrder,
+          weekLabel: item.weekLabel,
+          publishAt: item.publishAt ?? null,
+          topic: item.topic,
+          intentType: item.intentType,
+          objective: item.objective,
+          rationale: item.rationale,
+          status: item.status ?? "planned",
+          attemptCount: 0,
+          lastError: null,
+          reviewSnapshot: null,
+          lastProcessedAt: null,
+          contentJobId: item.contentJobId ?? null,
+          generatedAt: item.generatedAt ?? null,
+          updatedAt: now,
+        })),
+      });
+    }
+
+    return tx.contentPlan.findUniqueOrThrow({
+      where: { id: planId },
+      include: {
+        items: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        },
+      },
+    });
+  });
+}
+
+export async function attachContentJobToPlanItem(params: {
+  projectId: string;
+  planItemId: string;
+  contentJobId: string;
+  status?: string;
+  generatedAt?: Date | null;
+}) {
+  const item = await prisma.contentPlanItem.findFirst({
+    where: {
+      id: params.planItemId,
+      contentPlan: {
+        projectId: params.projectId,
+      },
+    },
+    select: { id: true },
+  });
+
+  if (!item) {
+    return null;
+  }
+
+  return prisma.contentPlanItem.update({
+    where: { id: params.planItemId },
+    data: {
+      contentJobId: params.contentJobId,
+      status: params.status ?? "generated",
+      lastError: null,
+      reviewSnapshot: null,
+      generatedAt: params.generatedAt ?? new Date(),
+      updatedAt: new Date(),
+    },
+  });
+}
+
+export async function listDueContentPlanItems(referenceTime: Date, projectId?: string) {
+  return prisma.contentPlanItem.findMany({
+    where: {
+      publishAt: {
+        lte: referenceTime,
+      },
+      status: {
+        in: ["planned", "failed"],
+      },
+      ...(projectId
+        ? {
+            contentPlan: {
+              projectId,
+            },
+          }
+        : {}),
+    },
+    orderBy: [{ publishAt: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+    include: {
+      contentPlan: {
+        include: {
+          project: true,
+        },
+      },
+    },
+  });
+}
+
+export async function getProjectContentPlanItem(params: {
+  projectId: string;
+  planItemId: string;
+}) {
+  return prisma.contentPlanItem.findFirst({
+    where: {
+      id: params.planItemId,
+      contentPlan: {
+        projectId: params.projectId,
+      },
+    },
+    include: {
+      contentPlan: {
+        include: {
+          project: true,
+        },
+      },
+    },
+  });
+}
+
+export async function markContentPlanItemStatus(params: {
+  planItemId: string;
+  status: string;
+  lastError?: string | null;
+  reviewSnapshot?: string | null;
+  contentJobId?: string | null;
+  generatedAt?: Date | null;
+}) {
+  return prisma.contentPlanItem.update({
+    where: { id: params.planItemId },
+    data: {
+      status: params.status,
+      attemptCount: {
+        increment: 1,
+      },
+      lastError: params.lastError ?? null,
+      reviewSnapshot: params.reviewSnapshot ?? null,
+      lastProcessedAt: new Date(),
+      contentJobId: params.contentJobId ?? undefined,
+      generatedAt: params.generatedAt ?? undefined,
+      updatedAt: new Date(),
     },
   });
 }
@@ -661,6 +1024,329 @@ export async function saveLatestContentJobPublishResult(params: {
       externalPostId: params.externalPostId ?? null,
       externalPostUrl: params.externalPostUrl ?? null,
       publishedAt: params.publishedAt ?? null,
+    },
+  });
+}
+
+export async function createChannelPublication(params: {
+  contentJobId: string;
+  channel: string;
+  provider: string;
+  status: string;
+  externalPostId?: string | null;
+  externalPostUrl?: string | null;
+  payloadSummary?: string | null;
+  errorMessage?: string | null;
+  publishedAt?: Date | null;
+}) {
+  return prisma.channelPublication.create({
+    data: {
+      contentJobId: params.contentJobId,
+      channel: params.channel,
+      provider: params.provider,
+      status: params.status,
+      externalPostId: params.externalPostId ?? null,
+      externalPostUrl: params.externalPostUrl ?? null,
+      payloadSummary: params.payloadSummary ?? null,
+      errorMessage: params.errorMessage ?? null,
+      publishedAt: params.publishedAt ?? null,
+    },
+  });
+}
+
+export async function getImageAssetById(imageAssetId: string) {
+  return prisma.imageAsset.findUnique({
+    where: { id: imageAssetId },
+  });
+}
+
+export async function listProjectChannelPublications(projectId: string, limit = 20) {
+  return prisma.channelPublication.findMany({
+    where: {
+      contentJob: {
+        projectId,
+      },
+    },
+    orderBy: [{ createdAt: "desc" }],
+    take: Math.max(1, Math.min(limit, 100)),
+  });
+}
+
+export async function createAutomationBatchRun(params: {
+  projectId: string;
+  kind: string;
+  label: string;
+  actorLabel?: string | null;
+  executionSource?: string | null;
+  durationMs?: number | null;
+  completedCount: number;
+  failedCount: number;
+  itemsSnapshot?: string | null;
+}) {
+  return prisma.automationBatchRun.create({
+    data: {
+      projectId: params.projectId,
+      kind: params.kind,
+      label: params.label,
+      actorLabel: params.actorLabel ?? null,
+      executionSource: params.executionSource ?? null,
+      durationMs: params.durationMs ?? null,
+      completedCount: params.completedCount,
+      failedCount: params.failedCount,
+      itemsSnapshot: params.itemsSnapshot ?? null,
+    },
+  });
+}
+
+export async function listProjectAutomationBatchRuns(projectId: string, limit = 10) {
+  return prisma.automationBatchRun.findMany({
+    where: {
+      projectId,
+    },
+    orderBy: [{ createdAt: "desc" }],
+    take: Math.max(1, Math.min(limit, 50)),
+  });
+}
+
+export async function createCredentialCheckRun(params: {
+  projectId: string;
+  service: string;
+  kind: string;
+  status: string;
+  actorLabel?: string | null;
+  summary: string;
+  detail?: string | null;
+  expiresAt?: Date | null;
+  checkedAt?: Date;
+}) {
+  return prisma.credentialCheckRun.create({
+    data: {
+      projectId: params.projectId,
+      service: params.service,
+      kind: params.kind,
+      status: params.status,
+      actorLabel: params.actorLabel ?? null,
+      summary: params.summary,
+      detail: params.detail ?? null,
+      expiresAt: params.expiresAt ?? null,
+      checkedAt: params.checkedAt ?? new Date(),
+    },
+  });
+}
+
+export async function listProjectCredentialCheckRuns(projectId: string, limit = 25) {
+  return prisma.credentialCheckRun.findMany({
+    where: {
+      projectId,
+    },
+    orderBy: [{ checkedAt: "desc" }, { createdAt: "desc" }],
+    take: Math.max(1, Math.min(limit, 100)),
+  });
+}
+
+export async function listProjectOperators(projectId: string) {
+  return prisma.projectOperator.findMany({
+    where: {
+      projectId,
+    },
+    orderBy: [{ role: "desc" }, { name: "asc" }],
+  });
+}
+
+export async function createProjectOperator(params: {
+  projectId: string;
+  name: string;
+  role: string;
+  accessKeyHash: string;
+}) {
+  return prisma.projectOperator.create({
+    data: {
+      projectId: params.projectId,
+      name: params.name,
+      role: params.role,
+      accessKeyHash: params.accessKeyHash,
+      active: true,
+    },
+  });
+}
+
+export async function updateProjectOperator(params: {
+  operatorId: string;
+  role?: string;
+  active?: boolean;
+  accessKeyHash?: string;
+}) {
+  return prisma.projectOperator.update({
+    where: {
+      id: params.operatorId,
+    },
+    data: {
+      role: params.role,
+      active: params.active,
+      accessKeyHash: params.accessKeyHash,
+    },
+  });
+}
+
+export async function getProjectOperatorByName(params: {
+  projectId: string;
+  name: string;
+}) {
+  return prisma.projectOperator.findFirst({
+    where: {
+      projectId: params.projectId,
+      name: params.name,
+    },
+  });
+}
+
+export async function getProjectOperatorById(params: {
+  projectId: string;
+  operatorId: string;
+}) {
+  return prisma.projectOperator.findFirst({
+    where: {
+      id: params.operatorId,
+      projectId: params.projectId,
+    },
+  });
+}
+
+export async function countProjectOperators(projectId: string) {
+  return prisma.projectOperator.count({
+    where: {
+      projectId,
+    },
+  });
+}
+
+export async function createProjectOperatorSession(params: {
+  operatorId: string;
+  tokenHash: string;
+  expiresAt: Date;
+}) {
+  return prisma.projectOperatorSession.create({
+    data: {
+      operatorId: params.operatorId,
+      tokenHash: params.tokenHash,
+      expiresAt: params.expiresAt,
+    },
+  });
+}
+
+export async function getProjectOperatorSessionByTokenHash(tokenHash: string) {
+  return prisma.projectOperatorSession.findUnique({
+    where: {
+      tokenHash,
+    },
+    include: {
+      operator: true,
+    },
+  });
+}
+
+export async function touchProjectOperatorSession(params: {
+  sessionId: string;
+  operatorId: string;
+}) {
+  const now = new Date();
+  await prisma.projectOperatorSession.update({
+    where: {
+      id: params.sessionId,
+    },
+    data: {
+      lastUsedAt: now,
+    },
+  });
+
+  await prisma.projectOperator.update({
+    where: {
+      id: params.operatorId,
+    },
+    data: {
+      lastUsedAt: now,
+    },
+  });
+}
+
+export async function deleteProjectOperatorSessionByTokenHash(tokenHash: string) {
+  return prisma.projectOperatorSession.deleteMany({
+    where: {
+      tokenHash,
+    },
+  });
+}
+
+export async function deleteExpiredProjectOperatorSessions(now = new Date()) {
+  return prisma.projectOperatorSession.deleteMany({
+    where: {
+      expiresAt: {
+        lt: now,
+      },
+    },
+  });
+}
+
+export async function getProjectChannelPublication(params: {
+  projectId: string;
+  publicationId: string;
+}) {
+  return prisma.channelPublication.findFirst({
+    where: {
+      id: params.publicationId,
+      contentJob: {
+        projectId: params.projectId,
+      },
+    },
+    include: {
+      contentJob: {
+        include: {
+          project: true,
+          assets: {
+            orderBy: [{ createdAt: "asc" }],
+            include: {
+              imageJobs: {
+                orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+                include: {
+                  imageAssets: {
+                    orderBy: [{ createdAt: "asc" }],
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function getProjectContentJob(params: {
+  projectId: string;
+  contentJobId: string;
+}) {
+  return prisma.contentJob.findFirst({
+    where: {
+      id: params.contentJobId,
+      projectId: params.projectId,
+    },
+    include: {
+      publications: {
+        orderBy: [{ createdAt: "desc" }],
+      },
+      assets: {
+        orderBy: [{ createdAt: "asc" }],
+        include: {
+          imageJobs: {
+            orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+            include: {
+              imageAssets: {
+                orderBy: [{ createdAt: "asc" }],
+              },
+            },
+          },
+        },
+      },
     },
   });
 }

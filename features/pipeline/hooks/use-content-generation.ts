@@ -120,13 +120,19 @@ export function useContentGeneration(params: {
     }));
   }, [editingTitle, editingBody, editingHashtags]);
 
-  const handleGenerate = useCallback(async (projectId: string, topicId?: string, topic?: string) => {
+  const handleGenerate = useCallback(async (
+    projectId: string,
+    topicId?: string,
+    topic?: string,
+    planItemId?: string,
+    objective?: string,
+  ) => {
     setGenerateBusy(true);
     onError("");
     try {
       const data = await apiPost<{ studio: StudioDetail }>(
         `/api/projects/${projectId}/content-jobs`,
-        { topicId, topic, derivationMode: "blog-first" }
+        { topicId, topic, planItemId, objective, derivationMode: "blog-first" }
       );
       onStudioUpdate(data.studio);
       hydrateEditor(data.studio);

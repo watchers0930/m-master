@@ -5,7 +5,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "m-master",
-  description: "Context-aware marketing platform",
+  description: "Context-aware marketing studio for multi-channel content operations",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
