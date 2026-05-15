@@ -36,6 +36,16 @@ function toSentence(value: string, maxLength: number) {
   return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
+function extractBlogImageCues(body: string) {
+  return body
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("[이미지 "))
+    .map((line) => line.replace(/^\[이미지\s+\d+\]\s*/, "").trim())
+    .filter(Boolean)
+    .slice(0, 4);
+}
+
 function svgToDataUri(svg: string) {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
@@ -43,7 +53,9 @@ function svgToDataUri(svg: string) {
 export function buildImagePrompt(projectName: string, asset: AssetSeed) {
   const title = toSentence(asset.title, 90);
   const summary = toSentence(asset.body, 180);
-  return `${projectName} ${asset.channel} 이미지. 제목은 "${title}", 핵심 메시지는 "${summary}", CTA는 "${toSentence(asset.cta, 80)}". 미니멀, 선명한 대비, 블루 포인트, 정보형 마케팅 비주얼.`;
+  const blogImageCues = asset.channel === "blog" ? extractBlogImageCues(asset.body) : [];
+  const cueSummary = blogImageCues.length > 0 ? `섹션 이미지 힌트: ${blogImageCues.join(" / ")}.` : "";
+  return `${projectName} ${asset.channel} 이미지. 제목은 "${title}", 핵심 메시지는 "${summary}", CTA는 "${toSentence(asset.cta, 80)}". ${cueSummary} 네이버 블로그용 정보형 에디토리얼 비주얼, 문단 사이에 자연스럽게 들어갈 실사풍 또는 인포그래픽 스타일, 미니멀, 선명한 대비, 블루 포인트.`;
 }
 
 function toOpenAiSize(channel: ImageChannel) {

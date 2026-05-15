@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, type ChangeEvent } from "react";
 import { InputField } from "@/components/ui/input-field";
 import { OperationsBoard } from "../components/operations-board";
 import type {
@@ -17,6 +18,7 @@ import type {
   AutomationReviewResolution,
   BulkOperationHistoryItem,
   BulkOperationReport,
+  SourceFileDraft,
 } from "../types";
 
 const TONE_PRESETS = [
@@ -38,6 +40,8 @@ type Props = {
   onDomainChange: (v: string) => void;
   workingPath: string;
   onWorkingPathChange: (v: string) => void;
+  sourceFiles: SourceFileDraft[];
+  onSourceFilesChange: (files: SourceFileDraft[]) => void;
   projectBusy: boolean;
   onCreateProject: () => void;
   onSelectProject: (id: string) => void;
@@ -121,7 +125,7 @@ export function SidebarPanel(props: Props) {
   const {
     projects, activeProject,
     name, onNameChange, domain, onDomainChange,
-    workingPath, onWorkingPathChange,
+    workingPath, onWorkingPathChange, sourceFiles, onSourceFilesChange,
     projectBusy, onCreateProject, onSelectProject,
     editingSummary, onEditingSummaryChange,
     editingAudience, onEditingAudienceChange,
@@ -164,6 +168,48 @@ export function SidebarPanel(props: Props) {
   const scores = review?.scores;
   const hasContent = (studio?.draft?.assets?.length ?? 0) > 0;
   const adoptedVariant = variantGroup?.variants?.find((v) => v.adopted);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  function normalizeFileDraft(file: File): SourceFileDraft {
+    const extension = file.name.includes(".") ? file.name.split(".").pop()?.toLowerCase() : undefined;
+    const relativePath = "webkitRelativePath" in file && typeof file.webkitRelativePath === "string" ? file.webkitRelativePath || undefined : undefined;
+
+    return {
+      name: file.name,
+      relativePath,
+      mimeType: file.type || undefined,
+      extension,
+      size: file.size,
+      lastModified: new Date(file.lastModified).toISOString(),
+    };
+  }
+
+  function handleFolderSelection(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) {
+      return;
+    }
+
+    const nextFiles = files.map(normalizeFileDraft);
+    onSourceFilesChange(nextFiles);
+
+    const firstRelativePath = nextFiles[0]?.relativePath;
+    const rootFolder = firstRelativePath?.split("/")[0] || files[0].name;
+    onWorkingPathChange(rootFolder);
+    event.target.value = "";
+  }
+
+  function handleReferenceFileSelection(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) {
+      return;
+    }
+
+    const nextFiles = files.map(normalizeFileDraft);
+    onSourceFilesChange([...sourceFiles, ...nextFiles]);
+    event.target.value = "";
+  }
 
   return (
     <aside className="sidebar-panel">
@@ -173,30 +219,83 @@ export function SidebarPanel(props: Props) {
         <div className="sb-section-body">
           {!activeProject ? (
             <>
-              {projects.length > 0 && (
-                <div className="sb-project-list">
-                  {projects.map((p) => (
-                    <button key={p.id} className="sb-project-item" onClick={() => onSelectProject(p.id)}>
-                      <strong>{p.name}</strong>
-                      <span className="fine-print">{p.domain || "도메인 없음"}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
               <div className="sb-form">
                 <InputField id="sb-name" label="프로젝트명" value={name} onChange={onNameChange} placeholder="프로젝트명" />
                 <InputField id="sb-domain" label="도메인" value={domain} onChange={onDomainChange} placeholder="https://..." />
-                <InputField id="sb-path" label="작업 폴더" value={workingPath} onChange={onWorkingPathChange} placeholder="/path" />
+                <div className="field-group">
+                  <label className="field-label">작업 폴더</label>
+                  <div className="sb-picker-row">
+                    <input className="text-input" value={workingPath} readOnly placeholder="선택한 폴더명" />
+                    <button className="button ghost" type="button" onClick={() => folderInputRef.current?.click()}>
+                      찾아보기
+                    </button>
+                  </div>
+                  <input
+                    ref={folderInputRef}
+                    type="file"
+                    hidden
+                    multiple
+                    onChange={handleFolderSelection}
+                    {...({ webkitdirectory: "" } as Record<string, string>)}
+                  />
+                </div>
+                <div className="field-group">
+                  <label className="field-label">참조 파일 추가</label>
+                  <div className="sb-picker-row">
+                    <input
+                      className="text-input"
+                      value={sourceFiles.length > 0 ? `${sourceFiles.length}개 파일 선택됨` : ""}
+                      readOnly
+                      placeholder="PDF, DOCX, TXT, HTML 등"
+                    />
+                    <button className="button ghost" type="button" onClick={() => fileInputRef.current?.click()}>
+                      파일 추가
+                    </button>
+                  </div>
+                  <input ref={fileInputRef} type="file" hidden multiple onChange={handleReferenceFileSelection} />
+                  {sourceFiles.length > 0 ? (
+                    <div className="sb-source-file-list">
+                      {sourceFiles.slice(0, 4).map((file, index) => (
+                        <div key={`${file.name}-${index}`} className="sb-source-file-chip">
+                          <strong>{file.name}</strong>
+                          <span>{file.relativePath || file.mimeType || "참조 파일"}</span>
+                        </div>
+                      ))}
+                      {sourceFiles.length > 4 ? (
+                        <span className="fine-print">외 {sourceFiles.length - 4}개 파일</span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
                 <button className="button primary sb-btn-full" disabled={projectBusy || !name.trim()} onClick={onCreateProject}>
                   {projectBusy ? "생성 중…" : "프로젝트 생성"}
                 </button>
               </div>
+              {projects.length > 0 && (
+                <details className="sb-subsection">
+                  <summary className="sb-subsection-title">지난 프로젝트</summary>
+                  <div className="sb-project-list">
+                    {projects.map((p) => (
+                      <button key={p.id} className="sb-project-item" onClick={() => onSelectProject(p.id)}>
+                        <strong>{p.name}</strong>
+                        <span className="fine-print">{p.domain || "도메인 없음"}</span>
+                      </button>
+                    ))}
+                  </div>
+                </details>
+              )}
             </>
           ) : (
             <div className="sb-active-project">
               <strong>{activeProject.project.name}</strong>
               <span className="fine-print">{activeProject.project.domain || "도메인 없음"}</span>
               {isApproved && <span className="status-pill active">콘텍스트 승인됨</span>}
+              <button className="button primary sb-btn-full" disabled={!isApproved || planBusy} onClick={onGenerateContentPlan}>
+                {planBusy ? "계획 생성 중…" : contentPlan ? "월간 계획 다시 생성" : "월간 계획 생성"}
+              </button>
+              {!isApproved ? (
+                <span className="fine-print">월간 계획은 콘텍스트 승인 후 생성할 수 있습니다.</span>
+              ) : null}
             </div>
           )}
         </div>

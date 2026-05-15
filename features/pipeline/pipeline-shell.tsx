@@ -257,6 +257,8 @@ export function PipelineShell() {
           onDomainChange={source.setDomain}
           workingPath={source.workingPath}
           onWorkingPathChange={source.setWorkingPath}
+          sourceFiles={source.sourceFiles}
+          onSourceFilesChange={source.setSourceFiles}
           projectBusy={source.busy}
           onCreateProject={source.handleCreateProject}
           onSelectProject={(id) => { state.reloadProject(id); }}

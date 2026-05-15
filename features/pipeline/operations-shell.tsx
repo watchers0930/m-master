@@ -1,20 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppHeader } from "@/features/site/app-header";
 import { OperationsBoard } from "./components/operations-board";
 import { usePipelineState } from "./hooks/use-pipeline-state";
 import { apiPost } from "./hooks/use-api";
 import { usePublishWorkflow } from "../dashboard/use-publish-workflow";
-import type { AutomationReviewResolution, AutomationRunSummary, BulkOperationReport, ProjectListItem } from "./types";
+import type { AutomationReviewResolution, AutomationRunSummary, BulkOperationReport, MonthlyContentPlan, ProjectListItem } from "./types";
+import type { ProjectOperatorSession } from "../dashboard/types";
 
 export function OperationsShell() {
   const state = usePipelineState();
+  const [planBusy, setPlanBusy] = useState(false);
   const [automationBusy, setAutomationBusy] = useState(false);
   const [automationRun, setAutomationRun] = useState<AutomationRunSummary | null>(null);
   const [automationFeedback, setAutomationFeedback] = useState<AutomationReviewResolution | null>(null);
   const [publicationFeedback, setPublicationFeedback] = useState<string | null>(null);
   const [bulkReport, setBulkReport] = useState<BulkOperationReport | null>(null);
+  const [operatorSession, setOperatorSession] = useState<ProjectOperatorSession | null>(null);
+  const [operatorLoginName, setOperatorLoginName] = useState("admin");
+  const [operatorLoginKey, setOperatorLoginKey] = useState("1111");
+  const [operatorBusy, setOperatorBusy] = useState(false);
+  const autoLoginAttemptedProjectIdRef = useRef<string | null>(null);
   const projectId = state.activeProject?.project?.id;
 
   const publish = usePublishWorkflow({
@@ -34,6 +41,29 @@ export function OperationsShell() {
       void state.reloadProject(state.projects[0].id);
     }
   }, [projectId, state.projects]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!projectId) {
+      setOperatorSession(null);
+      autoLoginAttemptedProjectIdRef.current = null;
+      return;
+    }
+
+    void loadOperatorSession(projectId);
+  }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId || operatorSession || operatorBusy) {
+      return;
+    }
+
+    if (autoLoginAttemptedProjectIdRef.current === projectId) {
+      return;
+    }
+
+    autoLoginAttemptedProjectIdRef.current = projectId;
+    void handleOperatorLogin();
+  }, [projectId, operatorSession, operatorBusy]);
 
   useEffect(() => {
     if (state.activeProject) {
@@ -67,6 +97,111 @@ export function OperationsShell() {
     setPublicationFeedback(null);
     setBulkReport(null);
     await state.reloadProject(nextProject.id);
+  }
+
+  async function loadOperatorSession(nextProjectId: string) {
+    try {
+      const response = await fetch(`/api/projects/${nextProjectId}/operators/session`, { cache: "no-store" });
+      const payload = (await response.json().catch(() => null)) as
+        | { ok?: boolean; data?: { operator?: ProjectOperatorSession | null }; error?: { message?: string } }
+        | null;
+
+      if (!payload?.ok) {
+        throw new Error(payload?.error?.message || "운영자 세션을 확인하지 못했습니다.");
+      }
+
+      setOperatorSession(payload.data?.operator ?? null);
+    } catch (error) {
+      setOperatorSession(null);
+      state.setError(error instanceof Error ? error.message : "운영자 세션을 확인하지 못했습니다.");
+    }
+  }
+
+  async function handleOperatorLogin() {
+    if (!projectId) {
+      return;
+    }
+
+    setOperatorBusy(true);
+    state.setError("");
+
+    try {
+      const requestSession = async () => {
+        const response = await fetch(`/api/projects/${projectId}/operators/session`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: operatorLoginName,
+            accessKey: operatorLoginKey,
+          }),
+        });
+        return (await response.json().catch(() => null)) as
+          | { ok?: boolean; data?: { operator?: ProjectOperatorSession | null }; error?: { message?: string } }
+          | null;
+      };
+
+      let payload = await requestSession();
+
+      if (!payload?.ok && payload?.error?.message === "운영자 계정을 찾지 못했습니다.") {
+        const operatorsResponse = await fetch(`/api/projects/${projectId}/operators`, { cache: "no-store" });
+        const operatorsPayload = (await operatorsResponse.json().catch(() => null)) as
+          | { ok?: boolean; data?: { bootstrapRequired?: boolean }; error?: { message?: string } }
+          | null;
+
+        if (operatorsPayload?.ok && operatorsPayload.data?.bootstrapRequired) {
+          const bootstrapResponse = await fetch(`/api/projects/${projectId}/operators`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: operatorLoginName,
+              accessKey: operatorLoginKey,
+              role: "owner",
+              bootstrapSecret: operatorLoginKey,
+            }),
+          });
+          const bootstrapPayload = (await bootstrapResponse.json().catch(() => null)) as
+            | { ok?: boolean; error?: { message?: string } }
+            | null;
+
+          if (!bootstrapPayload?.ok) {
+            throw new Error(bootstrapPayload?.error?.message || "운영자 계정을 생성하지 못했습니다.");
+          }
+
+          payload = await requestSession();
+        }
+      }
+
+      if (!payload?.ok || !payload.data?.operator) {
+        throw new Error(payload?.error?.message || "운영자 로그인에 실패했습니다.");
+      }
+
+      setOperatorSession(payload.data.operator);
+      setOperatorLoginKey("1111");
+    } catch (error) {
+      state.setError(error instanceof Error ? error.message : "운영자 로그인에 실패했습니다.");
+    } finally {
+      setOperatorBusy(false);
+    }
+  }
+
+  async function handleOperatorLogout() {
+    if (!projectId) {
+      return;
+    }
+
+    setOperatorBusy(true);
+    state.setError("");
+
+    try {
+      await fetch(`/api/projects/${projectId}/operators/session`, {
+        method: "DELETE",
+      });
+      setOperatorSession(null);
+    } catch (error) {
+      state.setError(error instanceof Error ? error.message : "운영자 로그아웃에 실패했습니다.");
+    } finally {
+      setOperatorBusy(false);
+    }
   }
 
   async function runBulkPlanAction(planItemIds: string[], action: "approve" | "retry") {
@@ -124,6 +259,25 @@ export function OperationsShell() {
       await state.reloadProject(projectId);
     } finally {
       setAutomationBusy(false);
+    }
+  }
+
+  async function handleGenerateContentPlan() {
+    if (!projectId) {
+      return;
+    }
+
+    setPlanBusy(true);
+    state.setError("");
+
+    try {
+      const data = await apiPost<{ plan: MonthlyContentPlan }>(`/api/projects/${projectId}/content-plan`, {});
+      state.setContentPlan(data.plan);
+      await state.reloadProject(projectId);
+    } catch (error) {
+      state.setError(error instanceof Error ? error.message : "월간 계획 생성에 실패했습니다.");
+    } finally {
+      setPlanBusy(false);
     }
   }
 
@@ -213,6 +367,41 @@ export function OperationsShell() {
           </details>
           {state.activeProject ? (
             <details className="sb-section" open>
+              <summary className="sb-section-title">운영자 로그인</summary>
+              <div className="sb-section-body">
+                <div className="sb-form">
+                  <div className="sb-active-project">
+                    <strong>{operatorSession ? `${operatorSession.name} · ${operatorSession.role}` : "로그인 안 됨"}</strong>
+                    <span className="fine-print">
+                      {operatorSession ? "이 세션으로 자동 실행, 승인, 재시도를 수행합니다." : "프로젝트 운영 권한이 필요한 작업 전에 로그인하세요."}
+                    </span>
+                  </div>
+                  {!operatorSession ? (
+                    <>
+                      <div className="field-group">
+                        <label className="field-label">운영자 이름</label>
+                        <input className="text-input" value={operatorLoginName} onChange={(e) => setOperatorLoginName(e.target.value)} />
+                      </div>
+                      <div className="field-group">
+                        <label className="field-label">접근 키</label>
+                        <input className="text-input" type="password" value={operatorLoginKey} onChange={(e) => setOperatorLoginKey(e.target.value)} />
+                      </div>
+                      <button className="button primary sb-btn-full" disabled={operatorBusy || !operatorLoginName.trim() || !operatorLoginKey.trim()} onClick={() => void handleOperatorLogin()}>
+                        {operatorBusy ? "로그인 중…" : "운영자 로그인"}
+                      </button>
+                      <p className="fine-print">기본 입력값은 `admin / 1111`입니다.</p>
+                    </>
+                  ) : (
+                    <button className="button ghost sb-btn-full" disabled={operatorBusy} onClick={() => void handleOperatorLogout()}>
+                      {operatorBusy ? "처리 중…" : "로그아웃"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </details>
+          ) : null}
+          {state.activeProject ? (
+            <details className="sb-section" open>
               <summary className="sb-section-title">채널 설정</summary>
               <div className="sb-section-body">
                 <div className="sb-form">
@@ -262,6 +451,19 @@ export function OperationsShell() {
                 <p className="fine-print">
                   월간 계획 실행 상태, 채널 실패, 승인 대기 항목을 한 곳에서 처리합니다.
                 </p>
+                <div className="button-row operations-header-actions">
+                  <button className="button primary" disabled={planBusy || !state.activeProject.brandProfile?.approved} onClick={() => void handleGenerateContentPlan()}>
+                    {planBusy ? "계획 생성 중…" : state.contentPlan ? "월간 계획 다시 생성" : "월간 계획 생성"}
+                  </button>
+                  {!state.activeProject.brandProfile?.approved ? (
+                    <span className="fine-print">콘텍스트 승인 후 월간 계획을 생성할 수 있습니다.</span>
+                  ) : null}
+                </div>
+                {state.activeProject.brandProfile?.approved ? (
+                  <p className="fine-print operations-header-hint">
+                    생성 후 결과는 이 화면 아래 운영 큐와 /studio의 콘텐츠 생성 섹션 안 월간 마케팅 계획 영역에서 바로 확인됩니다.
+                  </p>
+                ) : null}
               </div>
               <OperationsBoard
                 projectId={projectId}
@@ -404,6 +606,20 @@ export function OperationsShell() {
             </div>
           )}
         </section>
+        <aside className="image-panel">
+          <div className="ip-header">
+            <span className="eyebrow">우측 패널</span>
+          </div>
+          <div className="operations-placeholder-panel">
+            <div className="operations-placeholder-card">
+              <strong>데이터 준비중</strong>
+              <p className="fine-print">최근 실행, 알림, 게시 이력 같은 보조 패널이 이 영역에 들어올 예정입니다.</p>
+            </div>
+            <div className="operations-placeholder-skeleton" />
+            <div className="operations-placeholder-skeleton tall" />
+            <div className="operations-placeholder-skeleton" />
+          </div>
+        </aside>
       </div>
     </div>
   );
