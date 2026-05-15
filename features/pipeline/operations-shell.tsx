@@ -21,8 +21,18 @@ export function OperationsShell() {
   const [operatorLoginName, setOperatorLoginName] = useState("admin");
   const [operatorLoginKey, setOperatorLoginKey] = useState("1111");
   const [operatorBusy, setOperatorBusy] = useState(false);
+  const [requestedProjectId, setRequestedProjectId] = useState<string | null>(null);
   const autoLoginAttemptedProjectIdRef = useRef<string | null>(null);
   const projectId = state.activeProject?.project?.id;
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const nextProjectId = new URLSearchParams(window.location.search).get("projectId");
+    setRequestedProjectId(nextProjectId);
+  }, []);
 
   const publish = usePublishWorkflow({
     projectId,
@@ -38,9 +48,10 @@ export function OperationsShell() {
 
   useEffect(() => {
     if (!projectId && state.projects.length > 0) {
-      void state.reloadProject(state.projects[0].id);
+      const preferredProjectId = requestedProjectId && state.projects.some((project) => project.id === requestedProjectId) ? requestedProjectId : state.projects[0].id;
+      void state.reloadProject(preferredProjectId);
     }
-  }, [projectId, state.projects]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [projectId, requestedProjectId, state.projects]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!projectId) {
