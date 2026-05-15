@@ -1,6 +1,6 @@
 import { jsonError, jsonOk } from "../../../../lib/api-response";
 import { logger } from "../../../../server/logger";
-import { runAutomaticMonthlyPlans } from "../../../../server/services/project-service";
+import { executeDueContentPlanItems } from "../../../../server/services/project-service";
 
 function isAuthorized(request: Request) {
   const secret = process.env.AUTOMATION_SECRET || process.env.CRON_SECRET;
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await runAutomaticMonthlyPlans();
+    const result = await executeDueContentPlanItems();
     return jsonOk({ result });
   } catch (error) {
     logger.error("automation.monthly_content.failed", {

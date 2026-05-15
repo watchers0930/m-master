@@ -1,10 +1,11 @@
 import { jsonError, jsonOk } from "../../../../../lib/api-response";
 import { logger } from "../../../../../server/logger";
 import {
-  generateMonthlyProjectPlan,
+  executeProjectAutomation,
   getProjectById,
+  getProjectMonthlyPlan,
+  generateProjectMonthlyPlan,
   ProjectNotFoundError,
-  runMonthlyProjectPlan,
 } from "../../../../../server/services/project-service";
 
 type RouteContext = {
@@ -17,9 +18,10 @@ export async function GET(_request: Request, context: RouteContext) {
   const { projectId } = await context.params;
 
   try {
-    const project = await getProjectById(projectId);
+    await getProjectById(projectId);
+    const plan = await getProjectMonthlyPlan(projectId);
     return jsonOk({
-      plan: project.latestContentPlan || null,
+      plan: plan || null,
     });
   } catch (error) {
     if (error instanceof ProjectNotFoundError) {
@@ -38,8 +40,8 @@ export async function POST(request: Request, context: RouteContext) {
   const { projectId } = await context.params;
 
   try {
-    const body = await request.json().catch(() => ({})) as { autoGenerate?: boolean };
-    const plan = await generateMonthlyProjectPlan(projectId, Boolean(body.autoGenerate));
+    await request.json().catch(() => ({}));
+    const plan = await generateProjectMonthlyPlan(projectId);
     return jsonOk({ plan });
   } catch (error) {
     if (error instanceof ProjectNotFoundError) {
@@ -58,7 +60,7 @@ export async function PATCH(_request: Request, context: RouteContext) {
   const { projectId } = await context.params;
 
   try {
-    const result = await runMonthlyProjectPlan(projectId);
+    const result = await executeProjectAutomation(projectId);
     return jsonOk({ result });
   } catch (error) {
     if (error instanceof ProjectNotFoundError) {

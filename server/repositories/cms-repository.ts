@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { prisma } from "../../lib/prisma";
 
 export async function listCmsSections() {
@@ -37,11 +38,13 @@ export async function createCmsSection(params: {
 }) {
   return prisma.cmsSection.create({
     data: {
+      id: crypto.randomUUID(),
       key: params.key,
       title: params.title,
       description: params.description,
       visible: params.visible ?? true,
       sortOrder: params.sortOrder ?? 0,
+      updatedAt: new Date(),
     },
   });
 }
@@ -60,6 +63,7 @@ export async function updateCmsSection(params: {
       description: params.description,
       visible: params.visible,
       sortOrder: params.sortOrder,
+      updatedAt: new Date(),
     },
   });
 }
@@ -83,6 +87,7 @@ export async function createCmsItem(params: {
 }) {
   return prisma.cmsItem.create({
     data: {
+      id: crypto.randomUUID(),
       sectionId: params.sectionId,
       slug: params.slug,
       title: params.title,
@@ -98,6 +103,7 @@ export async function createCmsItem(params: {
       featured: params.featured ?? false,
       visible: params.visible ?? true,
       sortOrder: params.sortOrder ?? 0,
+      updatedAt: new Date(),
     },
   });
 }
@@ -136,6 +142,7 @@ export async function updateCmsItem(params: {
       featured: params.featured,
       visible: params.visible,
       sortOrder: params.sortOrder,
+      updatedAt: new Date(),
     },
   });
 }
