@@ -5,13 +5,18 @@ export type ContentAssetInput = {
   title?: string;
   body: string;
   cta?: string;
+  hashtags?: string;
 };
 
 export type ContentJobInput = {
   topic?: string;
   topicId?: string;
+  planItemId?: string;
   objective?: string;
   assets?: ContentAssetInput[];
+  variantGroupId?: string;
+  variantLabel?: string;
+  derivationMode?: "independent" | "blog-first";
 };
 
 function normalizeOptionalString(value: unknown, maxLength: number): string | undefined {
@@ -57,6 +62,7 @@ function parseAssets(value: unknown): ContentAssetInput[] | undefined {
       title: normalizeOptionalString(record.title, 300),
       body,
       cta: normalizeOptionalString(record.cta, 1000),
+      hashtags: normalizeOptionalString(record.hashtags, 1000),
     };
   });
 }
@@ -82,10 +88,78 @@ export async function parseContentJobInput(request: Request): Promise<ContentJob
     throw new ProjectValidationError("주제 또는 topicId는 필수입니다.");
   }
 
+  const derivationMode = record.derivationMode;
+  const validDerModes = ["independent", "blog-first"];
+
   return {
     topic,
     topicId,
+    planItemId: normalizeOptionalString(record.planItemId, 80),
     objective: normalizeOptionalString(record.objective, 1000),
     assets: parseAssets(record.assets),
+    variantGroupId: normalizeOptionalString(record.variantGroupId, 80),
+    variantLabel: normalizeOptionalString(record.variantLabel, 80),
+    derivationMode: typeof derivationMode === "string" && validDerModes.includes(derivationMode)
+      ? derivationMode as "independent" | "blog-first"
+      : undefined,
   };
+}
+
+export type VariantGenerationInput = {
+  topic: string;
+  count: number;
+};
+
+export async function parseVariantGenerationInput(request: Request): Promise<VariantGenerationInput> {
+  let body: unknown;
+
+  try {
+    body = await request.json();
+  } catch {
+    throw new ProjectValidationError("JSON 본문이 필요합니다.");
+  }
+
+  if (!body || typeof body !== "object") {
+    throw new ProjectValidationError("입력값이 올바르지 않습니다.");
+  }
+
+  const record = body as Record<string, unknown>;
+  const topic = normalizeOptionalString(record.topic, 300);
+
+  if (!topic) {
+    throw new ProjectValidationError("주제는 필수입니다.");
+  }
+
+  const count = typeof record.count === "number" ? record.count : 2;
+  if (count < 2 || count > 3) {
+    throw new ProjectValidationError("버전 수는 2 또는 3이어야 합니다.");
+  }
+
+  return { topic, count };
+}
+
+export type VariantAdoptInput = {
+  adopted: boolean;
+};
+
+export async function parseVariantAdoptInput(request: Request): Promise<VariantAdoptInput> {
+  let body: unknown;
+
+  try {
+    body = await request.json();
+  } catch {
+    throw new ProjectValidationError("JSON 본문이 필요합니다.");
+  }
+
+  if (!body || typeof body !== "object") {
+    throw new ProjectValidationError("입력값이 올바르지 않습니다.");
+  }
+
+  const record = body as Record<string, unknown>;
+
+  if (typeof record.adopted !== "boolean") {
+    throw new ProjectValidationError("adopted 값은 boolean이어야 합니다.");
+  }
+
+  return { adopted: record.adopted };
 }
