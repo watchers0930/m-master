@@ -1387,14 +1387,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding: 0 20px;
 }
 
 .operations-header-actions {
-  padding-left: 40px;
+  padding-left: 0;
 }
 
 .operations-header-hint {
-  padding-left: 40px;
+  padding-left: 0;
+}
+
+.operations-primary-actions {
+  margin-top: 12px;
 }
 
 .cp-tabs {
