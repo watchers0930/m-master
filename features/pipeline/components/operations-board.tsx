@@ -663,7 +663,7 @@ export function OperationsBoard(props: Props) {
             />
           </div>
         </div>
-        <div className="button-row">
+        <div className="button-row operations-primary-actions">
           <button className="button primary" disabled={automationBusy} onClick={onRunAutomation}>
             {automationBusy ? "자동 실행 중…" : "이 프로젝트 자동 실행"}
           </button>
