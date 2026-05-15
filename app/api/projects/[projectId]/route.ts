@@ -7,6 +7,7 @@ import {
   ProjectNotFoundError,
   saveProjectSettings,
 } from "../../../../server/services/project-service";
+import { authorizeProjectRoute } from "../../../../server/services/project-route-auth-service";
 import { parseUpdateProjectSettingsInput, ProjectValidationError } from "../../../../server/validators/project-validator";
 
 type RouteContext = {
@@ -45,6 +46,11 @@ export async function GET(request: Request, context: RouteContext) {
 
 export async function DELETE(_request: Request, context: RouteContext) {
   const { projectId } = await context.params;
+  const auth = await authorizeProjectRoute(_request, projectId, "owner");
+
+  if (!auth.ok) {
+    return auth.response;
+  }
 
   try {
     const deleted = await deleteProject(projectId);
@@ -65,12 +71,18 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   const { projectId } = await context.params;
+  const auth = await authorizeProjectRoute(request, projectId, "owner");
+
+  if (!auth.ok) {
+    return auth.response;
+  }
 
   try {
     const input = await parseUpdateProjectSettingsInput(request);
     const project = await saveProjectSettings({
       projectId,
       ...input,
+      actorLabel: auth.operator.name,
     });
     return jsonOk({ project });
   } catch (error) {

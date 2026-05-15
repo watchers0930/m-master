@@ -86,6 +86,7 @@ export function useContentGeneration(params: {
   onError: (msg: string) => void;
 }) {
   const { onStudioUpdate, onError } = params;
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [topicInput, setTopicInput] = useState("");
   const [generateBusy, setGenerateBusy] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
@@ -100,7 +101,6 @@ export function useContentGeneration(params: {
   const [hashtagBusy, setHashtagBusy] = useState(false);
 
   const hydrateEditor = useCallback((studio: StudioDetail) => {
-    setTopicInput(studio?.draft?.topic || "");
     if (!studio?.draft?.assets) return;
     const blogAsset = studio.draft.assets.find(a => a.channel === "blog");
     if (blogAsset) {
@@ -120,13 +120,19 @@ export function useContentGeneration(params: {
     }));
   }, [editingTitle, editingBody, editingHashtags]);
 
-  const handleGenerate = useCallback(async (projectId: string, topicId?: string, topic?: string) => {
+  const handleGenerate = useCallback(async (
+    projectId: string,
+    topicId?: string,
+    topic?: string,
+    planItemId?: string,
+    objective?: string,
+  ) => {
     setGenerateBusy(true);
     onError("");
     try {
       const data = await apiPost<{ studio: StudioDetail }>(
         `/api/projects/${projectId}/content-jobs`,
-        { topicId, topic, derivationMode: "blog-first" }
+        { topicId, topic, planItemId, objective, derivationMode: "blog-first" }
       );
       onStudioUpdate(data.studio);
       hydrateEditor(data.studio);
@@ -190,6 +196,7 @@ export function useContentGeneration(params: {
   }, [editingTitle, editingBody]);
 
   return {
+    selectedTopicId, setSelectedTopicId,
     topicInput, setTopicInput,
     generateBusy, saveBusy,
     seoCompliance,

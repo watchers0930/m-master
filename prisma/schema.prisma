@@ -14,63 +14,93 @@ model Project {
   domain                 String?
   industry               String?
   workingPath            String?
+  ga4PropertyId          String?
   status                 String         @default("active")
-  analyticsSourceType    String?
-  analyticsSourceId      String?
-  analyticsSourceLabel   String?
-  analyticsEndpointUrl   String?
-  analyticsAccessKey     String?        @db.Text
-  analyticsConnectedAt   DateTime?
   wordpressSiteUrl       String?
   wordpressUsername      String?
+  wordpressAppPasswordEncrypted String?
   wordpressStatus        String?
   wordpressCategoryNames String?
   wordpressTagNames      String?
+  metaAccessTokenEncrypted String?
+  metaTokenExpiresAt     DateTime?
+  facebookPageId         String?
+  instagramBusinessAccountId String?
+  operationsAlertWebhookEncrypted String?
+  alertPolicyMode        String         @default("failures-and-review")
+  alertQuietHoursStart   String?
+  alertQuietHoursEnd     String?
+  alertTimezone          String         @default("Asia/Seoul")
+  alertOnBlockedReadiness Boolean      @default(true)
+  automationMode         String         @default("draft-only")
+  automationRequireReview Boolean      @default(true)
+  automationMinOverallScore Int        @default(75)
+  automationMinRiskScore Int           @default(80)
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt
+  analyticsAccessKey     String?
+  analyticsConnectedAt   DateTime?
+  analyticsEndpointUrl   String?
+  analyticsSourceId      String?
+  analyticsSourceLabel   String?
+  analyticsSourceType    String?
   brandProfiles          BrandProfile[]
   topics                 TopicCandidate[]
   contentJobs            ContentJob[]
   contentPlans           ContentPlan[]
+  automationBatchRuns    AutomationBatchRun[]
+  operators              ProjectOperator[]
+  credentialChecks       CredentialCheckRun[]
 }
 
-model CmsSection {
-  id          String    @id @default(cuid())
-  key         String    @unique
-  title       String
-  description String?   @db.Text
-  visible     Boolean   @default(true)
-  sortOrder   Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  items       CmsItem[]
+model ProjectOperator {
+  id            String                 @id @default(cuid())
+  projectId     String
+  name          String
+  role          String
+  accessKeyHash String
+  active        Boolean                @default(true)
+  lastUsedAt    DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  project       Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sessions      ProjectOperatorSession[]
 
-  @@index([visible, sortOrder])
+  @@unique([projectId, name])
+  @@index([projectId, active, role])
 }
 
-model CmsItem {
-  id          String     @id @default(cuid())
-  sectionId   String
-  slug        String
-  title       String
-  subtitle    String?
-  clientName  String?
-  periodLabel String?
-  summary     String     @db.Text
-  body        String?    @db.Text
-  tags        String?    @db.Text
-  imageUrl    String?
-  linkUrl     String?
-  status      String     @default("published")
-  featured    Boolean    @default(false)
-  visible     Boolean    @default(true)
-  sortOrder   Int        @default(0)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  section     CmsSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+model ProjectOperatorSession {
+  id            String          @id @default(cuid())
+  operatorId     String
+  tokenHash      String
+  expiresAt      DateTime
+  lastUsedAt     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  operator       ProjectOperator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
 
-  @@unique([sectionId, slug])
-  @@index([sectionId, visible, sortOrder])
+  @@unique([tokenHash])
+  @@index([operatorId, expiresAt])
+}
+
+model CredentialCheckRun {
+  id          String   @id @default(cuid())
+  projectId   String
+  service     String
+  kind        String
+  status      String
+  actorLabel  String?
+  summary     String
+  detail      String?  @db.Text
+  expiresAt   DateTime?
+  checkedAt   DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, service, checkedAt])
+  @@index([projectId, createdAt])
 }
 
 model BrandProfile {
@@ -122,47 +152,47 @@ model ContentJob {
   updatedAt       DateTime       @updatedAt
   project         Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
   assets          ContentAsset[]
+  publications    ChannelPublication[]
 
   @@index([projectId, status])
   @@index([projectId, variantGroupId])
 }
 
-model ContentPlan {
-  id             String            @id @default(cuid())
-  projectId      String
-  monthKey       String
-  status         String            @default("draft")
-  basisSummary   String?           @db.Text
-  autoGenerate   Boolean           @default(false)
-  generatedAt    DateTime?
-  lastExecutedAt DateTime?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  items          ContentPlanItem[]
+model ChannelPublication {
+  id              String     @id @default(cuid())
+  contentJobId    String
+  channel         String
+  provider        String
+  status          String     @default("pending")
+  externalPostId  String?
+  externalPostUrl String?
+  payloadSummary  String?    @db.Text
+  errorMessage    String?    @db.Text
+  publishedAt     DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  contentJob      ContentJob @relation(fields: [contentJobId], references: [id], onDelete: Cascade)
 
-  @@unique([projectId, monthKey])
-  @@index([projectId, monthKey])
+  @@index([contentJobId, channel, createdAt])
+  @@index([status, publishedAt])
 }
 
-model ContentPlanItem {
-  id             String      @id @default(cuid())
-  contentPlanId  String
-  sortOrder      Int         @default(0)
-  weekLabel      String
-  topic          String
-  intentType     String?
-  objective      String?     @db.Text
-  rationale      String?     @db.Text
-  status         String      @default("planned")
-  contentJobId   String?
-  generatedAt    DateTime?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  contentPlan    ContentPlan @relation(fields: [contentPlanId], references: [id], onDelete: Cascade)
+model AutomationBatchRun {
+  id           String   @id @default(cuid())
+  projectId    String
+  kind         String
+  label        String
+  actorLabel   String? 
+  executionSource String?
+  durationMs   Int?
+  completedCount Int    @default(0)
+  failedCount  Int      @default(0)
+  itemsSnapshot String? @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
-  @@index([contentPlanId, sortOrder])
-  @@index([contentPlanId, status])
+  @@index([projectId, createdAt])
 }
 
 model ContentAsset {
@@ -198,18 +228,100 @@ model ImageJob {
 }
 
 model ImageAsset {
-  id            String    @id @default(cuid())
-  imageJobId     String
-  role           String
-  originalPath   String?
-  composedPath   String?
-  width          Int?
-  height         Int?
-  selected       Boolean   @default(false)
-  version        Int       @default(1)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  imageJob       ImageJob  @relation(fields: [imageJobId], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid())
+  imageJobId    String
+  role          String
+  originalPath  String?
+  composedPath  String?
+  width         Int?
+  height        Int?
+  selected      Boolean  @default(false)
+  version       Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  imageJob      ImageJob @relation(fields: [imageJobId], references: [id], onDelete: Cascade)
 
   @@index([imageJobId, selected])
+}
+
+model CmsItem {
+  id          String     @id
+  sectionId   String
+  slug        String
+  title       String
+  subtitle    String?
+  clientName  String?
+  periodLabel String?
+  summary     String     @db.Text
+  body        String?    @db.Text
+  tags        String?    @db.Text
+  imageUrl    String?
+  linkUrl     String?
+  status      String     @default("published")
+  featured    Boolean    @default(false)
+  visible     Boolean    @default(true)
+  sortOrder   Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime
+  section     CmsSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([sectionId, slug])
+  @@index([sectionId, visible, sortOrder])
+}
+
+model CmsSection {
+  id          String    @id
+  key         String    @unique
+  title       String
+  description String?   @db.Text
+  visible     Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime
+  items       CmsItem[]
+
+  @@index([visible, sortOrder])
+}
+
+model ContentPlan {
+  id             String            @id
+  projectId      String
+  monthKey       String
+  status         String            @default("draft")
+  basisSummary   String?           @db.Text
+  autoGenerate   Boolean           @default(false)
+  generatedAt    DateTime?
+  lastExecutedAt DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime
+  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items          ContentPlanItem[]
+
+  @@unique([projectId, monthKey])
+  @@index([projectId, monthKey])
+}
+
+model ContentPlanItem {
+  id            String      @id
+  contentPlanId String
+  sortOrder     Int         @default(0)
+  weekLabel     String
+  publishAt     DateTime?
+  topic         String
+  intentType    String?
+  objective     String?
+  rationale     String?     @db.Text
+  status        String      @default("planned")
+  attemptCount  Int         @default(0)
+  lastError     String?     @db.Text
+  reviewSnapshot String?    @db.Text
+  lastProcessedAt DateTime?
+  contentJobId  String?
+  generatedAt   DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime
+  contentPlan   ContentPlan @relation(fields: [contentPlanId], references: [id], onDelete: Cascade)
+
+  @@index([contentPlanId, sortOrder])
+  @@index([contentPlanId, status])
 }

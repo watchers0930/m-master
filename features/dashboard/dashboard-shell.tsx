@@ -6,10 +6,15 @@ import { ProjectIntakeForm } from "@/features/dashboard/project-intake-form";
 import { ProjectOverview } from "@/features/dashboard/project-overview";
 import { usePublishWorkflow } from "@/features/dashboard/use-publish-workflow";
 import type {
+  AutomationReadinessReport,
   ChannelKey,
+  CredentialHealthReport,
   EditableBrandProfileField,
   ImageStudioState,
   ImageStudioVariant,
+  ProjectOperatorRole,
+  ProjectOperatorSession,
+  ProjectOperatorSummary,
   ProjectActivityItem,
   ProjectDetail,
   ProjectListItem,
@@ -154,9 +159,21 @@ export function DashboardShell() {
   const [files, setFiles] = useState<SourceFileDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [planBusy, setPlanBusy] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
   const [folderSupported, setFolderSupported] = useState<boolean | null>(null);
+  const [automationReadiness, setAutomationReadiness] = useState<AutomationReadinessReport | null>(null);
+  const [projectWordpressAppPassword, setProjectWordpressAppPassword] = useState("");
+  const [projectMetaAccessToken, setProjectMetaAccessToken] = useState("");
+  const [projectOperationsAlertWebhook, setProjectOperationsAlertWebhook] = useState("");
+  const [operatorSession, setOperatorSession] = useState<ProjectOperatorSession | null>(null);
+  const [operators, setOperators] = useState<ProjectOperatorSummary[]>([]);
+  const [credentialHealth, setCredentialHealth] = useState<CredentialHealthReport | null>(null);
+  const [operatorLoginName, setOperatorLoginName] = useState("");
+  const [operatorLoginKey, setOperatorLoginKey] = useState("");
+  const [operatorBootstrapSecret, setOperatorBootstrapSecret] = useState("");
+  const [newOperatorName, setNewOperatorName] = useState("");
+  const [newOperatorKey, setNewOperatorKey] = useState("");
+  const [newOperatorRole, setNewOperatorRole] = useState<ProjectOperatorRole>("operator");
 
   const currentImageStudio = imageStudios[activeChannel];
   const contextApproved = Boolean(activeProject?.brandProfile?.approved);
@@ -197,6 +214,128 @@ export function DashboardShell() {
     setCurrentStep(step);
   }
 
+  function applyProjectDetail(nextProject: ProjectDetail) {
+    setActiveProject(nextProject);
+    setProjectWordpressAppPassword("");
+    setProjectMetaAccessToken("");
+    setProjectOperationsAlertWebhook("");
+    publishWorkflow.hydratePublishResult(nextProject);
+  }
+
+  function applyStudioDetail(nextStudio: StudioDetail, nextProject?: ProjectDetail | null) {
+    const topicSource = nextProject ?? activeProject;
+    const matchedTopic =
+      topicSource?.topics.find((topic) => topic.title === nextStudio.draft.topic) ||
+      topicSource?.topics[0] ||
+      null;
+
+    setStudio(nextStudio);
+    setSelectedTopicId(matchedTopic?.id ?? null);
+    setImageStudios(toImageStudios(nextStudio));
+  }
+
+  async function loadProjectDetail(projectId: string) {
+    const response = await fetch(`/api/projects/${projectId}`, { cache: "no-store" });
+    const payload = await parseJson<ApiResponse<{ project: ProjectDetail }>>(response);
+
+    if (!payload.ok) {
+      throw new Error(payload.error.message);
+    }
+
+    applyProjectDetail(payload.data.project);
+    return payload.data.project;
+  }
+
+  async function loadProjectStudio(projectId: string, nextProject?: ProjectDetail | null) {
+    const response = await fetch(`/api/projects/${projectId}/studio`, { cache: "no-store" });
+    const payload = await parseJson<ApiResponse<{ studio: StudioDetail }>>(response);
+
+    if (!payload.ok) {
+      throw new Error(payload.error.message);
+    }
+
+    applyStudioDetail(payload.data.studio, nextProject);
+    return payload.data.studio;
+  }
+
+  async function loadProjectHistory(projectId: string) {
+    const response = await fetch(`/api/projects/${projectId}/history`, { cache: "no-store" });
+    const payload = await parseJson<ApiResponse<{ history: ProjectActivityItem[] }>>(response);
+
+    if (!payload.ok) {
+      throw new Error(payload.error.message);
+    }
+
+    setHistory(payload.data.history);
+    return payload.data.history;
+  }
+
+  async function loadAutomationReadiness(projectId: string) {
+    const response = await fetch(`/api/projects/${projectId}/automation-readiness`, { cache: "no-store" });
+    const payload = await parseJson<ApiResponse<{ readiness: AutomationReadinessReport }>>(response);
+
+    if (!payload.ok) {
+      throw new Error(payload.error.message);
+    }
+
+    setAutomationReadiness(payload.data.readiness);
+    return payload.data.readiness;
+  }
+
+  async function loadOperatorSession(projectId: string) {
+    const response = await fetch(`/api/projects/${projectId}/operators/session`, { cache: "no-store" });
+    const payload = await parseJson<ApiResponse<{ operator: ProjectOperatorSession | null }>>(response);
+
+    if (!payload.ok) {
+      throw new Error(payload.error.message);
+    }
+
+    setOperatorSession(payload.data.operator);
+    return payload.data.operator;
+  }
+
+  async function loadOperators(projectId: string) {
+    const response = await fetch(`/api/projects/${projectId}/operators`, { cache: "no-store" });
+    const payload = await parseJson<ApiResponse<{ operators: ProjectOperatorSummary[]; bootstrapRequired: boolean }>>(response);
+
+    if (!payload.ok) {
+      if (response.status === 401 || response.status === 403) {
+        setOperators([]);
+        return [];
+      }
+
+      throw new Error(payload.error.message);
+    }
+
+    setOperators(payload.data.operators);
+    return payload.data.operators;
+  }
+
+  async function loadCredentialHealth(projectId: string) {
+    const response = await fetch(`/api/projects/${projectId}/credential-checks`, { cache: "no-store" });
+    const payload = await parseJson<ApiResponse<{ health: CredentialHealthReport }>>(response);
+
+    if (!payload.ok) {
+      if (response.status === 401 || response.status === 403) {
+        setCredentialHealth(null);
+        return null;
+      }
+
+      throw new Error(payload.error.message);
+    }
+
+    setCredentialHealth(payload.data.health);
+    return payload.data.health;
+  }
+
+  async function loadOperationsContext(projectId: string) {
+    await Promise.allSettled([
+      loadOperatorSession(projectId),
+      loadOperators(projectId),
+      loadCredentialHealth(projectId),
+    ]);
+  }
+
   async function loadProjects() {
     const response = await fetch("/api/projects", { cache: "no-store" });
     const payload = await parseJson<ApiResponse<{ projects: ProjectListItem[] }>>(response);
@@ -212,39 +351,14 @@ export function DashboardShell() {
   }
 
   async function loadProject(projectId: string) {
-    const [detailResponse, studioResponse, historyResponse] = await Promise.all([
-      fetch(`/api/projects/${projectId}`, { cache: "no-store" }),
-      fetch(`/api/projects/${projectId}/studio`, { cache: "no-store" }),
-      fetch(`/api/projects/${projectId}/history`, { cache: "no-store" }),
+    const [nextProject] = await Promise.all([
+      loadProjectDetail(projectId),
+      loadProjectHistory(projectId),
+      loadAutomationReadiness(projectId),
     ]);
-
-    const detailPayload = await parseJson<ApiResponse<{ project: ProjectDetail }>>(detailResponse);
-    const studioPayload = await parseJson<ApiResponse<{ studio: StudioDetail }>>(studioResponse);
-    const historyPayload = await parseJson<ApiResponse<{ history: ProjectActivityItem[] }>>(historyResponse);
-
-    if (!detailPayload.ok) {
-      throw new Error(detailPayload.error.message);
-    }
-
-    if (!studioPayload.ok) {
-      throw new Error(studioPayload.error.message);
-    }
-
-    if (!historyPayload.ok) {
-      throw new Error(historyPayload.error.message);
-    }
-
-    const nextProject = detailPayload.data.project;
-    const nextStudio = studioPayload.data.studio;
-    const matchedTopic = nextProject.topics.find((topic) => topic.title === nextStudio.draft.topic) || nextProject.topics[0];
-
-    setActiveProject(nextProject);
-    setStudio(nextStudio);
-    setSelectedTopicId(matchedTopic?.id ?? null);
-    setHistory(historyPayload.data.history);
-    setImageStudios(toImageStudios(nextStudio));
+    await loadProjectStudio(projectId, nextProject);
+    await loadOperationsContext(projectId);
     publishWorkflow.resetPublishState();
-    publishWorkflow.hydratePublishResult(nextProject);
   }
 
   async function requestPreview() {
@@ -295,6 +409,12 @@ export function DashboardShell() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    void loadProjects().catch((loadError: unknown) => {
+      setError(loadError instanceof Error ? loadError.message : "프로젝트 목록을 불러오지 못했습니다.");
+    });
+  }, []);
 
   useEffect(() => {
     setFolderSupported(typeof window !== "undefined" && typeof window.showDirectoryPicker === "function");
@@ -392,7 +512,7 @@ export function DashboardShell() {
         throw new Error(payload.error.message);
       }
 
-      setActiveProject(payload.data.project);
+      applyProjectDetail(payload.data.project);
       await loadProjects();
       setCurrentStep(3);
     } catch (approveError) {
@@ -430,8 +550,8 @@ export function DashboardShell() {
         throw new Error(payload.error.message);
       }
 
-      setActiveProject(payload.data.project);
-      await loadProject(activeProject.project.id);
+      applyProjectDetail(payload.data.project);
+      await loadProjectHistory(activeProject.project.id);
       await loadProjects();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "컨텍스트 임시 저장에 실패했습니다.");
@@ -458,8 +578,9 @@ export function DashboardShell() {
         throw new Error(payload.error.message);
       }
 
-      setActiveProject(payload.data.project);
-      await loadProject(activeProject.project.id);
+      applyProjectDetail(payload.data.project);
+      setSelectedTopicId(payload.data.project.topics[0]?.id ?? null);
+      await loadProjectHistory(activeProject.project.id);
       await loadProjects();
       setCurrentStep(2);
     } catch (regenerateError) {
@@ -502,8 +623,11 @@ export function DashboardShell() {
         throw new Error(payload.error.message);
       }
 
-      setStudio(payload.data.studio);
-      await loadProject(activeProject.project.id);
+      applyStudioDetail(payload.data.studio);
+      await Promise.all([
+        loadProjectDetail(activeProject.project.id),
+        loadProjectHistory(activeProject.project.id),
+      ]);
       setCurrentStep(4);
     } catch (generationError) {
       setError(generationError instanceof Error ? generationError.message : "콘텐츠 초안 생성에 실패했습니다.");
@@ -586,33 +710,295 @@ export function DashboardShell() {
     });
   }
 
-  function handleProjectAnalyticsFieldChange(
-    field: "analyticsSourceType" | "analyticsSourceId" | "analyticsSourceLabel" | "analyticsEndpointUrl" | "analyticsAccessKey",
-    value: string,
+  function handleProjectGa4PropertyIdChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          ga4PropertyId: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectWordpressSiteUrlChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          wordpressSiteUrl: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectWordpressUsernameChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          wordpressUsername: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectWordpressStatusChange(value: "draft" | "publish") {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          wordpressStatus: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectWordpressCategoryNamesChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          wordpressCategoryNames: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectWordpressTagNamesChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          wordpressTagNames: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectFacebookPageIdChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          facebookPageId: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectInstagramBusinessAccountIdChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          instagramBusinessAccountId: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectMetaTokenExpiresAtChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          metaTokenExpiresAt: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectAlertPolicyModeChange(
+    value: "disabled" | "all" | "critical-only" | "failures-only" | "failures-and-review",
   ) {
     setActiveProject((currentProject) => {
       if (!currentProject) {
         return currentProject;
       }
 
-      const nextProject = {
+      return {
         ...currentProject,
         project: {
           ...currentProject.project,
-          [field]: value,
+          alertPolicyMode: value,
         },
       };
+    });
+  }
 
-      if (field === "analyticsSourceType") {
-        if (value === "ga4") {
-          nextProject.project.analyticsEndpointUrl = "";
-          nextProject.project.analyticsAccessKey = "";
-        } else {
-          nextProject.project.analyticsSourceId = "";
-        }
+  function handleProjectAlertQuietHoursStartChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
       }
 
-      return nextProject;
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          alertQuietHoursStart: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectAlertQuietHoursEndChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          alertQuietHoursEnd: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectAlertTimezoneChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          alertTimezone: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectAlertOnBlockedReadinessChange(value: boolean) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          alertOnBlockedReadiness: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectAutomationModeChange(value: "draft-only" | "approved-auto-publish" | "full-auto") {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          automationMode: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectAutomationRequireReviewChange(value: boolean) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          automationRequireReview: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectAutomationMinOverallScoreChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      const numeric = Number(value);
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          automationMinOverallScore: Number.isFinite(numeric) ? numeric : 0,
+        },
+      };
+    });
+  }
+
+  function handleProjectAutomationMinRiskScoreChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      const numeric = Number(value);
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          automationMinRiskScore: Number.isFinite(numeric) ? numeric : 0,
+        },
+      };
     });
   }
 
@@ -630,16 +1016,27 @@ export function DashboardShell() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           industry: activeProject.project.industry || "general",
-          analyticsSourceType: activeProject.project.analyticsSourceType || "ga4",
-          analyticsSourceId: activeProject.project.analyticsSourceId || "",
-          analyticsSourceLabel: activeProject.project.analyticsSourceLabel || "",
-          analyticsEndpointUrl: activeProject.project.analyticsEndpointUrl || "",
-          analyticsAccessKey: activeProject.project.analyticsAccessKey || "",
+          ga4PropertyId: activeProject.project.ga4PropertyId,
           wordpressSiteUrl: activeProject.project.wordpressSiteUrl,
           wordpressUsername: activeProject.project.wordpressUsername,
+          wordpressAppPassword: projectWordpressAppPassword || undefined,
           wordpressStatus: activeProject.project.wordpressStatus,
           wordpressCategoryNames: activeProject.project.wordpressCategoryNames,
           wordpressTagNames: activeProject.project.wordpressTagNames,
+          metaAccessToken: projectMetaAccessToken || undefined,
+          metaTokenExpiresAt: activeProject.project.metaTokenExpiresAt || undefined,
+          facebookPageId: activeProject.project.facebookPageId,
+          instagramBusinessAccountId: activeProject.project.instagramBusinessAccountId,
+          operationsAlertWebhook: projectOperationsAlertWebhook || undefined,
+          alertPolicyMode: activeProject.project.alertPolicyMode,
+          alertQuietHoursStart: activeProject.project.alertQuietHoursStart,
+          alertQuietHoursEnd: activeProject.project.alertQuietHoursEnd,
+          alertTimezone: activeProject.project.alertTimezone,
+          alertOnBlockedReadiness: activeProject.project.alertOnBlockedReadiness,
+          automationMode: activeProject.project.automationMode,
+          automationRequireReview: activeProject.project.automationRequireReview,
+          automationMinOverallScore: activeProject.project.automationMinOverallScore,
+          automationMinRiskScore: activeProject.project.automationMinRiskScore,
         }),
       });
 
@@ -649,8 +1046,9 @@ export function DashboardShell() {
         throw new Error(payload.error.message);
       }
 
-      setActiveProject(payload.data.project);
-      await loadProject(activeProject.project.id);
+      applyProjectDetail(payload.data.project);
+      await loadAutomationReadiness(activeProject.project.id);
+      await loadCredentialHealth(activeProject.project.id);
       await loadProjects();
     } catch (settingsError) {
       setError(settingsError instanceof Error ? settingsError.message : "프로젝트 설정 저장에 실패했습니다.");
@@ -659,60 +1057,212 @@ export function DashboardShell() {
     }
   }
 
-  async function handleGenerateMonthlyPlan(autoGenerate: boolean) {
+  async function handleOperatorLogin() {
     if (!activeProject?.project.id) {
       return;
     }
 
     setError(null);
-    setPlanBusy(true);
+    setLoading(true);
 
     try {
-      const response = await fetch(`/api/projects/${activeProject.project.id}/monthly-plan`, {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/operators/session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ autoGenerate }),
+        body: JSON.stringify({
+          name: operatorLoginName,
+          accessKey: operatorLoginKey,
+        }),
       });
-      const payload = await parseJson<ApiResponse<{ plan: ProjectDetail["latestContentPlan"] }>>(response);
+      const payload = await parseJson<ApiResponse<{ operator: ProjectOperatorSession }>>(response);
 
       if (!payload.ok) {
         throw new Error(payload.error.message);
       }
 
-      await loadProject(activeProject.project.id);
-      await loadProjects();
-      setCurrentStep(3);
-    } catch (planError) {
-      setError(planError instanceof Error ? planError.message : "월간 계획 생성에 실패했습니다.");
+      setOperatorSession(payload.data.operator);
+      setOperatorLoginKey("");
+      await Promise.allSettled([
+        loadOperators(activeProject.project.id),
+        loadCredentialHealth(activeProject.project.id),
+        loadAutomationReadiness(activeProject.project.id),
+      ]);
+    } catch (sessionError) {
+      setError(sessionError instanceof Error ? sessionError.message : "운영자 로그인에 실패했습니다.");
     } finally {
-      setPlanBusy(false);
+      setLoading(false);
     }
   }
 
-  async function handleRunMonthlyPlan() {
+  async function handleOperatorLogout() {
     if (!activeProject?.project.id) {
       return;
     }
 
     setError(null);
-    setPlanBusy(true);
+    setLoading(true);
 
     try {
-      const response = await fetch(`/api/projects/${activeProject.project.id}/monthly-plan`, {
-        method: "PATCH",
+      await fetch(`/api/projects/${activeProject.project.id}/operators/session`, {
+        method: "DELETE",
       });
-      const payload = await parseJson<ApiResponse<{ result: { planId: string } }>>(response);
+      setOperatorSession(null);
+      setOperators([]);
+      setCredentialHealth(null);
+    } catch (sessionError) {
+      setError(sessionError instanceof Error ? sessionError.message : "운영자 로그아웃에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleBootstrapOperator() {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/operators`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: operatorLoginName,
+          accessKey: operatorLoginKey,
+          role: "owner",
+          bootstrapSecret: operatorBootstrapSecret,
+        }),
+      });
+      const payload = await parseJson<ApiResponse<{ operator: ProjectOperatorSummary }>>(response);
 
       if (!payload.ok) {
         throw new Error(payload.error.message);
       }
 
-      await loadProject(activeProject.project.id);
-      setCurrentStep(4);
-    } catch (runError) {
-      setError(runError instanceof Error ? runError.message : "월간 계획 실행에 실패했습니다.");
+      const sessionResponse = await fetch(`/api/projects/${activeProject.project.id}/operators/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: operatorLoginName,
+          accessKey: operatorLoginKey,
+        }),
+      });
+      const sessionPayload = await parseJson<ApiResponse<{ operator: ProjectOperatorSession }>>(sessionResponse);
+
+      if (!sessionPayload.ok) {
+        throw new Error(sessionPayload.error.message);
+      }
+
+      setOperatorSession(sessionPayload.data.operator);
+      setOperatorLoginKey("");
+      await Promise.allSettled([
+        loadOperators(activeProject.project.id),
+        loadCredentialHealth(activeProject.project.id),
+        loadAutomationReadiness(activeProject.project.id),
+      ]);
+    } catch (bootstrapError) {
+      setError(bootstrapError instanceof Error ? bootstrapError.message : "초기 owner 등록에 실패했습니다.");
     } finally {
-      setPlanBusy(false);
+      setLoading(false);
+    }
+  }
+
+  async function handleCreateOperator() {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/operators`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newOperatorName,
+          accessKey: newOperatorKey,
+          role: newOperatorRole,
+        }),
+      });
+      const payload = await parseJson<ApiResponse<{ operator: ProjectOperatorSummary }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      setNewOperatorName("");
+      setNewOperatorKey("");
+      setNewOperatorRole("operator");
+      await loadOperators(activeProject.project.id);
+    } catch (operatorError) {
+      setError(operatorError instanceof Error ? operatorError.message : "운영자 추가에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleUpdateOperator(operatorId: string, patch: { role?: ProjectOperatorRole; active?: boolean }) {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/operators`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          operatorId,
+          ...patch,
+        }),
+      });
+      const payload = await parseJson<ApiResponse<{ operator: ProjectOperatorSummary }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      await loadOperators(activeProject.project.id);
+    } catch (operatorError) {
+      setError(operatorError instanceof Error ? operatorError.message : "운영자 수정에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRunCredentialCheck(service: "wordpress" | "meta" | "ga4" | "alerts") {
+    if (!activeProject?.project.id) {
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/projects/${activeProject.project.id}/credential-checks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service }),
+      });
+      const payload = await parseJson<ApiResponse<{ run: unknown }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      await Promise.allSettled([
+        loadCredentialHealth(activeProject.project.id),
+        loadAutomationReadiness(activeProject.project.id),
+      ]);
+    } catch (checkError) {
+      setError(checkError instanceof Error ? checkError.message : "자격증명 점검 실행에 실패했습니다.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -799,9 +1349,7 @@ export function DashboardShell() {
         throw new Error(payload.error.message);
       }
 
-      setStudio(payload.data.studio);
-      setImageStudios(toImageStudios(payload.data.studio));
-      await loadProject(activeProject.project.id);
+      applyStudioDetail(payload.data.studio);
       setCurrentStep(6);
     } catch (imageError) {
       setError(imageError instanceof Error ? imageError.message : "이미지 생성에 실패했습니다.");
@@ -840,9 +1388,7 @@ export function DashboardShell() {
         throw new Error(payload.error.message);
       }
 
-      setStudio(payload.data.studio);
-      setImageStudios(toImageStudios(payload.data.studio));
-      await loadProject(activeProject.project.id);
+      applyStudioDetail(payload.data.studio);
     } catch (selectError) {
       setError(selectError instanceof Error ? selectError.message : "이미지 선택 적용에 실패했습니다.");
     } finally {
@@ -883,8 +1429,11 @@ export function DashboardShell() {
         throw new Error(payload.error.message);
       }
 
-      setStudio(payload.data.studio);
-      await loadProject(activeProject.project.id);
+      applyStudioDetail(payload.data.studio);
+      await Promise.all([
+        loadProjectDetail(activeProject.project.id),
+        loadProjectHistory(activeProject.project.id),
+      ]);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "콘텐츠 초안 저장에 실패했습니다.");
     } finally {
@@ -1021,15 +1570,57 @@ export function DashboardShell() {
                 projects={projects}
                 activeProject={activeProject}
                 loading={loading}
-                planBusy={planBusy}
                 onSelectProject={loadProject}
                 onDeleteProject={handleDeleteProject}
                 onRegenerateContext={handleRegenerateContext}
                 onProjectIndustryChange={handleProjectIndustryChange}
-                onProjectAnalyticsFieldChange={handleProjectAnalyticsFieldChange}
+                onProjectGa4PropertyIdChange={handleProjectGa4PropertyIdChange}
+                onProjectWordpressSiteUrlChange={handleProjectWordpressSiteUrlChange}
+                onProjectWordpressUsernameChange={handleProjectWordpressUsernameChange}
+                projectWordpressAppPassword={projectWordpressAppPassword}
+                onProjectWordpressAppPasswordChange={setProjectWordpressAppPassword}
+                onProjectWordpressStatusChange={handleProjectWordpressStatusChange}
+                onProjectWordpressCategoryNamesChange={handleProjectWordpressCategoryNamesChange}
+                onProjectWordpressTagNamesChange={handleProjectWordpressTagNamesChange}
+                projectMetaAccessToken={projectMetaAccessToken}
+                onProjectMetaAccessTokenChange={setProjectMetaAccessToken}
+                onProjectMetaTokenExpiresAtChange={handleProjectMetaTokenExpiresAtChange}
+                onProjectFacebookPageIdChange={handleProjectFacebookPageIdChange}
+                onProjectInstagramBusinessAccountIdChange={handleProjectInstagramBusinessAccountIdChange}
+                projectOperationsAlertWebhook={projectOperationsAlertWebhook}
+                onProjectOperationsAlertWebhookChange={setProjectOperationsAlertWebhook}
+                onProjectAlertPolicyModeChange={handleProjectAlertPolicyModeChange}
+                onProjectAlertQuietHoursStartChange={handleProjectAlertQuietHoursStartChange}
+                onProjectAlertQuietHoursEndChange={handleProjectAlertQuietHoursEndChange}
+                onProjectAlertTimezoneChange={handleProjectAlertTimezoneChange}
+                onProjectAlertOnBlockedReadinessChange={handleProjectAlertOnBlockedReadinessChange}
+                onProjectAutomationModeChange={handleProjectAutomationModeChange}
+                onProjectAutomationRequireReviewChange={handleProjectAutomationRequireReviewChange}
+                onProjectAutomationMinOverallScoreChange={handleProjectAutomationMinOverallScoreChange}
+                onProjectAutomationMinRiskScoreChange={handleProjectAutomationMinRiskScoreChange}
+                automationReadiness={automationReadiness}
+                operatorSession={operatorSession}
+                operators={operators}
+                credentialHealth={credentialHealth}
+                operatorLoginName={operatorLoginName}
+                onOperatorLoginNameChange={setOperatorLoginName}
+                operatorLoginKey={operatorLoginKey}
+                onOperatorLoginKeyChange={setOperatorLoginKey}
+                operatorBootstrapSecret={operatorBootstrapSecret}
+                onOperatorBootstrapSecretChange={setOperatorBootstrapSecret}
+                onOperatorLogin={handleOperatorLogin}
+                onOperatorLogout={handleOperatorLogout}
+                onOperatorBootstrap={handleBootstrapOperator}
+                newOperatorName={newOperatorName}
+                onNewOperatorNameChange={setNewOperatorName}
+                newOperatorKey={newOperatorKey}
+                onNewOperatorKeyChange={setNewOperatorKey}
+                newOperatorRole={newOperatorRole}
+                onNewOperatorRoleChange={setNewOperatorRole}
+                onCreateOperator={handleCreateOperator}
+                onUpdateOperator={handleUpdateOperator}
+                onRunCredentialCheck={handleRunCredentialCheck}
                 onSaveProjectSettings={handleSaveProjectSettings}
-                onGenerateMonthlyPlan={handleGenerateMonthlyPlan}
-                onRunMonthlyPlan={handleRunMonthlyPlan}
                 onBrandProfileChange={handleBrandProfileChange}
                 onSaveContext={handleSaveContext}
                 onApproveContext={handleApproveContext}
@@ -1071,7 +1662,6 @@ export function DashboardShell() {
                 onPreparePublish={publishWorkflow.handlePreparePublish}
                 onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
                 onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
-                onCopyTrackingLink={publishWorkflow.handleCopyTrackingLink}
                 onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
                 onDownloadExportHashtags={publishWorkflow.handleDownloadExportHashtags}
                 onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}
@@ -1122,7 +1712,6 @@ export function DashboardShell() {
                 onPreparePublish={publishWorkflow.handlePreparePublish}
                 onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
                 onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
-                onCopyTrackingLink={publishWorkflow.handleCopyTrackingLink}
                 onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
                 onDownloadExportHashtags={publishWorkflow.handleDownloadExportHashtags}
                 onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}
@@ -1173,7 +1762,6 @@ export function DashboardShell() {
                 onPreparePublish={publishWorkflow.handlePreparePublish}
                 onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
                 onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
-                onCopyTrackingLink={publishWorkflow.handleCopyTrackingLink}
                 onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
                 onDownloadExportHashtags={publishWorkflow.handleDownloadExportHashtags}
                 onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}
@@ -1224,7 +1812,6 @@ export function DashboardShell() {
                 onPreparePublish={publishWorkflow.handlePreparePublish}
                 onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
                 onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
-                onCopyTrackingLink={publishWorkflow.handleCopyTrackingLink}
                 onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
                 onDownloadExportHashtags={publishWorkflow.handleDownloadExportHashtags}
                 onCopyBlogPublishHtml={publishWorkflow.handleCopyBlogPublishHtml}

@@ -4,16 +4,16 @@
 
 ## 1. 브랜치와 배포
 
-- 모든 일상 개발은 반드시 최신 `origin/production` 기준의 짧은 작업 브랜치에서 진행한다.
+- 모든 일상 개발은 반드시 `production` 브랜치 기준으로 진행한다.
 - `production` 브랜치에는 직접 기능 개발을 하지 않는다.
 - 모든 배포는 `production` 푸시 기준으로 `m-master.vercel.app`에 바로 반영된다.
 - 운영 반영은 반드시 `production` 브랜치 머지를 통해서만 진행한다.
 - `production` 반영은 명시적인 승인과 확인 없이 진행하지 않는다.
-- 운영 배포는 `작업 브랜치 생성 -> 로컬 검증 -> PR -> production 머지 -> 운영배포` 흐름으로만 진행한다.
+- 로컬에서 `vercel --prod`로 직접 운영 배포하지 않는다.
 
 ## 2. Pull Request
 
-- `production`으로 가는 변경은 가능하면 PR로 기록하되, 공용 릴리스 명령을 쓸 때는 로컬 머지 기록이 기준이 된다.
+- `production`으로 가는 변경은 반드시 PR로 올린다.
 - PR에는 변경 목적, 영향 범위, 테스트 결과를 반드시 적는다.
 - UI 변경 PR에는 화면 캡처 또는 테스트 도메인 링크를 남긴다.
 - 데이터 모델 변경 PR에는 마이그레이션 영향과 롤백 방법을 적는다.
@@ -24,7 +24,7 @@
 - 다른 프로젝트 DB와 테이블을 공유하거나 섞지 않는다.
 - 스키마 변경은 반드시 Prisma 스키마 기준으로 관리한다.
 - 운영 데이터에 직접 수작업 수정이 필요하면 먼저 백업 가능성과 영향 범위를 확인한다.
-- 대량 수정, 삭제, 구조 변경은 로컬 또는 승인된 검증 절차에서 먼저 검증한다.
+- 대량 수정, 삭제, 구조 변경은 테스트 배포에서 먼저 검증한다.
 
 ## 4. 비밀정보와 환경변수
 
@@ -119,26 +119,27 @@
 
 ## 13. 기본 작업 순서
 
-1. 최신 `origin/production`에서 작업 브랜치를 만든다.
-2. 한 가지 목적만 구현한다.
-3. 로컬 검증을 한다.
-4. 바로 `production` 대상 PR을 만든다.
-5. 승인 후 `production` 머지로 운영 반영한다.
-6. `m-master.vercel.app`에서 확인한다.
+1. `production`에서 작업한다.
+2. 로컬 검증을 한다.
+3. `production`에 푸시한다.
+4. `m-master.vercel.app`에서 확인한다.
+5. PR로 `production` 승격을 요청한다.
+6. 승인 후 `production` 머지로 운영 반영한다.
 
 ## 14. 승격 체크리스트
 
-1. 작업 브랜치가 최신 `origin/production` 기준인지 확인한다.
+1. `production` 브랜치 HEAD가 배포 대상 최신 커밋인지 확인한다.
 2. `git status`가 의도한 변경만 포함하는지 확인한다.
 3. `npm run build`를 통과시킨다.
-4. PR diff가 한 가지 목적만 포함하는지 확인한다.
-5. 저장소 정책에 맞는 방식으로 `production`에 머지한다.
-6. GitHub Actions production deploy 성공을 확인한다.
-7. `m-master.vercel.app` 응답과 주요 화면을 확인한다.
+4. `origin/production` 푸시 후 GitHub Actions production 배포 성공을 확인한다.
+5. `m-master.vercel.app`에서 실제 사용자 흐름을 확인한다.
+7. 저장소 정책에 맞는 방식으로 머지한다.
+8. production deploy workflow 성공을 확인한다.
+9. `m-master.vercel.app` 응답과 주요 화면을 확인한다.
 
 ## 15. 승격 예외 처리
 
 - `production` 직접 push나 force push는 하지 않는다.
-- 작업 브랜치가 많이 오래됐거나 충돌나면, 최신 `origin/production` 기준 새 작업 브랜치를 다시 만든다.
-- 새 작업 브랜치에 검증된 변경만 cherry-pick하거나 다시 반영한 뒤 `production`으로 새 PR을 만든다.
+- `production` 직접 반영이 충돌나면, 최신 `origin/production` 기준 임시 정렬 브랜치를 만든다.
+- 임시 정렬 브랜치에 검증된 변경을 반영한 뒤 `production`으로 새 PR을 만든다.
 - PR 머지 후 production deploy가 자동으로 뜨지 않으면 `deploy.yml`을 `production` 기준으로 수동 실행한다.

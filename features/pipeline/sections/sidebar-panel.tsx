@@ -1,13 +1,22 @@
 "use client";
 
 import { InputField } from "@/components/ui/input-field";
+import { OperationsBoard } from "../components/operations-board";
 import type {
+  ProjectListItem,
   ProjectDetail,
   SeoComplianceResult,
   VariantGroup,
   StudioDetail,
   WordPressPublishConfig,
   BlogPublishPackage,
+  MonthlyContentPlan,
+  AutomationReadinessReport,
+  ChannelPublicationSummary,
+  AutomationRunSummary,
+  AutomationReviewResolution,
+  BulkOperationHistoryItem,
+  BulkOperationReport,
 } from "../types";
 
 const TONE_PRESETS = [
@@ -19,150 +28,135 @@ const TONE_PRESETS = [
   { key: "educational", label: "교육적" },
 ] as const;
 
-function buildMonthlyRecommendedTopics(project: ProjectDetail | null) {
-  const month = new Date().getMonth() + 1;
-
-  if (!project) {
-    return [
-      `${month}월에 바로 적용하는 콘텐츠 운영 체크리스트`,
-      `전환이 나는 랜딩페이지 카피 구조 정리`,
-      `브랜드 메시지를 고객 언어로 바꾸는 방법`,
-      `블로그 글 하나로 SNS 콘텐츠까지 확장하는 순서`,
-      `실무자가 바로 쓰는 마케팅 자동화 흐름 가이드`,
-    ];
-  }
-
-  const projectName = project.project.name;
-  const keywords = project.sourceAnalysis?.keywordHints?.slice(0, 3) ?? [];
-  const primaryKeyword = keywords[0];
-  const secondaryKeyword = keywords[1];
-  const audience = project.brandProfile?.audience?.split(",")[0]?.trim();
-  const cta = project.brandProfile?.cta?.trim();
-
-  const candidates = [
-    ...project.topics.map((topic) => topic.title),
-    primaryKeyword ? `${month}월 ${primaryKeyword} 실무 체크리스트` : "",
-    primaryKeyword ? `${projectName}로 ${primaryKeyword} 성과를 만드는 실행 순서` : "",
-    primaryKeyword && secondaryKeyword ? `${primaryKeyword}와 ${secondaryKeyword}를 함께 설계할 때 놓치기 쉬운 포인트` : "",
-    audience ? `${audience}가 ${projectName}를 도입하기 전에 가장 많이 묻는 질문 7가지` : "",
-    cta ? `${projectName} 콘텐츠에서 ${cta} 전환율을 높이는 카피 구조` : "",
-    `${month}월에 바로 써먹는 ${projectName} 운영 아이디어 5가지`,
-    `${projectName} 핵심 기능을 고객 언어로 다시 설명하는 방법`,
-  ]
-    .map((item) => item.replace(/\s+/g, " ").trim())
-    .filter(Boolean);
-
-  return candidates.filter((item, index) => candidates.indexOf(item) === index).slice(0, 5);
-}
-
 type Props = {
-  project: {
-    activeProject: ProjectDetail | null;
-    name: string;
-    onNameChange: (v: string) => void;
-    domain: string;
-    onDomainChange: (v: string) => void;
-    workingPath: string;
-    onWorkingPathChange: (v: string) => void;
-    projectBusy: boolean;
-    onCreateProject: () => void;
-  };
-  context: {
-    editingSummary: string;
-    onEditingSummaryChange: (v: string) => void;
-    editingAudience: string;
-    onEditingAudienceChange: (v: string) => void;
-    editingTone: string;
-    onEditingToneChange: (v: string) => void;
-    onTonePresetSelect: (v: string) => void;
-    editingCta: string;
-    onEditingCtaChange: (v: string) => void;
-    editingBannedTerms: string;
-    onEditingBannedTermsChange: (v: string) => void;
-    contextBusy: boolean;
-    onApproveContext: () => void;
-    onSaveContextDraft: () => void;
-  };
-  generation: {
-    topicInput: string;
-    onTopicInputChange: (v: string) => void;
-    generateBusy: boolean;
-    onGenerate: () => void;
-    seoCompliance: SeoComplianceResult | null;
-  };
-  abTesting: {
-    topic: string;
-    variantGroup: VariantGroup | null;
-    abGenerateBusy: boolean;
-    adoptBusy: string | null;
-    onGenerateVariants: (count: number) => void;
-    onAdoptVariant: (id: string) => void;
-  };
-  review: {
-    studio: StudioDetail | null;
-  };
-  hashtags: {
-    editingHashtags: string;
-    onEditingHashtagsChange: (v: string) => void;
-    hashtagBusy: boolean;
-    onGenerateHashtags: () => void;
-  };
-  publish: {
-    exportBusy: boolean;
-    onExportAll: () => void;
-    publishBusy: boolean;
-    publishPackage: BlogPublishPackage | null;
-    onPreparePublish: () => void;
-    wordpressConfig: WordPressPublishConfig;
-    onWordPressConfigChange: (field: keyof WordPressPublishConfig, value: string) => void;
-    settingsBusy: boolean;
-    onSaveWordPressDefaults: () => void;
-  };
+  /* Project */
+  projects: ProjectListItem[];
+  activeProject: ProjectDetail | null;
+  name: string;
+  onNameChange: (v: string) => void;
+  domain: string;
+  onDomainChange: (v: string) => void;
+  workingPath: string;
+  onWorkingPathChange: (v: string) => void;
+  projectBusy: boolean;
+  onCreateProject: () => void;
+  onSelectProject: (id: string) => void;
+  /* Context */
+  editingSummary: string;
+  onEditingSummaryChange: (v: string) => void;
+  editingAudience: string;
+  onEditingAudienceChange: (v: string) => void;
+  editingTone: string;
+  onEditingToneChange: (v: string) => void;
+  editingCta: string;
+  onEditingCtaChange: (v: string) => void;
+  editingBannedTerms: string;
+  onEditingBannedTermsChange: (v: string) => void;
+  contextBusy: boolean;
+  onApproveContext: () => void;
+  onSaveContextDraft: () => void;
+  /* Generation */
+  topicInput: string;
+  onTopicInputChange: (v: string) => void;
+  generateBusy: boolean;
+  onGenerate: () => void;
+  contentPlan: MonthlyContentPlan | null;
+  planBusy: boolean;
+  onGenerateContentPlan: () => void;
+  selectedPlannedTopicId: string | null;
+  onSelectPlannedTopic: (itemId: string, topicTitle: string) => void;
+  /* A/B */
+  topic: string;
+  variantGroup: VariantGroup | null;
+  abGenerateBusy: boolean;
+  onGenerateVariants: (count: number) => void;
+  adoptBusy: string | null;
+  onAdoptVariant: (id: string) => void;
+  /* SEO */
+  seoCompliance: SeoComplianceResult | null;
+  /* Review */
+  studio: StudioDetail | null;
+  /* Tone & Hashtag */
+  editingHashtags: string;
+  onEditingHashtagsChange: (v: string) => void;
+  hashtagBusy: boolean;
+  onGenerateHashtags: () => void;
+  /* Publish */
+  exportBusy: boolean;
+  onExportAll: () => void;
+  publishBusy: boolean;
+  publishPackage: BlogPublishPackage | null;
+  onPreparePublish: () => void;
+  wordpressConfig: WordPressPublishConfig;
+  onWordPressConfigChange: (
+    field: keyof WordPressPublishConfig,
+    value: WordPressPublishConfig[keyof WordPressPublishConfig],
+  ) => void;
+  settingsBusy: boolean;
+  onSaveWordPressDefaults: () => void;
+  publications: ChannelPublicationSummary[];
+  failedPublications: ChannelPublicationSummary[];
+  publishedPublications: ChannelPublicationSummary[];
+  readiness: AutomationReadinessReport | null;
+  automationBusy: boolean;
+  automationRun: AutomationRunSummary | null;
+  automationFeedback: AutomationReviewResolution | null;
+  publicationFeedback: string | null;
+  bulkReport: BulkOperationReport | null;
+  bulkReportHistory: BulkOperationHistoryItem[];
+  reviewQueue: MonthlyContentPlan["items"];
+  readyQueue: MonthlyContentPlan["items"];
+  failedQueue: MonthlyContentPlan["items"];
+  publishedQueue: MonthlyContentPlan["items"];
+  onRunAutomation: () => void;
+  onApproveReview: (planItemId: string) => void;
+  onRetryPlanItem: (planItemId: string) => void;
+  onRetryPublication: (publicationId: string) => void;
+  onBulkApproveReview: (planItemIds: string[]) => void;
+  onBulkRetryPlanItems: (planItemIds: string[]) => void;
+  onBulkRetryPublications: (publicationIds: string[]) => void;
 };
 
 export function SidebarPanel(props: Props) {
   const {
-    activeProject,
+    projects, activeProject,
     name, onNameChange, domain, onDomainChange,
     workingPath, onWorkingPathChange,
-    projectBusy, onCreateProject,
-  } = props.project;
-  const {
-    editingHashtags,
-    onEditingHashtagsChange,
-    hashtagBusy,
-    onGenerateHashtags,
-  } = props.hashtags;
-  const { topicInput, onTopicInputChange, generateBusy, onGenerate, seoCompliance } = props.generation;
-  const { topic, variantGroup, abGenerateBusy, adoptBusy, onGenerateVariants, onAdoptVariant } = props.abTesting;
-  const { studio } = props.review;
-  const {
-    exportBusy,
-    onExportAll,
-    publishBusy,
-    publishPackage,
-    onPreparePublish,
-    wordpressConfig,
-    onWordPressConfigChange,
-    settingsBusy,
-    onSaveWordPressDefaults,
-  } = props.publish;
-  const {
-    editingSummary,
-    onEditingSummaryChange,
-    editingAudience,
-    onEditingAudienceChange,
-    editingTone,
-    onEditingToneChange,
-    onTonePresetSelect,
-    editingCta,
-    onEditingCtaChange,
-    editingBannedTerms,
-    onEditingBannedTermsChange,
-    contextBusy,
-    onApproveContext,
-    onSaveContextDraft,
-  } = props.context;
+    projectBusy, onCreateProject, onSelectProject,
+    editingSummary, onEditingSummaryChange,
+    editingAudience, onEditingAudienceChange,
+    editingTone, onEditingToneChange,
+    editingCta, onEditingCtaChange,
+    editingBannedTerms, onEditingBannedTermsChange,
+    contextBusy, onApproveContext, onSaveContextDraft,
+    editingHashtags, onEditingHashtagsChange, hashtagBusy, onGenerateHashtags,
+    topicInput, onTopicInputChange, generateBusy, onGenerate,
+    contentPlan, planBusy, onGenerateContentPlan, selectedPlannedTopicId, onSelectPlannedTopic,
+    topic, variantGroup, abGenerateBusy, onGenerateVariants, adoptBusy, onAdoptVariant,
+    seoCompliance,
+    studio,
+    exportBusy, onExportAll,
+    publishBusy, publishPackage, onPreparePublish,
+    wordpressConfig, onWordPressConfigChange,
+    settingsBusy, onSaveWordPressDefaults,
+    publications, failedPublications, publishedPublications,
+    readiness,
+    automationBusy,
+    automationRun,
+    automationFeedback, publicationFeedback, bulkReport,
+    bulkReportHistory,
+    reviewQueue,
+    readyQueue,
+    failedQueue,
+    publishedQueue,
+    onRunAutomation,
+    onApproveReview,
+    onRetryPlanItem,
+    onRetryPublication,
+    onBulkApproveReview,
+    onBulkRetryPlanItems,
+    onBulkRetryPublications,
+  } = props;
 
   const bp = activeProject?.brandProfile;
   const isApproved = bp?.approved === true;
@@ -170,7 +164,6 @@ export function SidebarPanel(props: Props) {
   const scores = review?.scores;
   const hasContent = (studio?.draft?.assets?.length ?? 0) > 0;
   const adoptedVariant = variantGroup?.variants?.find((v) => v.adopted);
-  const recommendedTopics = buildMonthlyRecommendedTopics(activeProject);
 
   return (
     <aside className="sidebar-panel">
@@ -178,38 +171,18 @@ export function SidebarPanel(props: Props) {
       <details className="sb-section" open>
         <summary className="sb-section-title">프로젝트</summary>
         <div className="sb-section-body">
-          {recommendedTopics.length > 0 && (
-            <div className="field-group">
-              <div className="sb-topic-head">
-                <label className="field-label">이달의 추천 토픽</label>
-                <span className="fine-print">{recommendedTopics.length}개</span>
-              </div>
-              <div className="sb-topic-list">
-                {recommendedTopics.map((item, index) => (
-                  <button
-                    key={`${item}-${index}`}
-                    type="button"
-                    className={`sb-topic-item ${topicInput.trim() === item ? "active" : ""}`}
-                    onClick={() => onTopicInputChange(item)}
-                  >
-                    <span className="sb-topic-index">{index + 1}</span>
-                    <span className="sb-topic-copy">{item}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
           {!activeProject ? (
             <>
-              <div className="field-group">
-                <label className="field-label">토픽</label>
-                <input
-                  className="text-input"
-                  value={topicInput}
-                  onChange={(e) => onTopicInputChange(e.target.value)}
-                  placeholder="생성할 콘텐츠 토픽을 입력하세요"
-                />
-              </div>
+              {projects.length > 0 && (
+                <div className="sb-project-list">
+                  {projects.map((p) => (
+                    <button key={p.id} className="sb-project-item" onClick={() => onSelectProject(p.id)}>
+                      <strong>{p.name}</strong>
+                      <span className="fine-print">{p.domain || "도메인 없음"}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="sb-form">
                 <InputField id="sb-name" label="프로젝트명" value={name} onChange={onNameChange} placeholder="프로젝트명" />
                 <InputField id="sb-domain" label="도메인" value={domain} onChange={onDomainChange} placeholder="https://..." />
@@ -220,22 +193,11 @@ export function SidebarPanel(props: Props) {
               </div>
             </>
           ) : (
-            <>
-              <div className="sb-active-project">
-                <strong>{activeProject.project.name}</strong>
-                <span className="fine-print">{activeProject.project.domain || "도메인 없음"}</span>
-                {isApproved && <span className="status-pill active">콘텍스트 승인됨</span>}
-              </div>
-              <div className="field-group">
-                <label className="field-label">토픽</label>
-                <input
-                  className="text-input"
-                  value={topicInput}
-                  onChange={(e) => onTopicInputChange(e.target.value)}
-                  placeholder="생성할 콘텐츠 토픽을 입력하세요"
-                />
-              </div>
-            </>
+            <div className="sb-active-project">
+              <strong>{activeProject.project.name}</strong>
+              <span className="fine-print">{activeProject.project.domain || "도메인 없음"}</span>
+              {isApproved && <span className="status-pill active">콘텍스트 승인됨</span>}
+            </div>
           )}
         </div>
       </details>
@@ -261,14 +223,13 @@ export function SidebarPanel(props: Props) {
                     <button
                       key={preset.key}
                       type="button"
-                      className={`sb-tone-chip ${editingTone.includes(preset.label) ? "active" : ""}`}
-                      onClick={() => onTonePresetSelect(preset.label)}
+                      className={`sb-tone-chip ${editingTone === preset.label ? "active" : ""}`}
+                      onClick={() => onEditingToneChange(preset.label)}
                     >
                       {preset.label}
                     </button>
                   ))}
                 </div>
-                <span className="fine-print">현재 톤: {editingTone || "선택 안 됨"}</span>
               </div>
               <div className="field-group">
                 <label className="field-label">CTA</label>
@@ -294,6 +255,59 @@ export function SidebarPanel(props: Props) {
         <details className="sb-section" open>
           <summary className="sb-section-title">콘텐츠 생성</summary>
           <div className="sb-section-body">
+            <div className="sb-plan-card">
+              <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div>
+                  <strong style={{ display: "block" }}>월간 마케팅 계획</strong>
+                  <span className="fine-print">
+                    {contentPlan ? `${contentPlan.monthKey} 계획` : "GA4와 승인된 콘텍스트를 바탕으로 이번 달 발행 계획을 만듭니다."}
+                  </span>
+                </div>
+                <button className="button ghost" disabled={!isApproved || planBusy} onClick={onGenerateContentPlan}>
+                  {planBusy ? "생성 중…" : contentPlan ? "다시 생성" : "계획 생성"}
+                </button>
+              </div>
+              {!isApproved && (
+                <p className="fine-print">월간 계획은 브랜드 콘텍스트 승인 후 생성할 수 있습니다.</p>
+              )}
+              {contentPlan?.basisSummary && (
+                <p className="fine-print" style={{ marginTop: 8 }}>{contentPlan.basisSummary}</p>
+              )}
+              {contentPlan?.items?.length ? (
+                <div className="topic-chip-wrap" style={{ marginTop: 12 }}>
+                  {contentPlan.items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`topic-chip selectable ${selectedPlannedTopicId === item.id ? "active" : ""}`}
+                      onClick={() => onSelectPlannedTopic(item.id, item.topic)}
+                    >
+                      <strong>{item.weekLabel}</strong>
+                      <span className="fine-print">
+                        {item.publishAt ? item.publishAt.slice(5, 10) : "일정 미정"} · {item.intentType || "general"}
+                      </span>
+                      <span className="fine-print">{item.topic}</span>
+                      <span className="fine-print">
+                        상태: {item.status}
+                        {typeof item.attemptCount === "number" ? ` · 시도 ${item.attemptCount}회` : ""}
+                      </span>
+                      {item.lastError ? (
+                        <span className="fine-print" style={{ color: "#d64d49" }}>{item.lastError}</span>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            <div className="field-group">
+              <label className="field-label">토픽</label>
+              <input
+                className="text-input"
+                value={topicInput}
+                onChange={(e) => onTopicInputChange(e.target.value)}
+                placeholder="생성할 콘텐츠의 테마를 입력하세요"
+              />
+            </div>
             <button className="button primary sb-btn-full" disabled={generateBusy || !topicInput.trim()} onClick={onGenerate}>
               {generateBusy ? "생성 중…" : "전체 생성"}
             </button>
@@ -325,6 +339,26 @@ export function SidebarPanel(props: Props) {
                 )}
               </div>
             )}
+          </div>
+        </details>
+      )}
+
+      {/* ── 톤 ── */}
+      {activeProject && (
+        <details className="sb-section" open>
+          <summary className="sb-section-title">콘텐츠 톤</summary>
+          <div className="sb-section-body">
+            <div className="sb-tone-grid">
+              {TONE_PRESETS.map((preset) => (
+                <button
+                  key={preset.key}
+                  className={`sb-tone-chip ${editingTone === preset.label ? "active" : ""}`}
+                  onClick={() => onEditingToneChange(preset.label)}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
           </div>
         </details>
       )}
@@ -394,12 +428,24 @@ export function SidebarPanel(props: Props) {
                 <label className="field-label">앱 비밀번호</label>
                 <input className="text-input" type="password" value={wordpressConfig.appPassword} onChange={(e) => onWordPressConfigChange("appPassword", e.target.value)} />
               </div>
+              <div className="field-group">
+                <label className="field-label">Meta Access Token</label>
+                <input className="text-input" type="password" value={wordpressConfig.metaAccessToken} onChange={(e) => onWordPressConfigChange("metaAccessToken", e.target.value)} placeholder="Meta Graph access token" />
+              </div>
+              <div className="field-group">
+                <label className="field-label">Facebook Page ID</label>
+                <input className="text-input" value={wordpressConfig.facebookPageId} onChange={(e) => onWordPressConfigChange("facebookPageId", e.target.value)} placeholder="예: 1234567890" />
+              </div>
+              <div className="field-group">
+                <label className="field-label">Instagram Business Account ID</label>
+                <input className="text-input" value={wordpressConfig.instagramBusinessAccountId} onChange={(e) => onWordPressConfigChange("instagramBusinessAccountId", e.target.value)} placeholder="예: 1784..." />
+              </div>
               <div className="button-row">
                 <button className="button primary" disabled={publishBusy} onClick={onPreparePublish}>
                   {publishBusy ? "처리 중…" : publishPackage ? "WP 발행" : "발행 준비"}
                 </button>
                 <button className="button ghost" disabled={settingsBusy} onClick={onSaveWordPressDefaults}>
-                  {settingsBusy ? "저장 중…" : "설정 저장"}
+                  {settingsBusy ? "저장 중…" : "채널/정책 저장"}
                 </button>
               </div>
               <button className="button ghost sb-btn-full" disabled={exportBusy} onClick={onExportAll}>
@@ -407,6 +453,40 @@ export function SidebarPanel(props: Props) {
               </button>
             </div>
           </div>
+        </details>
+      )}
+
+      {activeProject && (
+        <details className="sb-section" open>
+          <summary className="sb-section-title">자동화 운영</summary>
+          <OperationsBoard
+            projectId={activeProject.project.id}
+            wordpressConfig={wordpressConfig}
+            onWordPressConfigChange={onWordPressConfigChange}
+            settingsBusy={settingsBusy}
+            onSaveWordPressDefaults={onSaveWordPressDefaults}
+            publications={publications}
+            failedPublications={failedPublications}
+            publishedPublications={publishedPublications}
+            readiness={readiness}
+            automationBusy={automationBusy}
+                automationRun={automationRun}
+                automationFeedback={automationFeedback}
+                publicationFeedback={publicationFeedback}
+                bulkReport={bulkReport}
+                bulkReportHistory={bulkReportHistory}
+                reviewQueue={reviewQueue}
+            readyQueue={readyQueue}
+            failedQueue={failedQueue}
+            publishedQueue={publishedQueue}
+            onRunAutomation={onRunAutomation}
+            onApproveReview={onApproveReview}
+            onRetryPlanItem={onRetryPlanItem}
+            onRetryPublication={onRetryPublication}
+            onBulkApproveReview={onBulkApproveReview}
+            onBulkRetryPlanItems={onBulkRetryPlanItems}
+            onBulkRetryPublications={onBulkRetryPublications}
+          />
         </details>
       )}
     </aside>

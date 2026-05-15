@@ -84,6 +84,13 @@ export function usePublishWorkflow(params: {
     status: "draft",
     categoryNames: "",
     tagNames: "",
+    metaAccessToken: "",
+    facebookPageId: "",
+    instagramBusinessAccountId: "",
+    automationMode: "draft-only",
+    automationRequireReview: true,
+    automationMinOverallScore: "75",
+    automationMinRiskScore: "80",
   });
   const [settingsBusy, setSettingsBusy] = useState(false);
 
@@ -97,14 +104,21 @@ export function usePublishWorkflow(params: {
       bodyHtml: "",
     });
     setWordpressResult(null);
-    setWordpressConfig({
-      siteUrl: "",
-      username: "",
-      appPassword: "",
-      status: "draft",
-      categoryNames: "",
-      tagNames: "",
-    });
+      setWordpressConfig({
+        siteUrl: "",
+        username: "",
+        appPassword: "",
+        status: "draft",
+        categoryNames: "",
+        tagNames: "",
+        metaAccessToken: "",
+        facebookPageId: "",
+        instagramBusinessAccountId: "",
+        automationMode: "draft-only",
+        automationRequireReview: true,
+        automationMinOverallScore: "75",
+        automationMinRiskScore: "80",
+      });
     setExportPreview({
       bundle: null,
       activeView: "blog",
@@ -123,6 +137,13 @@ export function usePublishWorkflow(params: {
         status: project.wordpressStatus === "publish" ? "publish" : "draft",
         categoryNames: project.wordpressCategoryNames || "",
         tagNames: project.wordpressTagNames || "",
+        metaAccessToken: current.metaAccessToken,
+        facebookPageId: project.facebookPageId || "",
+        instagramBusinessAccountId: project.instagramBusinessAccountId || "",
+        automationMode: project.automationMode || "draft-only",
+        automationRequireReview: project.automationRequireReview ?? true,
+        automationMinOverallScore: String(project.automationMinOverallScore ?? 75),
+        automationMinRiskScore: String(project.automationMinRiskScore ?? 80),
       }));
     }
 
@@ -284,31 +305,6 @@ export function usePublishWorkflow(params: {
     }
   }
 
-  async function handleCopyTrackingLink() {
-    if (!exportPreview.bundle || exportPreview.activeView === "json" || typeof navigator === "undefined" || !navigator.clipboard) {
-      setCopyStatus("복사할 추적 링크가 없거나 현재 환경에서 클립보드 복사를 지원하지 않습니다.");
-      return;
-    }
-
-    const activeChannel = exportPreview.bundle.channels.find((item) => item.channel === exportPreview.activeView);
-    if (!activeChannel?.tracking.trackedUrl) {
-      setCopyStatus(activeChannel?.tracking.note || "프로젝트 도메인이 없어 추적 링크를 만들지 못했습니다.");
-      return;
-    }
-
-    setCopyStatus(null);
-    setCopyBusy(true);
-
-    try {
-      await navigator.clipboard.writeText(activeChannel.tracking.trackedUrl);
-      setCopyStatus(`${activeChannel.channel} 추적 링크를 클립보드에 복사했습니다.`);
-    } catch (copyError) {
-      setCopyStatus(copyError instanceof Error ? copyError.message : "추적 링크 복사에 실패했습니다.");
-    } finally {
-      setCopyBusy(false);
-    }
-  }
-
   async function handleCopyBlogPublishHtml() {
     if (!publishPackage || typeof navigator === "undefined" || !navigator.clipboard) {
       setCopyStatus("복사할 블로그 등록 패키지가 없거나 현재 환경에서 클립보드 복사를 지원하지 않습니다.");
@@ -329,7 +325,10 @@ export function usePublishWorkflow(params: {
     }
   }
 
-  function handleWordPressConfigChange(field: keyof WordPressPublishConfig, value: string) {
+  function handleWordPressConfigChange(
+    field: keyof WordPressPublishConfig,
+    value: WordPressPublishConfig[keyof WordPressPublishConfig],
+  ) {
     setWordpressConfig((current) => ({
       ...current,
       [field]: value,
@@ -429,9 +428,17 @@ export function usePublishWorkflow(params: {
         body: JSON.stringify({
           wordpressSiteUrl: wordpressConfig.siteUrl,
           wordpressUsername: wordpressConfig.username,
+          wordpressAppPassword: wordpressConfig.appPassword,
           wordpressStatus: wordpressConfig.status,
           wordpressCategoryNames: wordpressConfig.categoryNames,
           wordpressTagNames: wordpressConfig.tagNames,
+          metaAccessToken: wordpressConfig.metaAccessToken,
+          facebookPageId: wordpressConfig.facebookPageId,
+          instagramBusinessAccountId: wordpressConfig.instagramBusinessAccountId,
+          automationMode: wordpressConfig.automationMode,
+          automationRequireReview: wordpressConfig.automationRequireReview,
+          automationMinOverallScore: wordpressConfig.automationMinOverallScore,
+          automationMinRiskScore: wordpressConfig.automationMinRiskScore,
         }),
       });
       const payload = await parseJson<ApiResponse<{ project: ProjectDetail }>>(response);
@@ -467,7 +474,6 @@ export function usePublishWorkflow(params: {
     handleCopyExportPreview,
     handleDownloadExportContent,
     handleDownloadExportHashtags,
-    handleCopyTrackingLink,
     handleCopyBlogPublishHtml,
     handleWordPressConfigChange,
     handleExportPreviewViewChange,

@@ -39,6 +39,7 @@ export type ProjectListItem = {
   name: string;
   domain?: string | null;
   industry?: string | null;
+  ga4PropertyId?: string | null;
   workingPath?: string | null;
   status: string;
   createdAt: string;
@@ -68,19 +69,29 @@ export type ProjectDetail = {
     name: string;
     domain?: string | null;
     industry?: string | null;
+    ga4PropertyId?: string | null;
     workingPath?: string | null;
     status: string;
-    analyticsSourceType?: string | null;
-    analyticsSourceId?: string | null;
-    analyticsSourceLabel?: string | null;
-    analyticsEndpointUrl?: string | null;
-    analyticsAccessKey?: string | null;
-    analyticsConnectedAt?: string | null;
     wordpressSiteUrl?: string | null;
     wordpressUsername?: string | null;
+    hasWordPressAppPassword?: boolean | null;
     wordpressStatus?: string | null;
     wordpressCategoryNames?: string | null;
     wordpressTagNames?: string | null;
+    hasMetaAccessToken?: boolean | null;
+    metaTokenExpiresAt?: string | null;
+    facebookPageId?: string | null;
+    instagramBusinessAccountId?: string | null;
+    hasOperationsAlertWebhook?: boolean | null;
+    alertPolicyMode?: "disabled" | "all" | "critical-only" | "failures-only" | "failures-and-review" | null;
+    alertQuietHoursStart?: string | null;
+    alertQuietHoursEnd?: string | null;
+    alertTimezone?: string | null;
+    alertOnBlockedReadiness?: boolean | null;
+    automationMode?: "draft-only" | "approved-auto-publish" | "full-auto" | null;
+    automationRequireReview?: boolean | null;
+    automationMinOverallScore?: number | null;
+    automationMinRiskScore?: number | null;
     createdAt: string;
     updatedAt: string;
   };
@@ -115,28 +126,68 @@ export type ProjectDetail = {
     externalPostUrl?: string | null;
     publishedAt?: string | null;
   } | null;
-  latestContentPlan?: {
-    id: string;
-    monthKey: string;
-    status: string;
-    basisSummary?: string | null;
-    autoGenerate: boolean;
-    generatedAt?: string | null;
-    lastExecutedAt?: string | null;
-    items: Array<{
-      id: string;
-      sortOrder: number;
-      weekLabel: string;
-      topic: string;
-      intentType?: string | null;
-      objective?: string | null;
-      rationale?: string | null;
-      status: string;
-      contentJobId?: string | null;
-      generatedAt?: string | null;
-    }>;
-  } | null;
   sourceAnalysis?: SourceAnalysisSummary | null;
+};
+
+export type AutomationReadinessIssue = {
+  id: string;
+  severity: "blocking" | "warning" | "info";
+  area: "context" | "analytics" | "wordpress" | "meta" | "images" | "automation" | "operations";
+  title: string;
+  detail: string;
+  recommendation?: string | null;
+};
+
+export type AutomationReadinessReport = {
+  status: "ready" | "warning" | "blocked";
+  generatedAt: string;
+  blockingCount: number;
+  warningCount: number;
+  infoCount: number;
+  issues: AutomationReadinessIssue[];
+};
+
+export type ProjectOperatorRole = "viewer" | "analyst" | "reviewer" | "operator" | "owner";
+
+export type ProjectOperatorSummary = {
+  id: string;
+  name: string;
+  role: ProjectOperatorRole;
+  active: boolean;
+  lastUsedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ProjectOperatorSession = {
+  id: string;
+  projectId: string;
+  name: string;
+  role: ProjectOperatorRole;
+  active: boolean;
+  lastUsedAt?: string | null;
+};
+
+export type CredentialCheckRun = {
+  id: string;
+  service: "wordpress" | "meta" | "ga4" | "alerts";
+  kind: string;
+  status: "ready" | "warning" | "failed";
+  actorLabel?: string | null;
+  summary: string;
+  detail?: string | null;
+  expiresAt?: string | null;
+  checkedAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CredentialHealthReport = {
+  services: Array<{
+    service: "wordpress" | "meta" | "ga4" | "alerts";
+    latest: CredentialCheckRun | null;
+  }>;
+  history: CredentialCheckRun[];
 };
 
 export type ProjectPreview = {
@@ -244,15 +295,6 @@ export type ExportBundle = {
     content: string;
     hashtags: string;
     hashtagsFilename?: string;
-    tracking: {
-      baseUrl: string | null;
-      trackedUrl: string | null;
-      campaign: string;
-      source: string;
-      medium: string;
-      content: string;
-      note?: string;
-    };
   }>;
 };
 
@@ -293,6 +335,13 @@ export type WordPressPublishConfig = {
   status: "draft" | "publish";
   categoryNames: string;
   tagNames: string;
+  metaAccessToken: string;
+  facebookPageId: string;
+  instagramBusinessAccountId: string;
+  automationMode: "draft-only" | "approved-auto-publish" | "full-auto";
+  automationRequireReview: boolean;
+  automationMinOverallScore: string;
+  automationMinRiskScore: string;
 };
 
 export type WordPressPublishResult = {

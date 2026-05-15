@@ -11,6 +11,7 @@ export type ContentAssetInput = {
 export type ContentJobInput = {
   topic?: string;
   topicId?: string;
+  planItemId?: string;
   objective?: string;
   assets?: ContentAssetInput[];
   variantGroupId?: string;
@@ -93,6 +94,7 @@ export async function parseContentJobInput(request: Request): Promise<ContentJob
   return {
     topic,
     topicId,
+    planItemId: normalizeOptionalString(record.planItemId, 80),
     objective: normalizeOptionalString(record.objective, 1000),
     assets: parseAssets(record.assets),
     variantGroupId: normalizeOptionalString(record.variantGroupId, 80),

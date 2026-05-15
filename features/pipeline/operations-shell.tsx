@@ -1,506 +1,406 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AppHeader } from "@/features/site/app-header";
-import { apiGet, apiPatch, apiPost } from "./hooks/use-api";
-
-type ProjectListItem = {
-  id: string;
-  name: string;
-  domain?: string | null;
-  status: string;
-  updatedAt: string;
-};
-
-type PlanItem = {
-  id: string;
-  weekLabel: string;
-  topic: string;
-  intentType?: string | null;
-  objective?: string | null;
-  rationale?: string | null;
-  status: string;
-  contentJobId?: string | null;
-  generatedAt?: string | null;
-};
-
-type MonthlyPlan = {
-  id: string;
-  monthKey: string;
-  status: string;
-  basisSummary?: string | null;
-  autoGenerate: boolean;
-  generatedAt?: string | null;
-  lastExecutedAt?: string | null;
-  items: PlanItem[];
-};
-
-type ProjectDetail = {
-  project: {
-    id: string;
-    name: string;
-    domain?: string | null;
-    status: string;
-    wordpressSiteUrl?: string | null;
-    wordpressUsername?: string | null;
-    wordpressStatus?: string | null;
-    updatedAt: string;
-  };
-  brandProfile: {
-    approved: boolean;
-    summary: string;
-    tone?: string | null;
-    cta?: string | null;
-  } | null;
-  latestContentJob?: {
-    id: string;
-    topic: string;
-    status: string;
-    publishProvider?: string | null;
-    externalPostUrl?: string | null;
-    publishedAt?: string | null;
-  } | null;
-  latestContentPlan?: MonthlyPlan | null;
-};
-
-type ActivityItem = {
-  id: string;
-  kind: string;
-  title: string;
-  description: string;
-  timestamp: string;
-};
-
-function groupLabel(status: string) {
-  switch (status) {
-    case "planned":
-      return "계획됨";
-    case "ready_to_publish":
-      return "발행 대기";
-    case "published":
-      return "게시 완료";
-    case "failed":
-      return "실패";
-    case "needs_review":
-      return "검토 필요";
-    default:
-      return status;
-  }
-}
-
-function formatDateTime(value?: string | null) {
-  if (!value) {
-    return "없음";
-  }
-
-  return new Date(value).toLocaleString("ko-KR");
-}
+import { OperationsBoard } from "./components/operations-board";
+import { usePipelineState } from "./hooks/use-pipeline-state";
+import { apiPost } from "./hooks/use-api";
+import { usePublishWorkflow } from "../dashboard/use-publish-workflow";
+import type { AutomationReviewResolution, AutomationRunSummary, BulkOperationReport, ProjectListItem } from "./types";
 
 export function OperationsShell() {
-  const [projects, setProjects] = useState<ProjectListItem[]>([]);
-  const [activeProjectId, setActiveProjectId] = useState<string>("");
-  const [projectDetail, setProjectDetail] = useState<ProjectDetail | null>(null);
-  const [plan, setPlan] = useState<MonthlyPlan | null>(null);
-  const [history, setHistory] = useState<ActivityItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [actionBusy, setActionBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [feedback, setFeedback] = useState("");
+  const state = usePipelineState();
+  const [automationBusy, setAutomationBusy] = useState(false);
+  const [automationRun, setAutomationRun] = useState<AutomationRunSummary | null>(null);
+  const [automationFeedback, setAutomationFeedback] = useState<AutomationReviewResolution | null>(null);
+  const [publicationFeedback, setPublicationFeedback] = useState<string | null>(null);
+  const [bulkReport, setBulkReport] = useState<BulkOperationReport | null>(null);
+  const projectId = state.activeProject?.project?.id;
 
-  async function loadProjects() {
-    const data = await apiGet<{ projects: ProjectListItem[] }>("/api/projects");
-    setProjects(data.projects);
-    return data.projects;
-  }
-
-  async function loadProjectBundle(projectId: string) {
-    const [projectData, planData, historyData] = await Promise.all([
-      apiGet<{ project: ProjectDetail }>(`/api/projects/${projectId}`),
-      apiGet<{ plan: MonthlyPlan | null }>(`/api/projects/${projectId}/monthly-plan`),
-      apiGet<{ history: ActivityItem[] }>(`/api/projects/${projectId}/history`),
-    ]);
-
-    setProjectDetail(projectData.project);
-    setPlan(planData.plan);
-    setHistory(historyData.history);
-  }
+  const publish = usePublishWorkflow({
+    projectId,
+    onError: state.setError,
+    reloadProject: async (nextProjectId: string) => {
+      await state.reloadProject(nextProjectId);
+    },
+  });
 
   useEffect(() => {
-    let cancelled = false;
+    void state.loadProjects();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    async function initialize() {
-      setLoading(true);
-      setError("");
+  useEffect(() => {
+    if (!projectId && state.projects.length > 0) {
+      void state.reloadProject(state.projects[0].id);
+    }
+  }, [projectId, state.projects]); // eslint-disable-line react-hooks/exhaustive-deps
 
-      try {
-        const list = await loadProjects();
-        if (cancelled) {
-          return;
-        }
+  useEffect(() => {
+    if (state.activeProject) {
+      publish.hydratePublishResult(state.activeProject);
+    }
+  }, [state.activeProject]); // eslint-disable-line react-hooks/exhaustive-deps
 
-        if (list.length === 0) {
-          setActiveProjectId("");
-          setProjectDetail(null);
-          setPlan(null);
-          setHistory([]);
-          return;
-        }
+  const reviewQueue = state.contentPlan?.items.filter((item) => item.status === "needs_review") || [];
+  const readyQueue = state.contentPlan?.items.filter((item) => item.status === "ready_to_publish") || [];
+  const failedQueue = state.contentPlan?.items.filter((item) => item.status === "failed") || [];
+  const publishedQueue = state.contentPlan?.items.filter((item) => item.status === "published").slice(0, 5) || [];
+  const failedPublications = state.publications.filter((publication) => publication.status === "failed").slice(0, 8);
+  const publishedPublications = state.publications.filter((publication) => publication.status === "published").slice(0, 8);
 
-        const initialId = activeProjectId || list[0].id;
-        setActiveProjectId(initialId);
-        await loadProjectBundle(initialId);
-      } catch (nextError) {
-        if (!cancelled) {
-          setError(nextError instanceof Error ? nextError.message : "운영보드를 불러오지 못했습니다.");
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
+  async function persistBulkReport(report: BulkOperationReport, durationMs: number) {
+    if (!projectId) {
+      return;
+    }
+
+    await apiPost<{ run: { id: string } }>(`/api/projects/${projectId}/automation-batch-runs`, {
+      ...report,
+      actorLabel: "operator",
+      executionSource: "studio/operations",
+      durationMs,
+    });
+  }
+
+  async function handleSelectProject(nextProject: ProjectListItem) {
+    state.setError("");
+    setAutomationFeedback(null);
+    setPublicationFeedback(null);
+    setBulkReport(null);
+    await state.reloadProject(nextProject.id);
+  }
+
+  async function runBulkPlanAction(planItemIds: string[], action: "approve" | "retry") {
+    if (!projectId || planItemIds.length === 0) {
+      return;
+    }
+
+    setAutomationBusy(true);
+    state.setError("");
+    setPublicationFeedback(null);
+    setBulkReport(null);
+
+    try {
+      const startedAt = Date.now();
+      let completed = 0;
+      let failed = 0;
+      const items: BulkOperationReport["items"] = [];
+
+      for (const planItemId of planItemIds) {
+        try {
+          const data = await apiPost<{ resolution: AutomationReviewResolution }>(`/api/projects/${projectId}/automation`, {
+            action,
+            planItemId,
+            executionSource: "studio/operations",
+            skipAuditLog: true,
+          });
+          setAutomationFeedback(data.resolution);
+          completed += 1;
+          items.push({
+            id: planItemId,
+            label: data.resolution.planItemId,
+            status: "success",
+            message: data.resolution.message,
+          });
+        } catch (error) {
+          failed += 1;
+          items.push({
+            id: planItemId,
+            label: planItemId,
+            status: "failed",
+            message: error instanceof Error ? error.message : "처리에 실패했습니다.",
+          });
         }
       }
-    }
 
-    void initialize();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function handleSelectProject(projectId: string) {
-    setLoading(true);
-    setError("");
-    setFeedback("");
-    setActiveProjectId(projectId);
-
-    try {
-      await loadProjectBundle(projectId);
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "프로젝트를 불러오지 못했습니다.");
+      const report: BulkOperationReport = {
+        kind: action === "approve" ? "plan_approve" : "plan_retry",
+        label: action === "approve" ? "검토 큐 일괄 승인 결과" : "계획 항목 일괄 재실행 결과",
+        completed,
+        failed,
+        items,
+      };
+      setBulkReport(report);
+      await persistBulkReport(report, Date.now() - startedAt).catch(() => null);
+      await state.reloadProject(projectId);
     } finally {
-      setLoading(false);
+      setAutomationBusy(false);
     }
   }
 
-  async function handleGeneratePlan() {
-    if (!activeProjectId) {
+  async function runBulkPublicationRetry(publicationIds: string[]) {
+    if (!projectId || publicationIds.length === 0) {
       return;
     }
 
-    setActionBusy(true);
-    setError("");
-    setFeedback("");
+    setAutomationBusy(true);
+    state.setError("");
+    setAutomationFeedback(null);
+    setPublicationFeedback(null);
+    setBulkReport(null);
 
     try {
-      const data = await apiPost<{ plan: MonthlyPlan }>(`/api/projects/${activeProjectId}/monthly-plan`, {
-        autoGenerate: true,
-      });
-      setPlan(data.plan);
-      setFeedback("월간 계획을 다시 생성했습니다.");
-      await loadProjectBundle(activeProjectId);
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "월간 계획 생성에 실패했습니다.");
+      const startedAt = Date.now();
+      let completed = 0;
+      let failed = 0;
+      const items: BulkOperationReport["items"] = [];
+
+      for (const publicationId of publicationIds) {
+        try {
+          const data = await apiPost<{ publication: { channel: string; provider: string } }>(
+            `/api/projects/${projectId}/publications`,
+            {
+              publicationId,
+              executionSource: "studio/operations",
+              skipAuditLog: true,
+            },
+          );
+          completed += 1;
+          items.push({
+            id: publicationId,
+            label: `${data.publication.channel} · ${data.publication.provider}`,
+            status: "success",
+            message: "채널 재시도 성공",
+          });
+        } catch (error) {
+          failed += 1;
+          items.push({
+            id: publicationId,
+            label: publicationId,
+            status: "failed",
+            message: error instanceof Error ? error.message : "채널 재시도 실패",
+          });
+        }
+      }
+
+      const report: BulkOperationReport = {
+        kind: "publication_retry",
+        label: "채널 실패 이력 일괄 재시도 결과",
+        completed,
+        failed,
+        items,
+      };
+      setBulkReport(report);
+      await persistBulkReport(report, Date.now() - startedAt).catch(() => null);
+      await state.reloadProject(projectId);
     } finally {
-      setActionBusy(false);
+      setAutomationBusy(false);
     }
   }
-
-  async function handleRunPlan() {
-    if (!activeProjectId) {
-      return;
-    }
-
-    setActionBusy(true);
-    setError("");
-    setFeedback("");
-
-    try {
-      await apiPatch<{ result: unknown }>(`/api/projects/${activeProjectId}/monthly-plan`, {});
-      setFeedback("월간 계획 실행을 완료했습니다.");
-      await loadProjectBundle(activeProjectId);
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "월간 계획 실행에 실패했습니다.");
-    } finally {
-      setActionBusy(false);
-    }
-  }
-
-  async function handlePreparePublish() {
-    if (!activeProjectId) {
-      return;
-    }
-
-    setActionBusy(true);
-    setError("");
-    setFeedback("");
-
-    try {
-      await apiPost<{ publish: { status: string } }>(`/api/projects/${activeProjectId}/publish`, {});
-      setFeedback("최신 콘텐츠를 발행 준비 상태로 반영했습니다.");
-      await loadProjectBundle(activeProjectId);
-    } catch (nextError) {
-      setError(nextError instanceof Error ? nextError.message : "발행 준비 처리에 실패했습니다.");
-    } finally {
-      setActionBusy(false);
-    }
-  }
-
-  const groupedItems = useMemo(() => {
-    const source = plan?.items || [];
-    return {
-      needsReview: source.filter((item) => item.status === "needs_review"),
-      ready: source.filter((item) => item.status === "ready_to_publish"),
-      failed: source.filter((item) => item.status === "failed"),
-      published: source.filter((item) => item.status === "published"),
-      planned: source.filter((item) => item.status !== "needs_review" && item.status !== "ready_to_publish" && item.status !== "failed" && item.status !== "published"),
-    };
-  }, [plan]);
-
-  const totalPlanItems = plan?.items.length || 0;
 
   return (
     <div className="app-shell">
       <AppHeader active="operations" title="운영 보드" />
-
-      {error ? (
+      {state.error ? (
         <div className="pipeline-error">
-          <p className="error-text">{error}</p>
-          <button className="button ghost" onClick={() => setError("")}>닫기</button>
+          <p className="error-text">{state.error}</p>
+          <button className="button ghost" onClick={state.clearError}>닫기</button>
         </div>
       ) : null}
-
       <div className="pipeline-grid">
         <aside className="sidebar-panel">
           <details className="sb-section" open>
-            <summary className="sb-section-title">프로젝트</summary>
+            <summary className="sb-section-title">프로젝트 선택</summary>
             <div className="sb-section-body">
-              <div className="stack">
-                {projects.length === 0 ? (
-                  <p className="fine-print">등록된 프로젝트가 없습니다.</p>
-                ) : (
-                  projects.map((project) => (
-                    <button
-                      key={project.id}
-                      className="button ghost"
-                      onClick={() => void handleSelectProject(project.id)}
-                      style={{
-                        justifyContent: "flex-start",
-                        borderColor: project.id === activeProjectId ? "rgba(59, 130, 246, 0.55)" : undefined,
-                        background: project.id === activeProjectId ? "rgba(59, 130, 246, 0.12)" : undefined,
-                      }}
-                    >
-                      {project.name}
-                    </button>
-                  ))
-                )}
+              <div className="sb-project-list">
+                {state.projects.map((project) => (
+                  <button key={project.id} className="sb-project-item" onClick={() => void handleSelectProject(project)}>
+                    <strong>{project.name}</strong>
+                    <span className="fine-print">{project.domain || "도메인 없음"}</span>
+                  </button>
+                ))}
               </div>
             </div>
           </details>
-
-          {projectDetail ? (
+          {state.activeProject ? (
             <details className="sb-section" open>
-              <summary className="sb-section-title">실행</summary>
+              <summary className="sb-section-title">채널 설정</summary>
               <div className="sb-section-body">
-                <div className="stack">
-                  <span className="fine-print">{projectDetail.project.domain || "도메인 없음"}</span>
-                  <span className="fine-print">
-                    컨텍스트 승인 {projectDetail.brandProfile?.approved ? "완료" : "필요"}
-                  </span>
-                  <span className="fine-print">
-                    워드프레스 {projectDetail.project.wordpressSiteUrl ? "설정됨" : "미설정"}
-                  </span>
-                  <button className="button primary" disabled={actionBusy} onClick={() => void handleGeneratePlan()}>
-                    {actionBusy ? "처리 중..." : "월간 계획 생성"}
+                <div className="sb-form">
+                  <div className="field-group">
+                    <label className="field-label">WP 사이트 URL</label>
+                    <input className="text-input" value={publish.wordpressConfig.siteUrl} onChange={(e) => publish.handleWordPressConfigChange("siteUrl", e.target.value)} />
+                  </div>
+                  <div className="field-group">
+                    <label className="field-label">사용자명</label>
+                    <input className="text-input" value={publish.wordpressConfig.username} onChange={(e) => publish.handleWordPressConfigChange("username", e.target.value)} />
+                  </div>
+                  <div className="field-group">
+                    <label className="field-label">앱 비밀번호</label>
+                    <input className="text-input" type="password" value={publish.wordpressConfig.appPassword} onChange={(e) => publish.handleWordPressConfigChange("appPassword", e.target.value)} />
+                  </div>
+                  <div className="field-group">
+                    <label className="field-label">Meta Access Token</label>
+                    <input className="text-input" type="password" value={publish.wordpressConfig.metaAccessToken} onChange={(e) => publish.handleWordPressConfigChange("metaAccessToken", e.target.value)} />
+                  </div>
+                  <div className="field-group">
+                    <label className="field-label">Facebook Page ID</label>
+                    <input className="text-input" value={publish.wordpressConfig.facebookPageId} onChange={(e) => publish.handleWordPressConfigChange("facebookPageId", e.target.value)} />
+                  </div>
+                  <div className="field-group">
+                    <label className="field-label">Instagram Business Account ID</label>
+                    <input className="text-input" value={publish.wordpressConfig.instagramBusinessAccountId} onChange={(e) => publish.handleWordPressConfigChange("instagramBusinessAccountId", e.target.value)} />
+                  </div>
+                  <button className="button ghost sb-btn-full" disabled={publish.settingsBusy} onClick={publish.handleSaveWordPressDefaults}>
+                    {publish.settingsBusy ? "저장 중…" : "채널 설정 저장"}
                   </button>
-                  <button className="button ghost" disabled={actionBusy} onClick={() => void handleRunPlan()}>
-                    계획 실행
-                  </button>
-                  <button className="button ghost" disabled={actionBusy} onClick={() => void handlePreparePublish()}>
-                    최신 콘텐츠 발행 준비
-                  </button>
-                  {feedback ? <span className="fine-print">{feedback}</span> : null}
                 </div>
               </div>
             </details>
           ) : null}
         </aside>
-
-        <section className="content-panel soft-scrollbar">
-          {loading ? (
-            <div className="operations-empty-card">
-              <strong>운영보드 로딩 중</strong>
-              <span className="fine-print">프로젝트와 실행 상태를 불러오고 있습니다.</span>
-            </div>
-          ) : !projectDetail ? (
-            <div className="operations-empty-card">
-              <strong>프로젝트 없음</strong>
-              <span className="fine-print">좌측에서 프로젝트를 선택하면 운영 상태가 표시됩니다.</span>
+        <section className="content-panel">
+          {!state.activeProject ? (
+            <div className="cp-empty">
+              <span className="eyebrow">운영 보드</span>
+              <p className="fine-print">좌측에서 프로젝트를 선택하면 운영 큐와 채널 이력이 표시됩니다.</p>
             </div>
           ) : (
-            <div className="operations-board-page">
-              <section className="operations-hero-card">
-                <div className="operations-hero-copy">
-                  <span className="eyebrow">Operations</span>
-                  <h2 className="operations-page-title">{projectDetail.project.name}</h2>
-                  <p className="operations-page-subcopy">
-                    월간 계획 생성, 실행, 발행 준비와 최근 작업 흐름을 한 화면에서 확인합니다.
-                  </p>
-                  <div className="operations-meta-row">
-                    <span className="operations-meta-pill">마지막 업데이트 {formatDateTime(projectDetail.project.updatedAt)}</span>
-                    <span className="operations-meta-pill">최근 발행 상태 {projectDetail.latestContentJob?.status || "없음"}</span>
-                    <span className="operations-meta-pill">계획 항목 {totalPlanItems}건</span>
-                  </div>
-                </div>
-                <div className="operations-hero-aside">
-                  <span className="fine-print">최근 콘텐츠</span>
-                  <strong>{projectDetail.latestContentJob?.topic || "아직 생성된 콘텐츠 없음"}</strong>
-                  {projectDetail.latestContentJob?.externalPostUrl ? (
-                    <a className="fine-print" href={projectDetail.latestContentJob.externalPostUrl} target="_blank" rel="noreferrer">
-                      게시 링크 열기
-                    </a>
-                  ) : null}
-                </div>
-              </section>
+            <div className="operations-page">
+              <div className="operations-page-header">
+                <span className="eyebrow">Operations</span>
+                <h2 className="brand-title" style={{ margin: 0 }}>{state.activeProject.project.name}</h2>
+                <p className="fine-print">
+                  월간 계획 실행 상태, 채널 실패, 승인 대기 항목을 한 곳에서 처리합니다.
+                </p>
+              </div>
+              <OperationsBoard
+                projectId={projectId}
+                wordpressConfig={publish.wordpressConfig}
+                onWordPressConfigChange={publish.handleWordPressConfigChange}
+                settingsBusy={publish.settingsBusy}
+                onSaveWordPressDefaults={publish.handleSaveWordPressDefaults}
+                publications={state.publications}
+                failedPublications={failedPublications}
+                publishedPublications={publishedPublications}
+                readiness={state.automationReadiness}
+                automationBusy={automationBusy}
+                automationRun={automationRun}
+                automationFeedback={automationFeedback}
+                publicationFeedback={publicationFeedback}
+                bulkReport={bulkReport}
+                bulkReportHistory={state.bulkOperationHistory}
+                reviewQueue={reviewQueue}
+                readyQueue={readyQueue}
+                failedQueue={failedQueue}
+                publishedQueue={publishedQueue}
+                onRunAutomation={async () => {
+                  if (!projectId) {
+                    return;
+                  }
 
-              <section className="operations-stats-grid">
-                <article className="operations-stat-card">
-                  <span>검토 필요</span>
-                  <strong>{groupedItems.needsReview.length}</strong>
-                  <p>운영자 확인이 필요한 항목</p>
-                </article>
-                <article className="operations-stat-card">
-                  <span>발행 대기</span>
-                  <strong>{groupedItems.ready.length}</strong>
-                  <p>게시 준비 완료된 항목</p>
-                </article>
-                <article className="operations-stat-card">
-                  <span>실패</span>
-                  <strong>{groupedItems.failed.length}</strong>
-                  <p>다시 실행이 필요한 항목</p>
-                </article>
-                <article className="operations-stat-card">
-                  <span>게시 완료</span>
-                  <strong>{groupedItems.published.length}</strong>
-                  <p>최근 게시 완료된 항목</p>
-                </article>
-              </section>
+                  setAutomationBusy(true);
+                  state.setError("");
+                  setAutomationFeedback(null);
+                  setPublicationFeedback(null);
+                  setBulkReport(null);
 
-              <section className="operations-two-col-grid">
-                <article className="operations-surface-card">
-                  <div className="operations-section-head">
-                    <div>
-                      <p className="operations-kicker">Plan</p>
-                      <h3>월간 계획 요약</h3>
-                    </div>
-                  </div>
-                  {plan ? (
-                    <div className="operations-plan-summary">
-                      <span className="operations-meta-pill">{plan.monthKey}</span>
-                      <span className="operations-meta-pill">상태 {groupLabel(plan.status)}</span>
-                      <span className="operations-meta-pill">생성 {formatDateTime(plan.generatedAt)}</span>
-                      {plan.lastExecutedAt ? (
-                        <span className="operations-meta-pill">실행 {formatDateTime(plan.lastExecutedAt)}</span>
-                      ) : null}
-                      {plan.basisSummary ? <p>{plan.basisSummary}</p> : null}
-                    </div>
-                  ) : (
-                    <p className="fine-print">아직 월간 계획이 없습니다.</p>
-                  )}
-                </article>
+                  try {
+                    const data = await apiPost<{ run: AutomationRunSummary }>(`/api/projects/${projectId}/automation`, {
+                      executionSource: "studio/operations",
+                    });
+                    setAutomationRun(data.run);
+                    await state.reloadProject(projectId);
+                  } catch (error) {
+                    state.setError(error instanceof Error ? error.message : "프로젝트 자동 실행에 실패했습니다.");
+                  } finally {
+                    setAutomationBusy(false);
+                  }
+                }}
+                onApproveReview={(planItemId) => {
+                  if (!projectId) {
+                    return;
+                  }
 
-                <article className="operations-surface-card">
-                  <div className="operations-section-head">
-                    <div>
-                      <p className="operations-kicker">Status</p>
-                      <h3>운영 상태</h3>
-                    </div>
-                  </div>
-                  <div className="operations-status-list">
-                    <div className="operations-status-row">
-                      <span>도메인</span>
-                      <strong>{projectDetail.project.domain || "도메인 없음"}</strong>
-                    </div>
-                    <div className="operations-status-row">
-                      <span>컨텍스트 승인</span>
-                      <strong>{projectDetail.brandProfile?.approved ? "완료" : "필요"}</strong>
-                    </div>
-                    <div className="operations-status-row">
-                      <span>워드프레스</span>
-                      <strong>{projectDetail.project.wordpressSiteUrl ? "설정됨" : "미설정"}</strong>
-                    </div>
-                    <div className="operations-status-row">
-                      <span>최근 콘텐츠</span>
-                      <strong>{projectDetail.latestContentJob?.topic || "없음"}</strong>
-                    </div>
-                  </div>
-                </article>
-              </section>
+                  setAutomationBusy(true);
+                  state.setError("");
+                  setPublicationFeedback(null);
+                  setBulkReport(null);
 
-              <section className="operations-section-stack">
-                {([
-                  ["검토 필요", groupedItems.needsReview],
-                  ["발행 대기", groupedItems.ready],
-                  ["실패", groupedItems.failed],
-                  ["게시 완료", groupedItems.published],
-                  ["기타 계획", groupedItems.planned],
-                ] as Array<[string, PlanItem[]]>).map(([title, items]) =>
-                  Array.isArray(items) && items.length > 0 ? (
-                    <article key={title} className="operations-surface-card">
-                      <div className="operations-section-head">
-                        <div>
-                          <p className="operations-kicker">Queue</p>
-                          <h3>{title}</h3>
-                        </div>
-                        <span className="operations-count-badge">{items.length}건</span>
-                      </div>
-                      <div className="operations-item-list">
-                        {items.map((item) => (
-                          <div key={item.id} className="operations-item-card">
-                            <div className="operations-item-head">
-                              <strong>{item.weekLabel} · {item.topic}</strong>
-                              <span className={`operations-status-chip status-${item.status}`}>{groupLabel(item.status)}</span>
-                            </div>
-                            <div className="operations-item-meta">
-                              {item.intentType ? <span>{item.intentType}</span> : null}
-                              {item.objective ? <span>목표 {item.objective}</span> : null}
-                              {item.generatedAt ? <span>생성 {formatDateTime(item.generatedAt)}</span> : null}
-                            </div>
-                            {item.rationale ? <p>{item.rationale}</p> : null}
-                          </div>
-                        ))}
-                      </div>
-                    </article>
-                  ) : null,
-                )}
-              </section>
+                  void apiPost<{ resolution: AutomationReviewResolution }>(`/api/projects/${projectId}/automation`, {
+                    action: "approve",
+                    planItemId,
+                    executionSource: "studio/operations",
+                  })
+                    .then(async (data) => {
+                      setAutomationFeedback(data.resolution);
+                      await state.reloadProject(projectId);
+                    })
+                    .catch((error) => {
+                      state.setError(error instanceof Error ? error.message : "검토 승인 처리에 실패했습니다.");
+                    })
+                    .finally(() => {
+                      setAutomationBusy(false);
+                    });
+                }}
+                onRetryPlanItem={(planItemId) => {
+                  if (!projectId) {
+                    return;
+                  }
 
-              <section className="operations-section-stack">
-                <article className="operations-surface-card">
-                  <div className="operations-section-head">
-                    <div>
-                      <p className="operations-kicker">Timeline</p>
-                      <h3>최근 작업 이력</h3>
-                    </div>
-                    <span className="operations-count-badge">{Math.min(history.length, 12)}건</span>
-                  </div>
-                  <div className="operations-timeline">
-                    {history.length === 0 ? (
-                      <span className="fine-print">기록된 이력이 없습니다.</span>
-                    ) : (
-                      history.slice(0, 12).map((item) => (
-                        <div key={item.id} className="operations-timeline-item">
-                          <div className="operations-timeline-dot" />
-                          <div className="operations-timeline-body">
-                            <strong>{item.title}</strong>
-                            <span className="fine-print">{formatDateTime(item.timestamp)}</span>
-                            <p>{item.description}</p>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </article>
-              </section>
+                  setAutomationBusy(true);
+                  state.setError("");
+                  setPublicationFeedback(null);
+                  setBulkReport(null);
+
+                  void apiPost<{ resolution: AutomationReviewResolution }>(`/api/projects/${projectId}/automation`, {
+                    action: "retry",
+                    planItemId,
+                    executionSource: "studio/operations",
+                  })
+                    .then(async (data) => {
+                      setAutomationFeedback(data.resolution);
+                      await state.reloadProject(projectId);
+                    })
+                    .catch((error) => {
+                      state.setError(error instanceof Error ? error.message : "자동화 재실행에 실패했습니다.");
+                    })
+                    .finally(() => {
+                      setAutomationBusy(false);
+                    });
+                }}
+                onRetryPublication={(publicationId) => {
+                  if (!projectId) {
+                    return;
+                  }
+
+                  setAutomationBusy(true);
+                  state.setError("");
+                  setAutomationFeedback(null);
+                  setPublicationFeedback(null);
+                  setBulkReport(null);
+
+                  void apiPost<{ publication: { channel: string; provider: string; externalPostUrl?: string | null } }>(
+                    `/api/projects/${projectId}/publications`,
+                    {
+                      publicationId,
+                      executionSource: "studio/operations",
+                    },
+                  )
+                    .then(async (data) => {
+                      setPublicationFeedback(
+                        `${data.publication.channel} · ${data.publication.provider} 재시도를 완료했습니다.${
+                          data.publication.externalPostUrl ? ` ${data.publication.externalPostUrl}` : ""
+                        }`,
+                      );
+                      await state.reloadProject(projectId);
+                    })
+                    .catch((error) => {
+                      state.setError(error instanceof Error ? error.message : "채널 재시도에 실패했습니다.");
+                    })
+                    .finally(() => {
+                      setAutomationBusy(false);
+                    });
+                }}
+                onBulkApproveReview={(planItemIds) => {
+                  void runBulkPlanAction(planItemIds, "approve");
+                }}
+                onBulkRetryPlanItems={(planItemIds) => {
+                  void runBulkPlanAction(planItemIds, "retry");
+                }}
+                onBulkRetryPublications={(publicationIds) => {
+                  void runBulkPublicationRetry(publicationIds);
+                }}
+              />
             </div>
           )}
         </section>

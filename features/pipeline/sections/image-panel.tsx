@@ -9,18 +9,15 @@ const CHANNEL_LABELS: Record<ChannelKey, string> = {
 };
 
 type Props = {
-  image: {
-    projectId: string | undefined;
-    activeChannel: ChannelKey;
-    onChannelChange: (ch: ChannelKey) => void;
-    currentStudio: ImageStudioState | null;
-    expectedVariantCount: number;
-    generateBusy: boolean;
-    selectBusy: boolean;
-    onGenerateImages: (projectId: string, channel: ChannelKey) => void;
-    onSelectImage: (projectId: string, channel: ChannelKey, imageAssetId: string) => void;
-    hasContent: boolean;
-  };
+  projectId: string | undefined;
+  activeChannel: ChannelKey;
+  onChannelChange: (ch: ChannelKey) => void;
+  currentStudio: ImageStudioState | null;
+  generateBusy: boolean;
+  selectBusy: boolean;
+  onGenerateImages: (projectId: string, channel: ChannelKey) => void;
+  onSelectImage: (projectId: string, channel: ChannelKey, imageAssetId: string) => void;
+  hasContent: boolean;
 };
 
 export function ImagePanel(props: Props) {
@@ -28,11 +25,10 @@ export function ImagePanel(props: Props) {
     projectId,
     activeChannel, onChannelChange,
     currentStudio,
-    expectedVariantCount,
     generateBusy, selectBusy,
     onGenerateImages, onSelectImage,
     hasContent,
-  } = props.image;
+  } = props;
 
   const variants = currentStudio?.variants ?? [];
 
@@ -112,11 +108,7 @@ export function ImagePanel(props: Props) {
 
       {variants.length === 0 && (
         <div className="ip-no-variants">
-          <p className="fine-print">
-            {activeChannel === "blog"
-              ? `블로그 본문에 배치된 이미지 수만큼 생성됩니다. 현재 ${expectedVariantCount}개 기준입니다.`
-              : `이미지를 생성하면 ${expectedVariantCount}개 변형이 표시됩니다.`}
-          </p>
+          <p className="fine-print">이미지를 생성하면 3개 변형이 표시됩니다.</p>
         </div>
       )}
     </div>

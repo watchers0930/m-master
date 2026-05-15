@@ -1,7 +1,7 @@
 "use client";
 import { useState, useCallback } from "react";
 import type { SourceFileDraft, ProjectDetail, SourceAnalysisSummary, ProjectPreview } from "../types";
-import { apiPost, apiPatch, apiPut, apiGet } from "./use-api";
+import { apiPost, apiPatch, apiGet } from "./use-api";
 
 export function useSourceRegistration(params: {
   onProjectCreated: (project: ProjectDetail) => void;
@@ -81,27 +81,19 @@ export function useSourceRegistration(params: {
     }
   }, [editingSummary, editingAudience, editingTone, editingCta, editingBannedTerms, onProjectCreated, onError]);
 
-  const handleSaveContextDraftWithOverrides = useCallback(async (
-    projectId: string,
-    overrides?: Partial<{
-      summary: string;
-      audience: string;
-      tone: string;
-      cta: string;
-      bannedTerms: string;
-    }>,
-  ) => {
+  const handleSaveContextDraft = useCallback(async (projectId: string) => {
     setContextBusy(true);
     onError("");
     try {
-      const data = await apiPut<{ project: ProjectDetail }>(
+      const data = await apiPatch<{ project: ProjectDetail }>(
         `/api/projects/${projectId}/brand-profile`,
         {
-          summary: overrides?.summary ?? editingSummary,
-          audience: overrides?.audience ?? editingAudience,
-          tone: overrides?.tone ?? editingTone,
-          cta: overrides?.cta ?? editingCta,
-          bannedTerms: overrides?.bannedTerms ?? editingBannedTerms,
+          action: "draft",
+          summary: editingSummary,
+          audience: editingAudience,
+          tone: editingTone,
+          cta: editingCta,
+          bannedTerms: editingBannedTerms,
         }
       );
       onProjectCreated(data.project);
@@ -111,10 +103,6 @@ export function useSourceRegistration(params: {
       setContextBusy(false);
     }
   }, [editingSummary, editingAudience, editingTone, editingCta, editingBannedTerms, onProjectCreated, onError]);
-
-  const handleSaveContextDraft = useCallback(async (projectId: string) => {
-    return handleSaveContextDraftWithOverrides(projectId);
-  }, [handleSaveContextDraftWithOverrides]);
 
   return {
     name, setName,
@@ -133,6 +121,5 @@ export function useSourceRegistration(params: {
     hydrateContextForm,
     handleApproveContext,
     handleSaveContextDraft,
-    handleSaveContextDraftWithOverrides,
   };
 }

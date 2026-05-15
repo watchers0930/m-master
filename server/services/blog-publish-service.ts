@@ -41,12 +41,6 @@ export type BlogPublishPackage = {
   sourceUrl?: string | null;
 };
 
-type InlineImageAsset = {
-  originalPath: string | null;
-  composedPath: string | null;
-  selected: boolean;
-};
-
 function createSlug(value: string) {
   const normalized = value
     .normalize("NFKC")
@@ -76,21 +70,7 @@ function paragraphizeMarkdown(value: string) {
     .join("\n");
 }
 
-function selectInlineImageUrl(asset: InlineImageAsset) {
-  return asset.composedPath || asset.originalPath || null;
-}
-
-function getOrderedInlineImages(asset: BlogPublishAsset) {
-  const imageAssets = asset.imageJobs.flatMap((job) => job.imageAssets);
-  const selected = imageAssets.filter((imageAsset) => imageAsset.selected);
-  const unselected = imageAssets.filter((imageAsset) => !imageAsset.selected);
-
-  return [...selected, ...unselected]
-    .map((imageAsset) => selectInlineImageUrl(imageAsset))
-    .filter((item): item is string => Boolean(item));
-}
-
-function renderStructuredBlogBody(value: string, inlineImages: string[] = []) {
+function renderStructuredBlogBody(value: string) {
   const blocks: string[] = [];
   const lines = value.split("\n");
   let paragraphLines: string[] = [];
@@ -128,13 +108,8 @@ function renderStructuredBlogBody(value: string, inlineImages: string[] = []) {
     if (imageCue) {
       flushParagraph();
       flushList();
-      const imageIndex = Math.max(0, Number(imageCue[1]) - 1);
-      const imageUrl = inlineImages[imageIndex];
-      const caption = `이미지 ${escapeHtml(imageCue[1])}. ${escapeHtml(imageCue[2])}`;
       blocks.push(
-        imageUrl
-          ? `<figure><img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(imageCue[2])}" loading="lazy" style="max-width:100%;height:auto;border-radius:16px;" referrerpolicy="no-referrer-when-downgrade" /><figcaption>${caption}</figcaption></figure>`
-          : `<figure><figcaption>${caption}</figcaption></figure>`,
+        `<figure><figcaption>이미지 ${escapeHtml(imageCue[1])}. ${escapeHtml(imageCue[2])}</figcaption></figure>`,
       );
       continue;
     }
@@ -236,10 +211,9 @@ export function buildBlogHtml(params: {
   cta?: string | null;
   hashtags?: string | null;
   coverImageUrl?: string | null;
-  inlineImageUrls?: string[];
 }) {
   const bodyHtml = params.body.includes("## ") || /\[이미지\s+\d+\]/.test(params.body)
-    ? renderStructuredBlogBody(params.body, params.inlineImageUrls)
+    ? renderStructuredBlogBody(params.body)
     : paragraphizeMarkdown(params.body);
   const ctaHtml = params.cta ? `<section><h2>다음 단계</h2><p>${escapeHtml(params.cta)}</p></section>` : "";
   const hashtagHtml = parseHashtagText(params.hashtags).length
@@ -282,7 +256,6 @@ export function buildBlogPublishPackage(params: {
   };
 }): BlogPublishPackage {
   const coverImageUrl = selectBlogCoverImage(params.asset);
-  const inlineImageUrls = getOrderedInlineImages(params.asset);
   const title = params.overrides?.title?.trim() || params.asset.title || params.fallbackTitle;
   const summary = (params.overrides?.summary?.trim() || params.profile.summary).slice(0, 220);
   const cta = params.asset.cta || params.profile.cta || null;
@@ -297,7 +270,6 @@ export function buildBlogPublishPackage(params: {
       cta,
       hashtags,
       coverImageUrl,
-      inlineImageUrls,
     });
   const { bodyHtml, htmlWarnings } = sanitizeHtmlContent(rawBodyHtml);
 

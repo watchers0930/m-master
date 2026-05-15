@@ -12,38 +12,36 @@ import type {
 } from "../types";
 
 type Props = {
-  content: {
-    studio: StudioDetail | null;
-    activeChannel: ChannelKey;
-    onChannelChange: (ch: ChannelKey) => void;
-    editingTitle: string;
-    onEditingTitleChange: (v: string) => void;
-    editingBody: string;
-    onEditingBodyChange: (v: string) => void;
-    editingCta: string;
-    onEditingCtaChange: (v: string) => void;
-    editingHashtags: string;
-    onEditingHashtagsChange: (v: string) => void;
-    onUpdateSeo: () => void;
-    seoCompliance: SeoComplianceResult | null;
-    saveBusy: boolean;
-    onSave: () => void;
-  };
-  variants: {
-    topic: string;
-    variantGroup: VariantGroup | null;
-    generateBusy: boolean;
-    adoptBusy: string | null;
-    onGenerateVariants: (count: number) => void;
-    onAdoptVariant: (id: string) => void;
-  };
-  exportState: {
-    exportPreview: ExportPreviewState;
-    onExportPreviewViewChange: (view: ChannelKey | "json") => void;
-    onCopyExportPreview: () => void;
-    copyBusy: boolean;
-    copyStatus: string | null;
-  };
+  studio: StudioDetail | null;
+  /* Channel */
+  activeChannel: ChannelKey;
+  onChannelChange: (ch: ChannelKey) => void;
+  /* Blog editor */
+  editingTitle: string;
+  onEditingTitleChange: (v: string) => void;
+  editingBody: string;
+  onEditingBodyChange: (v: string) => void;
+  editingCta: string;
+  onEditingCtaChange: (v: string) => void;
+  editingHashtags: string;
+  onEditingHashtagsChange: (v: string) => void;
+  onUpdateSeo: () => void;
+  /* SEO */
+  seoCompliance: SeoComplianceResult | null;
+  /* Save */
+  saveBusy: boolean;
+  onSave: () => void;
+  /* Variants */
+  variantGroup: VariantGroup | null;
+  adoptBusy: string | null;
+  onAdoptVariant: (id: string) => void;
+  /* Export preview */
+  exportPreview: ExportPreviewState;
+  onExportChannel: (ch: ChannelKey) => void;
+  onExportPreviewViewChange: (view: ChannelKey | "json") => void;
+  onCopyExportPreview: () => void;
+  copyBusy: boolean;
+  copyStatus: string | null;
 };
 
 export function ContentPanel(props: Props) {
@@ -57,15 +55,10 @@ export function ContentPanel(props: Props) {
     onUpdateSeo,
     seoCompliance,
     saveBusy, onSave,
-  } = props.content;
-  const { topic, variantGroup, generateBusy, adoptBusy, onGenerateVariants, onAdoptVariant } = props.variants;
-  const {
-    exportPreview,
-    onExportPreviewViewChange,
-    onCopyExportPreview,
-    copyBusy,
-    copyStatus,
-  } = props.exportState;
+    variantGroup, adoptBusy, onAdoptVariant,
+    exportPreview, onExportChannel, onExportPreviewViewChange,
+    onCopyExportPreview, copyBusy, copyStatus,
+  } = props;
 
   const hasAssets = (studio?.draft?.assets?.length ?? 0) > 0;
   const hasVariants = (variantGroup?.variants?.length ?? 0) > 0;
@@ -139,22 +132,7 @@ export function ContentPanel(props: Props) {
           </button>
         </div>
       ) : (
-        <div className="cp-derived-channel">
-          <div className="cp-derived-actions">
-            <span className="eyebrow">
-              {activeChannel === "instagram" ? "인스타 A/B 테스트" : "페이스북 A/B 테스트"}
-            </span>
-            <div className="button-row">
-              <button className="button ghost" disabled={generateBusy || !topic} onClick={() => onGenerateVariants(2)}>
-                {generateBusy ? "생성 중…" : "2개 생성"}
-              </button>
-              <button className="button ghost" disabled={generateBusy || !topic} onClick={() => onGenerateVariants(3)}>
-                3개 생성
-              </button>
-            </div>
-          </div>
-          <DerivedChannelPanel assets={studio?.draft?.assets ?? []} />
-        </div>
+        <DerivedChannelPanel assets={studio?.draft?.assets ?? []} />
       )}
 
       {/* A/B Variant comparison */}

@@ -42,15 +42,6 @@ function sanitizeFilename(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "upload";
 }
 
-function isUnsplashUrl(value: string) {
-  try {
-    const url = new URL(value);
-    return url.hostname === "images.unsplash.com" || url.hostname.endsWith(".unsplash.com");
-  } catch {
-    return false;
-  }
-}
-
 function parseCommaSeparatedNames(value?: string | null) {
   if (!value) {
     return [];
@@ -162,13 +153,6 @@ async function uploadFeaturedMedia(params: {
   title: string;
   coverImageUrl: string;
 }) {
-  if (isUnsplashUrl(params.coverImageUrl)) {
-    return {
-      mediaId: null,
-      warning: "Unsplash 이미지는 핫링크 정책을 유지하기 위해 워드프레스 featured image 업로드를 건너뛰었습니다.",
-    };
-  }
-
   const source = await resolveImageUploadSource(params.coverImageUrl, params.title);
 
   if (!source) {
