@@ -31,6 +31,8 @@ type PublishPanelProps = {
   onPreparePublish: () => Promise<void>;
   onSaveWordPressDefaults: () => Promise<void>;
   onCopyExportPreview?: () => Promise<void>;
+  onDownloadExportContent?: () => Promise<void>;
+  onDownloadExportHashtags?: () => Promise<void>;
   onCopyBlogPublishHtml?: () => Promise<void>;
   onPublishDraftChange: (field: keyof BlogPublishDraft, value: string) => void;
   onWordPressConfigChange: (field: keyof WordPressPublishConfig, value: string) => void;
@@ -62,6 +64,8 @@ export function PublishPanel({
   onPreparePublish,
   onSaveWordPressDefaults,
   onCopyExportPreview,
+  onDownloadExportContent,
+  onDownloadExportHashtags,
   onCopyBlogPublishHtml,
   onPublishDraftChange,
   onWordPressConfigChange,
@@ -171,6 +175,27 @@ export function PublishPanel({
           <button className="button ghost" disabled={copyBusy || !exportPreview.bundle} type="button" onClick={() => void onCopyExportPreview?.()}>
             {copyBusy ? "복사 중" : "현재 결과 복사"}
           </button>
+          <button
+            className="button ghost"
+            disabled={exportBusy || !exportPreview.bundle || exportPreview.activeView === "json"}
+            type="button"
+            onClick={() => void onDownloadExportContent?.()}
+          >
+            본문 파일 다운로드
+          </button>
+          <button
+            className="button ghost"
+            disabled={
+              exportBusy ||
+              !exportPreview.bundle ||
+              exportPreview.activeView === "json" ||
+              !activeExportChannel?.hashtagsFilename
+            }
+            type="button"
+            onClick={() => void onDownloadExportHashtags?.()}
+          >
+            해시태그 파일 다운로드
+          </button>
           {copyStatus ? <p className="fine-print">{copyStatus}</p> : null}
         </div>
         <div className="export-preview-card">
@@ -221,16 +246,25 @@ export function PublishPanel({
                 <span className="fine-print">
                   생성 시각 {new Date(exportPreview.bundle.generatedAt).toLocaleString("ko-KR")}
                 </span>
-                <span className="fine-print">
-                  {exportPreview.activeView === "json"
-                    ? exportPreview.bundle.jsonFilename
-                    : activeExportChannel?.filename || "선택된 파일 없음"}
-                </span>
+                {exportPreview.activeView === "json" ? (
+                  <span className="fine-print">{exportPreview.bundle.jsonFilename}</span>
+                ) : (
+                  <>
+                    <span className="fine-print">{activeExportChannel?.filename || "선택된 파일 없음"}</span>
+                    {activeExportChannel?.hashtagsFilename ? <span className="fine-print">{activeExportChannel.hashtagsFilename}</span> : null}
+                  </>
+                )}
               </div>
               <div className="export-preview-body">
                 {exportPreview.activeView === "json"
                   ? JSON.stringify(exportPreview.bundle, null, 2)
-                  : activeExportChannel?.content || "선택된 내보내기 초안이 없습니다."}
+                  : activeExportChannel
+                    ? activeExportChannel.hashtagsFilename
+                      ? [activeExportChannel.content, "", "해시태그 파일", activeExportChannel.hashtagsFilename, activeExportChannel.hashtags]
+                          .filter(Boolean)
+                          .join("\n")
+                      : activeExportChannel.content
+                    : "선택된 내보내기 초안이 없습니다."}
               </div>
             </>
           ) : (
