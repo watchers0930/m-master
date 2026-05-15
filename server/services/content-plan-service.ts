@@ -118,12 +118,56 @@ function buildPublishDates(year: number, month: number, count: number) {
   return dates.slice(0, count);
 }
 
+function determineOptimalPlanCount(params: {
+  topics: PlanningTopic[];
+  snapshot: PlanningSnapshot;
+  performanceFeedback?: PlanningPerformanceFeedback;
+}) {
+  let count = 4;
+
+  const strongTopics = params.topics.filter((topic) => (topic.score ?? 0) >= 7).length;
+  if (strongTopics >= 6) {
+    count += 2;
+  } else if (strongTopics >= 4) {
+    count += 1;
+  }
+
+  if (params.snapshot.configured && !params.snapshot.error) {
+    count += 1;
+  }
+
+  if ((params.performanceFeedback?.publishedJobs ?? 0) >= 6) {
+    count += 1;
+  }
+
+  if ((params.performanceFeedback?.failedPublications ?? 0) >= 3) {
+    count -= 1;
+  }
+
+  if ((params.performanceFeedback?.channelMix.length ?? 0) >= 2) {
+    count += 1;
+  }
+
+  return Math.max(4, Math.min(8, count));
+}
+
+function buildWeekLabel(index: number, totalCount: number) {
+  if (totalCount <= 4) {
+    return `${index + 1}주차`;
+  }
+
+  const weekIndex = Math.floor(index / 2) + 1;
+  const slotLabel = index % 2 === 0 ? "1차" : "2차";
+  return `${weekIndex}주차 ${slotLabel}`;
+}
+
 function buildBasisSummary(params: {
   project: PlanningProject;
   snapshot: PlanningSnapshot;
   monthLabel: string;
   approvedProfile: PlanningBrandProfile;
   performanceFeedback?: PlanningPerformanceFeedback;
+  plannedCount: number;
 }) {
   const metrics = params.snapshot.metricCards
     .map((item) => `${item.label} ${item.value}`)
@@ -162,7 +206,7 @@ function buildBasisSummary(params: {
     : "";
 
   return [
-    `${params.monthLabel} 운영 초점은 ${params.project.name}의 브랜드 컨텍스트를 유지하면서 검색형 블로그 원문과 SNS 파생 효율을 함께 높이는 것입니다.`,
+    `${params.monthLabel} 운영 초점은 ${params.project.name}의 브랜드 컨텍스트를 유지하면서 검색형 블로그 원문과 SNS 파생 효율을 함께 높이는 것입니다. 이번 달 권장 발행 수는 ${params.plannedCount}건으로 계산했습니다.`,
     metrics ? `최근 성과 요약: ${metrics}.` : "",
     topPage ? `가장 반응이 높은 페이지는 ${topPage.path} (${topPage.views}뷰)로, ${topPage.title}와 가까운 문제 해결형 주제를 우선 반영합니다.` : "",
     analyticsNote,
@@ -219,10 +263,15 @@ export function buildMonthlyContentPlan(params: {
   const { monthKey, year, month } = parseMonthKey(params.monthKey);
   const focus = MONTH_FOCUS[month];
   const generatedAt = new Date();
-  const publishDates = buildPublishDates(year, month, 4);
+  const optimalCount = determineOptimalPlanCount({
+    topics: params.topics,
+    snapshot: params.snapshot,
+    performanceFeedback: params.performanceFeedback,
+  });
+  const publishDates = buildPublishDates(year, month, optimalCount);
   const rankedTopics = [...params.topics]
     .sort((left, right) => (right.score ?? 0) - (left.score ?? 0))
-    .slice(0, Math.max(4, Math.min(6, params.topics.length || 4)));
+    .slice(0, Math.max(optimalCount, Math.min(8, params.topics.length || optimalCount)));
 
   const fallbackTopics = rankedTopics.length > 0
     ? rankedTopics
@@ -262,13 +311,14 @@ export function buildMonthlyContentPlan(params: {
       monthLabel: `${month}월 ${focus.label}`,
       approvedProfile: params.approvedProfile,
       performanceFeedback: params.performanceFeedback,
+      plannedCount: publishDates.length,
     }),
     autoGenerate: true,
     generatedAt,
     items: publishDates.map((publishAt, index) => {
       const topic = fallbackTopics[index % fallbackTopics.length];
       const angle = focus.angles[index % focus.angles.length];
-      const weekLabel = `${index + 1}주차`;
+      const weekLabel = buildWeekLabel(index, publishDates.length);
 
       return {
         sortOrder: index + 1,
