@@ -38,8 +38,6 @@ export type ProjectListItem = {
   id: string;
   name: string;
   domain?: string | null;
-  industry?: string | null;
-  ga4PropertyId?: string | null;
   workingPath?: string | null;
   status: string;
   createdAt: string;
@@ -68,30 +66,13 @@ export type ProjectDetail = {
     id: string;
     name: string;
     domain?: string | null;
-    industry?: string | null;
-    ga4PropertyId?: string | null;
     workingPath?: string | null;
     status: string;
     wordpressSiteUrl?: string | null;
     wordpressUsername?: string | null;
-    hasWordPressAppPassword?: boolean | null;
     wordpressStatus?: string | null;
     wordpressCategoryNames?: string | null;
     wordpressTagNames?: string | null;
-    hasMetaAccessToken?: boolean | null;
-    metaTokenExpiresAt?: string | null;
-    facebookPageId?: string | null;
-    instagramBusinessAccountId?: string | null;
-    hasOperationsAlertWebhook?: boolean | null;
-    alertPolicyMode?: "disabled" | "all" | "critical-only" | "failures-only" | "failures-and-review" | null;
-    alertQuietHoursStart?: string | null;
-    alertQuietHoursEnd?: string | null;
-    alertTimezone?: string | null;
-    alertOnBlockedReadiness?: boolean | null;
-    automationMode?: "draft-only" | "approved-auto-publish" | "full-auto" | null;
-    automationRequireReview?: boolean | null;
-    automationMinOverallScore?: number | null;
-    automationMinRiskScore?: number | null;
     createdAt: string;
     updatedAt: string;
   };
@@ -129,67 +110,6 @@ export type ProjectDetail = {
   sourceAnalysis?: SourceAnalysisSummary | null;
 };
 
-export type AutomationReadinessIssue = {
-  id: string;
-  severity: "blocking" | "warning" | "info";
-  area: "context" | "analytics" | "wordpress" | "meta" | "images" | "automation" | "operations";
-  title: string;
-  detail: string;
-  recommendation?: string | null;
-};
-
-export type AutomationReadinessReport = {
-  status: "ready" | "warning" | "blocked";
-  generatedAt: string;
-  blockingCount: number;
-  warningCount: number;
-  infoCount: number;
-  issues: AutomationReadinessIssue[];
-};
-
-export type ProjectOperatorRole = "viewer" | "analyst" | "reviewer" | "operator" | "owner";
-
-export type ProjectOperatorSummary = {
-  id: string;
-  name: string;
-  role: ProjectOperatorRole;
-  active: boolean;
-  lastUsedAt?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
-};
-
-export type ProjectOperatorSession = {
-  id: string;
-  projectId: string;
-  name: string;
-  role: ProjectOperatorRole;
-  active: boolean;
-  lastUsedAt?: string | null;
-};
-
-export type CredentialCheckRun = {
-  id: string;
-  service: "wordpress" | "meta" | "ga4" | "alerts";
-  kind: string;
-  status: "ready" | "warning" | "failed";
-  actorLabel?: string | null;
-  summary: string;
-  detail?: string | null;
-  expiresAt?: string | null;
-  checkedAt: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type CredentialHealthReport = {
-  services: Array<{
-    service: "wordpress" | "meta" | "ga4" | "alerts";
-    latest: CredentialCheckRun | null;
-  }>;
-  history: CredentialCheckRun[];
-};
-
 export type ProjectPreview = {
   brandProfile: {
     summary: string;
@@ -213,7 +133,6 @@ export type StudioDetail = {
     id: string;
     name: string;
     domain?: string | null;
-    industry?: string | null;
     workingPath?: string | null;
     status: string;
   };
@@ -235,13 +154,11 @@ export type StudioDetail = {
   draft: {
     topic: string;
     objective: string;
-    generationProvider: "openai" | "fallback";
     assets: Array<{
       channel: ChannelKey;
       title: string;
       body: string;
       cta: string;
-      hashtags: string;
     }>;
     images: Array<{
       channel: ChannelKey;
@@ -293,8 +210,6 @@ export type ExportBundle = {
     filename: string;
     title: string;
     content: string;
-    hashtags: string;
-    hashtagsFilename?: string;
   }>;
 };
 
@@ -316,7 +231,6 @@ export type BlogPublishPackage = {
   bodyHtml: string;
   htmlWarnings: string[];
   cta?: string | null;
-  hashtags?: string | null;
   coverImageUrl?: string | null;
   sourceUrl?: string | null;
 };
@@ -335,13 +249,6 @@ export type WordPressPublishConfig = {
   status: "draft" | "publish";
   categoryNames: string;
   tagNames: string;
-  metaAccessToken: string;
-  facebookPageId: string;
-  instagramBusinessAccountId: string;
-  automationMode: "draft-only" | "approved-auto-publish" | "full-auto";
-  automationRequireReview: boolean;
-  automationMinOverallScore: string;
-  automationMinRiskScore: string;
 };
 
 export type WordPressPublishResult = {

@@ -15,8 +15,8 @@
   - 빌드 가능 여부
   - 기본 실행 여부
   - 변경 범위 핵심 흐름 확인
-- `production 검증`
-  - `m-master.vercel.app`에서 실제 사용자 흐름 확인
+- `test 검증`
+  - `tm-master.vercel.app`에서 실제 사용자 흐름 확인
   - 외부 연동, 상태 변화, 예외 흐름 확인
 - `production 전 검증`
   - PR 검토
@@ -84,7 +84,7 @@
 
 ## 10. 배포 검증 규칙
 
-- `production` 배포 전 `npm run build`와 핵심 사용자 흐름 검증을 생략하지 않는다
+- `test` 배포 성공 없이 `production` 승격 금지
 - GitHub Actions 성공 여부 확인
 - 테스트 도메인 핵심 흐름 확인
 - 환경변수 누락 여부 확인

@@ -1,6 +1,5 @@
 import { jsonError, jsonOk } from "@/lib/api-response";
 import { logger } from "@/server/logger";
-import { authorizeProjectRoute } from "@/server/services/project-route-auth-service";
 import {
   generateProjectImages,
   ProjectContextApprovalRequiredError,
@@ -17,11 +16,6 @@ type RouteContext = {
 
 export async function POST(request: Request, context: RouteContext) {
   const { projectId } = await context.params;
-  const auth = await authorizeProjectRoute(request, projectId, "operator");
-
-  if (!auth.ok) {
-    return auth.response;
-  }
 
   try {
     const body = (await request.json()) as {
@@ -60,11 +54,6 @@ export async function POST(request: Request, context: RouteContext) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   const { projectId } = await context.params;
-  const auth = await authorizeProjectRoute(request, projectId, "operator");
-
-  if (!auth.ok) {
-    return auth.response;
-  }
 
   try {
     const body = (await request.json()) as {

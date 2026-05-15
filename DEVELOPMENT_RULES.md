@@ -4,9 +4,9 @@
 
 ## 1. 브랜치와 배포
 
-- 모든 일상 개발은 반드시 `production` 브랜치 기준으로 진행한다.
+- 모든 일상 개발은 반드시 `test` 브랜치에서 시작한다.
 - `production` 브랜치에는 직접 기능 개발을 하지 않는다.
-- 모든 배포는 `production` 푸시 기준으로 `m-master.vercel.app`에 바로 반영된다.
+- `test` 푸시는 항상 테스트 배포 `tm-master.vercel.app`에서 먼저 검증한다.
 - 운영 반영은 반드시 `production` 브랜치 머지를 통해서만 진행한다.
 - `production` 반영은 명시적인 승인과 확인 없이 진행하지 않는다.
 - 로컬에서 `vercel --prod`로 직접 운영 배포하지 않는다.
@@ -73,7 +73,7 @@
 ## 8. 품질 검증
 
 - 새 기능은 최소한 로컬 실행 또는 빌드 검증 후 올린다.
-- 배포 전에는 로컬 검증과 필요 시 정렬 브랜치 PR 검증으로 마무리한다.
+- 배포 전에는 `test` 도메인에서 실제 흐름을 한 번 끝까지 확인한다.
 - 실패한 배포를 무시하고 다음 작업으로 넘어가지 않는다.
 - 에러 로그가 있으면 증상만 고치지 말고 원인을 확인한다.
 - 관측 가능하게 만든다. 로그, 에러, 상태를 확인할 수 있어야 한다.
@@ -99,7 +99,7 @@
 
 ## 11. 이 프로젝트 전용 고급 규칙
 
-- 운영과 배포 기준 브랜치는 `production` 하나로 유지한다.
+- 운영은 `production`에서만 하고, 검증은 `test`에서만 한다.
 - DB 스키마 변경은 리뷰 없이 금지한다.
 - AI 결과물은 검수 레이어 없이 바로 발행하지 않는다.
 - 브랜드 컨텍스트 추출 결과는 사용자 승인 전 확정하지 않는다.
@@ -119,27 +119,9 @@
 
 ## 13. 기본 작업 순서
 
-1. `production`에서 작업한다.
+1. `test`에서 작업한다.
 2. 로컬 검증을 한다.
-3. `production`에 푸시한다.
-4. `m-master.vercel.app`에서 확인한다.
+3. `test`에 푸시한다.
+4. `tm-master.vercel.app`에서 확인한다.
 5. PR로 `production` 승격을 요청한다.
 6. 승인 후 `production` 머지로 운영 반영한다.
-
-## 14. 승격 체크리스트
-
-1. `production` 브랜치 HEAD가 배포 대상 최신 커밋인지 확인한다.
-2. `git status`가 의도한 변경만 포함하는지 확인한다.
-3. `npm run build`를 통과시킨다.
-4. `origin/production` 푸시 후 GitHub Actions production 배포 성공을 확인한다.
-5. `m-master.vercel.app`에서 실제 사용자 흐름을 확인한다.
-7. 저장소 정책에 맞는 방식으로 머지한다.
-8. production deploy workflow 성공을 확인한다.
-9. `m-master.vercel.app` 응답과 주요 화면을 확인한다.
-
-## 15. 승격 예외 처리
-
-- `production` 직접 push나 force push는 하지 않는다.
-- `production` 직접 반영이 충돌나면, 최신 `origin/production` 기준 임시 정렬 브랜치를 만든다.
-- 임시 정렬 브랜치에 검증된 변경을 반영한 뒤 `production`으로 새 PR을 만든다.
-- PR 머지 후 production deploy가 자동으로 뜨지 않으면 `deploy.yml`을 `production` 기준으로 수동 실행한다.
