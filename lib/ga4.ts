@@ -303,56 +303,57 @@ function buildHealthIssues(overview: Ga4OverviewResponse) {
 
 export async function fetchGa4Health(rangeDays = 7): Promise<Ga4HealthResponse> {
   const configMap = getGa4ConfigMap();
-  const sources = await Promise.all(
-    GA4_SOURCE_OPTIONS.map(async (sourceOption) => {
-      const config = configMap.get(sourceOption.id) || null;
+  const sources: Ga4SourceHealth[] = [];
 
-      if (!config) {
-        return {
-          source: sourceOption.id,
-          sourceLabel: sourceOption.label,
-          propertyId: null,
-          configured: false,
-          status: "not-configured" as const,
-          rangeDays,
-          checkedAt: new Date().toISOString(),
-          issues: ["이 소스의 GA4 OAuth 환경변수가 설정되지 않았습니다."],
-        };
-      }
+  for (const sourceOption of GA4_SOURCE_OPTIONS) {
+    const config = configMap.get(sourceOption.id) || null;
 
-      try {
-        const overview = await fetchGa4Overview(rangeDays, sourceOption.id);
-        const issues = buildHealthIssues(overview);
+    if (!config) {
+      sources.push({
+        source: sourceOption.id,
+        sourceLabel: sourceOption.label,
+        propertyId: null,
+        configured: false,
+        status: "not-configured",
+        rangeDays,
+        checkedAt: new Date().toISOString(),
+        issues: ["이 소스의 GA4 OAuth 환경변수가 설정되지 않았습니다."],
+      });
+      continue;
+    }
 
-        return {
-          source: sourceOption.id,
-          sourceLabel: sourceOption.label,
-          propertyId: overview.propertyId,
-          configured: true,
-          status: issues.length > 0 ? ("no-data" as const) : ("healthy" as const),
-          rangeDays,
-          checkedAt: new Date().toISOString(),
-          issues,
-          overview: {
-            totalUsers: overview.overview.totalUsers,
-            sessions: overview.overview.sessions,
-            views: overview.overview.views,
-          },
-        };
-      } catch (error) {
-        return {
-          source: sourceOption.id,
-          sourceLabel: sourceOption.label,
-          propertyId: config.propertyId,
-          configured: true,
-          status: "error" as const,
-          rangeDays,
-          checkedAt: new Date().toISOString(),
-          issues: [error instanceof Error ? error.message : "GA4 헬스체크 중 오류가 발생했습니다."],
-        };
-      }
-    }),
-  );
+    try {
+      const overview = await fetchGa4Overview(rangeDays, sourceOption.id);
+      const issues = buildHealthIssues(overview);
+
+      sources.push({
+        source: sourceOption.id,
+        sourceLabel: sourceOption.label,
+        propertyId: overview.propertyId,
+        configured: true,
+        status: issues.length > 0 ? "no-data" : "healthy",
+        rangeDays,
+        checkedAt: new Date().toISOString(),
+        issues,
+        overview: {
+          totalUsers: overview.overview.totalUsers,
+          sessions: overview.overview.sessions,
+          views: overview.overview.views,
+        },
+      });
+    } catch (error) {
+      sources.push({
+        source: sourceOption.id,
+        sourceLabel: sourceOption.label,
+        propertyId: config.propertyId,
+        configured: true,
+        status: "error",
+        rangeDays,
+        checkedAt: new Date().toISOString(),
+        issues: [error instanceof Error ? error.message : "GA4 헬스체크 중 오류가 발생했습니다."],
+      });
+    }
+  }
 
   return {
     generatedAt: new Date().toISOString(),
@@ -379,70 +380,67 @@ export async function fetchGa4Overview(rangeDays: number, sourceId?: string): Pr
   const accessToken = await getGa4AccessToken(config);
   const dateRange = buildDateRange(rangeDays);
 
-  const [summaryReport, trendReport, pagesReport, channelsReport, regionsReport, citiesReport, devicesReport, browsersReport] =
-    await Promise.all([
-      runReport(accessToken, config.propertyId, {
-        dateRanges: [dateRange],
-        metrics: [
-          { name: "totalUsers" },
-          { name: "newUsers" },
-          { name: "sessions" },
-          { name: "engagedSessions" },
-          { name: "screenPageViews" },
-          { name: "averageSessionDuration" },
-          { name: "bounceRate" },
-        ],
-      }),
-      runReport(accessToken, config.propertyId, {
-        dateRanges: [dateRange],
-        dimensions: [{ name: "date" }],
-        metrics: [{ name: "screenPageViews" }, { name: "totalUsers" }, { name: "sessions" }],
-        orderBys: [{ dimension: { dimensionName: "date" } }],
-        limit: 400,
-      }),
-      runReport(accessToken, config.propertyId, {
-        dateRanges: [dateRange],
-        dimensions: [{ name: "pagePath" }, { name: "pageTitle" }],
-        metrics: [{ name: "screenPageViews" }, { name: "totalUsers" }],
-        orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
-        limit: 12,
-      }),
-      runReport(accessToken, config.propertyId, {
-        dateRanges: [dateRange],
-        dimensions: [{ name: "sessionDefaultChannelGroup" }],
-        metrics: [{ name: "sessions" }],
-        orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-        limit: 10,
-      }),
-      runReport(accessToken, config.propertyId, {
-        dateRanges: [dateRange],
-        dimensions: [{ name: "country" }, { name: "region" }],
-        metrics: [{ name: "sessions" }],
-        orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-        limit: 10,
-      }),
-      runReport(accessToken, config.propertyId, {
-        dateRanges: [dateRange],
-        dimensions: [{ name: "region" }, { name: "city" }],
-        metrics: [{ name: "sessions" }],
-        orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-        limit: 10,
-      }),
-      runReport(accessToken, config.propertyId, {
-        dateRanges: [dateRange],
-        dimensions: [{ name: "deviceCategory" }],
-        metrics: [{ name: "sessions" }],
-        orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-        limit: 10,
-      }),
-      runReport(accessToken, config.propertyId, {
-        dateRanges: [dateRange],
-        dimensions: [{ name: "browser" }],
-        metrics: [{ name: "sessions" }],
-        orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
-        limit: 10,
-      }),
-    ]);
+  const summaryReport = await runReport(accessToken, config.propertyId, {
+    dateRanges: [dateRange],
+    metrics: [
+      { name: "totalUsers" },
+      { name: "newUsers" },
+      { name: "sessions" },
+      { name: "engagedSessions" },
+      { name: "screenPageViews" },
+      { name: "averageSessionDuration" },
+      { name: "bounceRate" },
+    ],
+  });
+  const trendReport = await runReport(accessToken, config.propertyId, {
+    dateRanges: [dateRange],
+    dimensions: [{ name: "date" }],
+    metrics: [{ name: "screenPageViews" }, { name: "totalUsers" }, { name: "sessions" }],
+    orderBys: [{ dimension: { dimensionName: "date" } }],
+    limit: 400,
+  });
+  const pagesReport = await runReport(accessToken, config.propertyId, {
+    dateRanges: [dateRange],
+    dimensions: [{ name: "pagePath" }, { name: "pageTitle" }],
+    metrics: [{ name: "screenPageViews" }, { name: "totalUsers" }],
+    orderBys: [{ metric: { metricName: "screenPageViews" }, desc: true }],
+    limit: 12,
+  });
+  const channelsReport = await runReport(accessToken, config.propertyId, {
+    dateRanges: [dateRange],
+    dimensions: [{ name: "sessionDefaultChannelGroup" }],
+    metrics: [{ name: "sessions" }],
+    orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+    limit: 10,
+  });
+  const regionsReport = await runReport(accessToken, config.propertyId, {
+    dateRanges: [dateRange],
+    dimensions: [{ name: "country" }, { name: "region" }],
+    metrics: [{ name: "sessions" }],
+    orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+    limit: 10,
+  });
+  const citiesReport = await runReport(accessToken, config.propertyId, {
+    dateRanges: [dateRange],
+    dimensions: [{ name: "region" }, { name: "city" }],
+    metrics: [{ name: "sessions" }],
+    orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+    limit: 10,
+  });
+  const devicesReport = await runReport(accessToken, config.propertyId, {
+    dateRanges: [dateRange],
+    dimensions: [{ name: "deviceCategory" }],
+    metrics: [{ name: "sessions" }],
+    orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+    limit: 10,
+  });
+  const browsersReport = await runReport(accessToken, config.propertyId, {
+    dateRanges: [dateRange],
+    dimensions: [{ name: "browser" }],
+    metrics: [{ name: "sessions" }],
+    orderBys: [{ metric: { metricName: "sessions" }, desc: true }],
+    limit: 10,
+  });
 
   const summaryRow = summaryReport.rows?.[0];
   const totalUsers = metricNumber(summaryRow, 0);

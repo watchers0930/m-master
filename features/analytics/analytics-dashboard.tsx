@@ -207,7 +207,7 @@ export function AnalyticsDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [customSources, refreshing, source]);
+  }, [customSources, refreshing]);
 
   useEffect(() => {
     let cancelled = false;
