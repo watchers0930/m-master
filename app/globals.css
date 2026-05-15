@@ -1402,6 +1402,44 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   margin-top: 12px;
 }
 
+.operations-plan-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.03), rgba(37, 99, 235, 0.01));
+}
+
+.operations-plan-summary-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.operations-plan-items {
+  display: grid;
+  gap: 8px;
+}
+
+.operations-plan-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+
+.operations-plan-item span {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
 .cp-tabs {
   display: flex;
   gap: 4px;

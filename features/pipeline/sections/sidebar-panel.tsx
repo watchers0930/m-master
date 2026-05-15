@@ -560,6 +560,7 @@ export function SidebarPanel(props: Props) {
           <summary className="sb-section-title">자동화 운영</summary>
           <OperationsBoard
             projectId={activeProject.project.id}
+            contentPlan={contentPlan}
             wordpressConfig={wordpressConfig}
             onWordPressConfigChange={onWordPressConfigChange}
             settingsBusy={settingsBusy}

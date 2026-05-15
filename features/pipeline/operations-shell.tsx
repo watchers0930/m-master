@@ -467,6 +467,7 @@ export function OperationsShell() {
               </div>
               <OperationsBoard
                 projectId={projectId}
+                contentPlan={state.contentPlan}
                 wordpressConfig={publish.wordpressConfig}
                 onWordPressConfigChange={publish.handleWordPressConfigChange}
                 settingsBusy={publish.settingsBusy}
