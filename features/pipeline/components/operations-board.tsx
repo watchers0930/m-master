@@ -29,6 +29,7 @@ const OPERATIONS_VIEW_STORAGE_KEY = "m-master:operations-view";
 
 type Props = {
   projectId?: string | null;
+  contentPlan: MonthlyContentPlan | null;
   wordpressConfig: WordPressPublishConfig;
   onWordPressConfigChange: (
     field: keyof WordPressPublishConfig,
@@ -62,6 +63,7 @@ type Props = {
 export function OperationsBoard(props: Props) {
   const {
     projectId,
+    contentPlan,
     wordpressConfig,
     onWordPressConfigChange,
     settingsBusy,
@@ -621,6 +623,35 @@ export function OperationsBoard(props: Props) {
   return (
     <div className="sb-section-body">
       <div className="sb-form" style={{ marginBottom: 16 }}>
+        <div className="operations-plan-summary">
+          <div className="operations-plan-summary-header">
+            <div>
+              <strong>{contentPlan ? `${contentPlan.monthKey} 월간 계획` : "월간 계획 없음"}</strong>
+              <p className="fine-print">
+                {contentPlan
+                  ? `계획 항목 ${contentPlan.items.length}건 · 상태 ${contentPlan.status}${contentPlan.generatedAt ? ` · 생성 ${new Date(contentPlan.generatedAt).toLocaleString("ko-KR")}` : ""}`
+                  : "먼저 월간 계획을 생성하면 주차별 주제와 실행 큐가 이 영역에 표시됩니다."}
+              </p>
+            </div>
+          </div>
+          {contentPlan?.basisSummary ? (
+            <p className="fine-print">{contentPlan.basisSummary}</p>
+          ) : null}
+          {contentPlan?.items.length ? (
+            <div className="operations-plan-items">
+              {contentPlan.items.slice(0, 6).map((item) => (
+                <div key={item.id} className="operations-plan-item">
+                  <strong>{item.weekLabel}</strong>
+                  <span>{item.topic}</span>
+                  <p className="fine-print">
+                    {item.publishAt ? `예약 ${new Date(item.publishAt).toLocaleString("ko-KR")} · ` : ""}
+                    상태 {item.status}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
         <div className="field-group">
           <label className="field-label">자동화 모드</label>
           <select
