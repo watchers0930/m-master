@@ -132,6 +132,48 @@ export function ProjectOverview({
   onSaveContext,
   onApproveContext,
 }: ProjectOverviewProps) {
+  const readinessStatusLabel =
+    automationReadiness?.status === "blocked"
+      ? "즉시 보완 필요"
+      : automationReadiness?.status === "warning"
+        ? "설정 점검 필요"
+        : "자동화 준비 완료";
+
+  const getReadinessSeverityLabel = (severity: "blocking" | "warning" | "info") => {
+    if (severity === "blocking") return "차단";
+    if (severity === "warning") return "경고";
+    return "정보";
+  };
+
+  const getReadinessSeverityClassName = (severity: "blocking" | "warning" | "info") => {
+    if (severity === "blocking") return "readiness-severity blocking";
+    if (severity === "warning") return "readiness-severity warning";
+    return "readiness-severity info";
+  };
+
+  const getReadinessAreaLabel = (
+    area: "context" | "analytics" | "wordpress" | "meta" | "images" | "automation" | "operations",
+  ) => {
+    switch (area) {
+      case "context":
+        return "콘텍스트";
+      case "analytics":
+        return "분석";
+      case "wordpress":
+        return "워드프레스";
+      case "meta":
+        return "Meta";
+      case "images":
+        return "이미지";
+      case "automation":
+        return "자동화";
+      case "operations":
+        return "운영";
+      default:
+        return area;
+    }
+  };
+
   return (
     <SectionCard
       title="브랜드 콘텍스트 정리"
@@ -568,21 +610,51 @@ export function ProjectOverview({
               <details className="inline-details">
                 <summary>자동화 준비도 경고</summary>
                 <div className="inline-details-body stack">
-                  <p className="fine-print">
-                    상태 {automationReadiness.status} · 차단 {automationReadiness.blockingCount}건 · 경고 {automationReadiness.warningCount}건
-                  </p>
+                  <div className={`readiness-summary ${automationReadiness.status}`}>
+                    <div>
+                      <strong>{readinessStatusLabel}</strong>
+                      <p className="fine-print">
+                        마지막 점검 {automationReadiness.generatedAt} 기준으로 현재 자동화 운영 상태를 정리했습니다.
+                      </p>
+                    </div>
+                    <div className="readiness-summary-metrics">
+                      <div className="readiness-metric">
+                        <span>차단</span>
+                        <strong>{automationReadiness.blockingCount}건</strong>
+                      </div>
+                      <div className="readiness-metric">
+                        <span>경고</span>
+                        <strong>{automationReadiness.warningCount}건</strong>
+                      </div>
+                      <div className="readiness-metric">
+                        <span>정보</span>
+                        <strong>{automationReadiness.infoCount}건</strong>
+                      </div>
+                    </div>
+                  </div>
                   {automationReadiness.issues.length === 0 ? (
                     <p className="fine-print">현재 등록된 운영 경고가 없습니다.</p>
                   ) : (
-                    automationReadiness.issues.map((issue) => (
-                      <div key={issue.id} className="review-item">
-                        <strong className={issue.severity === "blocking" ? "error-text" : ""}>
-                          [{issue.area}] {issue.title}
-                        </strong>
-                        <p className="fine-print">{issue.detail}</p>
-                        {issue.recommendation ? <p className="fine-print">권장 조치: {issue.recommendation}</p> : null}
-                      </div>
-                    ))
+                    <div className="readiness-issue-list">
+                      {automationReadiness.issues.map((issue) => (
+                        <div key={issue.id} className="readiness-issue-card">
+                          <div className="readiness-issue-header">
+                            <span className={getReadinessSeverityClassName(issue.severity)}>
+                              {getReadinessSeverityLabel(issue.severity)}
+                            </span>
+                            <span className="readiness-area-chip">{getReadinessAreaLabel(issue.area)}</span>
+                          </div>
+                          <strong className={issue.severity === "blocking" ? "error-text" : ""}>{issue.title}</strong>
+                          <p className="fine-print">{issue.detail}</p>
+                          {issue.recommendation ? (
+                            <div className="readiness-recommendation">
+                              <span>권장 조치</span>
+                              <p className="fine-print">{issue.recommendation}</p>
+                            </div>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               </details>

@@ -235,6 +235,39 @@ function ensureCtaPresence(body: string, cta: string) {
   return `${body}\n\n${cta}`.trim();
 }
 
+function ensureBlogImageFlow(body: string) {
+  const normalized = body.replace(/\r\n/g, "\n").trim();
+  const lines = normalized.split("\n");
+  const next: string[] = [];
+  let imageCount = 0;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]?.trimEnd() || "";
+    next.push(line);
+
+    if (line.startsWith("[이미지 ")) {
+      imageCount += 1;
+      continue;
+    }
+
+    const nextLine = lines[index + 1]?.trim() || "";
+    if (!/^## /.test(line) || /^## 마무리/.test(line) || nextLine.startsWith("[이미지 ")) {
+      continue;
+    }
+
+    if (imageCount >= 5) {
+      continue;
+    }
+
+    next.push("");
+    next.push(`[이미지 ${imageCount + 1}] 위 섹션 핵심을 시각적으로 요약하는 이미지`);
+    next.push("");
+    imageCount += 1;
+  }
+
+  return next.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 function ensureBlogLength(body: string, profile: BrandProfileSeed, topic: string, cta: string) {
   const normalized = body.trim();
   if (normalized.length >= NAVER_BLOG_TARGET.minChars) {
@@ -276,6 +309,7 @@ function normalizeAsset(
     body = ensureBrandContext(body, profile.summary);
   }
   if (channel === "blog") {
+    body = ensureBlogImageFlow(body);
     body = ensureBlogLength(body, profile, fallback.title, cta);
   } else {
     body = ensureCtaPresence(body, cta);
@@ -336,8 +370,9 @@ function buildChannelPrompt(params: {
           "- 출력은 반드시 JSON만 반환한다.",
           "- blog는 네이버 블로그용 초안으로 작성한다.",
           '- 소제목은 "## 도입", "## 1. ...", "## 2. ...", "## 3. ...", "## 마무리" 형식을 우선 사용한다.',
-          "- [이미지 1]부터 [이미지 5]까지 자연스럽게 배치한다.",
-          "- 5개 섹션 안팎으로 구성하고, 각 문단은 2~3문장 정도로 짧게 끊는다.",
+          "- 각 주요 섹션 설명 다음에는 반드시 [이미지 N] 한 줄을 붙여 글-이미지-글-이미지 흐름을 만든다.",
+          "- [이미지 1]부터 [이미지 5]까지 자연스럽게 배치하고, 각 이미지는 바로 앞 문단 내용을 요약해야 한다.",
+          "- 4~5개 섹션 안팎으로 구성하고, 각 문단은 2~3문장 정도로 짧게 끊는다.",
           "- 블로그 본문은 대체로 1500~2200자 범위에서 작성한다.",
           "- 너무 짧게 끝내지 말고, 실무 적용 포인트나 체크 포인트를 포함한다.",
           "- 브랜드 요약 문장을 그대로 길게 복사하지 말고, 핵심 의미만 자연스럽게 풀어서 쓴다.",
@@ -346,7 +381,8 @@ function buildChannelPrompt(params: {
           "- meta_description은 155자 이내 요약을 함께 작성한다. JSON에 \"metaDescription\" 필드로 반환한다.",
           "- H1 1개 + H2/H3 계층 구조를 유지한다.",
           "- 키워드 밀도 1-2%를 목표로 한다.",
-          "- 본문에 [이미지 N]을 3-5개 배치하고 각각 alt/caption 용도 설명을 함께 쓴다.",
+          "- 본문에 [이미지 N]을 3-5개 배치하고, 각 줄에서 이미지가 어떤 장면인지 짧게 설명한다.",
+          "- 네이버 블로그 최적화 관점에서 긴 벽문단을 피하고, 모바일에서 스크롤할 때 리듬감 있게 읽히도록 쓴다.",
         ]
       : params.channel === "instagram"
         ? [
