@@ -1,6 +1,5 @@
 import { jsonError, jsonOk } from "@/lib/api-response";
 import { logger } from "@/server/logger";
-import { authorizeProjectRoute } from "@/server/services/project-route-auth-service";
 import {
   approveProjectContext,
   ProjectNotFoundError,
@@ -18,11 +17,6 @@ type RouteContext = {
 
 export async function POST(_request: Request, context: RouteContext) {
   const { projectId } = await context.params;
-  const auth = await authorizeProjectRoute(_request, projectId, "operator");
-
-  if (!auth.ok) {
-    return auth.response;
-  }
 
   try {
     const project = await regenerateProjectContextDraft(projectId);
@@ -43,11 +37,6 @@ export async function POST(_request: Request, context: RouteContext) {
 
 export async function PATCH(request: Request, context: RouteContext) {
   const { projectId } = await context.params;
-  const auth = await authorizeProjectRoute(request, projectId, "reviewer");
-
-  if (!auth.ok) {
-    return auth.response;
-  }
 
   try {
     const input = await parseBrandProfileInput(request);
@@ -81,11 +70,6 @@ export async function PATCH(request: Request, context: RouteContext) {
 
 export async function PUT(request: Request, context: RouteContext) {
   const { projectId } = await context.params;
-  const auth = await authorizeProjectRoute(request, projectId, "operator");
-
-  if (!auth.ok) {
-    return auth.response;
-  }
 
   try {
     const input = await parseBrandProfileInput(request);

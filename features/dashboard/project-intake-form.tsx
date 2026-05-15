@@ -9,7 +9,6 @@ import type { ProjectPreview, SourceFileDraft } from "@/features/dashboard/types
 type ProjectIntakeFormProps = {
   name: string;
   domain: string;
-  industry: string;
   workingPath: string;
   files: SourceFileDraft[];
   preview: ProjectPreview | null;
@@ -18,7 +17,6 @@ type ProjectIntakeFormProps = {
   error?: string | null;
   onNameChange: (value: string) => void;
   onDomainChange: (value: string) => void;
-  onIndustryChange: (value: string) => void;
   onPickFolder: () => Promise<void>;
   onPreview: () => Promise<void>;
   onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
@@ -28,7 +26,6 @@ export function ProjectIntakeForm(props: ProjectIntakeFormProps) {
   const {
     name,
     domain,
-    industry,
     workingPath,
     files,
     preview,
@@ -37,7 +34,6 @@ export function ProjectIntakeForm(props: ProjectIntakeFormProps) {
     error,
     onNameChange,
     onDomainChange,
-    onIndustryChange,
     onPickFolder,
     onPreview,
     onSubmit,
@@ -76,25 +72,6 @@ export function ProjectIntakeForm(props: ProjectIntakeFormProps) {
             onChange={(event) => onDomainChange(event.target.value)}
           />
           <p className="fine-print">전체 URL이나 도메인 모두 입력할 수 있습니다. 입력한 사이트를 읽어 브랜드 컨텍스트와 주제 후보를 자동 추출합니다.</p>
-        </div>
-
-        <div className="field-group">
-          <label className="field-label" htmlFor="project-industry">
-            업종 분류
-          </label>
-          <select
-            id="project-industry"
-            className="text-input"
-            value={industry}
-            onChange={(event) => onIndustryChange(event.target.value)}
-          >
-            <option value="general">일반</option>
-            <option value="real-estate">부동산</option>
-            <option value="marketing">마케팅</option>
-            <option value="saas">SaaS</option>
-            <option value="finance">금융</option>
-          </select>
-          <p className="fine-print">선택한 업종은 해시태그 추천과 채널 초안의 실무 가이드 우선순위에 반영됩니다.</p>
         </div>
 
         <div className="field-group">

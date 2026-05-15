@@ -22,4 +22,4 @@
 - 블로그는 원본 자산이다.
 - 인스타그램과 페이스북은 파생 자산이다.
 - AI 결과물은 검수 없이 확정하지 않는다.
-- 공개 기준 도메인은 `m-master.vercel.app`으로 관리한다.
+- 테스트는 `tm-master.vercel.app`, 운영은 `m-master.vercel.app` 기준으로 관리한다.

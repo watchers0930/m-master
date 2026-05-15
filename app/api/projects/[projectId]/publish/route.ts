@@ -1,12 +1,10 @@
 import { jsonError, jsonOk } from "@/lib/api-response";
 import { logger } from "@/server/logger";
-import { authorizeProjectRoute } from "@/server/services/project-route-auth-service";
 import {
   ProjectContextApprovalRequiredError,
   markProjectReadyForPublish,
   ProjectContentNotFoundError,
   ProjectNotFoundError,
-  ProjectPublishSafetyError,
   WordPressPublishError,
 } from "@/server/services/project-service";
 
@@ -18,11 +16,6 @@ type RouteContext = {
 
 export async function POST(request: Request, context: RouteContext) {
   const { projectId } = await context.params;
-  const auth = await authorizeProjectRoute(request, projectId, "operator");
-
-  if (!auth.ok) {
-    return auth.response;
-  }
 
   try {
     const body = (await request.json().catch(() => null)) as
@@ -76,10 +69,6 @@ export async function POST(request: Request, context: RouteContext) {
 
     if (error instanceof WordPressPublishError) {
       return jsonError(error.message, 400);
-    }
-
-    if (error instanceof ProjectPublishSafetyError) {
-      return jsonError(error.message, 409);
     }
 
     logger.error("projects.publish.failed", {

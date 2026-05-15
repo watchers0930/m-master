@@ -11,10 +11,12 @@ Context-aware marketing platform.
 
 ## Deployment workflow
 
-- `production` branch: all routine development and deployment happen here
+- `test` branch: all routine development goes here
+- `production` branch: production deployment branch, update only by explicit promotion
 
 ## GitHub Actions deployment
 
+- pushes to `test` deploy to the Vercel preview target and rebind `tm-master.vercel.app`
 - pushes to `production` deploy to the Vercel production target and rebind `m-master.vercel.app`
 - Vercel Git auto-deploy should stay disabled to avoid duplicate deployments
 
@@ -26,23 +28,8 @@ Context-aware marketing platform.
 
 - GitHub Actions is the deployment entry point
 - local CLI direct deploys should be avoided except for emergency maintenance
+- `tm-master.vercel.app` is the fixed test domain
 - `m-master.vercel.app` is the fixed production domain
-
-## Promotion checklist
-
-1. Work only on `production`
-2. Run local verification: at minimum `npm run build`
-3. Push `production`
-4. Wait for the GitHub Actions production deploy
-5. Verify `m-master.vercel.app`
-
-### If production promotion is not clean
-
-- Do not force-push `production`
-- If a direct `production` push is blocked by branch protection or branch divergence, create a temporary alignment branch from the latest `origin/production`
-- Apply the verified content onto that branch
-- Open a clean PR from the alignment branch into `production`
-- If the production deploy workflow does not auto-start after merge, run `deploy.yml` with `workflow_dispatch` on `production`
 
 ## Database
 
@@ -54,8 +41,6 @@ Context-aware marketing platform.
 ## Image generation
 
 - `OPENAI_API_KEY`: enables GPT image generation for the image studio
-- `OPENAI_TEXT_MODEL`: optional override for GPT draft generation, defaults to `gpt-5.4-mini`
 - `OPENAI_IMAGE_MODEL`: optional override, defaults to `gpt-image-1-mini`
 - cost-optimized default: `low` quality and `1` variant per request
 - if the API key is missing or the OpenAI request fails, the app falls back to the built-in SVG generator
-- channel draft generation also uses the same `OPENAI_API_KEY`; if the request fails, it falls back to the built-in rule-based draft generator
