@@ -293,19 +293,6 @@ export function PipelineShell() {
           projectBusy={source.busy}
           onCreateProject={source.handleCreateProject}
           onSelectProject={(id) => { state.reloadProject(id); }}
-          editingSummary={source.editingSummary}
-          onEditingSummaryChange={source.setEditingSummary}
-          editingAudience={source.editingAudience}
-          onEditingAudienceChange={source.setEditingAudience}
-          editingTone={source.editingTone}
-          onEditingToneChange={source.setEditingTone}
-          editingCta={source.editingCta}
-          onEditingCtaChange={source.setEditingCta}
-          editingBannedTerms={source.editingBannedTerms}
-          onEditingBannedTermsChange={source.setEditingBannedTerms}
-          contextBusy={source.contextBusy}
-          onApproveContext={() => projectId && source.handleApproveContext(projectId)}
-          onSaveContextDraft={() => projectId && source.handleSaveContextDraft(projectId)}
           topicInput={content.topicInput}
           onTopicInputChange={content.setTopicInput}
           generateBusy={content.generateBusy}
@@ -363,14 +350,10 @@ export function PipelineShell() {
           publishPackage={publish.publishPackage}
           onPreparePublish={publish.handlePreparePublish}
           onPublishNow={publish.handlePublishNow}
-          wordpressConfig={publish.wordpressConfig}
-          onWordPressConfigChange={publish.handleWordPressConfigChange}
           editingHashtags={content.editingHashtags}
           onEditingHashtagsChange={content.setEditingHashtags}
           hashtagBusy={content.hashtagBusy}
           onGenerateHashtags={content.handleGenerateHashtags}
-          settingsBusy={publish.settingsBusy}
-          onSaveWordPressDefaults={publish.handleSaveWordPressDefaults}
           publications={state.publications}
           failedPublications={failedPublications}
           publishedPublications={publishedPublications}
@@ -506,6 +489,8 @@ export function PipelineShell() {
 
         {/* Center: Content preview */}
         <ContentPanel
+          projectId={projectId}
+          contextReady={Boolean(state.activeProject?.brandProfile?.approved)}
           studio={state.studio}
           activeChannel={content.activeChannel}
           onChannelChange={content.setActiveChannel}

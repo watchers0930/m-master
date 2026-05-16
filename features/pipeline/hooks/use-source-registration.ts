@@ -49,13 +49,11 @@ export function useSourceRegistration(params: {
 
   const hydrateContextForm = useCallback((project: ProjectDetail) => {
     const bp = project.brandProfile;
-    if (bp) {
-      setEditingSummary(bp.summary || "");
-      setEditingAudience(bp.audience || "");
-      setEditingTone(bp.tone || "");
-      setEditingCta(bp.cta || "");
-      setEditingBannedTerms(bp.bannedTerms || "");
-    }
+    setEditingSummary(bp?.summary || "");
+    setEditingAudience(bp?.audience || "");
+    setEditingTone(bp?.tone || "");
+    setEditingCta(bp?.cta || "");
+    setEditingBannedTerms(bp?.bannedTerms || "");
   }, []);
 
   const handleApproveContext = useCallback(async (projectId: string) => {

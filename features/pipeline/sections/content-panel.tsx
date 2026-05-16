@@ -12,6 +12,8 @@ import type {
 } from "../types";
 
 type Props = {
+  projectId?: string | null;
+  contextReady: boolean;
   studio: StudioDetail | null;
   /* Channel */
   activeChannel: ChannelKey;
@@ -46,6 +48,8 @@ type Props = {
 
 export function ContentPanel(props: Props) {
   const {
+    projectId,
+    contextReady,
     studio,
     activeChannel, onChannelChange,
     editingTitle, onEditingTitleChange,
@@ -62,6 +66,22 @@ export function ContentPanel(props: Props) {
 
   const hasAssets = (studio?.draft?.assets?.length ?? 0) > 0;
   const hasVariants = (variantGroup?.variants?.length ?? 0) > 0;
+
+  if (!contextReady) {
+    return (
+      <div className="content-panel">
+        <div className="cp-empty">
+          <span className="eyebrow">콘텐츠 생성</span>
+          <p className="fine-print">콘텐츠 생성 전 준비는 설정 화면에서 끝냅니다. 브랜드 컨텍스트를 저장하고 승인한 뒤 다시 돌아오세요.</p>
+          <div className="button-row" style={{ marginTop: 16 }}>
+            <a className="button primary" href={projectId ? `/studio/settings?projectId=${projectId}` : "/studio/settings"}>
+              설정으로 이동
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!hasAssets) {
     return (

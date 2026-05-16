@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AppHeader } from "@/features/site/app-header";
 import { usePipelineState } from "./hooks/use-pipeline-state";
 import { usePublishWorkflow } from "../dashboard/use-publish-workflow";
+import { useSourceRegistration } from "./hooks/use-source-registration";
 import { apiPost } from "./hooks/use-api";
 import type { CredentialHealthReport, ProjectOperatorSession } from "../dashboard/types";
 
@@ -18,6 +19,12 @@ export function SettingsShell() {
   const [credentialHealth, setCredentialHealth] = useState<CredentialHealthReport | null>(null);
   const [operatorSession, setOperatorSession] = useState<ProjectOperatorSession | null>(null);
   const projectId = state.activeProject?.project.id ?? null;
+  const source = useSourceRegistration({
+    onProjectCreated: (project) => {
+      state.setActiveProject(project);
+    },
+    onError: state.setError,
+  });
 
   const publish = usePublishWorkflow({
     projectId,
@@ -59,6 +66,7 @@ export function SettingsShell() {
   useEffect(() => {
     if (state.activeProject) {
       publish.hydratePublishResult(state.activeProject);
+      source.hydrateContextForm(state.activeProject);
     }
   }, [state.activeProject]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -172,6 +180,77 @@ export function SettingsShell() {
           </section>
         ) : (
           <div className="settings-grid">
+            <section className="analytics-surface settings-card">
+              <div className="settings-card-head">
+                <div>
+                  <h3>브랜드 컨텍스트</h3>
+                  <p>초기 상태에서는 여기서 브랜드 요약과 운영 기준을 먼저 저장합니다. 콘텐츠생성과 운영보드는 이 설정이 완료된 뒤 사용하는 화면입니다.</p>
+                </div>
+                <span className={`status-pill ${state.activeProject.brandProfile?.approved ? "active" : ""}`}>
+                  {state.activeProject.brandProfile?.approved ? "컨텍스트 승인됨" : "컨텍스트 미완료"}
+                </span>
+              </div>
+              <div className="settings-form-grid">
+                <div className="field-group">
+                  <label className="field-label">브랜드 요약</label>
+                  <textarea
+                    className="text-area"
+                    value={source.editingSummary}
+                    onChange={(e) => source.setEditingSummary(e.target.value)}
+                    rows={5}
+                    placeholder="브랜드와 서비스 핵심을 요약하세요."
+                  />
+                </div>
+                <div className="field-group">
+                  <label className="field-label">타겟 독자</label>
+                  <textarea
+                    className="text-area"
+                    value={source.editingAudience}
+                    onChange={(e) => source.setEditingAudience(e.target.value)}
+                    rows={4}
+                    placeholder="누구를 위한 콘텐츠인지 적어주세요."
+                  />
+                </div>
+                <div className="field-group">
+                  <label className="field-label">톤</label>
+                  <input
+                    className="text-input"
+                    value={source.editingTone}
+                    onChange={(e) => source.setEditingTone(e.target.value)}
+                    placeholder="예: 신뢰감 있고 차분한 실무형 톤"
+                  />
+                </div>
+                <div className="field-group">
+                  <label className="field-label">CTA</label>
+                  <input
+                    className="text-input"
+                    value={source.editingCta}
+                    onChange={(e) => source.setEditingCta(e.target.value)}
+                    placeholder="예: 계약 전에 위험 신호를 먼저 점검해 보세요."
+                  />
+                </div>
+                <div className="field-group">
+                  <label className="field-label">금지 표현</label>
+                  <textarea
+                    className="text-area"
+                    value={source.editingBannedTerms}
+                    onChange={(e) => source.setEditingBannedTerms(e.target.value)}
+                    rows={4}
+                    placeholder="예: 100% 보장, 무조건 안전, 업계 1위"
+                  />
+                </div>
+              </div>
+              <div className="button-row">
+                <button className="button ghost" disabled={source.contextBusy} onClick={() => void source.handleSaveContextDraft(projectId!)}>
+                  {source.contextBusy ? "저장 중…" : "컨텍스트 임시 저장"}
+                </button>
+                <button className="button primary" disabled={source.contextBusy || !source.editingSummary.trim()} onClick={() => void source.handleApproveContext(projectId!)}>
+                  {source.contextBusy ? "처리 중…" : "컨텍스트 저장 및 승인"}
+                </button>
+              </div>
+              <p className="fine-print">설정 화면에서 컨텍스트, 채널, 자동화 정책을 모두 끝내면 그다음에만 콘텐츠생성과 운영보드를 쓰면 됩니다.</p>
+            </section>
+
             <section className="analytics-surface settings-card">
               <div className="settings-card-head">
                 <div>
@@ -306,6 +385,9 @@ export function SettingsShell() {
                 </div>
               </div>
               <div className="settings-status-row">
+                <span className={`status-pill ${state.activeProject.brandProfile?.approved ? "active" : ""}`}>
+                  {state.activeProject.brandProfile?.approved ? "브랜드 컨텍스트 승인됨" : "브랜드 컨텍스트 미완료"}
+                </span>
                 <span className={`status-pill ${state.activeProject.project.hasBloggerAccessToken ? "active" : ""}`}>
                   {state.activeProject.project.hasBloggerAccessToken ? "Blogger 토큰 저장됨" : "Blogger 토큰 미등록"}
                 </span>
