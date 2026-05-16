@@ -332,11 +332,33 @@ export function OperationsShell() {
                   </div>
                   <div className="field-group">
                     <label className="field-label">Blogger Access Token</label>
-                    <input className="text-input" type="password" value={publish.wordpressConfig.bloggerAccessToken} onChange={(e) => publish.handleWordPressConfigChange("bloggerAccessToken", e.target.value)} />
+                    <input
+                      className="text-input"
+                      type="password"
+                      value={publish.wordpressConfig.bloggerAccessToken}
+                      onChange={(e) => publish.handleWordPressConfigChange("bloggerAccessToken", e.target.value)}
+                      placeholder={state.activeProject.project.hasBloggerAccessToken ? "********" : "OAuth access token"}
+                    />
+                    <span className="fine-print">
+                      {state.activeProject.project.hasBloggerAccessToken && !publish.wordpressConfig.bloggerAccessToken
+                        ? "현재 Blogger 토큰이 저장돼 있습니다. 새 값을 입력하면 교체됩니다."
+                        : "Blogger 게시에 사용하는 access token입니다."}
+                    </span>
                   </div>
                   <div className="field-group">
                     <label className="field-label">Meta Access Token</label>
-                    <input className="text-input" type="password" value={publish.wordpressConfig.metaAccessToken} onChange={(e) => publish.handleWordPressConfigChange("metaAccessToken", e.target.value)} />
+                    <input
+                      className="text-input"
+                      type="password"
+                      value={publish.wordpressConfig.metaAccessToken}
+                      onChange={(e) => publish.handleWordPressConfigChange("metaAccessToken", e.target.value)}
+                      placeholder={state.activeProject.project.hasMetaAccessToken ? "********" : "Meta Graph access token"}
+                    />
+                    <span className="fine-print">
+                      {state.activeProject.project.hasMetaAccessToken && !publish.wordpressConfig.metaAccessToken
+                        ? "현재 Meta 토큰이 저장돼 있습니다. 새 값을 입력하면 교체됩니다."
+                        : "Meta 자동 게시에 사용하는 access token입니다."}
+                    </span>
                   </div>
                   <div className="field-group">
                     <label className="field-label">Facebook Page ID</label>
