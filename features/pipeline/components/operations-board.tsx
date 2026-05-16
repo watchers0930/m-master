@@ -11,7 +11,6 @@ import type {
   ChannelPublicationSummary,
   ContentJobDetail,
   MonthlyContentPlan,
-  WordPressPublishConfig,
 } from "../types";
 
 type OperationsFilter =
@@ -30,13 +29,6 @@ const OPERATIONS_VIEW_STORAGE_KEY = "m-master:operations-view";
 type Props = {
   projectId?: string | null;
   contentPlan: MonthlyContentPlan | null;
-  wordpressConfig: WordPressPublishConfig;
-  onWordPressConfigChange: (
-    field: keyof WordPressPublishConfig,
-    value: WordPressPublishConfig[keyof WordPressPublishConfig],
-  ) => void;
-  settingsBusy: boolean;
-  onSaveWordPressDefaults: () => void;
   publications: ChannelPublicationSummary[];
   failedPublications: ChannelPublicationSummary[];
   publishedPublications: ChannelPublicationSummary[];
@@ -64,10 +56,6 @@ export function OperationsBoard(props: Props) {
   const {
     projectId,
     contentPlan,
-    wordpressConfig,
-    onWordPressConfigChange,
-    settingsBusy,
-    onSaveWordPressDefaults,
     publications,
     failedPublications,
     publishedPublications,
@@ -650,55 +638,13 @@ export function OperationsBoard(props: Props) {
             </div>
           ) : null}
         </div>
-        <div className="field-group">
-          <label className="field-label">자동화 모드</label>
-          <select
-            className="text-input"
-            value={wordpressConfig.automationMode}
-            onChange={(e) => onWordPressConfigChange("automationMode", e.target.value)}
-          >
-            <option value="draft-only">draft-only</option>
-            <option value="approved-auto-publish">approved-auto-publish</option>
-            <option value="full-auto">full-auto</option>
-          </select>
-        </div>
-        <label className="fine-print" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <input
-            type="checkbox"
-            checked={wordpressConfig.automationRequireReview}
-            onChange={(e) => onWordPressConfigChange("automationRequireReview", e.target.checked)}
-          />
-          자동 게시 전에 리뷰 가드레일 강제
-        </label>
-        <div className="field-grid-2">
-          <div className="field-group">
-            <label className="field-label">최소 종합 점수</label>
-            <input
-              className="text-input"
-              inputMode="numeric"
-              value={wordpressConfig.automationMinOverallScore}
-              onChange={(e) => onWordPressConfigChange("automationMinOverallScore", e.target.value)}
-              placeholder="75"
-            />
-          </div>
-          <div className="field-group">
-            <label className="field-label">최소 리스크 점수</label>
-            <input
-              className="text-input"
-              inputMode="numeric"
-              value={wordpressConfig.automationMinRiskScore}
-              onChange={(e) => onWordPressConfigChange("automationMinRiskScore", e.target.value)}
-              placeholder="80"
-            />
-          </div>
-        </div>
         <div className="button-row operations-primary-actions">
           <button className="button primary" disabled={automationBusy} onClick={onRunAutomation}>
             {automationBusy ? "자동 실행 중…" : "이 프로젝트 자동 실행"}
           </button>
-          <button className="button ghost" disabled={settingsBusy} onClick={onSaveWordPressDefaults}>
-            {settingsBusy ? "저장 중…" : "채널/정책 저장"}
-          </button>
+          <a className="button ghost" href={projectId ? `/studio/settings?projectId=${projectId}` : "/studio/settings"}>
+            설정 열기
+          </a>
         </div>
         <div className="field-grid-2" style={{ marginTop: 12 }}>
           <div className="field-group">
@@ -724,9 +670,7 @@ export function OperationsBoard(props: Props) {
             </select>
           </div>
         </div>
-        <p className="fine-print">
-          `draft-only`는 초안만 생성합니다. `approved-auto-publish`는 Blogger까지만 자동 게시하고, `full-auto`는 소셜까지 이어집니다.
-        </p>
+        <p className="fine-print">자동화 정책과 채널 정보 수정은 설정 화면에서만 관리합니다. 운영보드에서는 계획 실행, 검토, 재시도 상태만 처리합니다.</p>
       </div>
       {readiness ? (
         <div className="stack" style={{ marginBottom: 16 }}>

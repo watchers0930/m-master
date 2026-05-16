@@ -6,7 +6,6 @@ import { AppHeader } from "@/features/site/app-header";
 import { OperationsBoard } from "./components/operations-board";
 import { usePipelineState } from "./hooks/use-pipeline-state";
 import { apiPost } from "./hooks/use-api";
-import { usePublishWorkflow } from "../dashboard/use-publish-workflow";
 import type { AutomationReviewResolution, AutomationRunSummary, BulkOperationReport, MonthlyContentPlan, ProjectListItem } from "./types";
 import type { ProjectOperatorSession } from "../dashboard/types";
 
@@ -55,14 +54,6 @@ export function OperationsShell() {
     setRequestedProjectId(nextProjectId);
   }, []);
 
-  const publish = usePublishWorkflow({
-    projectId,
-    onError: state.setError,
-    reloadProject: async (nextProjectId: string) => {
-      await state.reloadProject(nextProjectId);
-    },
-  });
-
   useEffect(() => {
     void state.loadProjects().finally(() => {
       setProjectsResolved(true);
@@ -90,12 +81,6 @@ export function OperationsShell() {
 
     void loadOperatorSession(projectId);
   }, [projectId]);
-
-  useEffect(() => {
-    if (state.activeProject) {
-      publish.hydratePublishResult(state.activeProject);
-    }
-  }, [state.activeProject]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reviewQueue = state.contentPlan?.items.filter((item) => item.status === "needs_review") || [];
   const readyQueue = state.contentPlan?.items.filter((item) => item.status === "ready_to_publish") || [];
@@ -321,60 +306,6 @@ export function OperationsShell() {
               </div>
             </details>
           ) : null}
-          {state.activeProject ? (
-            <details className="sb-section" open>
-              <summary className="sb-section-title">채널 설정</summary>
-              <div className="sb-section-body">
-                <div className="sb-form">
-                  <div className="field-group">
-                    <label className="field-label">Blogger Blog ID</label>
-                    <input className="text-input" value={publish.wordpressConfig.bloggerBlogId} onChange={(e) => publish.handleWordPressConfigChange("bloggerBlogId", e.target.value)} />
-                  </div>
-                  <div className="field-group">
-                    <label className="field-label">Blogger Access Token</label>
-                    <input
-                      className="text-input"
-                      type="password"
-                      value={publish.wordpressConfig.bloggerAccessToken}
-                      onChange={(e) => publish.handleWordPressConfigChange("bloggerAccessToken", e.target.value)}
-                      placeholder={state.activeProject.project.hasBloggerAccessToken ? "********" : "OAuth access token"}
-                    />
-                    <span className="fine-print">
-                      {state.activeProject.project.hasBloggerAccessToken && !publish.wordpressConfig.bloggerAccessToken
-                        ? "현재 Blogger 토큰이 저장돼 있습니다. 새 값을 입력하면 교체됩니다."
-                        : "Blogger 게시에 사용하는 access token입니다."}
-                    </span>
-                  </div>
-                  <div className="field-group">
-                    <label className="field-label">Meta Access Token</label>
-                    <input
-                      className="text-input"
-                      type="password"
-                      value={publish.wordpressConfig.metaAccessToken}
-                      onChange={(e) => publish.handleWordPressConfigChange("metaAccessToken", e.target.value)}
-                      placeholder={state.activeProject.project.hasMetaAccessToken ? "********" : "Meta Graph access token"}
-                    />
-                    <span className="fine-print">
-                      {state.activeProject.project.hasMetaAccessToken && !publish.wordpressConfig.metaAccessToken
-                        ? "현재 Meta 토큰이 저장돼 있습니다. 새 값을 입력하면 교체됩니다."
-                        : "Meta 자동 게시에 사용하는 access token입니다."}
-                    </span>
-                  </div>
-                  <div className="field-group">
-                    <label className="field-label">Facebook Page ID</label>
-                    <input className="text-input" value={publish.wordpressConfig.facebookPageId} onChange={(e) => publish.handleWordPressConfigChange("facebookPageId", e.target.value)} />
-                  </div>
-                  <div className="field-group">
-                    <label className="field-label">Instagram Business Account ID</label>
-                    <input className="text-input" value={publish.wordpressConfig.instagramBusinessAccountId} onChange={(e) => publish.handleWordPressConfigChange("instagramBusinessAccountId", e.target.value)} />
-                  </div>
-                  <button className="button ghost sb-btn-full" disabled={publish.settingsBusy} onClick={publish.handleSaveWordPressDefaults}>
-                    {publish.settingsBusy ? "저장 중…" : "채널 설정 저장"}
-                  </button>
-                </div>
-              </div>
-            </details>
-          ) : null}
         </aside>
         <section className="content-panel">
           {!state.activeProject ? (
@@ -395,7 +326,12 @@ export function OperationsShell() {
                     {planBusy ? "계획 생성 중…" : state.contentPlan ? "월간 계획 다시 생성" : "월간 계획 생성"}
                   </button>
                   {!state.activeProject.brandProfile?.approved ? (
-                    <span className="fine-print">콘텍스트 승인 후 월간 계획을 생성할 수 있습니다.</span>
+                    <>
+                      <span className="fine-print">운영보드 시작 전 설정 화면에서 브랜드 컨텍스트를 먼저 저장하고 승인하세요.</span>
+                      <a className="button ghost" href={`/studio/settings?projectId=${state.activeProject.project.id}`}>
+                        설정 열기
+                      </a>
+                    </>
                   ) : null}
                 </div>
                 {state.activeProject.brandProfile?.approved ? (
@@ -407,10 +343,6 @@ export function OperationsShell() {
               <OperationsBoard
                 projectId={projectId}
                 contentPlan={state.contentPlan}
-                wordpressConfig={publish.wordpressConfig}
-                onWordPressConfigChange={publish.handleWordPressConfigChange}
-                settingsBusy={publish.settingsBusy}
-                onSaveWordPressDefaults={publish.handleSaveWordPressDefaults}
                 publications={state.publications}
                 failedPublications={failedPublications}
                 publishedPublications={publishedPublications}

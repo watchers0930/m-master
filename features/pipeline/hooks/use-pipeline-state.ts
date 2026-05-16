@@ -60,7 +60,13 @@ export function usePipelineState() {
       const data = await apiGet<{ studio: StudioDetail }>(`/api/projects/${projectId}/studio`);
       setStudio(data.studio);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "스튜디오 로드 실패");
+      const message = e instanceof Error ? e.message : "스튜디오 로드 실패";
+      if (message.includes("프로젝트 또는 컨텍스트 초안을 찾을 수 없습니다.")) {
+        setStudio(null);
+        return;
+      }
+
+      setError(message);
     } finally {
       setLoading(false);
     }

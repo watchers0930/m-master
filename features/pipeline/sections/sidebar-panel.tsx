@@ -9,7 +9,6 @@ import type {
   SeoComplianceResult,
   VariantGroup,
   StudioDetail,
-  WordPressPublishConfig,
   BlogPublishPackage,
   MonthlyContentPlan,
   AutomationReadinessReport,
@@ -20,15 +19,6 @@ import type {
   BulkOperationReport,
   SourceFileDraft,
 } from "../types";
-
-const TONE_PRESETS = [
-  { key: "professional", label: "전문적" },
-  { key: "friendly", label: "친근한" },
-  { key: "authoritative", label: "권위적" },
-  { key: "casual", label: "캐주얼" },
-  { key: "persuasive", label: "설득적" },
-  { key: "educational", label: "교육적" },
-] as const;
 
 type Props = {
   /* Project */
@@ -45,20 +35,6 @@ type Props = {
   projectBusy: boolean;
   onCreateProject: () => void;
   onSelectProject: (id: string) => void;
-  /* Context */
-  editingSummary: string;
-  onEditingSummaryChange: (v: string) => void;
-  editingAudience: string;
-  onEditingAudienceChange: (v: string) => void;
-  editingTone: string;
-  onEditingToneChange: (v: string) => void;
-  editingCta: string;
-  onEditingCtaChange: (v: string) => void;
-  editingBannedTerms: string;
-  onEditingBannedTermsChange: (v: string) => void;
-  contextBusy: boolean;
-  onApproveContext: () => void;
-  onSaveContextDraft: () => void;
   /* Generation */
   topicInput: string;
   onTopicInputChange: (v: string) => void;
@@ -92,13 +68,6 @@ type Props = {
   publishPackage: BlogPublishPackage | null;
   onPreparePublish: () => void;
   onPublishNow: () => void;
-  wordpressConfig: WordPressPublishConfig;
-  onWordPressConfigChange: (
-    field: keyof WordPressPublishConfig,
-    value: WordPressPublishConfig[keyof WordPressPublishConfig],
-  ) => void;
-  settingsBusy: boolean;
-  onSaveWordPressDefaults: () => void;
   publications: ChannelPublicationSummary[];
   failedPublications: ChannelPublicationSummary[];
   publishedPublications: ChannelPublicationSummary[];
@@ -128,12 +97,6 @@ export function SidebarPanel(props: Props) {
     name, onNameChange, domain, onDomainChange,
     workingPath, onWorkingPathChange, sourceFiles, onSourceFilesChange,
     projectBusy, onCreateProject, onSelectProject,
-    editingSummary, onEditingSummaryChange,
-    editingAudience, onEditingAudienceChange,
-    editingTone, onEditingToneChange,
-    editingCta, onEditingCtaChange,
-    editingBannedTerms, onEditingBannedTermsChange,
-    contextBusy, onApproveContext, onSaveContextDraft,
     editingHashtags, onEditingHashtagsChange, hashtagBusy, onGenerateHashtags,
     topicInput, onTopicInputChange, generateBusy, onGenerate,
     contentPlan, planBusy, onGenerateContentPlan, selectedPlannedTopicId, onSelectPlannedTopic,
@@ -142,8 +105,6 @@ export function SidebarPanel(props: Props) {
     studio,
     exportBusy, onExportAll,
     publishBusy, publishPackage, onPreparePublish, onPublishNow,
-    wordpressConfig, onWordPressConfigChange,
-    settingsBusy, onSaveWordPressDefaults,
     publications, failedPublications, publishedPublications,
     readiness,
     automationBusy,
@@ -325,60 +286,12 @@ export function SidebarPanel(props: Props) {
                 {planBusy ? "계획 생성 중…" : contentPlan ? "월간 계획 다시 생성" : "월간 계획 생성"}
               </button>
               {!isApproved ? (
-                <span className="fine-print">월간 계획은 콘텍스트 승인 후 생성할 수 있습니다.</span>
+                <span className="fine-print">설정 화면에서 브랜드 컨텍스트를 먼저 저장하고 승인해야 콘텐츠 생성이 열립니다.</span>
               ) : null}
             </div>
           )}
         </div>
       </details>
-
-      {/* ── 콘텍스트 ── */}
-      {activeProject && (
-        <details className="sb-section" open={!isApproved}>
-          <summary className="sb-section-title">브랜드 콘텍스트</summary>
-          <div className="sb-section-body">
-            <div className="sb-form">
-              <div className="field-group">
-                <label className="field-label">요약</label>
-                <textarea className="text-area sb-textarea" value={editingSummary} onChange={(e) => onEditingSummaryChange(e.target.value)} rows={2} />
-              </div>
-              <div className="field-group">
-                <label className="field-label">타겟 독자</label>
-                <input className="text-input" value={editingAudience} onChange={(e) => onEditingAudienceChange(e.target.value)} />
-              </div>
-              <div className="field-group">
-                <label className="field-label">톤</label>
-                <div className="sb-tone-grid">
-                  {TONE_PRESETS.map((preset) => (
-                    <button
-                      key={preset.key}
-                      type="button"
-                      className={`sb-tone-chip ${editingTone === preset.label ? "active" : ""}`}
-                      onClick={() => onEditingToneChange(preset.label)}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="field-group">
-                <label className="field-label">CTA</label>
-                <input className="text-input" value={editingCta} onChange={(e) => onEditingCtaChange(e.target.value)} />
-              </div>
-              <div className="field-group">
-                <label className="field-label">금지 표현</label>
-                <input className="text-input" value={editingBannedTerms} onChange={(e) => onEditingBannedTermsChange(e.target.value)} placeholder="쉼표 구분" />
-              </div>
-              <div className="button-row">
-                <button className="button primary" disabled={contextBusy || !editingSummary.trim()} onClick={onApproveContext}>
-                  {contextBusy ? "처리 중…" : isApproved ? "재승인" : "승인"}
-                </button>
-                <button className="button ghost" disabled={contextBusy} onClick={onSaveContextDraft}>임시 저장</button>
-              </div>
-            </div>
-          </div>
-        </details>
-      )}
 
       {/* ── 생성 ── */}
       {activeProject && (
@@ -398,7 +311,12 @@ export function SidebarPanel(props: Props) {
                 </button>
               </div>
               {!isApproved && (
-                <p className="fine-print">월간 계획은 브랜드 콘텍스트 승인 후 생성할 수 있습니다.</p>
+                <div className="stack">
+                  <p className="fine-print">월간 계획은 브랜드 콘텍스트 승인 후 생성할 수 있습니다.</p>
+                  <a className="button ghost" href={activeProject ? `/studio/settings?projectId=${activeProject.project.id}` : "/studio/settings"}>
+                    설정에서 컨텍스트 완료
+                  </a>
+                </div>
               )}
               {contentPlan?.basisSummary && (
                 <p className="fine-print" style={{ marginTop: 8 }}>{contentPlan.basisSummary}</p>
@@ -501,24 +419,9 @@ export function SidebarPanel(props: Props) {
               <div className="review-item">
                 <strong>Blogger 설정은 전체 설정 메뉴에서 관리합니다.</strong>
                 <p className="fine-print">
-                  Blog ID, Access Token, 게시 상태는 설정 화면에 저장된 값을 그대로 사용합니다. 이 화면에서는 중복 입력 없이 저장된 Blogger 설정으로 바로 발행합니다.
+                  Blog ID, Access Token, 게시 상태와 자동화 정책은 설정 화면에 저장된 값을 그대로 사용합니다. 이 화면에서는 생성된 콘텐츠의 발행만 처리합니다.
                 </p>
               </div>
-              <details className="sb-subsection">
-                <summary className="sb-subsection-title">소셜/보조 채널 설정</summary>
-              <div className="field-group">
-                <label className="field-label">Meta Access Token</label>
-                <input className="text-input" type="password" value={wordpressConfig.metaAccessToken} onChange={(e) => onWordPressConfigChange("metaAccessToken", e.target.value)} placeholder="Meta Graph access token" />
-              </div>
-              <div className="field-group">
-                <label className="field-label">Facebook Page ID</label>
-                <input className="text-input" value={wordpressConfig.facebookPageId} onChange={(e) => onWordPressConfigChange("facebookPageId", e.target.value)} placeholder="예: 1234567890" />
-              </div>
-              <div className="field-group">
-                <label className="field-label">Instagram Business Account ID</label>
-                <input className="text-input" value={wordpressConfig.instagramBusinessAccountId} onChange={(e) => onWordPressConfigChange("instagramBusinessAccountId", e.target.value)} placeholder="예: 1784..." />
-              </div>
-              </details>
               <div className="field-group">
                 <label className="field-label">해시태그</label>
                 {editingHashtags ? <div className="sb-hashtag-output">{editingHashtags}</div> : null}
@@ -560,10 +463,6 @@ export function SidebarPanel(props: Props) {
           <OperationsBoard
             projectId={activeProject.project.id}
             contentPlan={contentPlan}
-            wordpressConfig={wordpressConfig}
-            onWordPressConfigChange={onWordPressConfigChange}
-            settingsBusy={settingsBusy}
-            onSaveWordPressDefaults={onSaveWordPressDefaults}
             publications={publications}
             failedPublications={failedPublications}
             publishedPublications={publishedPublications}
