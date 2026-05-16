@@ -329,7 +329,6 @@ export async function listUnclaimedProjects() {
     include: projectSummaryInclude,
   });
 }
-
 export async function getProjectDetail(projectId: string): Promise<ProjectDetailRecord | null> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },

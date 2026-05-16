@@ -208,7 +208,6 @@ export function RootLoginShell() {
       setLookupBusy(false);
     }
   }
-
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
