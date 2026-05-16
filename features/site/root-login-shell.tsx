@@ -9,6 +9,7 @@ type ProjectListResponse = {
   ok?: boolean;
   data?: {
     projects?: ProjectListItem[];
+    claimableProjects?: ProjectListItem[];
   };
   error?: {
     message?: string;
@@ -79,6 +80,7 @@ function getProjectShortId(projectId: string) {
 export function RootLoginShell() {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
+  const [claimableProjects, setClaimableProjects] = useState<ProjectListItem[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [operatorName, setOperatorName] = useState("admin");
   const [operatorKey, setOperatorKey] = useState("1111");
@@ -108,6 +110,7 @@ export function RootLoginShell() {
         }
 
         setProjects(nextProjects);
+        setClaimableProjects([]);
         setSelectedProjectId(nextProjects[0]?.id ?? "");
       } catch (nextError) {
         if (!cancelled) {
@@ -157,14 +160,50 @@ export function RootLoginShell() {
       }
 
       const nextProjects = payload.data?.projects ?? [];
+      const nextClaimableProjects = payload.data?.claimableProjects ?? [];
       setProjects(nextProjects);
+      setClaimableProjects(nextClaimableProjects);
       setSelectedProjectId(nextProjects[0]?.id ?? "");
       return true;
     } catch (nextError) {
       setProjects([]);
+      setClaimableProjects([]);
       setSelectedProjectId("");
       setError(nextError instanceof Error ? nextError.message : "내 프로젝트를 확인하지 못했습니다.");
       return false;
+    } finally {
+      setLookupBusy(false);
+    }
+  }
+
+  async function handleClaimProject(projectId: string) {
+    if (!operatorName.trim() || !operatorKey.trim()) {
+      setError("운영자 이름과 접근 키를 먼저 입력하세요.");
+      return;
+    }
+
+    setLookupBusy(true);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/operators/claim`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: operatorName.trim(),
+          accessKey: operatorKey.trim(),
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as SessionResponse | null;
+
+      if (!payload?.ok) {
+        throw new Error(payload?.error?.message || "프로젝트 연결에 실패했습니다.");
+      }
+
+      await handleLookupProjects();
+      setSelectedProjectId(projectId);
+    } catch (nextError) {
+      setError(nextError instanceof Error ? nextError.message : "프로젝트 연결에 실패했습니다.");
     } finally {
       setLookupBusy(false);
     }
@@ -305,6 +344,7 @@ export function RootLoginShell() {
                   onChange={(event) => {
                     setOperatorName(event.target.value);
                     setProjects([]);
+                    setClaimableProjects([]);
                     setSelectedProjectId("");
                     setError("");
                   }}
@@ -320,6 +360,7 @@ export function RootLoginShell() {
                   onChange={(event) => {
                     setOperatorKey(event.target.value);
                     setProjects([]);
+                    setClaimableProjects([]);
                     setSelectedProjectId("");
                     setError("");
                   }}
@@ -349,6 +390,26 @@ export function RootLoginShell() {
                 스튜디오만 열기
               </a>
             </div>
+
+            {claimableProjects.length > 0 ? (
+              <div className="root-login-project-card" style={{ marginTop: 16 }}>
+                <strong>운영자 연결이 필요한 프로젝트</strong>
+                {claimableProjects.map((project) => (
+                  <div key={project.id} style={{ display: "grid", gap: 6, marginTop: 10 }}>
+                    <span>{project.name}</span>
+                    <span>{`${project.domain || "도메인 없음"} · 최근 수정 ${formatProjectTimestamp(project.updatedAt)} · ID ${getProjectShortId(project.id)}`}</span>
+                    <button
+                      type="button"
+                      className="root-login-secondary"
+                      onClick={() => void handleClaimProject(project.id)}
+                      disabled={lookupBusy || submitting}
+                    >
+                      이 계정으로 연결
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </form>
         </div>
       </section>

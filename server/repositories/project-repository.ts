@@ -318,6 +318,18 @@ export async function listProjectsForOperatorIdentity(params: {
   });
 }
 
+export async function listUnclaimedProjects() {
+  return prisma.project.findMany({
+    where: {
+      operators: {
+        none: {},
+      },
+    },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    include: projectSummaryInclude,
+  });
+}
+
 export async function getProjectDetail(projectId: string): Promise<ProjectDetailRecord | null> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
