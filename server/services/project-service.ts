@@ -2258,9 +2258,7 @@ export async function saveProjectContentDraft(params: {
     guardrail.approved &&
     Boolean(refreshedRecord.project.bloggerBlogId) &&
     Boolean(storedBloggerAccessToken) &&
-    Boolean(latestContentJob) &&
-    !latestContentJob?.externalPostId &&
-    !latestContentJob?.externalPostUrl;
+    Boolean(latestContentJob);
 
   if (shouldAutoPublishEditedDraft) {
     const publish = await markProjectReadyForPublish(params.projectId, {
@@ -2502,6 +2500,7 @@ export async function markProjectReadyForPublish(
         blogId: effectiveBlogger.blogId,
         accessToken: effectiveBlogger.accessToken,
         status: effectiveBlogger.status,
+        postId: latestContentJob.externalPostId,
         title: publishPackage.title,
         content: publishPackage.bodyHtml,
         labels:
