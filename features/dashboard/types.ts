@@ -78,6 +78,9 @@ export type ProjectDetail = {
     wordpressStatus?: string | null;
     wordpressCategoryNames?: string | null;
     wordpressTagNames?: string | null;
+    bloggerBlogId?: string | null;
+    hasBloggerAccessToken?: boolean | null;
+    bloggerStatus?: string | null;
     hasMetaAccessToken?: boolean | null;
     metaTokenExpiresAt?: string | null;
     facebookPageId?: string | null;
@@ -132,7 +135,7 @@ export type ProjectDetail = {
 export type AutomationReadinessIssue = {
   id: string;
   severity: "blocking" | "warning" | "info";
-  area: "context" | "analytics" | "wordpress" | "meta" | "images" | "automation" | "operations";
+  area: "context" | "analytics" | "meta" | "images" | "automation" | "operations";
   title: string;
   detail: string;
   recommendation?: string | null;
@@ -170,7 +173,7 @@ export type ProjectOperatorSession = {
 
 export type CredentialCheckRun = {
   id: string;
-  service: "wordpress" | "meta" | "ga4" | "alerts";
+  service: "blogger" | "meta" | "ga4" | "alerts";
   kind: string;
   status: "ready" | "warning" | "failed";
   actorLabel?: string | null;
@@ -184,7 +187,7 @@ export type CredentialCheckRun = {
 
 export type CredentialHealthReport = {
   services: Array<{
-    service: "wordpress" | "meta" | "ga4" | "alerts";
+    service: "blogger" | "meta" | "ga4" | "alerts";
     latest: CredentialCheckRun | null;
   }>;
   history: CredentialCheckRun[];
@@ -329,12 +332,9 @@ export type BlogPublishDraft = {
 };
 
 export type WordPressPublishConfig = {
-  siteUrl: string;
-  username: string;
-  appPassword: string;
-  status: "draft" | "publish";
-  categoryNames: string;
-  tagNames: string;
+  bloggerBlogId: string;
+  bloggerAccessToken: string;
+  bloggerStatus: "draft" | "publish";
   metaAccessToken: string;
   facebookPageId: string;
   instagramBusinessAccountId: string;
@@ -344,12 +344,10 @@ export type WordPressPublishConfig = {
   automationMinRiskScore: string;
 };
 
-export type WordPressPublishResult = {
-  postId: number;
+export type BlogPublishResult = {
+  provider: "blogger";
+  postId: number | string;
   link: string;
   status: string;
-  featuredMediaId?: number | null;
-  mediaWarning?: string | null;
-  categoryIds?: number[];
-  tagIds?: number[];
+  labels?: string[];
 };

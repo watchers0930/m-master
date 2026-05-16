@@ -163,14 +163,12 @@ export function DashboardShell() {
   const [folderSupported, setFolderSupported] = useState<boolean | null>(null);
   const [automationReadiness, setAutomationReadiness] = useState<AutomationReadinessReport | null>(null);
   const [projectWordpressAppPassword, setProjectWordpressAppPassword] = useState("");
+  const [projectBloggerAccessToken, setProjectBloggerAccessToken] = useState("");
   const [projectMetaAccessToken, setProjectMetaAccessToken] = useState("");
   const [projectOperationsAlertWebhook, setProjectOperationsAlertWebhook] = useState("");
   const [operatorSession, setOperatorSession] = useState<ProjectOperatorSession | null>(null);
   const [operators, setOperators] = useState<ProjectOperatorSummary[]>([]);
   const [credentialHealth, setCredentialHealth] = useState<CredentialHealthReport | null>(null);
-  const [operatorLoginName, setOperatorLoginName] = useState("");
-  const [operatorLoginKey, setOperatorLoginKey] = useState("");
-  const [operatorBootstrapSecret, setOperatorBootstrapSecret] = useState("");
   const [newOperatorName, setNewOperatorName] = useState("");
   const [newOperatorKey, setNewOperatorKey] = useState("");
   const [newOperatorRole, setNewOperatorRole] = useState<ProjectOperatorRole>("operator");
@@ -217,6 +215,7 @@ export function DashboardShell() {
   function applyProjectDetail(nextProject: ProjectDetail) {
     setActiveProject(nextProject);
     setProjectWordpressAppPassword("");
+    setProjectBloggerAccessToken("");
     setProjectMetaAccessToken("");
     setProjectOperationsAlertWebhook("");
     publishWorkflow.hydratePublishResult(nextProject);
@@ -489,6 +488,10 @@ export function DashboardShell() {
       return;
     }
 
+    if (!(await ensureOperatorSession())) {
+      return;
+    }
+
     setError(null);
     setLoading(true);
 
@@ -524,6 +527,10 @@ export function DashboardShell() {
 
   async function handleSaveContext() {
     if (!activeProject?.brandProfile) {
+      return;
+    }
+
+    if (!(await ensureOperatorSession())) {
       return;
     }
 
@@ -565,6 +572,10 @@ export function DashboardShell() {
       return;
     }
 
+    if (!(await ensureOperatorSession())) {
+      return;
+    }
+
     setError(null);
     setLoading(true);
 
@@ -592,6 +603,10 @@ export function DashboardShell() {
 
   async function handleGenerateContent() {
     if (!activeProject?.project.id) {
+      return;
+    }
+
+    if (!(await ensureOperatorSession())) {
       return;
     }
 
@@ -637,6 +652,10 @@ export function DashboardShell() {
   }
 
   async function handleDeleteProject(projectId: string) {
+    if (!(await ensureOperatorSession())) {
+      return;
+    }
+
     setError(null);
     setLoading(true);
 
@@ -801,6 +820,38 @@ export function DashboardShell() {
         project: {
           ...currentProject.project,
           wordpressTagNames: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectBloggerBlogIdChange(value: string) {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          bloggerBlogId: value,
+        },
+      };
+    });
+  }
+
+  function handleProjectBloggerStatusChange(value: "draft" | "publish") {
+    setActiveProject((currentProject) => {
+      if (!currentProject) {
+        return currentProject;
+      }
+
+      return {
+        ...currentProject,
+        project: {
+          ...currentProject.project,
+          bloggerStatus: value,
         },
       };
     });
@@ -1007,6 +1058,10 @@ export function DashboardShell() {
       return;
     }
 
+    if (!(await ensureOperatorSession())) {
+      return;
+    }
+
     setError(null);
     setLoading(true);
 
@@ -1017,12 +1072,9 @@ export function DashboardShell() {
         body: JSON.stringify({
           industry: activeProject.project.industry || "general",
           ga4PropertyId: activeProject.project.ga4PropertyId,
-          wordpressSiteUrl: activeProject.project.wordpressSiteUrl,
-          wordpressUsername: activeProject.project.wordpressUsername,
-          wordpressAppPassword: projectWordpressAppPassword || undefined,
-          wordpressStatus: activeProject.project.wordpressStatus,
-          wordpressCategoryNames: activeProject.project.wordpressCategoryNames,
-          wordpressTagNames: activeProject.project.wordpressTagNames,
+          bloggerBlogId: activeProject.project.bloggerBlogId,
+          bloggerAccessToken: projectBloggerAccessToken || undefined,
+          bloggerStatus: activeProject.project.bloggerStatus,
           metaAccessToken: projectMetaAccessToken || undefined,
           metaTokenExpiresAt: activeProject.project.metaTokenExpiresAt || undefined,
           facebookPageId: activeProject.project.facebookPageId,
@@ -1057,120 +1109,34 @@ export function DashboardShell() {
     }
   }
 
-  async function handleOperatorLogin() {
-    if (!activeProject?.project.id) {
-      return;
+  async function ensureOperatorSession() {
+    if (operatorSession) {
+      return true;
     }
 
-    setError(null);
-    setLoading(true);
+    if (!activeProject?.project.id) {
+      return false;
+    }
 
     try {
-      const response = await fetch(`/api/projects/${activeProject.project.id}/operators/session`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: operatorLoginName,
-          accessKey: operatorLoginKey,
-        }),
-      });
-      const payload = await parseJson<ApiResponse<{ operator: ProjectOperatorSession }>>(response);
-
-      if (!payload.ok) {
-        throw new Error(payload.error.message);
+      const nextSession = await loadOperatorSession(activeProject.project.id);
+      if (nextSession) {
+        return true;
       }
-
-      setOperatorSession(payload.data.operator);
-      setOperatorLoginKey("");
-      await Promise.allSettled([
-        loadOperators(activeProject.project.id),
-        loadCredentialHealth(activeProject.project.id),
-        loadAutomationReadiness(activeProject.project.id),
-      ]);
-    } catch (sessionError) {
-      setError(sessionError instanceof Error ? sessionError.message : "운영자 로그인에 실패했습니다.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleOperatorLogout() {
-    if (!activeProject?.project.id) {
-      return;
+    } catch {
+      // Fall through to unified message below.
     }
 
-    setError(null);
-    setLoading(true);
-
-    try {
-      await fetch(`/api/projects/${activeProject.project.id}/operators/session`, {
-        method: "DELETE",
-      });
-      setOperatorSession(null);
-      setOperators([]);
-      setCredentialHealth(null);
-    } catch (sessionError) {
-      setError(sessionError instanceof Error ? sessionError.message : "운영자 로그아웃에 실패했습니다.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleBootstrapOperator() {
-    if (!activeProject?.project.id) {
-      return;
-    }
-
-    setError(null);
-    setLoading(true);
-
-    try {
-      const response = await fetch(`/api/projects/${activeProject.project.id}/operators`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: operatorLoginName,
-          accessKey: operatorLoginKey,
-          role: "owner",
-          bootstrapSecret: operatorBootstrapSecret,
-        }),
-      });
-      const payload = await parseJson<ApiResponse<{ operator: ProjectOperatorSummary }>>(response);
-
-      if (!payload.ok) {
-        throw new Error(payload.error.message);
-      }
-
-      const sessionResponse = await fetch(`/api/projects/${activeProject.project.id}/operators/session`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: operatorLoginName,
-          accessKey: operatorLoginKey,
-        }),
-      });
-      const sessionPayload = await parseJson<ApiResponse<{ operator: ProjectOperatorSession }>>(sessionResponse);
-
-      if (!sessionPayload.ok) {
-        throw new Error(sessionPayload.error.message);
-      }
-
-      setOperatorSession(sessionPayload.data.operator);
-      setOperatorLoginKey("");
-      await Promise.allSettled([
-        loadOperators(activeProject.project.id),
-        loadCredentialHealth(activeProject.project.id),
-        loadAutomationReadiness(activeProject.project.id),
-      ]);
-    } catch (bootstrapError) {
-      setError(bootstrapError instanceof Error ? bootstrapError.message : "초기 owner 등록에 실패했습니다.");
-    } finally {
-      setLoading(false);
-    }
+    setError("이 작업은 프로젝트별 루트 로그인 세션이 필요합니다. 루트 로그인 화면에서 먼저 로그인하세요.");
+    return false;
   }
 
   async function handleCreateOperator() {
     if (!activeProject?.project.id) {
+      return;
+    }
+
+    if (!(await ensureOperatorSession())) {
       return;
     }
 
@@ -1209,6 +1175,10 @@ export function DashboardShell() {
       return;
     }
 
+    if (!(await ensureOperatorSession())) {
+      return;
+    }
+
     setError(null);
     setLoading(true);
 
@@ -1235,8 +1205,12 @@ export function DashboardShell() {
     }
   }
 
-  async function handleRunCredentialCheck(service: "wordpress" | "meta" | "ga4" | "alerts") {
+  async function handleRunCredentialCheck(service: "blogger" | "meta" | "ga4" | "alerts") {
     if (!activeProject?.project.id) {
+      return;
+    }
+
+    if (!(await ensureOperatorSession())) {
       return;
     }
 
@@ -1331,6 +1305,10 @@ export function DashboardShell() {
       return;
     }
 
+    if (!(await ensureOperatorSession())) {
+      return;
+    }
+
     setError(null);
     setImageBusy(true);
 
@@ -1370,6 +1348,10 @@ export function DashboardShell() {
       return;
     }
 
+    if (!(await ensureOperatorSession())) {
+      return;
+    }
+
     setError(null);
     setImageBusy(true);
 
@@ -1398,6 +1380,10 @@ export function DashboardShell() {
 
   async function handleSaveContent() {
     if (!activeProject?.project.id || !studio) {
+      return;
+    }
+
+    if (!(await ensureOperatorSession())) {
       return;
     }
 
@@ -1582,6 +1568,10 @@ export function DashboardShell() {
                 onProjectWordpressStatusChange={handleProjectWordpressStatusChange}
                 onProjectWordpressCategoryNamesChange={handleProjectWordpressCategoryNamesChange}
                 onProjectWordpressTagNamesChange={handleProjectWordpressTagNamesChange}
+                onProjectBloggerBlogIdChange={handleProjectBloggerBlogIdChange}
+                projectBloggerAccessToken={projectBloggerAccessToken}
+                onProjectBloggerAccessTokenChange={setProjectBloggerAccessToken}
+                onProjectBloggerStatusChange={handleProjectBloggerStatusChange}
                 projectMetaAccessToken={projectMetaAccessToken}
                 onProjectMetaAccessTokenChange={setProjectMetaAccessToken}
                 onProjectMetaTokenExpiresAtChange={handleProjectMetaTokenExpiresAtChange}
@@ -1602,15 +1592,6 @@ export function DashboardShell() {
                 operatorSession={operatorSession}
                 operators={operators}
                 credentialHealth={credentialHealth}
-                operatorLoginName={operatorLoginName}
-                onOperatorLoginNameChange={setOperatorLoginName}
-                operatorLoginKey={operatorLoginKey}
-                onOperatorLoginKeyChange={setOperatorLoginKey}
-                operatorBootstrapSecret={operatorBootstrapSecret}
-                onOperatorBootstrapSecretChange={setOperatorBootstrapSecret}
-                onOperatorLogin={handleOperatorLogin}
-                onOperatorLogout={handleOperatorLogout}
-                onOperatorBootstrap={handleBootstrapOperator}
                 newOperatorName={newOperatorName}
                 onNewOperatorNameChange={setNewOperatorName}
                 newOperatorKey={newOperatorKey}
@@ -1660,6 +1641,7 @@ export function DashboardShell() {
                 onExportAll={publishWorkflow.handleExportAll}
                 onExportPreviewViewChange={publishWorkflow.handleExportPreviewViewChange}
                 onPreparePublish={publishWorkflow.handlePreparePublish}
+                onPublishNow={publishWorkflow.handlePublishNow}
                 onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
                 onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
                 onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
@@ -1710,6 +1692,7 @@ export function DashboardShell() {
                 onExportAll={publishWorkflow.handleExportAll}
                 onExportPreviewViewChange={publishWorkflow.handleExportPreviewViewChange}
                 onPreparePublish={publishWorkflow.handlePreparePublish}
+                onPublishNow={publishWorkflow.handlePublishNow}
                 onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
                 onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
                 onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
@@ -1760,6 +1743,7 @@ export function DashboardShell() {
                 onExportAll={publishWorkflow.handleExportAll}
                 onExportPreviewViewChange={publishWorkflow.handleExportPreviewViewChange}
                 onPreparePublish={publishWorkflow.handlePreparePublish}
+                onPublishNow={publishWorkflow.handlePublishNow}
                 onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
                 onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
                 onDownloadExportContent={publishWorkflow.handleDownloadExportContent}
@@ -1810,6 +1794,7 @@ export function DashboardShell() {
                 onExportAll={publishWorkflow.handleExportAll}
                 onExportPreviewViewChange={publishWorkflow.handleExportPreviewViewChange}
                 onPreparePublish={publishWorkflow.handlePreparePublish}
+                onPublishNow={publishWorkflow.handlePublishNow}
                 onSaveWordPressDefaults={publishWorkflow.handleSaveWordPressDefaults}
                 onCopyExportPreview={publishWorkflow.handleCopyExportPreview}
                 onDownloadExportContent={publishWorkflow.handleDownloadExportContent}

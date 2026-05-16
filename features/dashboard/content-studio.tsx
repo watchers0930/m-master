@@ -5,6 +5,7 @@ import { PublishPanel } from "@/features/dashboard/publish-panel";
 import { SectionCard } from "@/components/ui/section-card";
 import { StatusPill } from "@/components/ui/status-pill";
 import type {
+  BlogPublishResult,
   BlogPublishDraft,
   BlogPublishPackage,
   ChannelKey,
@@ -15,7 +16,6 @@ import type {
   ReviewFinding,
   StudioDetail,
   WordPressPublishConfig,
-  WordPressPublishResult,
 } from "@/features/dashboard/types";
 
 function compactText(value?: string | null, maxLength = 120) {
@@ -41,7 +41,7 @@ type ContentStudioProps = {
   publishPackage?: BlogPublishPackage | null;
   publishDraft: BlogPublishDraft;
   wordpressConfig: WordPressPublishConfig;
-  wordpressResult?: WordPressPublishResult | null;
+  wordpressResult?: BlogPublishResult | null;
   exportPreview: ExportPreviewState;
   activeChannel: ChannelKey;
   selectedTopicId?: string | null;
@@ -59,6 +59,7 @@ type ContentStudioProps = {
   onExportAll: () => Promise<void>;
   onExportPreviewViewChange: (view: ChannelKey | "json") => void;
   onPreparePublish: () => Promise<void>;
+  onPublishNow: () => Promise<void>;
   onSaveWordPressDefaults: () => Promise<void>;
   onCopyExportPreview?: () => Promise<void>;
   onDownloadExportContent?: () => Promise<void>;
@@ -124,6 +125,7 @@ export function ContentStudio({
   onExportAll,
   onExportPreviewViewChange,
   onPreparePublish,
+  onPublishNow,
   onSaveWordPressDefaults,
   onCopyExportPreview,
   onDownloadExportContent,
@@ -423,6 +425,7 @@ export function ContentStudio({
           onExportAll={onExportAll}
           onExportPreviewViewChange={onExportPreviewViewChange}
           onPreparePublish={onPreparePublish}
+          onPublishNow={onPublishNow}
           onSaveWordPressDefaults={onSaveWordPressDefaults}
           onCopyExportPreview={onCopyExportPreview}
           onDownloadExportContent={onDownloadExportContent}

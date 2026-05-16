@@ -1,6 +1,7 @@
 import { jsonError, jsonOk } from "../../../../lib/api-response";
 import { logger } from "../../../../server/logger";
 import {
+  BloggerPublishError,
   deleteProject,
   getProjectById,
   getProjectStudioSeed,
@@ -87,6 +88,10 @@ export async function PATCH(request: Request, context: RouteContext) {
     return jsonOk({ project });
   } catch (error) {
     if (error instanceof ProjectValidationError) {
+      return jsonError(error.message, 400);
+    }
+
+    if (error instanceof BloggerPublishError) {
       return jsonError(error.message, 400);
     }
 

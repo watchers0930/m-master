@@ -39,6 +39,21 @@ type OperatorsResponse = {
   };
 };
 
+type RecoverResponse = {
+  ok?: boolean;
+  data?: {
+    operator?: {
+      id: string;
+      name: string;
+      role: string;
+      active: boolean;
+    };
+  };
+  error?: {
+    message?: string;
+  };
+};
+
 export function RootLoginShell() {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
@@ -142,6 +157,23 @@ export function RootLoginShell() {
             throw new Error(bootstrapPayload?.error?.message || "첫 운영자 계정을 생성하지 못했습니다.");
           }
 
+          payload = await requestSession();
+        }
+      }
+
+      if (!payload?.ok && operatorName.trim() && operatorKey.trim()) {
+        const recoverResponse = await fetch(`/api/projects/${selectedProjectId}/operators/recover`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: operatorName,
+            accessKey: operatorKey,
+            bootstrapSecret: operatorKey,
+          }),
+        });
+        const recoverPayload = (await recoverResponse.json().catch(() => null)) as RecoverResponse | null;
+
+        if (recoverPayload?.ok) {
           payload = await requestSession();
         }
       }

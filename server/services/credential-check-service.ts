@@ -7,7 +7,7 @@ import { getAnalyticsHealth } from "./analytics-service";
 import { decryptSecret } from "./credential-vault-service";
 import { sendProjectOperationsAlertTest } from "./project-alert-service";
 
-type CredentialServiceKey = "wordpress" | "meta" | "ga4" | "alerts";
+type CredentialServiceKey = "blogger" | "meta" | "ga4" | "alerts";
 type CredentialCheckStatus = "ready" | "warning" | "failed";
 
 type CredentialCheckResult = {
@@ -16,56 +16,6 @@ type CredentialCheckResult = {
   detail: string;
   expiresAt?: Date | null;
 };
-
-function normalizeWordPressBaseUrl(siteUrl: string) {
-  const trimmed = siteUrl.trim();
-  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-  const parsed = new URL(candidate);
-  return `${parsed.origin}${parsed.pathname.replace(/\/+$/, "")}`;
-}
-
-async function checkWordPress(record: NonNullable<Awaited<ReturnType<typeof getProjectDetail>>>) {
-  if (!record.project.wordpressSiteUrl || !record.project.wordpressUsername || !record.project.wordpressAppPasswordEncrypted) {
-    return {
-      status: "warning" as const,
-      summary: "워드프레스는 아직 미설정 상태입니다.",
-      detail: "사이트 URL, 사용자명, 앱 비밀번호가 모두 있어야 연결 테스트를 실행합니다.",
-    };
-  }
-
-  const appPassword = decryptSecret(record.project.wordpressAppPasswordEncrypted);
-  if (!appPassword) {
-    return {
-      status: "failed" as const,
-      summary: "저장된 워드프레스 앱 비밀번호를 복호화하지 못했습니다.",
-      detail: "CREDENTIAL_ENCRYPTION_SECRET 또는 저장된 자격증명 형식을 확인하세요.",
-    };
-  }
-
-  const authToken = Buffer.from(`${record.project.wordpressUsername}:${appPassword}`).toString("base64");
-  const response = await fetch(`${normalizeWordPressBaseUrl(record.project.wordpressSiteUrl)}/wp-json/wp/v2/users/me`, {
-    headers: {
-      Authorization: `Basic ${authToken}`,
-    },
-    cache: "no-store",
-  });
-
-  const payload = (await response.json().catch(() => null)) as { id?: number; name?: string; message?: string } | null;
-
-  if (!response.ok || !payload?.id) {
-    return {
-      status: "failed" as const,
-      summary: "워드프레스 인증 테스트에 실패했습니다.",
-      detail: payload?.message || `HTTP ${response.status}`,
-    };
-  }
-
-  return {
-    status: "ready" as const,
-    summary: "워드프레스 인증 테스트에 성공했습니다.",
-    detail: `사용자 ${payload.name || record.project.wordpressUsername} 로 연결되었습니다.`,
-  };
-}
 
 async function checkMeta(record: NonNullable<Awaited<ReturnType<typeof getProjectDetail>>>) {
   if (!record.project.metaAccessTokenEncrypted || !record.project.facebookPageId || !record.project.instagramBusinessAccountId) {
@@ -158,6 +108,50 @@ async function checkMeta(record: NonNullable<Awaited<ReturnType<typeof getProjec
     summary: "Meta 연결 테스트에 성공했습니다.",
     detail: `Facebook ${page.name || page.id}, Instagram ${instagram.username || instagram.id} 계정 접근이 확인됐습니다.`,
     expiresAt: record.project.metaTokenExpiresAt ?? null,
+  };
+}
+
+async function checkBlogger(record: NonNullable<Awaited<ReturnType<typeof getProjectDetail>>>) {
+  if (!record.project.bloggerBlogId || !record.project.bloggerAccessTokenEncrypted) {
+    return {
+      status: "warning" as const,
+      summary: "Blogger는 아직 미설정 상태입니다.",
+      detail: "Blog ID와 OAuth access token이 있어야 연결 테스트를 실행합니다.",
+    };
+  }
+
+  const accessToken = decryptSecret(record.project.bloggerAccessTokenEncrypted);
+  if (!accessToken) {
+    return {
+      status: "failed" as const,
+      summary: "저장된 Blogger access token을 복호화하지 못했습니다.",
+      detail: "CREDENTIAL_ENCRYPTION_SECRET 또는 저장된 토큰 형식을 확인하세요.",
+    };
+  }
+
+  const response = await fetch(`https://www.googleapis.com/blogger/v3/blogs/${encodeURIComponent(record.project.bloggerBlogId)}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    cache: "no-store",
+  });
+
+  const payload = (await response.json().catch(() => null)) as
+    | { id?: string; name?: string; url?: string; error?: { message?: string } }
+    | null;
+
+  if (!response.ok || !payload?.id) {
+    return {
+      status: "failed" as const,
+      summary: "Blogger 인증 테스트에 실패했습니다.",
+      detail: payload?.error?.message || `HTTP ${response.status}`,
+    };
+  }
+
+  return {
+    status: "ready" as const,
+    summary: "Blogger 인증 테스트에 성공했습니다.",
+    detail: `${payload.name || payload.id} 블로그에 연결되었습니다.${payload.url ? ` ${payload.url}` : ""}`,
   };
 }
 
@@ -260,8 +254,8 @@ export async function runProjectCredentialCheck(params: {
   }
 
   const result: CredentialCheckResult =
-    params.service === "wordpress"
-      ? await checkWordPress(record)
+    params.service === "blogger"
+        ? await checkBlogger(record)
       : params.service === "meta"
         ? await checkMeta(record)
         : params.service === "ga4"
@@ -293,7 +287,7 @@ export async function getProjectCredentialHealth(projectId: string) {
   }
 
   return {
-    services: (["wordpress", "meta", "ga4", "alerts"] as CredentialServiceKey[]).map((service) => {
+    services: (["blogger", "meta", "ga4", "alerts"] as CredentialServiceKey[]).map((service) => {
       const latest = latestByService.get(service);
       return {
         service,

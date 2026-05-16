@@ -2,12 +2,12 @@ import { jsonError, jsonOk } from "@/lib/api-response";
 import { logger } from "@/server/logger";
 import { authorizeProjectRoute } from "@/server/services/project-route-auth-service";
 import {
+  BloggerPublishError,
   ProjectContextApprovalRequiredError,
   markProjectReadyForPublish,
   ProjectContentNotFoundError,
   ProjectNotFoundError,
   ProjectPublishSafetyError,
-  WordPressPublishError,
 } from "@/server/services/project-service";
 
 type RouteContext = {
@@ -27,13 +27,10 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const body = (await request.json().catch(() => null)) as
         | {
-          wordpress?: {
-            siteUrl?: string;
-            username?: string;
-            appPassword?: string;
+          blogger?: {
+            blogId?: string;
+            accessToken?: string;
             status?: "draft" | "publish";
-            categoryNames?: string;
-            tagNames?: string;
           };
           publishOverrides?: {
             title?: string;
@@ -45,14 +42,11 @@ export async function POST(request: Request, context: RouteContext) {
       | null;
 
     const publish = await markProjectReadyForPublish(projectId, {
-      wordpress: body?.wordpress?.siteUrl
+      blogger: body?.blogger?.blogId
         ? {
-            siteUrl: body.wordpress.siteUrl,
-            username: body.wordpress.username || "",
-            appPassword: body.wordpress.appPassword || "",
-            status: body.wordpress.status === "publish" ? "publish" : "draft",
-            categoryNames: body.wordpress.categoryNames || "",
-            tagNames: body.wordpress.tagNames || "",
+            blogId: body.blogger.blogId,
+            accessToken: body.blogger.accessToken || "",
+            status: body.blogger.status === "publish" ? "publish" : "draft",
           }
         : undefined,
       publishOverrides: body?.publishOverrides
@@ -74,7 +68,7 @@ export async function POST(request: Request, context: RouteContext) {
       return jsonError("컨텍스트 승인이 끝난 프로젝트만 발행 준비를 진행할 수 있습니다.", 409);
     }
 
-    if (error instanceof WordPressPublishError) {
+    if (error instanceof BloggerPublishError) {
       return jsonError(error.message, 400);
     }
 

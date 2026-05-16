@@ -242,6 +242,9 @@ export async function updateProjectSettings(params: {
   wordpressStatus?: string;
   wordpressCategoryNames?: string;
   wordpressTagNames?: string;
+  bloggerBlogId?: string;
+  bloggerAccessTokenEncrypted?: string | null;
+  bloggerStatus?: string;
   metaAccessTokenEncrypted?: string | null;
   metaTokenExpiresAt?: Date | null;
   facebookPageId?: string;
@@ -268,6 +271,9 @@ export async function updateProjectSettings(params: {
       wordpressStatus: params.wordpressStatus,
       wordpressCategoryNames: params.wordpressCategoryNames,
       wordpressTagNames: params.wordpressTagNames,
+      bloggerBlogId: params.bloggerBlogId,
+      bloggerAccessTokenEncrypted: params.bloggerAccessTokenEncrypted,
+      bloggerStatus: params.bloggerStatus,
       metaAccessTokenEncrypted: params.metaAccessTokenEncrypted,
       metaTokenExpiresAt: params.metaTokenExpiresAt,
       facebookPageId: params.facebookPageId,
@@ -909,6 +915,27 @@ export async function attachContentJobToPlanItem(params: {
   });
 }
 
+export async function getProjectContentPlanItemByContentJobId(params: {
+  projectId: string;
+  contentJobId: string;
+}) {
+  return prisma.contentPlanItem.findFirst({
+    where: {
+      contentJobId: params.contentJobId,
+      contentPlan: {
+        projectId: params.projectId,
+      },
+    },
+    select: {
+      id: true,
+      status: true,
+      reviewSnapshot: true,
+      lastError: true,
+      contentJobId: true,
+    },
+  });
+}
+
 export async function listDueContentPlanItems(referenceTime: Date, projectId?: string) {
   return prisma.contentPlanItem.findMany({
     where: {
@@ -978,6 +1005,24 @@ export async function markContentPlanItemStatus(params: {
       lastProcessedAt: new Date(),
       contentJobId: params.contentJobId ?? undefined,
       generatedAt: params.generatedAt ?? undefined,
+      updatedAt: new Date(),
+    },
+  });
+}
+
+export async function updateContentPlanItemReviewState(params: {
+  planItemId: string;
+  status: string;
+  lastError?: string | null;
+  reviewSnapshot?: string | null;
+}) {
+  return prisma.contentPlanItem.update({
+    where: { id: params.planItemId },
+    data: {
+      status: params.status,
+      lastError: params.lastError ?? null,
+      reviewSnapshot: params.reviewSnapshot ?? null,
+      lastProcessedAt: new Date(),
       updatedAt: new Date(),
     },
   });

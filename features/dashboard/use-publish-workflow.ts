@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import type {
+  BlogPublishResult,
   BlogPublishDraft,
   BlogPublishPackage,
   ChannelKey,
@@ -10,7 +11,6 @@ import type {
   ExportPreviewState,
   ProjectDetail,
   WordPressPublishConfig,
-  WordPressPublishResult,
 } from "@/features/dashboard/types";
 
 type ApiOk<T> = {
@@ -76,14 +76,11 @@ export function usePublishWorkflow(params: {
     summary: "",
     bodyHtml: "",
   });
-  const [wordpressResult, setWordpressResult] = useState<WordPressPublishResult | null>(null);
+  const [wordpressResult, setWordpressResult] = useState<BlogPublishResult | null>(null);
   const [wordpressConfig, setWordpressConfig] = useState<WordPressPublishConfig>({
-    siteUrl: "",
-    username: "",
-    appPassword: "",
-    status: "draft",
-    categoryNames: "",
-    tagNames: "",
+    bloggerBlogId: "",
+    bloggerAccessToken: "",
+    bloggerStatus: "draft",
     metaAccessToken: "",
     facebookPageId: "",
     instagramBusinessAccountId: "",
@@ -104,21 +101,18 @@ export function usePublishWorkflow(params: {
       bodyHtml: "",
     });
     setWordpressResult(null);
-      setWordpressConfig({
-        siteUrl: "",
-        username: "",
-        appPassword: "",
-        status: "draft",
-        categoryNames: "",
-        tagNames: "",
-        metaAccessToken: "",
-        facebookPageId: "",
-        instagramBusinessAccountId: "",
-        automationMode: "draft-only",
-        automationRequireReview: true,
-        automationMinOverallScore: "75",
-        automationMinRiskScore: "80",
-      });
+    setWordpressConfig({
+      bloggerBlogId: "",
+      bloggerAccessToken: "",
+      bloggerStatus: "draft",
+      metaAccessToken: "",
+      facebookPageId: "",
+      instagramBusinessAccountId: "",
+      automationMode: "draft-only",
+      automationRequireReview: true,
+      automationMinOverallScore: "75",
+      automationMinRiskScore: "80",
+    });
     setExportPreview({
       bundle: null,
       activeView: "blog",
@@ -132,11 +126,8 @@ export function usePublishWorkflow(params: {
     if (project) {
       setWordpressConfig((current) => ({
         ...current,
-        siteUrl: project.wordpressSiteUrl || "",
-        username: project.wordpressUsername || "",
-        status: project.wordpressStatus === "publish" ? "publish" : "draft",
-        categoryNames: project.wordpressCategoryNames || "",
-        tagNames: project.wordpressTagNames || "",
+        bloggerBlogId: project.bloggerBlogId || "",
+        bloggerStatus: project.bloggerStatus === "publish" ? "publish" : "draft",
         metaAccessToken: current.metaAccessToken,
         facebookPageId: project.facebookPageId || "",
         instagramBusinessAccountId: project.instagramBusinessAccountId || "",
@@ -148,12 +139,13 @@ export function usePublishWorkflow(params: {
     }
 
     if (
-      latestContentJob?.publishProvider === "wordpress" &&
+      latestContentJob?.publishProvider === "blogger" &&
       latestContentJob.externalPostId &&
       latestContentJob.externalPostUrl
     ) {
       setWordpressResult({
-        postId: Number(latestContentJob.externalPostId),
+        provider: "blogger",
+        postId: latestContentJob.externalPostId,
         link: latestContentJob.externalPostUrl,
         status: latestContentJob.status,
       });
@@ -342,7 +334,7 @@ export function usePublishWorkflow(params: {
     }));
   }
 
-  async function handlePreparePublish() {
+  async function runPublish(options?: { forcePublish?: boolean }) {
     if (!projectId) {
       return;
     }
@@ -351,24 +343,16 @@ export function usePublishWorkflow(params: {
     setPublishBusy(true);
 
     try {
-      const hasWordPressCredentials = Boolean(
-        publishPackage &&
-          wordpressConfig.siteUrl &&
-          wordpressConfig.username &&
-          wordpressConfig.appPassword,
-      );
+      const hasBloggerCredentials = Boolean(publishPackage && wordpressConfig.bloggerBlogId);
       const response = await fetch(`/api/projects/${projectId}/publish`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          wordpress: hasWordPressCredentials
+          blogger: hasBloggerCredentials
             ? {
-                siteUrl: wordpressConfig.siteUrl,
-                username: wordpressConfig.username,
-                appPassword: wordpressConfig.appPassword,
-                status: wordpressConfig.status,
-                categoryNames: wordpressConfig.categoryNames,
-                tagNames: wordpressConfig.tagNames,
+                blogId: wordpressConfig.bloggerBlogId,
+                accessToken: wordpressConfig.bloggerAccessToken || undefined,
+                status: options?.forcePublish ? "publish" : wordpressConfig.bloggerStatus,
               }
             : undefined,
           publishOverrides: {
@@ -384,7 +368,7 @@ export function usePublishWorkflow(params: {
           publish: {
             status: string;
             publishPackage: BlogPublishPackage;
-            wordpress?: WordPressPublishResult | null;
+            blogger?: BlogPublishResult | null;
           };
         }>
       >(response);
@@ -401,16 +385,20 @@ export function usePublishWorkflow(params: {
         summary: payload.data.publish.publishPackage.summary,
         bodyHtml: payload.data.publish.publishPackage.bodyHtml,
       });
-      setWordpressConfig((current) => ({
-        ...current,
-        tagNames: current.tagNames || hashtagsToWordPressTags(payload.data.publish.publishPackage.hashtags),
-      }));
-      setWordpressResult(payload.data.publish.wordpress ?? null);
+      setWordpressResult(payload.data.publish.blogger ?? null);
     } catch (publishError) {
       onError(publishError instanceof Error ? publishError.message : "발행 준비 처리에 실패했습니다.");
     } finally {
       setPublishBusy(false);
     }
+  }
+
+  async function handlePreparePublish() {
+    await runPublish();
+  }
+
+  async function handlePublishNow() {
+    await runPublish({ forcePublish: true });
   }
 
   async function handleSaveWordPressDefaults() {
@@ -426,13 +414,10 @@ export function usePublishWorkflow(params: {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          wordpressSiteUrl: wordpressConfig.siteUrl,
-          wordpressUsername: wordpressConfig.username,
-          wordpressAppPassword: wordpressConfig.appPassword,
-          wordpressStatus: wordpressConfig.status,
-          wordpressCategoryNames: wordpressConfig.categoryNames,
-          wordpressTagNames: wordpressConfig.tagNames,
-          metaAccessToken: wordpressConfig.metaAccessToken,
+          bloggerBlogId: wordpressConfig.bloggerBlogId,
+          bloggerAccessToken: wordpressConfig.bloggerAccessToken || undefined,
+          bloggerStatus: wordpressConfig.bloggerStatus,
+          metaAccessToken: wordpressConfig.metaAccessToken || undefined,
           facebookPageId: wordpressConfig.facebookPageId,
           instagramBusinessAccountId: wordpressConfig.instagramBusinessAccountId,
           automationMode: wordpressConfig.automationMode,
@@ -449,7 +434,39 @@ export function usePublishWorkflow(params: {
 
       await reloadProject(projectId);
     } catch (settingsError) {
-      onError(settingsError instanceof Error ? settingsError.message : "워드프레스 기본값 저장에 실패했습니다.");
+      onError(settingsError instanceof Error ? settingsError.message : "채널 기본값 저장에 실패했습니다.");
+    } finally {
+      setSettingsBusy(false);
+    }
+  }
+
+  async function handleSaveBloggerSettings() {
+    if (!projectId) {
+      return;
+    }
+
+    onError("");
+    setSettingsBusy(true);
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bloggerBlogId: wordpressConfig.bloggerBlogId,
+          bloggerAccessToken: wordpressConfig.bloggerAccessToken || undefined,
+          bloggerStatus: wordpressConfig.bloggerStatus,
+        }),
+      });
+      const payload = await parseJson<ApiResponse<{ project: ProjectDetail }>>(response);
+
+      if (!payload.ok) {
+        throw new Error(payload.error.message);
+      }
+
+      await reloadProject(projectId);
+    } catch (settingsError) {
+      onError(settingsError instanceof Error ? settingsError.message : "Blogger 설정 저장에 실패했습니다.");
     } finally {
       setSettingsBusy(false);
     }
@@ -478,6 +495,8 @@ export function usePublishWorkflow(params: {
     handleWordPressConfigChange,
     handleExportPreviewViewChange,
     handlePreparePublish,
+    handlePublishNow,
     handleSaveWordPressDefaults,
+    handleSaveBloggerSettings,
   };
 }

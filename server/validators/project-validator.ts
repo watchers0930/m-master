@@ -15,6 +15,9 @@ export type UpdateProjectSettingsInput = {
   wordpressStatus?: "draft" | "publish";
   wordpressCategoryNames?: string;
   wordpressTagNames?: string;
+  bloggerBlogId?: string;
+  bloggerAccessToken?: string;
+  bloggerStatus?: "draft" | "publish";
   metaAccessToken?: string;
   metaTokenExpiresAt?: string;
   facebookPageId?: string;
@@ -317,10 +320,15 @@ export async function parseUpdateProjectSettingsInput(request: Request): Promise
 
   const inputRecord = body as Record<string, unknown>;
   const wordpressStatus = normalizeOptionalString(inputRecord.wordpressStatus);
+  const bloggerStatus = normalizeOptionalString(inputRecord.bloggerStatus);
   const industry = normalizeOptionalString(inputRecord.industry);
 
   if (wordpressStatus && wordpressStatus !== "draft" && wordpressStatus !== "publish") {
     throw new ProjectValidationError("워드프레스 게시 상태는 draft 또는 publish만 허용됩니다.");
+  }
+
+  if (bloggerStatus && bloggerStatus !== "draft" && bloggerStatus !== "publish") {
+    throw new ProjectValidationError("Blogger 게시 상태는 draft 또는 publish만 허용됩니다.");
   }
 
   if (industry && !ALLOWED_INDUSTRIES.has(industry)) {
@@ -336,6 +344,9 @@ export async function parseUpdateProjectSettingsInput(request: Request): Promise
     wordpressStatus: wordpressStatus as "draft" | "publish" | undefined,
     wordpressCategoryNames: normalizeOptionalString(inputRecord.wordpressCategoryNames)?.slice(0, 300),
     wordpressTagNames: normalizeOptionalString(inputRecord.wordpressTagNames)?.slice(0, 300),
+    bloggerBlogId: normalizeOptionalString(inputRecord.bloggerBlogId)?.slice(0, 120),
+    bloggerAccessToken: normalizeOptionalString(inputRecord.bloggerAccessToken)?.slice(0, 4000),
+    bloggerStatus: bloggerStatus as "draft" | "publish" | undefined,
     metaAccessToken: normalizeOptionalString(inputRecord.metaAccessToken)?.slice(0, 600),
     metaTokenExpiresAt: normalizeIsoDateTime(inputRecord.metaTokenExpiresAt, "Meta 토큰 만료일"),
     facebookPageId: normalizeOptionalString(inputRecord.facebookPageId)?.slice(0, 120),

@@ -60,7 +60,7 @@ export function VerifyPublishCard(props: Props) {
 
   return (
     <div className="pipeline-section">
-      <SectionCard title="검증 · 발행" description="AI 리뷰 스코어 확인 후 내보내기 또는 WordPress 발행">
+      <SectionCard title="검증 · 발행" description="AI 리뷰 스코어 확인 후 내보내기 또는 Blogger 발행">
         {locked && <SectionLockOverlay message="콘텐츠가 필요합니다." />}
 
         <div className="wizard-stage">
@@ -166,9 +166,9 @@ export function VerifyPublishCard(props: Props) {
             )}
           </div>
 
-          {/* WordPress publish */}
+          {/* Blogger publish */}
           <div className="card">
-            <h4 className="card-title">WordPress 발행</h4>
+            <h4 className="card-title">Blogger 발행</h4>
 
             {wordpressResult && (
               <div className="step-focus-banner" style={{ marginTop: 12 }}>
@@ -182,55 +182,11 @@ export function VerifyPublishCard(props: Props) {
               </div>
             )}
 
-            <div className="form-grid" style={{ marginTop: 12 }}>
-              <div className="field-grid-2">
-                <div className="field-group">
-                  <label className="field-label">사이트 URL</label>
-                  <input
-                    className="text-input"
-                    value={wordpressConfig.siteUrl}
-                    onChange={(e) => onWordPressConfigChange("siteUrl", e.target.value)}
-                    placeholder="https://your-site.com"
-                  />
-                </div>
-                <div className="field-group">
-                  <label className="field-label">사용자명</label>
-                  <input
-                    className="text-input"
-                    value={wordpressConfig.username}
-                    onChange={(e) => onWordPressConfigChange("username", e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="field-group">
-                <label className="field-label">앱 비밀번호</label>
-                <input
-                  className="text-input"
-                  type="password"
-                  value={wordpressConfig.appPassword}
-                  onChange={(e) => onWordPressConfigChange("appPassword", e.target.value)}
-                />
-              </div>
-              <div className="field-grid-2">
-                <div className="field-group">
-                  <label className="field-label">카테고리</label>
-                  <input
-                    className="text-input"
-                    value={wordpressConfig.categoryNames}
-                    onChange={(e) => onWordPressConfigChange("categoryNames", e.target.value)}
-                    placeholder="쉼표로 구분"
-                  />
-                </div>
-                <div className="field-group">
-                  <label className="field-label">태그</label>
-                  <input
-                    className="text-input"
-                    value={wordpressConfig.tagNames}
-                    onChange={(e) => onWordPressConfigChange("tagNames", e.target.value)}
-                    placeholder="쉼표로 구분"
-                  />
-                </div>
-              </div>
+            <div className="review-item" style={{ marginTop: 12 }}>
+              <strong>Blogger 설정은 전체 설정 화면에서 관리합니다.</strong>
+              <p className="fine-print">
+                Blog ID, Access Token, 게시 상태는 저장된 값을 그대로 사용합니다. 이 단계에서는 발행 초안만 검토하면 됩니다.
+              </p>
             </div>
 
             {/* Publish draft override */}
@@ -263,14 +219,14 @@ export function VerifyPublishCard(props: Props) {
                 disabled={publishBusy}
                 onClick={onPreparePublish}
               >
-                {publishBusy ? "발행 처리 중…" : publishPackage ? "WordPress 발행" : "발행 준비"}
+                {publishBusy ? "발행 처리 중…" : publishPackage ? "Blogger 발행" : "발행 준비"}
               </button>
               <button
                 className="button ghost"
                 disabled={settingsBusy}
                 onClick={onSaveWordPressDefaults}
               >
-                {settingsBusy ? "저장 중…" : "WP 설정 저장"}
+                {settingsBusy ? "저장 중…" : "채널 설정 저장"}
               </button>
             </div>
           </div>

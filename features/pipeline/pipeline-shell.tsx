@@ -331,6 +331,7 @@ export function PipelineShell() {
           publishBusy={publish.publishBusy}
           publishPackage={publish.publishPackage}
           onPreparePublish={publish.handlePreparePublish}
+          onPublishNow={publish.handlePublishNow}
           wordpressConfig={publish.wordpressConfig}
           onWordPressConfigChange={publish.handleWordPressConfigChange}
           editingHashtags={content.editingHashtags}

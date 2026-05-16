@@ -265,3 +265,43 @@ export async function updateManagedProjectOperator(params: {
   });
 }
 
+export async function recoverProjectOperatorAccess(params: {
+  projectId: string;
+  name: string;
+  accessKey: string;
+  bootstrapSecret: string;
+}) {
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
+    throw new ProjectOperatorAuthError("운영자 복구는 로컬 개발 환경에서만 허용됩니다.", 403);
+  }
+
+  const expected = getBootstrapSecret();
+
+  if (!expected || params.bootstrapSecret.trim() !== expected) {
+    throw new ProjectOperatorAuthError("운영자 부트스트랩 키가 올바르지 않습니다.", 403);
+  }
+
+  const operators = await listProjectOperators(params.projectId);
+  const normalizedName = params.name.trim();
+  const nextAccessKeyHash = hashValue(params.accessKey.trim());
+  const targetOperator =
+    operators.find((operator) => operator.name === normalizedName) ??
+    operators.find((operator) => normalizeRole(operator.role) === "owner") ??
+    null;
+
+  if (!targetOperator) {
+    return createProjectOperator({
+      projectId: params.projectId,
+      name: normalizedName,
+      role: "owner",
+      accessKeyHash: nextAccessKeyHash,
+    });
+  }
+
+  return updateProjectOperator({
+    operatorId: targetOperator.id,
+    role: "owner",
+    active: true,
+    accessKeyHash: nextAccessKeyHash,
+  });
+}

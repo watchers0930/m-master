@@ -175,15 +175,13 @@ export function OperationsBoard(props: Props) {
   }
 
   function getReadinessAreaLabel(
-    area: "context" | "analytics" | "wordpress" | "meta" | "images" | "automation" | "operations",
+    area: "context" | "analytics" | "meta" | "images" | "automation" | "operations",
   ) {
     switch (area) {
       case "context":
         return "콘텍스트";
       case "analytics":
         return "분석";
-      case "wordpress":
-        return "워드프레스";
       case "meta":
         return "Meta";
       case "images":
@@ -727,7 +725,7 @@ export function OperationsBoard(props: Props) {
           </div>
         </div>
         <p className="fine-print">
-          `draft-only`는 초안만 생성합니다. `approved-auto-publish`는 워드프레스까지만 자동 게시하고, `full-auto`는 소셜까지 이어집니다.
+          `draft-only`는 초안만 생성합니다. `approved-auto-publish`는 Blogger까지만 자동 게시하고, `full-auto`는 소셜까지 이어집니다.
         </p>
       </div>
       {readiness ? (

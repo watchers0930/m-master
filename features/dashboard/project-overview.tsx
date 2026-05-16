@@ -29,6 +29,10 @@ type ProjectOverviewProps = {
   onProjectWordpressStatusChange: (value: "draft" | "publish") => void;
   onProjectWordpressCategoryNamesChange: (value: string) => void;
   onProjectWordpressTagNamesChange: (value: string) => void;
+  onProjectBloggerBlogIdChange: (value: string) => void;
+  projectBloggerAccessToken: string;
+  onProjectBloggerAccessTokenChange: (value: string) => void;
+  onProjectBloggerStatusChange: (value: "draft" | "publish") => void;
   projectMetaAccessToken: string;
   onProjectMetaAccessTokenChange: (value: string) => void;
   onProjectMetaTokenExpiresAtChange: (value: string) => void;
@@ -49,15 +53,6 @@ type ProjectOverviewProps = {
   operatorSession: ProjectOperatorSession | null;
   operators: ProjectOperatorSummary[];
   credentialHealth: CredentialHealthReport | null;
-  operatorLoginName: string;
-  onOperatorLoginNameChange: (value: string) => void;
-  operatorLoginKey: string;
-  onOperatorLoginKeyChange: (value: string) => void;
-  operatorBootstrapSecret: string;
-  onOperatorBootstrapSecretChange: (value: string) => void;
-  onOperatorLogin: () => Promise<void>;
-  onOperatorLogout: () => Promise<void>;
-  onOperatorBootstrap: () => Promise<void>;
   newOperatorName: string;
   onNewOperatorNameChange: (value: string) => void;
   newOperatorKey: string;
@@ -66,7 +61,7 @@ type ProjectOverviewProps = {
   onNewOperatorRoleChange: (value: ProjectOperatorRole) => void;
   onCreateOperator: () => Promise<void>;
   onUpdateOperator: (operatorId: string, patch: { role?: ProjectOperatorRole; active?: boolean }) => Promise<void>;
-  onRunCredentialCheck: (service: "wordpress" | "meta" | "ga4" | "alerts") => Promise<void>;
+  onRunCredentialCheck: (service: "blogger" | "meta" | "ga4" | "alerts") => Promise<void>;
   onSaveProjectSettings: () => Promise<void>;
   onBrandProfileChange: (field: EditableBrandProfileField, value: string) => void;
   onSaveContext: () => Promise<void>;
@@ -89,6 +84,10 @@ export function ProjectOverview({
   onProjectWordpressStatusChange,
   onProjectWordpressCategoryNamesChange,
   onProjectWordpressTagNamesChange,
+  onProjectBloggerBlogIdChange,
+  projectBloggerAccessToken,
+  onProjectBloggerAccessTokenChange,
+  onProjectBloggerStatusChange,
   projectMetaAccessToken,
   onProjectMetaAccessTokenChange,
   onProjectMetaTokenExpiresAtChange,
@@ -109,15 +108,6 @@ export function ProjectOverview({
   operatorSession,
   operators,
   credentialHealth,
-  operatorLoginName,
-  onOperatorLoginNameChange,
-  operatorLoginKey,
-  onOperatorLoginKeyChange,
-  operatorBootstrapSecret,
-  onOperatorBootstrapSecretChange,
-  onOperatorLogin,
-  onOperatorLogout,
-  onOperatorBootstrap,
   newOperatorName,
   onNewOperatorNameChange,
   newOperatorKey,
@@ -152,15 +142,13 @@ export function ProjectOverview({
   };
 
   const getReadinessAreaLabel = (
-    area: "context" | "analytics" | "wordpress" | "meta" | "images" | "automation" | "operations",
+    area: "context" | "analytics" | "meta" | "images" | "automation" | "operations",
   ) => {
     switch (area) {
       case "context":
         return "콘텍스트";
       case "analytics":
         return "분석";
-      case "wordpress":
-        return "워드프레스";
       case "meta":
         return "Meta";
       case "images":
@@ -289,60 +277,45 @@ export function ProjectOverview({
               <div className="inline-details-body stack">
                 <div className="field-grid-2">
                   <InputField
-                    id="project-wordpress-site-url"
-                    label="워드프레스 사이트 URL"
-                    value={activeProject.project.wordpressSiteUrl || ""}
-                    onChange={onProjectWordpressSiteUrlChange}
-                    placeholder="https://example.com"
+                    id="project-blogger-blog-id"
+                    label="Blogger Blog ID"
+                    value={activeProject.project.bloggerBlogId || ""}
+                    onChange={onProjectBloggerBlogIdChange}
+                    placeholder="1234567890123456789"
                   />
                   <InputField
-                    id="project-wordpress-username"
-                    label="워드프레스 사용자명"
-                    value={activeProject.project.wordpressUsername || ""}
-                    onChange={onProjectWordpressUsernameChange}
-                    placeholder="admin"
+                    id="project-blogger-access-token"
+                    label="Blogger Access Token"
+                    type="password"
+                    value={projectBloggerAccessToken}
+                    onChange={onProjectBloggerAccessTokenChange}
+                    placeholder={
+                      activeProject.project.hasBloggerAccessToken
+                        ? "새 토큰을 입력하면 교체됩니다"
+                        : "OAuth access token 입력"
+                    }
+                    hint={
+                      activeProject.project.hasBloggerAccessToken
+                        ? "현재 토큰은 저장되어 있습니다. 비워두면 유지됩니다."
+                        : "저장 후 Blogger 게시와 연결 테스트에 사용됩니다."
+                    }
                   />
                 </div>
                 <div className="field-grid-2">
-                  <InputField
-                    id="project-wordpress-app-password"
-                    label="워드프레스 앱 비밀번호"
-                    type="password"
-                    value={projectWordpressAppPassword}
-                    onChange={onProjectWordpressAppPasswordChange}
-                    placeholder={activeProject.project.hasWordPressAppPassword ? "새 비밀번호를 입력하면 교체됩니다" : "앱 비밀번호 입력"}
-                    hint={activeProject.project.hasWordPressAppPassword ? "현재 비밀번호는 저장되어 있습니다. 비워두면 유지됩니다." : "저장 후 자동 게시에 사용됩니다."}
-                  />
                   <div className="field-group">
-                    <label className="field-label" htmlFor="project-wordpress-status">
-                      워드프레스 게시 상태
+                    <label className="field-label" htmlFor="project-blogger-status">
+                      Blogger 게시 상태
                     </label>
                     <select
-                      id="project-wordpress-status"
+                      id="project-blogger-status"
                       className="text-input"
-                      value={activeProject.project.wordpressStatus || "draft"}
-                      onChange={(event) => onProjectWordpressStatusChange(event.target.value as "draft" | "publish")}
+                      value={activeProject.project.bloggerStatus || "draft"}
+                      onChange={(event) => onProjectBloggerStatusChange(event.target.value as "draft" | "publish")}
                     >
                       <option value="draft">draft</option>
                       <option value="publish">publish</option>
                     </select>
                   </div>
-                </div>
-                <div className="field-grid-2">
-                  <InputField
-                    id="project-wordpress-categories"
-                    label="워드프레스 카테고리"
-                    value={activeProject.project.wordpressCategoryNames || ""}
-                    onChange={onProjectWordpressCategoryNamesChange}
-                    placeholder="marketing, automation"
-                  />
-                  <InputField
-                    id="project-wordpress-tags"
-                    label="워드프레스 태그"
-                    value={activeProject.project.wordpressTagNames || ""}
-                    onChange={onProjectWordpressTagNamesChange}
-                    placeholder="ga4, content, blog"
-                  />
                 </div>
                 <div className="field-grid-2">
                   <InputField
@@ -378,8 +351,8 @@ export function ProjectOverview({
                   hint="자동 감지가 아닌 운영 메타데이터입니다. 7일 이내면 준비도 경고가 뜹니다."
                 />
                 <div className="row">
-                  <StatusPill active={Boolean(activeProject.project.hasWordPressAppPassword)}>
-                    {activeProject.project.hasWordPressAppPassword ? "WP 비밀번호 저장됨" : "WP 비밀번호 미등록"}
+                  <StatusPill active={Boolean(activeProject.project.hasBloggerAccessToken)}>
+                    {activeProject.project.hasBloggerAccessToken ? "Blogger 토큰 저장됨" : "Blogger 토큰 미등록"}
                   </StatusPill>
                   <StatusPill active={Boolean(activeProject.project.hasMetaAccessToken)}>
                     {activeProject.project.hasMetaAccessToken ? "Meta 토큰 저장됨" : "Meta 토큰 미등록"}
@@ -395,49 +368,7 @@ export function ProjectOverview({
                     {operatorSession ? `${operatorSession.name} · ${operatorSession.role}` : "운영자 로그아웃 상태"}
                   </StatusPill>
                 </div>
-                <div className="field-grid-2">
-                  <InputField
-                    id="operator-login-name"
-                    label="운영자 이름"
-                    value={operatorLoginName}
-                    onChange={onOperatorLoginNameChange}
-                    placeholder="owner"
-                  />
-                  <InputField
-                    id="operator-login-key"
-                    label="운영자 접근 키"
-                    type="password"
-                    value={operatorLoginKey}
-                    onChange={onOperatorLoginKeyChange}
-                    placeholder="접근 키 입력"
-                  />
-                </div>
-                <div className="button-row">
-                  <button className="button" disabled={loading} type="button" onClick={() => void onOperatorLogin()}>
-                    운영자 로그인
-                  </button>
-                  <button className="button ghost" disabled={loading || !operatorSession} type="button" onClick={() => void onOperatorLogout()}>
-                    로그아웃
-                  </button>
-                </div>
-                {!operatorSession && operators.length === 0 ? (
-                  <>
-                    <InputField
-                      id="operator-bootstrap-secret"
-                      label="부트스트랩 시크릿"
-                      type="password"
-                      value={operatorBootstrapSecret}
-                      onChange={onOperatorBootstrapSecretChange}
-                      placeholder="PROJECT_OPERATOR_BOOTSTRAP_SECRET"
-                    />
-                    <p className="fine-print">아직 owner가 없으면 위 이름/키와 부트스트랩 시크릿으로 첫 owner를 등록합니다.</p>
-                    <div className="button-row">
-                      <button className="button" disabled={loading} type="button" onClick={() => void onOperatorBootstrap()}>
-                        첫 owner 등록
-                      </button>
-                    </div>
-                  </>
-                ) : null}
+                {!operatorSession ? <p className="fine-print">루트 로그인에서 이 프로젝트로 먼저 로그인한 세션이 있어야 설정 저장, 자동화, 발행 작업을 진행할 수 있습니다.</p> : null}
                 {operatorSession?.role === "owner" ? (
                   <>
                     <div className="field-grid-2">
@@ -569,8 +500,8 @@ export function ProjectOverview({
               <summary>연결 테스트와 갱신 이력</summary>
               <div className="inline-details-body stack">
                 <div className="button-row">
-                  <button className="button ghost" disabled={loading} type="button" onClick={() => void onRunCredentialCheck("wordpress")}>
-                    워드프레스 테스트
+                  <button className="button ghost" disabled={loading} type="button" onClick={() => void onRunCredentialCheck("blogger")}>
+                    Blogger 테스트
                   </button>
                   <button className="button ghost" disabled={loading} type="button" onClick={() => void onRunCredentialCheck("meta")}>
                     Meta 테스트
