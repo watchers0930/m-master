@@ -184,6 +184,19 @@ function normalizeAutomationMode(mode?: string | null): AutomationMode {
   return "draft-only";
 }
 
+function hasMetaAutomationConfig(params: {
+  facebookPageId?: string | null;
+  instagramBusinessAccountId?: string | null;
+  metaAccessToken?: string | null;
+  metaAccessTokenEncrypted?: string | null;
+}) {
+  return Boolean(
+    (params.metaAccessToken || params.metaAccessTokenEncrypted) &&
+      params.facebookPageId &&
+      params.instagramBusinessAccountId,
+  );
+}
+
 function parseAutomationBatchRunItems(snapshot?: string | null): AutomationBatchRunItem[] {
   if (!snapshot) {
     return [];
@@ -602,8 +615,13 @@ async function processAutomationPlanItem(item: AutomationPlanItemRecord) {
       : undefined,
   );
   const metaAccessToken = decryptSecret(item.contentPlan.project.metaAccessTokenEncrypted);
+  const hasMetaAutomation = hasMetaAutomationConfig({
+    facebookPageId: item.contentPlan.project.facebookPageId,
+    instagramBusinessAccountId: item.contentPlan.project.instagramBusinessAccountId,
+    metaAccessToken,
+  });
 
-  if (automationMode === "full-auto") {
+  if (automationMode === "full-auto" && hasMetaAutomation) {
     await publishProjectSocialChannels({
       project: item.contentPlan.project,
       latestContentJob,
@@ -626,7 +644,7 @@ async function processAutomationPlanItem(item: AutomationPlanItemRecord) {
     status: (publish.status === "published" ? "published" : "ready_to_publish") as AutomationExecutionStatus,
     contentJobId: publish.contentJobId,
     message: hasBloggerAutomation
-      ? automationMode === "full-auto"
+      ? automationMode === "full-auto" && hasMetaAutomation
         ? `${item.topic} 콘텐츠를 생성하고 Blogger 및 소셜 자동 게시까지 처리했습니다.`
         : `${item.topic} 콘텐츠를 생성하고 Blogger 자동 게시까지 처리했습니다.`
       : `${item.topic} 콘텐츠를 생성하고 발행 준비 상태로 전환했습니다.`,
@@ -1312,18 +1330,24 @@ export async function getProjectAutomationReadiness(projectId: string) {
   }
 
   if (automationMode === "full-auto") {
-    if (!record.project.facebookPageId || !record.project.instagramBusinessAccountId || !record.project.metaAccessTokenEncrypted) {
+    const hasMetaAutomation = hasMetaAutomationConfig({
+      facebookPageId: record.project.facebookPageId,
+      instagramBusinessAccountId: record.project.instagramBusinessAccountId,
+      metaAccessTokenEncrypted: record.project.metaAccessTokenEncrypted,
+    });
+
+    if (!hasMetaAutomation) {
       issues.push({
         id: "meta-config-missing",
-        severity: "blocking",
+        severity: "warning",
         area: "meta",
-        title: "Meta 자동 게시 설정이 완전하지 않습니다.",
-        detail: "Access Token, Facebook Page ID, Instagram Business Account ID가 모두 필요합니다.",
-        recommendation: "채널 설정에 Meta 자격증명과 계정 식별자를 저장하세요.",
+        title: "Meta 자동 게시 설정이 비어 있습니다.",
+        detail: "지금은 Blogger 자동 게시만 진행하고, 페이스북/인스타그램 자동 게시만 건너뜁니다.",
+        recommendation: "소셜 자동 게시가 필요할 때만 Meta 자격증명과 계정 식별자를 저장하세요.",
       });
     }
 
-    if (!process.env.PUBLIC_APP_URL?.trim()) {
+    if (hasMetaAutomation && !process.env.PUBLIC_APP_URL?.trim()) {
       issues.push({
         id: "public-app-url-missing",
         severity: "blocking",
@@ -1833,11 +1857,18 @@ export async function resolveProjectAutomationReview(params: {
     { skipSafetyGate: true },
   );
 
-  if (automationMode === "full-auto") {
+  const metaAccessToken = decryptSecret(record.project.metaAccessTokenEncrypted);
+  const hasMetaAutomation = hasMetaAutomationConfig({
+    facebookPageId: record.project.facebookPageId,
+    instagramBusinessAccountId: record.project.instagramBusinessAccountId,
+    metaAccessToken,
+  });
+
+  if (automationMode === "full-auto" && hasMetaAutomation) {
     await publishProjectSocialChannels({
       project: record.project,
       latestContentJob,
-      metaAccessToken: decryptSecret(record.project.metaAccessTokenEncrypted),
+      metaAccessToken,
     });
   }
 
@@ -2245,12 +2276,18 @@ export async function saveProjectContentDraft(params: {
     if (automationMode === "full-auto") {
       const latestPublishedRecord = requireApprovedBrandProfile(await getProjectDetail(params.projectId), params.projectId);
       const latestPublishedContentJob = latestPublishedRecord.latestContentJob;
+      const metaAccessToken = decryptSecret(latestPublishedRecord.project.metaAccessTokenEncrypted);
+      const hasMetaAutomation = hasMetaAutomationConfig({
+        facebookPageId: latestPublishedRecord.project.facebookPageId,
+        instagramBusinessAccountId: latestPublishedRecord.project.instagramBusinessAccountId,
+        metaAccessToken,
+      });
 
-      if (latestPublishedContentJob) {
+      if (latestPublishedContentJob && hasMetaAutomation) {
         await publishProjectSocialChannels({
           project: latestPublishedRecord.project,
           latestContentJob: latestPublishedContentJob,
-          metaAccessToken: decryptSecret(latestPublishedRecord.project.metaAccessTokenEncrypted),
+          metaAccessToken,
         });
       }
     }
