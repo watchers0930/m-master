@@ -282,6 +282,25 @@ export async function createManagedProjectOperator(params: {
   });
 }
 
+export async function claimUnownedProjectOperator(params: {
+  projectId: string;
+  name: string;
+  accessKey: string;
+}) {
+  const existingCount = await countProjectOperators(params.projectId);
+
+  if (existingCount > 0) {
+    throw new ProjectOperatorAuthError("이미 운영자가 연결된 프로젝트입니다. 기존 계정으로 로그인하세요.", 409);
+  }
+
+  return createProjectOperator({
+    projectId: params.projectId,
+    name: params.name.trim(),
+    role: "owner",
+    accessKeyHash: hashValue(params.accessKey.trim()),
+  });
+}
+
 export async function updateManagedProjectOperator(params: {
   projectId: string;
   operatorId: string;

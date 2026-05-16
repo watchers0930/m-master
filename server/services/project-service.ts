@@ -28,6 +28,7 @@ import {
   listProjectContentJobs,
   listProjects,
   listProjectsForOperatorIdentity,
+  listUnclaimedProjects,
   replaceProjectTopics,
   saveBrandProfileDraft,
   saveProjectContentPlan,
@@ -915,6 +916,10 @@ export async function getProjectListForOperatorCredentials(params: {
   });
 }
 
+export async function getUnclaimedProjectList() {
+  const projects = await listUnclaimedProjects();
+  return projects.map(serializeProjectListItem);
+}
 export async function deleteProject(projectId: string) {
   const record = await getProjectDetail(projectId);
 
