@@ -299,6 +299,25 @@ export async function listProjects() {
   });
 }
 
+export async function listProjectsForOperatorIdentity(params: {
+  name: string;
+  accessKeyHash: string;
+}) {
+  return prisma.project.findMany({
+    where: {
+      operators: {
+        some: {
+          name: params.name,
+          accessKeyHash: params.accessKeyHash,
+          active: true,
+        },
+      },
+    },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    include: projectSummaryInclude,
+  });
+}
+
 export async function getProjectDetail(projectId: string): Promise<ProjectDetailRecord | null> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },

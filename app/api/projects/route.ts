@@ -1,11 +1,19 @@
 import { jsonError, jsonOk } from "../../../lib/api-response";
 import { logger } from "../../../server/logger";
-import { createProject, getProjectList, ProjectNotFoundError } from "../../../server/services/project-service";
+import { getCurrentProjectOperatorAccessIdentity } from "../../../server/services/project-operator-service";
+import { createProject, getProjectListForOperatorIdentity, ProjectNotFoundError } from "../../../server/services/project-service";
 import { parseCreateProjectInput, ProjectValidationError } from "../../../server/validators/project-validator";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const projects = await getProjectList();
+    const operatorIdentity = await getCurrentProjectOperatorAccessIdentity(request);
+    const projects = operatorIdentity
+      ? await getProjectListForOperatorIdentity({
+          name: operatorIdentity.name,
+          accessKeyHash: operatorIdentity.accessKeyHash,
+        })
+      : [];
+
     return jsonOk({ projects });
   } catch (error) {
     logger.error("projects.list.failed", {
@@ -19,7 +27,15 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const input = await parseCreateProjectInput(request);
-    const project = await createProject(input);
+    const operatorIdentity = await getCurrentProjectOperatorAccessIdentity(request);
+    const project = await createProject(input, {
+      creatorOperator: operatorIdentity
+        ? {
+            name: operatorIdentity.name,
+            accessKeyHash: operatorIdentity.accessKeyHash,
+          }
+        : null,
+    });
 
     return jsonOk({ project }, { status: 201 });
   } catch (error) {

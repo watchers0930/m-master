@@ -8,6 +8,7 @@ import {
   createChannelPublication,
   createImageJobWithAssets,
   createOrUpdateContentJobWithAssets,
+  createProjectOperator,
   createProjectWithSeeds,
   deleteProjectById,
   adoptVariant,
@@ -26,6 +27,7 @@ import {
   listProjectAutomationBatchRuns,
   listProjectContentJobs,
   listProjects,
+  listProjectsForOperatorIdentity,
   replaceProjectTopics,
   saveBrandProfileDraft,
   saveProjectContentPlan,
@@ -823,7 +825,15 @@ function buildChannelMessage(params: {
     .trim();
 }
 
-export async function createProject(input: CreateProjectInput) {
+export async function createProject(
+  input: CreateProjectInput,
+  options?: {
+    creatorOperator?: {
+      name: string;
+      accessKeyHash: string;
+    } | null;
+  },
+) {
   const enrichedInput = await enrichInputWithWebsiteSource(input);
 
   logger.info("project.create.start", {
@@ -848,6 +858,15 @@ export async function createProject(input: CreateProjectInput) {
     topics,
   });
 
+  if (options?.creatorOperator) {
+    await createProjectOperator({
+      projectId,
+      name: options.creatorOperator.name,
+      role: "owner",
+      accessKeyHash: options.creatorOperator.accessKeyHash,
+    });
+  }
+
   logger.info("project.create.success", {
     projectId,
     topicCount: topics.length,
@@ -864,6 +883,36 @@ export async function createProject(input: CreateProjectInput) {
 export async function getProjectList() {
   const projects = await listProjects();
   return projects.map(serializeProjectListItem);
+}
+
+export async function getProjectListForOperatorIdentity(params: {
+  name: string;
+  accessKeyHash: string;
+}) {
+  const projects = await listProjectsForOperatorIdentity({
+    name: params.name.trim(),
+    accessKeyHash: params.accessKeyHash,
+  });
+
+  return projects.map(serializeProjectListItem);
+}
+
+export async function getProjectListForOperatorCredentials(params: {
+  name: string;
+  accessKey: string;
+}) {
+  const normalizedName = params.name.trim();
+  const normalizedAccessKey = params.accessKey.trim();
+
+  if (!normalizedName || !normalizedAccessKey) {
+    return [];
+  }
+
+  const accessKeyHash = crypto.createHash("sha256").update(normalizedAccessKey).digest("hex");
+  return getProjectListForOperatorIdentity({
+    name: normalizedName,
+    accessKeyHash,
+  });
 }
 
 export async function deleteProject(projectId: string) {
