@@ -349,7 +349,6 @@ export function PipelineShell() {
           publishBusy={publish.publishBusy}
           publishPackage={publish.publishPackage}
           onPreparePublish={publish.handlePreparePublish}
-          onPublishNow={publish.handlePublishNow}
           editingHashtags={content.editingHashtags}
           onEditingHashtagsChange={content.setEditingHashtags}
           hashtagBusy={content.hashtagBusy}
@@ -492,6 +491,7 @@ export function PipelineShell() {
           projectId={projectId}
           contextReady={Boolean(state.activeProject?.brandProfile?.approved)}
           studio={state.studio}
+          blogImageStudio={images.imageStudios.blog}
           activeChannel={content.activeChannel}
           onChannelChange={content.setActiveChannel}
           editingTitle={content.editingTitle}

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { SeoComplianceIndicator } from "../components/seo-compliance-indicator";
 import { DerivedChannelPanel } from "../components/derived-channel-panel";
 import { VariantComparisonCard } from "../components/variant-comparison";
@@ -9,12 +10,105 @@ import type {
   ChannelKey,
   VariantGroup,
   ExportPreviewState,
+  ImageStudioState,
 } from "../types";
+
+function renderBlogPreview(body: string, imageStudio: ImageStudioState | null): ReactNode[] {
+  const imageUrls = (imageStudio?.variants || [])
+    .slice()
+    .sort((left, right) => {
+      if (left.selected && !right.selected) return -1;
+      if (!left.selected && right.selected) return 1;
+      return left.id.localeCompare(right.id);
+    })
+    .map((variant) => variant.url)
+    .filter(Boolean);
+  const blocks: ReactNode[] = [];
+  const lines = body.split("\n");
+  let paragraphBuffer: string[] = [];
+
+  function flushParagraph() {
+    if (!paragraphBuffer.length) {
+      return;
+    }
+
+    const text = paragraphBuffer.join(" ").trim();
+    if (text) {
+      blocks.push(
+        <p key={`paragraph-${blocks.length}`} className="fine-print" style={{ whiteSpace: "pre-wrap", lineHeight: 1.8, fontSize: 16, color: "#111827" }}>
+          {text}
+        </p>,
+      );
+    }
+    paragraphBuffer = [];
+  }
+
+  lines.forEach((rawLine, index) => {
+    const line = rawLine.trim();
+    if (!line) {
+      flushParagraph();
+      return;
+    }
+
+    const imageCue = line.match(/^\[이미지\s+(\d+)\]\s*(.*)$/);
+    if (imageCue) {
+      flushParagraph();
+      const imageIndex = Math.max(0, Number(imageCue[1]) - 1);
+      const imageUrl = imageUrls[imageIndex];
+      const caption = imageCue[2] || `이미지 ${imageCue[1]}`;
+      blocks.push(
+        <figure key={`image-${index}`} style={{ margin: "16px 0 24px" }}>
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={caption}
+              style={{ width: "100%", borderRadius: 18, border: "1px solid #dbe4f0", display: "block" }}
+            />
+          ) : (
+            <div style={{ border: "1px dashed #cbd5e1", borderRadius: 18, padding: "28px 18px", textAlign: "center", color: "#64748b" }}>
+              선택된 이미지가 아직 없습니다.
+            </div>
+          )}
+          <figcaption className="fine-print" style={{ marginTop: 10 }}>
+            {caption}
+          </figcaption>
+        </figure>,
+      );
+      return;
+    }
+
+    if (line.startsWith("## ")) {
+      flushParagraph();
+      blocks.push(
+        <h3 key={`h2-${index}`} style={{ margin: "28px 0 12px", fontSize: 28, lineHeight: 1.25, fontWeight: 800, color: "#111827" }}>
+          {line.replace(/^##\s*/, "")}
+        </h3>,
+      );
+      return;
+    }
+
+    if (line.startsWith("### ")) {
+      flushParagraph();
+      blocks.push(
+        <h4 key={`h3-${index}`} style={{ margin: "24px 0 10px", fontSize: 22, lineHeight: 1.35, fontWeight: 700, color: "#1f2937" }}>
+          {line.replace(/^###\s*/, "")}
+        </h4>,
+      );
+      return;
+    }
+
+    paragraphBuffer.push(line);
+  });
+
+  flushParagraph();
+  return blocks;
+}
 
 type Props = {
   projectId?: string | null;
   contextReady: boolean;
   studio: StudioDetail | null;
+  blogImageStudio: ImageStudioState | null;
   /* Channel */
   activeChannel: ChannelKey;
   onChannelChange: (ch: ChannelKey) => void;
@@ -51,6 +145,7 @@ export function ContentPanel(props: Props) {
     projectId,
     contextReady,
     studio,
+    blogImageStudio,
     activeChannel, onChannelChange,
     editingTitle, onEditingTitleChange,
     editingBody, onEditingBodyChange,
@@ -134,6 +229,12 @@ export function ContentPanel(props: Props) {
               onBlur={onUpdateSeo}
               rows={20}
             />
+          </div>
+          <div className="field-group">
+            <label className="field-label">본문 미리보기</label>
+            <div className="analytics-surface" style={{ padding: 24, borderRadius: 20 }}>
+              {renderBlogPreview(editingBody, blogImageStudio)}
+            </div>
           </div>
 
           <div className="cp-meta-row">

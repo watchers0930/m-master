@@ -67,7 +67,6 @@ type Props = {
   publishBusy: boolean;
   publishPackage: BlogPublishPackage | null;
   onPreparePublish: () => void;
-  onPublishNow: () => void;
   publications: ChannelPublicationSummary[];
   failedPublications: ChannelPublicationSummary[];
   publishedPublications: ChannelPublicationSummary[];
@@ -104,7 +103,7 @@ export function SidebarPanel(props: Props) {
     seoCompliance,
     studio,
     exportBusy, onExportAll,
-    publishBusy, publishPackage, onPreparePublish, onPublishNow,
+    publishBusy, publishPackage, onPreparePublish,
     publications, failedPublications, publishedPublications,
     readiness,
     automationBusy,
@@ -444,9 +443,6 @@ export function SidebarPanel(props: Props) {
               <div className="button-row">
                 <button className="button primary" disabled={publishBusy} onClick={onPreparePublish}>
                   {publishBusy ? "처리 중…" : publishPackage ? "Blogger 발행" : "발행 준비"}
-                </button>
-                <button className="button ghost" disabled={publishBusy} onClick={onPublishNow}>
-                  {publishBusy ? "처리 중…" : "즉시 업데이트"}
                 </button>
               </div>
               <button className="button ghost sb-btn-full" disabled={exportBusy} onClick={onExportAll}>
