@@ -104,7 +104,6 @@ export function PipelineShell() {
       void state.reloadProject(matchedProject.id);
     }
   }, [requestedProjectId, state.activeProject, state.projects, state.reloadProject]);
-
   // When project changes
   useEffect(() => {
     if (state.activeProject) {
