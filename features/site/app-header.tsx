@@ -1,9 +1,26 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 type AppHeaderProps = {
   active: "content" | "analytics" | "operations" | "settings";
   title?: string;
 };
 
 export function AppHeader({ active, title = "콘텐츠 스튜디오" }: AppHeaderProps) {
+  const [projectId, setProjectId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const nextProjectId = new URLSearchParams(window.location.search).get("projectId");
+    setProjectId(nextProjectId);
+  }, []);
+
+  const withProjectId = (path: string) => (projectId ? `${path}?projectId=${projectId}` : path);
+
   return (
     <header className="pipeline-header">
       <div className="pipeline-header-left">
@@ -15,19 +32,19 @@ export function AppHeader({ active, title = "콘텐츠 스튜디오" }: AppHeade
             홈
           </a>
           <span className="pipeline-header-divider">|</span>
-          <a className={active === "content" ? "pipeline-header-link active" : "pipeline-header-link"} href="/studio">
+          <a className={active === "content" ? "pipeline-header-link active" : "pipeline-header-link"} href={withProjectId("/studio")}>
             콘텐츠생성
           </a>
           <span className="pipeline-header-divider">|</span>
-          <a className={active === "operations" ? "pipeline-header-link active" : "pipeline-header-link"} href="/studio/operations">
+          <a className={active === "operations" ? "pipeline-header-link active" : "pipeline-header-link"} href={withProjectId("/studio/operations")}>
             운영보드
           </a>
           <span className="pipeline-header-divider">|</span>
-          <a className={active === "settings" ? "pipeline-header-link active" : "pipeline-header-link"} href="/studio/settings">
+          <a className={active === "settings" ? "pipeline-header-link active" : "pipeline-header-link"} href={withProjectId("/studio/settings")}>
             설정
           </a>
           <span className="pipeline-header-divider">|</span>
-          <a className={active === "analytics" ? "pipeline-header-link active" : "pipeline-header-link"} href="/studio/analytics">
+          <a className={active === "analytics" ? "pipeline-header-link active" : "pipeline-header-link"} href={withProjectId("/studio/analytics")}>
             방문자 분석
           </a>
         </nav>

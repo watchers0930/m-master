@@ -19,6 +19,7 @@ export function PipelineShell() {
   const router = useRouter();
   const state = usePipelineState();
   const [projectsResolved, setProjectsResolved] = useState(false);
+  const [requestedProjectId, setRequestedProjectId] = useState<string | null>(null);
   const [planBusy, setPlanBusy] = useState(false);
   const [automationBusy, setAutomationBusy] = useState(false);
   const [automationRun, setAutomationRun] = useState<AutomationRunSummary | null>(null);
@@ -84,6 +85,25 @@ export function PipelineShell() {
     }
   }, [projectsResolved, state.loading, state.projects.length, router]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const nextProjectId = new URLSearchParams(window.location.search).get("projectId");
+    setRequestedProjectId(nextProjectId);
+  }, []);
+
+  useEffect(() => {
+    if (!requestedProjectId || state.activeProject || state.projects.length === 0) {
+      return;
+    }
+
+    const matchedProject = state.projects.find((project) => project.id === requestedProjectId);
+    if (matchedProject) {
+      void state.reloadProject(matchedProject.id);
+    }
+  }, [requestedProjectId, state.activeProject, state.projects, state.reloadProject]);
   // When project changes
   useEffect(() => {
     if (state.activeProject) {
