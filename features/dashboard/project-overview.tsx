@@ -68,6 +68,28 @@ type ProjectOverviewProps = {
   onApproveContext: () => Promise<void>;
 };
 
+function formatProjectTimestamp(value?: string | null) {
+  if (!value) {
+    return "시각 없음";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function getProjectShortId(projectId: string) {
+  return projectId.slice(-6);
+}
+
 export function ProjectOverview({
   projects,
   activeProject,
@@ -689,6 +711,8 @@ export function ProjectOverview({
                           <span className="fine-print">{project.domain || "사이트 주소 미입력"}</span>
                           <span className="fine-print">{project.workingPath || "폴더 미지정"}</span>
                           <span className="fine-print">테마 {project.topicCount}개</span>
+                          <span className="fine-print">{`최근 수정 ${formatProjectTimestamp(project.updatedAt)}`}</span>
+                          <span className="fine-print">{`ID ${getProjectShortId(project.id)}`}</span>
                         </div>
                       </button>
                       <div className="project-item-actions">

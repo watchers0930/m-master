@@ -54,6 +54,28 @@ type RecoverResponse = {
   };
 };
 
+function formatProjectTimestamp(value?: string | null) {
+  if (!value) {
+    return "시각 없음";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function getProjectShortId(projectId: string) {
+  return projectId.slice(-6);
+}
+
 export function RootLoginShell() {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
@@ -213,7 +235,7 @@ export function RootLoginShell() {
                 {projects.length === 0 ? <option value="">등록된 프로젝트 없음</option> : null}
                 {projects.map((project) => (
                   <option key={project.id} value={project.id}>
-                    {project.name}
+                    {`${project.name} · ${project.domain || "도메인 없음"} · ${getProjectShortId(project.id)}`}
                   </option>
                 ))}
               </select>
@@ -222,6 +244,9 @@ export function RootLoginShell() {
             <div className="root-login-project-card">
               <strong>{selectedProject?.name || "프로젝트를 선택하세요."}</strong>
               <span>{selectedProject?.domain || "도메인이 아직 없습니다."}</span>
+              {selectedProject ? (
+                <span>{`최근 수정 ${formatProjectTimestamp(selectedProject.updatedAt)} · ID ${getProjectShortId(selectedProject.id)}`}</span>
+              ) : null}
             </div>
 
             <div className="root-login-field-grid">

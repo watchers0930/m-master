@@ -9,6 +9,28 @@ import { usePublishWorkflow } from "../dashboard/use-publish-workflow";
 import type { AutomationReviewResolution, AutomationRunSummary, BulkOperationReport, MonthlyContentPlan, ProjectListItem } from "./types";
 import type { ProjectOperatorSession } from "../dashboard/types";
 
+function formatProjectTimestamp(value?: string | null) {
+  if (!value) {
+    return "시각 없음";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function getProjectShortId(projectId: string) {
+  return projectId.slice(-6);
+}
+
 export function OperationsShell() {
   const state = usePipelineState();
   const [planBusy, setPlanBusy] = useState(false);
@@ -266,6 +288,7 @@ export function OperationsShell() {
                   <button key={project.id} className="sb-project-item" onClick={() => void handleSelectProject(project)}>
                     <strong>{project.name}</strong>
                     <span className="fine-print">{project.domain || "도메인 없음"}</span>
+                    <span className="fine-print">{`최근 수정 ${formatProjectTimestamp(project.updatedAt)} · ID ${getProjectShortId(project.id)}`}</span>
                   </button>
                 ))}
               </div>
