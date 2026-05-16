@@ -2366,18 +2366,47 @@ export async function markProjectReadyForPublish(
     skipSafetyGate?: boolean;
   },
 ) {
-  const record = requireApprovedBrandProfile(await getProjectDetail(projectId), projectId);
-  const latestContentJob = record.latestContentJob;
+  let record = requireApprovedBrandProfile(await getProjectDetail(projectId), projectId);
+  let latestContentJob = record.latestContentJob;
   const storedBloggerAccessToken = decryptSecret(record.project.bloggerAccessTokenEncrypted);
 
   if (!latestContentJob) {
     throw new ProjectContentNotFoundError(projectId);
   }
 
-  const blogAsset = latestContentJob.assets.find((asset) => asset.channel === "blog");
+  let blogAsset = latestContentJob.assets.find((asset) => asset.channel === "blog");
 
   if (!blogAsset) {
     throw new ProjectContentNotFoundError(projectId);
+  }
+
+  const hasInlineImageCue = /\[이미지\s+\d+\]/.test(blogAsset.body);
+  const hasBlogImages = blogAsset.imageJobs.some((job) =>
+    job.imageAssets.some((imageAsset) => Boolean(imageAsset.composedPath || imageAsset.originalPath)),
+  );
+
+  if (hasInlineImageCue && !hasBlogImages) {
+    const bundle = await buildImageVariants(record.project.name, {
+      channel: "blog",
+      title: blogAsset.title || latestContentJob.topic,
+      body: blogAsset.body,
+      cta: blogAsset.cta || record.brandProfile.cta || "자세히 보기",
+    });
+
+    await createImageJobWithAssets({
+      contentAssetId: blogAsset.id,
+      channelPreset: `blog-${bundle.preset.width}x${bundle.preset.height}`,
+      prompt: bundle.prompt,
+      imageAssets: bundle.images,
+    });
+
+    record = requireApprovedBrandProfile(await getProjectDetail(projectId), projectId);
+    latestContentJob = record.latestContentJob;
+    blogAsset = latestContentJob?.assets.find((asset) => asset.channel === "blog");
+
+    if (!latestContentJob || !blogAsset) {
+      throw new ProjectContentNotFoundError(projectId);
+    }
   }
 
   const effectiveBlogger =
