@@ -70,11 +70,28 @@ function paragraphizeMarkdown(value: string) {
     .join("\n");
 }
 
-function renderStructuredBlogBody(value: string) {
+function collectInlineImageUrls(asset: BlogPublishAsset) {
+  const preferred = asset.imageJobs.flatMap((job) =>
+    job.imageAssets
+      .filter((imageAsset) => imageAsset.selected)
+      .map((imageAsset) => imageAsset.composedPath || imageAsset.originalPath)
+      .filter((path): path is string => Boolean(path)),
+  );
+  const fallback = asset.imageJobs.flatMap((job) =>
+    job.imageAssets
+      .map((imageAsset) => imageAsset.composedPath || imageAsset.originalPath)
+      .filter((path): path is string => Boolean(path)),
+  );
+
+  return [...new Set([...preferred, ...fallback])];
+}
+
+function renderStructuredBlogBody(value: string, inlineImageUrls: string[] = []) {
   const blocks: string[] = [];
   const lines = value.split("\n");
   let paragraphLines: string[] = [];
   let listItems: string[] = [];
+  let imageIndex = 0;
 
   const flushParagraph = () => {
     if (paragraphLines.length === 0) {
@@ -108,8 +125,19 @@ function renderStructuredBlogBody(value: string) {
     if (imageCue) {
       flushParagraph();
       flushList();
+      const imageUrl = inlineImageUrls.length > 0 ? inlineImageUrls[imageIndex % inlineImageUrls.length] : null;
+      imageIndex += 1;
       blocks.push(
-        `<figure><figcaption>이미지 ${escapeHtml(imageCue[1])}. ${escapeHtml(imageCue[2])}</figcaption></figure>`,
+        [
+          `<figure>`,
+          imageUrl
+            ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(imageCue[2])}" style="max-width:100%;height:auto;border-radius:16px;" />`
+            : "",
+          `<figcaption>이미지 ${escapeHtml(imageCue[1])}. ${escapeHtml(imageCue[2])}</figcaption>`,
+          `</figure>`,
+        ]
+          .filter(Boolean)
+          .join(""),
       );
       continue;
     }
@@ -211,9 +239,10 @@ export function buildBlogHtml(params: {
   cta?: string | null;
   hashtags?: string | null;
   coverImageUrl?: string | null;
+  inlineImageUrls?: string[];
 }) {
   const bodyHtml = params.body.includes("## ") || /\[이미지\s+\d+\]/.test(params.body)
-    ? renderStructuredBlogBody(params.body)
+    ? renderStructuredBlogBody(params.body, params.inlineImageUrls)
     : paragraphizeMarkdown(params.body);
   const ctaHtml = params.cta ? `<section><h2>다음 단계</h2><p>${escapeHtml(params.cta)}</p></section>` : "";
   const hashtagHtml = parseHashtagText(params.hashtags).length
@@ -270,6 +299,7 @@ export function buildBlogPublishPackage(params: {
       cta,
       hashtags,
       coverImageUrl,
+      inlineImageUrls: collectInlineImageUrls(params.asset),
     });
   const { bodyHtml, htmlWarnings } = sanitizeHtmlContent(rawBodyHtml);
 

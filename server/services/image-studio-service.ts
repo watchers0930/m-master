@@ -25,11 +25,11 @@ const PRESET_MAP: Record<ImageChannel, { width: number; height: number; label: s
 const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1-mini";
 const OPENAI_API_URL = "https://api.openai.com/v1/images/generations";
 const OPENAI_IMAGE_QUALITY = "low";
-const OPENAI_VARIANT_COUNT = 1;
 const VARIANT_DIRECTIONS = [
   "제품 핵심 메시지를 정면으로 전달하는 선명한 히어로형 구도",
   "신뢰감 있는 카드형 정보 구조와 여백 중심의 에디토리얼 구도",
   "행동 유도를 강조하는 CTA 중심 캠페인 배너 구도",
+  "도입 문단 다음에 자연스럽게 들어갈 설명형 블로그 컷 구도",
 ] as const;
 
 function toSentence(value: string, maxLength: number) {
@@ -194,9 +194,13 @@ async function generateOpenAiVariant(params: {
 async function buildOpenAiImageVariants(projectName: string, asset: AssetSeed, promptOverride?: string) {
   const preset = PRESET_MAP[asset.channel];
   const prompt = promptOverride?.trim() || buildImagePrompt(projectName, asset);
+  const desiredVariantCount =
+    asset.channel === "blog"
+      ? Math.max(1, Math.min(VARIANT_DIRECTIONS.length, extractBlogImageCues(asset.body).length || 3))
+      : 1;
 
   const images = await Promise.all(
-    VARIANT_DIRECTIONS.slice(0, OPENAI_VARIANT_COUNT).map((direction, index) =>
+    VARIANT_DIRECTIONS.slice(0, desiredVariantCount).map((direction, index) =>
       generateOpenAiVariant({
         prompt: `${prompt} ${direction}. 텍스트는 이미지에 직접 넣지 말고, 배경 비주얼과 분위기만 만든다.`,
         channel: asset.channel,
