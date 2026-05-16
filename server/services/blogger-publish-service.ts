@@ -4,6 +4,7 @@ type BloggerPublishInput = {
   title: string;
   content: string;
   status: "draft" | "publish";
+  postId?: string | null;
   labels?: string[] | null;
 };
 
@@ -54,20 +55,33 @@ export async function publishToBlogger(input: BloggerPublishInput): Promise<Blog
   const blogId = normalizeBlogId(input.blogId);
   const accessToken = normalizeAccessToken(input.accessToken);
   const labels = normalizeLabels(input.labels);
-  const endpoint = new URL(`https://www.googleapis.com/blogger/v3/blogs/${encodeURIComponent(blogId)}/posts`);
+  const normalizedPostId = input.postId?.trim() || null;
+  const endpoint = normalizedPostId
+    ? new URL(
+        `https://www.googleapis.com/blogger/v3/blogs/${encodeURIComponent(blogId)}/posts/${encodeURIComponent(normalizedPostId)}`,
+      )
+    : new URL(`https://www.googleapis.com/blogger/v3/blogs/${encodeURIComponent(blogId)}/posts`);
 
-  if (input.status === "draft") {
+  if (normalizedPostId) {
+    if (input.status === "publish") {
+      endpoint.searchParams.set("publish", "true");
+    }
+  } else if (input.status === "draft") {
     endpoint.searchParams.set("isDraft", "true");
   }
 
   const response = await fetch(endpoint.toString(), {
-    method: "POST",
+    method: normalizedPostId ? "PUT" : "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
       kind: "blogger#post",
+      id: normalizedPostId || undefined,
+      blog: {
+        id: blogId,
+      },
       title: input.title,
       content: input.content,
       labels: labels.length ? labels : undefined,
