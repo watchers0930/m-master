@@ -1,5 +1,5 @@
 type AppHeaderProps = {
-  active: "content" | "analytics" | "operations";
+  active: "content" | "analytics" | "operations" | "settings";
   title?: string;
 };
 
@@ -21,6 +21,10 @@ export function AppHeader({ active, title = "콘텐츠 스튜디오" }: AppHeade
           <span className="pipeline-header-divider">|</span>
           <a className={active === "operations" ? "pipeline-header-link active" : "pipeline-header-link"} href="/studio/operations">
             운영보드
+          </a>
+          <span className="pipeline-header-divider">|</span>
+          <a className={active === "settings" ? "pipeline-header-link active" : "pipeline-header-link"} href="/studio/settings">
+            설정
           </a>
           <span className="pipeline-header-divider">|</span>
           <a className={active === "analytics" ? "pipeline-header-link active" : "pipeline-header-link"} href="/studio/analytics">

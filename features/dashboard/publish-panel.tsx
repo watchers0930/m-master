@@ -2,13 +2,13 @@ import { EmptyStatePanel } from "@/components/ui/empty-state-panel";
 import { InputField } from "@/components/ui/input-field";
 import { SectionCard } from "@/components/ui/section-card";
 import type {
+  BlogPublishResult,
   BlogPublishDraft,
   BlogPublishPackage,
   ChannelKey,
   ExportPreviewState,
   ProjectActivityItem,
   WordPressPublishConfig,
-  WordPressPublishResult,
 } from "@/features/dashboard/types";
 
 type PublishPanelProps = {
@@ -23,12 +23,13 @@ type PublishPanelProps = {
   publishPackage?: BlogPublishPackage | null;
   publishDraft: BlogPublishDraft;
   wordpressConfig: WordPressPublishConfig;
-  wordpressResult?: WordPressPublishResult | null;
+  wordpressResult?: BlogPublishResult | null;
   onChannelChange: (channel: ChannelKey) => void;
   onExportChannel: (channel: ChannelKey) => Promise<void>;
   onExportAll: () => Promise<void>;
   onExportPreviewViewChange: (view: ChannelKey | "json") => void;
   onPreparePublish: () => Promise<void>;
+  onPublishNow: () => Promise<void>;
   onSaveWordPressDefaults: () => Promise<void>;
   onCopyExportPreview?: () => Promise<void>;
   onDownloadExportContent?: () => Promise<void>;
@@ -62,6 +63,7 @@ export function PublishPanel({
   onExportAll,
   onExportPreviewViewChange,
   onPreparePublish,
+  onPublishNow,
   onSaveWordPressDefaults,
   onCopyExportPreview,
   onDownloadExportContent,
@@ -92,62 +94,15 @@ export function PublishPanel({
           <div className="review-item">
             <strong>블로그 게시 설정</strong>
             <p className="fine-print">
-              먼저 블로그 등록 패키지를 만들고 제목, slug, excerpt를 검토한 뒤 다시 버튼을 누르면 워드프레스에 게시합니다. 인스타그램과 페이스북 탭은 결과 미리보기 확인용입니다.
+              먼저 블로그 등록 패키지를 만들고 제목, slug, excerpt를 검토한 뒤 Blogger로 바로 게시합니다. 인스타그램과 페이스북 탭은 결과 미리보기 확인용입니다.
             </p>
           </div>
-          <InputField
-            id="wordpress-site-url"
-            label="워드프레스 사이트 주소"
-            value={wordpressConfig.siteUrl}
-            onChange={(value) => onWordPressConfigChange("siteUrl", value)}
-            type="url"
-            placeholder="예: https://yourblog.com"
-          />
-          <InputField
-            id="wordpress-username"
-            label="워드프레스 사용자명"
-            value={wordpressConfig.username}
-            onChange={(value) => onWordPressConfigChange("username", value)}
-            placeholder="예: editor"
-          />
-          <InputField
-            id="wordpress-app-password"
-            label="앱 비밀번호"
-            value={wordpressConfig.appPassword}
-            onChange={(value) => onWordPressConfigChange("appPassword", value)}
-            type="password"
-            placeholder="워드프레스 Application Password"
-          />
-          <div className="field-group">
-            <label className="field-label" htmlFor="wordpress-status">
-              게시 상태
-            </label>
-            <select
-              id="wordpress-status"
-              className="text-input"
-              value={wordpressConfig.status}
-              onChange={(event) => onWordPressConfigChange("status", event.target.value)}
-            >
-              <option value="draft">임시글</option>
-              <option value="publish">즉시 발행</option>
-            </select>
+          <div className="review-item">
+            <strong>Blogger 설정은 전체 설정 메뉴에서 관리합니다.</strong>
+            <p className="fine-print">
+              Blog ID, Access Token, 게시 상태는 설정 화면에 저장된 값을 그대로 사용합니다. 이 화면에서는 추가 입력 없이 저장된 Blogger 설정으로 바로 발행합니다.
+            </p>
           </div>
-          <InputField
-            id="wordpress-categories"
-            label="카테고리"
-            value={wordpressConfig.categoryNames}
-            onChange={(value) => onWordPressConfigChange("categoryNames", value)}
-            placeholder="예: 마케팅, 블로그"
-            hint="콤마로 여러 개를 구분합니다. 없으면 자동 분류 없이 게시합니다."
-          />
-          <InputField
-            id="wordpress-tags"
-            label="태그"
-            value={wordpressConfig.tagNames}
-            onChange={(value) => onWordPressConfigChange("tagNames", value)}
-            placeholder="예: 부동산, 자산관리, 전세"
-            hint="콤마로 여러 개를 구분합니다."
-          />
           <div className="content-tabs">
             {(Object.keys(channelLabels) as Array<keyof typeof channelLabels>).map((channel) => (
               <button
@@ -167,10 +122,13 @@ export function PublishPanel({
             전체 JSON 보기
           </button>
           <button className="button ghost" disabled={settingsBusy} type="button" onClick={() => void onSaveWordPressDefaults()}>
-            {settingsBusy ? "기본값 저장 중" : "워드프레스 기본값 저장"}
+            {settingsBusy ? "기본값 저장 중" : "발행 기본값 저장"}
           </button>
           <button className="button" disabled={publishBusy} type="button" onClick={() => void onPreparePublish()}>
-            {publishBusy ? "블로그 등록 준비 중" : "블로그 등록 준비"}
+            {publishBusy ? "블로그 발행 처리 중" : "블로그 등록 준비"}
+          </button>
+          <button className="button primary" disabled={publishBusy} type="button" onClick={() => void onPublishNow()}>
+            {publishBusy ? "즉시 게시 처리 중" : "즉시 업데이트"}
           </button>
           <button className="button ghost" disabled={copyBusy || !exportPreview.bundle} type="button" onClick={() => void onCopyExportPreview?.()}>
             {copyBusy ? "복사 중" : "현재 결과 복사"}
@@ -304,7 +262,7 @@ export function PublishPanel({
                   label="게시 excerpt"
                   value={publishDraft.summary}
                   onChange={(value) => onPublishDraftChange("summary", value)}
-                  placeholder="워드프레스 excerpt"
+                  placeholder="게시 요약"
                   multiline
                   rows={4}
                 />
@@ -337,12 +295,9 @@ export function PublishPanel({
                 </div>
                 {wordpressResult ? (
                   <div className="review-item">
-                    <strong>워드프레스 게시 완료</strong>
+                    <strong>Blogger 게시 완료</strong>
                     <p className="fine-print">Post ID {wordpressResult.postId} · 상태 {wordpressResult.status}</p>
-                    {wordpressResult.featuredMediaId ? <p className="fine-print">대표 이미지 Media ID {wordpressResult.featuredMediaId}</p> : null}
-                    {wordpressResult.categoryIds?.length ? <p className="fine-print">카테고리 ID {wordpressResult.categoryIds.join(", ")}</p> : null}
-                    {wordpressResult.tagIds?.length ? <p className="fine-print">태그 ID {wordpressResult.tagIds.join(", ")}</p> : null}
-                    {wordpressResult.mediaWarning ? <p className="fine-print">{wordpressResult.mediaWarning}</p> : null}
+                    {wordpressResult.labels?.length ? <p className="fine-print">라벨 {wordpressResult.labels.join(", ")}</p> : null}
                     <p className="fine-print">{wordpressResult.link}</p>
                   </div>
                 ) : null}

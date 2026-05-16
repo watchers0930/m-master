@@ -8,7 +8,6 @@ import {
   retryProjectChannelPublication,
 } from "@/server/services/project-service";
 import { MetaPublishError } from "@/server/services/meta-publish-service";
-import { WordPressPublishError } from "@/server/services/wordpress-publish-service";
 
 type RouteContext = {
   params: Promise<{
@@ -96,7 +95,7 @@ export async function POST(request: Request, context: RouteContext) {
       return jsonError(error.message, 404);
     }
 
-    if (error instanceof MetaPublishError || error instanceof WordPressPublishError) {
+    if (error instanceof MetaPublishError) {
       return jsonError(error.message, 400);
     }
 

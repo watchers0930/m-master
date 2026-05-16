@@ -22,6 +22,9 @@ model Project {
   wordpressStatus        String?
   wordpressCategoryNames String?
   wordpressTagNames      String?
+  bloggerBlogId          String?
+  bloggerAccessTokenEncrypted String?
+  bloggerStatus          String?
   metaAccessTokenEncrypted String?
   metaTokenExpiresAt     DateTime?
   facebookPageId         String?

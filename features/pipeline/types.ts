@@ -136,9 +136,14 @@ export type ProjectDetail = {
     status: string;
     wordpressSiteUrl?: string | null;
     wordpressUsername?: string | null;
+    hasWordPressAppPassword?: boolean | null;
     wordpressStatus?: string | null;
     wordpressCategoryNames?: string | null;
     wordpressTagNames?: string | null;
+    bloggerBlogId?: string | null;
+    hasBloggerAccessToken?: boolean | null;
+    bloggerStatus?: string | null;
+    hasMetaAccessToken?: boolean | null;
     facebookPageId?: string | null;
     instagramBusinessAccountId?: string | null;
     automationMode?: "draft-only" | "approved-auto-publish" | "full-auto" | null;
@@ -272,12 +277,9 @@ export type BlogPublishDraft = {
 };
 
 export type WordPressPublishConfig = {
-  siteUrl: string;
-  username: string;
-  appPassword: string;
-  status: "draft" | "publish";
-  categoryNames: string;
-  tagNames: string;
+  bloggerBlogId: string;
+  bloggerAccessToken: string;
+  bloggerStatus: "draft" | "publish";
   metaAccessToken: string;
   facebookPageId: string;
   instagramBusinessAccountId: string;
@@ -288,13 +290,11 @@ export type WordPressPublishConfig = {
 };
 
 export type WordPressPublishResult = {
-  postId: number;
+  provider: "blogger";
+  postId: number | string;
   link: string;
   status: string;
-  featuredMediaId?: number | null;
-  mediaWarning?: string | null;
-  categoryIds?: number[];
-  tagIds?: number[];
+  labels?: string[];
 };
 
 export type ProjectPreview = {
@@ -393,7 +393,7 @@ export type ChannelPublicationSummary = {
 export type AutomationReadinessIssue = {
   id: string;
   severity: "blocking" | "warning" | "info";
-  area: "context" | "analytics" | "wordpress" | "meta" | "images" | "automation" | "operations";
+  area: "context" | "analytics" | "meta" | "images" | "automation" | "operations";
   title: string;
   detail: string;
   recommendation?: string | null;

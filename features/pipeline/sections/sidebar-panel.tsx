@@ -91,6 +91,7 @@ type Props = {
   publishBusy: boolean;
   publishPackage: BlogPublishPackage | null;
   onPreparePublish: () => void;
+  onPublishNow: () => void;
   wordpressConfig: WordPressPublishConfig;
   onWordPressConfigChange: (
     field: keyof WordPressPublishConfig,
@@ -140,7 +141,7 @@ export function SidebarPanel(props: Props) {
     seoCompliance,
     studio,
     exportBusy, onExportAll,
-    publishBusy, publishPackage, onPreparePublish,
+    publishBusy, publishPackage, onPreparePublish, onPublishNow,
     wordpressConfig, onWordPressConfigChange,
     settingsBusy, onSaveWordPressDefaults,
     publications, failedPublications, publishedPublications,
@@ -168,6 +169,9 @@ export function SidebarPanel(props: Props) {
   const scores = review?.scores;
   const hasContent = (studio?.draft?.assets?.length ?? 0) > 0;
   const adoptedVariant = variantGroup?.variants?.find((v) => v.adopted);
+  const averageScore = scores
+    ? Math.round((scores.brandAlignment + scores.formatFit + scores.ctaClarity + scores.riskControl) / 4)
+    : null;
   const folderInputRef = useRef<HTMLInputElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -213,6 +217,33 @@ export function SidebarPanel(props: Props) {
 
   return (
     <aside className="sidebar-panel">
+      {activeProject ? (
+        <section className="sb-overview">
+          <div className="sb-overview-head">
+            <div>
+              <p className="sb-kicker">Active Project</p>
+              <strong>{activeProject.project.name}</strong>
+              <span>{activeProject.project.domain || "도메인 없음"}</span>
+            </div>
+            {isApproved ? <span className="status-pill active">승인됨</span> : <span className="status-pill">점검 필요</span>}
+          </div>
+          <div className="sb-overview-metrics">
+            <div className="sb-metric-chip">
+              <span>월간 계획</span>
+              <strong>{contentPlan?.items?.length ?? 0}건</strong>
+            </div>
+            <div className="sb-metric-chip">
+              <span>검토 큐</span>
+              <strong>{reviewQueue.length}건</strong>
+            </div>
+            <div className="sb-metric-chip">
+              <span>검증</span>
+              <strong>{averageScore ? `${averageScore}점` : "-"}</strong>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {/* ── 프로젝트 ── */}
       <details className="sb-section" open>
         <summary className="sb-section-title">프로젝트</summary>
@@ -373,28 +404,28 @@ export function SidebarPanel(props: Props) {
                 <p className="fine-print" style={{ marginTop: 8 }}>{contentPlan.basisSummary}</p>
               )}
               {contentPlan?.items?.length ? (
-                <div className="topic-chip-wrap" style={{ marginTop: 12 }}>
-                  {contentPlan.items.map((item) => (
+                <div className="sb-plan-list">
+                  {contentPlan.items.slice(0, 3).map((item) => (
                     <button
                       key={item.id}
                       type="button"
-                      className={`topic-chip selectable ${selectedPlannedTopicId === item.id ? "active" : ""}`}
+                      className={`sb-plan-item-button ${selectedPlannedTopicId === item.id ? "active" : ""}`}
                       onClick={() => onSelectPlannedTopic(item.id, item.topic)}
                     >
                       <strong>{item.weekLabel}</strong>
-                      <span className="fine-print">
-                        {item.publishAt ? item.publishAt.slice(5, 10) : "일정 미정"} · {item.intentType || "general"}
-                      </span>
-                      <span className="fine-print">{item.topic}</span>
-                      <span className="fine-print">
-                        상태: {item.status}
+                      <span>{item.topic}</span>
+                      <small>
+                        {item.publishAt ? item.publishAt.slice(5, 10) : "일정 미정"} · {item.status}
                         {typeof item.attemptCount === "number" ? ` · 시도 ${item.attemptCount}회` : ""}
-                      </span>
+                      </small>
                       {item.lastError ? (
-                        <span className="fine-print" style={{ color: "#d64d49" }}>{item.lastError}</span>
+                        <small style={{ color: "#d64d49" }}>{item.lastError}</small>
                       ) : null}
                     </button>
                   ))}
+                  {contentPlan.items.length > 3 ? (
+                    <span className="fine-print">외 {contentPlan.items.length - 3}개 항목은 우측 보드에서 확인</span>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -442,57 +473,9 @@ export function SidebarPanel(props: Props) {
         </details>
       )}
 
-      {/* ── 톤 ── */}
-      {activeProject && (
-        <details className="sb-section" open>
-          <summary className="sb-section-title">콘텐츠 톤</summary>
-          <div className="sb-section-body">
-            <div className="sb-tone-grid">
-              {TONE_PRESETS.map((preset) => (
-                <button
-                  key={preset.key}
-                  className={`sb-tone-chip ${editingTone === preset.label ? "active" : ""}`}
-                  onClick={() => onEditingToneChange(preset.label)}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </details>
-      )}
-
-      {/* ── 해시태그 ── */}
-      {hasContent && (
-        <details className="sb-section" open>
-          <summary className="sb-section-title">해시태그</summary>
-          <div className="sb-section-body">
-            <button
-              className="button primary sb-btn-full"
-              disabled={hashtagBusy}
-              onClick={onGenerateHashtags}
-            >
-              {hashtagBusy ? "생성 중…" : "해시태그 자동 생성"}
-            </button>
-            {editingHashtags && (
-              <div className="sb-hashtag-output">{editingHashtags}</div>
-            )}
-            <div className="field-group">
-              <label className="field-label">직접 편집</label>
-              <input
-                className="text-input"
-                value={editingHashtags}
-                onChange={(e) => onEditingHashtagsChange(e.target.value)}
-                placeholder="#키워드1 #키워드2"
-              />
-            </div>
-          </div>
-        </details>
-      )}
-
       {/* ── 검증 ── */}
       {scores && (
-        <details className="sb-section" open>
+        <details className="sb-section">
           <summary className="sb-section-title">검증</summary>
           <div className="sb-section-body">
             <div className="sb-scores">
@@ -511,22 +494,18 @@ export function SidebarPanel(props: Props) {
 
       {/* ── 발행 ── */}
       {hasContent && (
-        <details className="sb-section">
-          <summary className="sb-section-title">발행</summary>
+        <details className="sb-section" open>
+          <summary className="sb-section-title">발행 채널</summary>
           <div className="sb-section-body">
             <div className="sb-form">
-              <div className="field-group">
-                <label className="field-label">WP 사이트 URL</label>
-                <input className="text-input" value={wordpressConfig.siteUrl} onChange={(e) => onWordPressConfigChange("siteUrl", e.target.value)} placeholder="https://your-site.com" />
+              <div className="review-item">
+                <strong>Blogger 설정은 전체 설정 메뉴에서 관리합니다.</strong>
+                <p className="fine-print">
+                  Blog ID, Access Token, 게시 상태는 설정 화면에 저장된 값을 그대로 사용합니다. 이 화면에서는 중복 입력 없이 저장된 Blogger 설정으로 바로 발행합니다.
+                </p>
               </div>
-              <div className="field-group">
-                <label className="field-label">사용자명</label>
-                <input className="text-input" value={wordpressConfig.username} onChange={(e) => onWordPressConfigChange("username", e.target.value)} />
-              </div>
-              <div className="field-group">
-                <label className="field-label">앱 비밀번호</label>
-                <input className="text-input" type="password" value={wordpressConfig.appPassword} onChange={(e) => onWordPressConfigChange("appPassword", e.target.value)} />
-              </div>
+              <details className="sb-subsection">
+                <summary className="sb-subsection-title">소셜/보조 채널 설정</summary>
               <div className="field-group">
                 <label className="field-label">Meta Access Token</label>
                 <input className="text-input" type="password" value={wordpressConfig.metaAccessToken} onChange={(e) => onWordPressConfigChange("metaAccessToken", e.target.value)} placeholder="Meta Graph access token" />
@@ -539,12 +518,32 @@ export function SidebarPanel(props: Props) {
                 <label className="field-label">Instagram Business Account ID</label>
                 <input className="text-input" value={wordpressConfig.instagramBusinessAccountId} onChange={(e) => onWordPressConfigChange("instagramBusinessAccountId", e.target.value)} placeholder="예: 1784..." />
               </div>
+              </details>
+              <div className="field-group">
+                <label className="field-label">해시태그</label>
+                {editingHashtags ? <div className="sb-hashtag-output">{editingHashtags}</div> : null}
+                <div className="button-row">
+                  <button
+                    className="button ghost"
+                    disabled={hashtagBusy}
+                    onClick={onGenerateHashtags}
+                  >
+                    {hashtagBusy ? "생성 중…" : "자동 생성"}
+                  </button>
+                </div>
+                <input
+                  className="text-input"
+                  value={editingHashtags}
+                  onChange={(e) => onEditingHashtagsChange(e.target.value)}
+                  placeholder="#키워드1 #키워드2"
+                />
+              </div>
               <div className="button-row">
                 <button className="button primary" disabled={publishBusy} onClick={onPreparePublish}>
-                  {publishBusy ? "처리 중…" : publishPackage ? "WP 발행" : "발행 준비"}
+                  {publishBusy ? "처리 중…" : publishPackage ? "Blogger 발행" : "발행 준비"}
                 </button>
-                <button className="button ghost" disabled={settingsBusy} onClick={onSaveWordPressDefaults}>
-                  {settingsBusy ? "저장 중…" : "채널/정책 저장"}
+                <button className="button ghost" disabled={publishBusy} onClick={onPublishNow}>
+                  {publishBusy ? "처리 중…" : "즉시 업데이트"}
                 </button>
               </div>
               <button className="button ghost sb-btn-full" disabled={exportBusy} onClick={onExportAll}>
@@ -556,7 +555,7 @@ export function SidebarPanel(props: Props) {
       )}
 
       {activeProject && (
-        <details className="sb-section" open>
+        <details className="sb-section">
           <summary className="sb-section-title">자동화 운영</summary>
           <OperationsBoard
             projectId={activeProject.project.id}

@@ -9,10 +9,10 @@ type RouteContext = {
   }>;
 };
 
-type CredentialServiceKey = "wordpress" | "meta" | "ga4" | "alerts";
+type CredentialServiceKey = "blogger" | "meta" | "ga4" | "alerts";
 
 function normalizeService(value: unknown): CredentialServiceKey | null {
-  if (value === "wordpress" || value === "meta" || value === "ga4" || value === "alerts") {
+  if (value === "blogger" || value === "meta" || value === "ga4" || value === "alerts") {
     return value;
   }
 
@@ -70,4 +70,3 @@ export async function POST(request: Request, context: RouteContext) {
     return jsonError(error instanceof Error ? error.message : "자격증명 점검 실행에 실패했습니다.", 500);
   }
 }
-

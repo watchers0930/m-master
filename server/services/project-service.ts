@@ -18,6 +18,7 @@ import {
   getProjectContentPlan,
   listProjectChannelPublications,
   listDueContentPlanItems,
+  getProjectContentPlanItemByContentJobId,
   getLatestVariantGroup,
   getProjectDetail,
   getVariantGroup,
@@ -31,6 +32,7 @@ import {
   markContentPlanItemStatus,
   saveLatestContentJobPublishResult,
   saveLatestContentJobAssets,
+  updateContentPlanItemReviewState,
   updateContentAssetDraft,
   selectImageAssetForContentAsset,
   updateProjectSettings,
@@ -57,7 +59,7 @@ import { analyzeSourceFiles } from "./source-analysis-service";
 import { buildStudioSeed } from "./studio-seed-service";
 import { buildTopicRecommendations, normalizeTopicTitle } from "./topic-recommendation-service";
 import { fetchWebsiteSource } from "./website-source-service";
-import { publishToWordPress, WordPressPublishError } from "./wordpress-publish-service";
+import { BloggerPublishError, publishToBlogger } from "./blogger-publish-service";
 import type { CreateProjectInput } from "../validators/project-validator";
 
 export class ProjectNotFoundError extends Error {
@@ -109,7 +111,7 @@ export class ProjectAutomationReadinessError extends Error {
   }
 }
 
-export { WordPressPublishError };
+export { BloggerPublishError };
 
 type AutomationMode = "draft-only" | "approved-auto-publish" | "full-auto";
 type AutomationExecutionStatus = "published" | "ready_to_publish" | "needs_review" | "failed";
@@ -579,23 +581,19 @@ async function processAutomationPlanItem(item: AutomationPlanItemRecord) {
     };
   }
 
-  const storedAppPassword = decryptSecret(item.contentPlan.project.wordpressAppPasswordEncrypted);
-  const hasWordPressAutomation =
-    Boolean(item.contentPlan.project.wordpressSiteUrl) &&
-    Boolean(item.contentPlan.project.wordpressUsername) &&
-    Boolean(storedAppPassword);
+  const storedBloggerAccessToken = decryptSecret(item.contentPlan.project.bloggerAccessTokenEncrypted);
+  const hasBloggerAutomation =
+    Boolean(item.contentPlan.project.bloggerBlogId) &&
+    Boolean(storedBloggerAccessToken);
 
   const publish = await markProjectReadyForPublish(
     projectId,
-    hasWordPressAutomation
+    hasBloggerAutomation
       ? {
-          wordpress: {
-            siteUrl: item.contentPlan.project.wordpressSiteUrl || "",
-            username: item.contentPlan.project.wordpressUsername || "",
-            appPassword: storedAppPassword || "",
-            status: item.contentPlan.project.wordpressStatus === "publish" ? "publish" : "draft",
-            categoryNames: item.contentPlan.project.wordpressCategoryNames || "",
-            tagNames: item.contentPlan.project.wordpressTagNames || "",
+          blogger: {
+            blogId: item.contentPlan.project.bloggerBlogId || "",
+            accessToken: storedBloggerAccessToken || "",
+            status: item.contentPlan.project.bloggerStatus === "publish" ? "publish" : "draft",
           },
         }
       : undefined,
@@ -624,10 +622,10 @@ async function processAutomationPlanItem(item: AutomationPlanItemRecord) {
     projectId,
     status: (publish.status === "published" ? "published" : "ready_to_publish") as AutomationExecutionStatus,
     contentJobId: publish.contentJobId,
-    message: hasWordPressAutomation
+    message: hasBloggerAutomation
       ? automationMode === "full-auto"
-        ? `${item.topic} 콘텐츠를 생성하고 블로그 및 소셜 자동 게시까지 처리했습니다.`
-        : `${item.topic} 콘텐츠를 생성하고 워드프레스 자동 게시까지 처리했습니다.`
+        ? `${item.topic} 콘텐츠를 생성하고 Blogger 및 소셜 자동 게시까지 처리했습니다.`
+        : `${item.topic} 콘텐츠를 생성하고 Blogger 자동 게시까지 처리했습니다.`
       : `${item.topic} 콘텐츠를 생성하고 발행 준비 상태로 전환했습니다.`,
   };
 }
@@ -675,6 +673,9 @@ function serializeProjectDetail(record: NonNullable<Awaited<ReturnType<typeof ge
       wordpressStatus: record.project.wordpressStatus,
       wordpressCategoryNames: record.project.wordpressCategoryNames,
       wordpressTagNames: record.project.wordpressTagNames,
+      bloggerBlogId: record.project.bloggerBlogId,
+      hasBloggerAccessToken: Boolean(record.project.bloggerAccessTokenEncrypted),
+      bloggerStatus: record.project.bloggerStatus,
       hasMetaAccessToken: Boolean(record.project.metaAccessTokenEncrypted),
       metaTokenExpiresAt: record.project.metaTokenExpiresAt?.toISOString() ?? null,
       facebookPageId: record.project.facebookPageId,
@@ -886,6 +887,9 @@ export async function saveProjectSettings(params: {
   wordpressStatus?: "draft" | "publish";
   wordpressCategoryNames?: string;
   wordpressTagNames?: string;
+  bloggerBlogId?: string;
+  bloggerAccessToken?: string;
+  bloggerStatus?: "draft" | "publish";
   metaAccessToken?: string;
   metaTokenExpiresAt?: string;
   facebookPageId?: string;
@@ -921,6 +925,12 @@ export async function saveProjectSettings(params: {
     wordpressStatus: params.wordpressStatus,
     wordpressCategoryNames: params.wordpressCategoryNames,
     wordpressTagNames: params.wordpressTagNames,
+    bloggerBlogId: params.bloggerBlogId,
+    bloggerAccessTokenEncrypted:
+      params.bloggerAccessToken !== undefined
+        ? encryptSecret(params.bloggerAccessToken) ?? null
+        : undefined,
+    bloggerStatus: params.bloggerStatus,
     metaAccessTokenEncrypted:
       params.metaAccessToken !== undefined
         ? encryptSecret(params.metaAccessToken) ?? null
@@ -943,13 +953,13 @@ export async function saveProjectSettings(params: {
     automationMinRiskScore: params.automationMinRiskScore,
   });
 
-  if (params.wordpressAppPassword !== undefined) {
+  if (params.bloggerAccessToken !== undefined) {
     await recordCredentialRotation({
       projectId: params.projectId,
-      service: "wordpress",
+      service: "blogger",
       actorLabel: params.actorLabel ?? null,
-      summary: params.wordpressAppPassword ? "워드프레스 앱 비밀번호를 갱신했습니다." : "워드프레스 앱 비밀번호를 제거했습니다.",
-      detail: params.wordpressAppPassword ? "프로젝트 설정 화면에서 워드프레스 자격증명을 교체했습니다." : "프로젝트 설정에서 워드프레스 앱 비밀번호를 비웠습니다.",
+      summary: params.bloggerAccessToken ? "Blogger access token을 갱신했습니다." : "Blogger access token을 제거했습니다.",
+      detail: params.bloggerAccessToken ? "프로젝트 설정 화면에서 Blogger access token을 교체했습니다." : "프로젝트 설정에서 Blogger access token을 비웠습니다.",
     });
   }
 
@@ -1224,14 +1234,14 @@ export async function getProjectAutomationReadiness(projectId: string) {
   }
 
   if (automationMode !== "draft-only") {
-    if (!record.project.wordpressSiteUrl || !record.project.wordpressUsername || !record.project.wordpressAppPasswordEncrypted) {
+    if (!record.project.bloggerBlogId || !record.project.bloggerAccessTokenEncrypted) {
       issues.push({
-        id: "wordpress-config-missing",
+        id: "blogger-config-missing",
         severity: "blocking",
-        area: "wordpress",
-        title: "워드프레스 자동 게시 설정이 완전하지 않습니다.",
-        detail: "사이트 URL, 사용자명, 앱 비밀번호가 모두 필요합니다.",
-        recommendation: "채널 설정에서 워드프레스 기본값을 저장하세요.",
+        area: "automation",
+        title: "Blogger 자동 게시 설정이 완전하지 않습니다.",
+        detail: "Blog ID와 access token이 모두 필요합니다.",
+        recommendation: "채널 설정에서 Blogger 기본값을 저장하세요.",
       });
     }
 
@@ -1521,12 +1531,12 @@ export async function retryProjectChannelPublication(params: {
     };
   }
 
-  if (publication.provider === "wordpress") {
+  if (publication.provider === "blogger") {
     const blogAsset = contentJob.assets.find((asset) => asset.channel === "blog");
-    const storedAppPassword = decryptSecret(project.wordpressAppPasswordEncrypted);
+    const storedAccessToken = decryptSecret(project.bloggerAccessTokenEncrypted);
 
-    if (!project.wordpressSiteUrl || !project.wordpressUsername || !storedAppPassword || !blogAsset) {
-      throw new WordPressPublishError("워드프레스 재시도에 필요한 프로젝트 설정 또는 블로그 자산이 없습니다.");
+    if (!project.bloggerBlogId || !storedAccessToken || !blogAsset) {
+      throw new BloggerPublishError("Blogger 재시도에 필요한 프로젝트 설정 또는 블로그 자산이 없습니다.");
     }
 
     const approvedRecord = requireApprovedBrandProfile(await getProjectDetail(params.projectId), params.projectId);
@@ -1540,42 +1550,35 @@ export async function retryProjectChannelPublication(params: {
       updatedAt: contentJob.updatedAt.toISOString(),
     });
 
-    const wordpressPost = await publishToWordPress({
-      siteUrl: project.wordpressSiteUrl,
-      username: project.wordpressUsername,
-      appPassword: storedAppPassword,
-      status: project.wordpressStatus === "publish" ? "publish" : "draft",
+    const bloggerPost = await publishToBlogger({
+      blogId: project.bloggerBlogId,
+      accessToken: storedAccessToken,
+      status: project.bloggerStatus === "publish" ? "publish" : "draft",
       title: publishPackage.title,
-      slug: publishPackage.slug,
-      excerpt: publishPackage.summary,
       content: publishPackage.bodyHtml,
-      coverImageUrl: publishPackage.coverImageUrl,
-      categoryNames: project.wordpressCategoryNames,
-      tagNames:
-        project.wordpressTagNames ||
+      labels:
         blogAsset.hashtags
           ?.split(",")
           .map((tag) => tag.trim().replace(/^#/, ""))
-          .filter(Boolean)
-          .join(", "),
+          .filter(Boolean) || [],
     });
 
     await saveLatestContentJobPublishResult({
       projectId: params.projectId,
-      status: project.wordpressStatus === "publish" ? "published" : "ready_to_publish",
-      publishProvider: "wordpress",
-      externalPostId: String(wordpressPost.postId),
-      externalPostUrl: wordpressPost.link,
+      status: project.bloggerStatus === "publish" ? "published" : "ready_to_publish",
+      publishProvider: "blogger",
+      externalPostId: bloggerPost.postId,
+      externalPostUrl: bloggerPost.url || bloggerPost.selfLink || null,
       publishedAt: new Date(),
     });
 
     const retried = await createChannelPublication({
       contentJobId: contentJob.id,
       channel: "blog",
-      provider: "wordpress",
-      status: project.wordpressStatus === "publish" ? "published" : "ready_to_publish",
-      externalPostId: String(wordpressPost.postId),
-      externalPostUrl: wordpressPost.link,
+      provider: "blogger",
+      status: project.bloggerStatus === "publish" ? "published" : "ready_to_publish",
+      externalPostId: bloggerPost.postId,
+      externalPostUrl: bloggerPost.url || bloggerPost.selfLink || null,
       payloadSummary: publishPackage.title || blogAsset.body.slice(0, 140),
       publishedAt: new Date(),
     });
@@ -1756,24 +1759,20 @@ export async function resolveProjectAutomationReview(params: {
     throw new ProjectContentNotFoundError(params.projectId);
   }
 
-  const storedAppPassword = decryptSecret(record.project.wordpressAppPasswordEncrypted);
-  const hasWordPressAutomation =
-    Boolean(record.project.wordpressSiteUrl) &&
-    Boolean(record.project.wordpressUsername) &&
-    Boolean(storedAppPassword);
+  const storedBloggerAccessToken = decryptSecret(record.project.bloggerAccessTokenEncrypted);
+  const hasBloggerAutomation =
+    Boolean(record.project.bloggerBlogId) &&
+    Boolean(storedBloggerAccessToken);
   const automationMode = normalizeAutomationMode(record.project.automationMode);
 
   const publish = await markProjectReadyForPublish(
     params.projectId,
-    hasWordPressAutomation
+    hasBloggerAutomation
       ? {
-          wordpress: {
-            siteUrl: record.project.wordpressSiteUrl || "",
-            username: record.project.wordpressUsername || "",
-            appPassword: storedAppPassword || "",
-            status: record.project.wordpressStatus === "publish" ? "publish" : "draft",
-            categoryNames: record.project.wordpressCategoryNames || "",
-            tagNames: record.project.wordpressTagNames || "",
+          blogger: {
+            blogId: record.project.bloggerBlogId || "",
+            accessToken: storedBloggerAccessToken || "",
+            status: record.project.bloggerStatus === "publish" ? "publish" : "draft",
           },
         }
       : undefined,
@@ -2031,6 +2030,8 @@ export async function generateProjectContent(params: {
   derivationMode?: "blog-first" | "independent";
 }) {
   const record = requireApprovedBrandProfile(await getProjectDetail(params.projectId), params.projectId);
+  const automationMode = normalizeAutomationMode(record.project.automationMode);
+  const storedBloggerAccessToken = decryptSecret(record.project.bloggerAccessTokenEncrypted);
 
   const selectedTopic =
     (params.topicId
@@ -2044,6 +2045,41 @@ export async function generateProjectContent(params: {
   }
 
   const normalizedTopic = normalizeTopicTitle(selectedTopic, record.project.name);
+
+  async function maybeAutoPublishAfterGenerate() {
+    if (params.planItemId) {
+      return;
+    }
+
+    if (automationMode === "draft-only") {
+      return;
+    }
+
+    if (!record.project.bloggerBlogId || !storedBloggerAccessToken) {
+      return;
+    }
+
+    await markProjectReadyForPublish(params.projectId, {
+      blogger: {
+        blogId: record.project.bloggerBlogId,
+        accessToken: storedBloggerAccessToken,
+        status: record.project.bloggerStatus === "publish" ? "publish" : "draft",
+      },
+    });
+
+    if (automationMode === "full-auto") {
+      const refreshedRecord = requireApprovedBrandProfile(await getProjectDetail(params.projectId), params.projectId);
+      const latestContentJob = refreshedRecord.latestContentJob;
+
+      if (latestContentJob) {
+        await publishProjectSocialChannels({
+          project: refreshedRecord.project,
+          latestContentJob,
+          metaAccessToken: decryptSecret(refreshedRecord.project.metaAccessTokenEncrypted),
+        });
+      }
+    }
+  }
 
   if (params.derivationMode === "blog-first") {
     const blogGenerated = await buildGeneratedStudioSeed({
@@ -2086,6 +2122,8 @@ export async function generateProjectContent(params: {
       });
     }
 
+    await maybeAutoPublishAfterGenerate();
+
     return getProjectStudioSeed(params.projectId);
   }
 
@@ -2115,6 +2153,8 @@ export async function generateProjectContent(params: {
     });
   }
 
+  await maybeAutoPublishAfterGenerate();
+
   return getProjectStudioSeed(params.projectId);
 }
 
@@ -2140,6 +2180,47 @@ export async function saveProjectContentDraft(params: {
     objective: params.objective,
     assets: params.assets,
   });
+
+  const refreshedRecord = requireApprovedBrandProfile(await getProjectDetail(params.projectId), params.projectId);
+  const latestContentJob = refreshedRecord.latestContentJob;
+  const review = buildReviewSummary({
+    summary: refreshedRecord.brandProfile.summary,
+    cta: refreshedRecord.brandProfile.cta,
+    bannedTerms: refreshedRecord.brandProfile.bannedTerms,
+    assets: params.assets,
+  });
+  const guardrail = evaluateReviewGuardrail({
+    requireReview: refreshedRecord.project.automationRequireReview,
+    minOverallScore: refreshedRecord.project.automationMinOverallScore,
+    minRiskScore: refreshedRecord.project.automationMinRiskScore,
+    review,
+  });
+  const reviewSnapshot = buildReviewSnapshot({
+    guardrail,
+    review,
+    requireReview: refreshedRecord.project.automationRequireReview,
+    minOverallScore: refreshedRecord.project.automationMinOverallScore,
+    minRiskScore: refreshedRecord.project.automationMinRiskScore,
+  });
+  const nextStatus = guardrail.approved ? "ready_to_publish" : "needs_review";
+
+  await updateLatestContentJobStatus(params.projectId, nextStatus);
+
+  if (latestContentJob?.id) {
+    const linkedPlanItem = await getProjectContentPlanItemByContentJobId({
+      projectId: params.projectId,
+      contentJobId: latestContentJob.id,
+    });
+
+    if (linkedPlanItem) {
+      await updateContentPlanItemReviewState({
+        planItemId: linkedPlanItem.id,
+        status: nextStatus,
+        lastError: guardrail.approved ? null : guardrail.message,
+        reviewSnapshot,
+      });
+    }
+  }
 
   return getProjectStudioSeed(params.projectId);
 }
@@ -2219,13 +2300,10 @@ export async function exportProjectContent(projectId: string) {
 export async function markProjectReadyForPublish(
   projectId: string,
   options?: {
-    wordpress?: {
-      siteUrl: string;
-      username: string;
-      appPassword: string;
+    blogger?: {
+      blogId: string;
+      accessToken: string;
       status: "draft" | "publish";
-      categoryNames?: string;
-      tagNames?: string;
     };
     publishOverrides?: {
       title?: string;
@@ -2240,6 +2318,7 @@ export async function markProjectReadyForPublish(
 ) {
   const record = requireApprovedBrandProfile(await getProjectDetail(projectId), projectId);
   const latestContentJob = record.latestContentJob;
+  const storedBloggerAccessToken = decryptSecret(record.project.bloggerAccessTokenEncrypted);
 
   if (!latestContentJob) {
     throw new ProjectContentNotFoundError(projectId);
@@ -2251,7 +2330,16 @@ export async function markProjectReadyForPublish(
     throw new ProjectContentNotFoundError(projectId);
   }
 
-  if (options?.wordpress && !settings?.skipSafetyGate) {
+  const effectiveBlogger =
+    options?.blogger && (options.blogger.blogId || record.project.bloggerBlogId)
+      ? {
+          blogId: options.blogger.blogId || record.project.bloggerBlogId || "",
+          accessToken: options.blogger.accessToken || storedBloggerAccessToken || "",
+          status: options.blogger.status,
+        }
+      : null;
+
+  if (effectiveBlogger && !settings?.skipSafetyGate) {
     const review = buildReviewSummary({
       summary: record.brandProfile.summary,
       cta: record.brandProfile.cta,
@@ -2287,47 +2375,49 @@ export async function markProjectReadyForPublish(
     updatedAt: latestContentJob.updatedAt.toISOString(),
     overrides: options?.publishOverrides,
   });
-  let wordpress = null as Awaited<ReturnType<typeof publishToWordPress>> | null;
+  let publishResult:
+    | { provider: "blogger"; status: "draft" | "publish"; postId: string; link: string }
+    | null = null;
+  let blogger = null as Awaited<ReturnType<typeof publishToBlogger>> | null;
 
-  if (options?.wordpress && options.wordpress.siteUrl && options.wordpress.username && options.wordpress.appPassword) {
+  if (effectiveBlogger && effectiveBlogger.blogId && effectiveBlogger.accessToken) {
     try {
-      wordpress = await publishToWordPress({
-        siteUrl: options.wordpress.siteUrl,
-        username: options.wordpress.username,
-        appPassword: options.wordpress.appPassword,
-        status: options.wordpress.status,
+      blogger = await publishToBlogger({
+        blogId: effectiveBlogger.blogId,
+        accessToken: effectiveBlogger.accessToken,
+        status: effectiveBlogger.status,
         title: publishPackage.title,
-        slug: publishPackage.slug,
-        excerpt: publishPackage.summary,
         content: publishPackage.bodyHtml,
-        coverImageUrl: publishPackage.coverImageUrl,
-        categoryNames: options.wordpress.categoryNames,
-        tagNames:
-          options.wordpress.tagNames ||
+        labels:
           blogAsset.hashtags
             ?.split(",")
             .map((tag) => tag.trim().replace(/^#/, ""))
-            .filter(Boolean)
-            .join(", "),
+            .filter(Boolean) || [],
       });
 
       await createChannelPublication({
         contentJobId: latestContentJob.id,
         channel: "blog",
-        provider: "wordpress",
-        status: options.wordpress.status === "publish" ? "published" : "ready_to_publish",
-        externalPostId: String(wordpress.postId),
-        externalPostUrl: wordpress.link,
+        provider: "blogger",
+        status: effectiveBlogger.status === "publish" ? "published" : "ready_to_publish",
+        externalPostId: blogger.postId,
+        externalPostUrl: blogger.url || blogger.selfLink || null,
         payloadSummary: publishPackage.title || blogAsset.body.slice(0, 140),
         publishedAt: new Date(),
       });
+      publishResult = {
+        provider: "blogger",
+        status: effectiveBlogger.status,
+        postId: blogger.postId,
+        link: blogger.url || blogger.selfLink || "",
+      };
     } catch (error) {
-      const message = error instanceof Error ? error.message : "워드프레스 게시에 실패했습니다.";
+      const message = error instanceof Error ? error.message : "Blogger 게시에 실패했습니다.";
 
       await createChannelPublication({
         contentJobId: latestContentJob.id,
         channel: "blog",
-        provider: "wordpress",
+        provider: "blogger",
         status: "failed",
         errorMessage: message.slice(0, 4000),
         payloadSummary: publishPackage.title || blogAsset.body.slice(0, 140),
@@ -2337,13 +2427,13 @@ export async function markProjectReadyForPublish(
     }
   }
 
-  const updated = wordpress
+  const updated = publishResult
     ? await saveLatestContentJobPublishResult({
         projectId,
-        status: options?.wordpress?.status === "publish" ? "published" : "ready_to_publish",
-        publishProvider: "wordpress",
-        externalPostId: String(wordpress.postId),
-        externalPostUrl: wordpress.link,
+        status: publishResult.status === "publish" ? "published" : "ready_to_publish",
+        publishProvider: publishResult.provider,
+        externalPostId: publishResult.postId,
+        externalPostUrl: publishResult.link,
         publishedAt: new Date(),
       })
     : await saveLatestContentJobPublishResult({
@@ -2370,7 +2460,7 @@ export async function markProjectReadyForPublish(
       status: updated.status,
       updatedAt: updated.updatedAt.toISOString(),
     },
-    wordpress,
+    blogger,
   };
 }
 

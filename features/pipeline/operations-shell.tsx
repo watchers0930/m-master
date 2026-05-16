@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AppHeader } from "@/features/site/app-header";
 import { OperationsBoard } from "./components/operations-board";
 import { usePipelineState } from "./hooks/use-pipeline-state";
@@ -18,11 +18,7 @@ export function OperationsShell() {
   const [publicationFeedback, setPublicationFeedback] = useState<string | null>(null);
   const [bulkReport, setBulkReport] = useState<BulkOperationReport | null>(null);
   const [operatorSession, setOperatorSession] = useState<ProjectOperatorSession | null>(null);
-  const [operatorLoginName, setOperatorLoginName] = useState("admin");
-  const [operatorLoginKey, setOperatorLoginKey] = useState("1111");
-  const [operatorBusy, setOperatorBusy] = useState(false);
   const [requestedProjectId, setRequestedProjectId] = useState<string | null>(null);
-  const autoLoginAttemptedProjectIdRef = useRef<string | null>(null);
   const projectId = state.activeProject?.project?.id;
 
   useEffect(() => {
@@ -56,25 +52,11 @@ export function OperationsShell() {
   useEffect(() => {
     if (!projectId) {
       setOperatorSession(null);
-      autoLoginAttemptedProjectIdRef.current = null;
       return;
     }
 
     void loadOperatorSession(projectId);
   }, [projectId]);
-
-  useEffect(() => {
-    if (!projectId || operatorSession || operatorBusy) {
-      return;
-    }
-
-    if (autoLoginAttemptedProjectIdRef.current === projectId) {
-      return;
-    }
-
-    autoLoginAttemptedProjectIdRef.current = projectId;
-    void handleOperatorLogin();
-  }, [projectId, operatorSession, operatorBusy]);
 
   useEffect(() => {
     if (state.activeProject) {
@@ -125,93 +107,6 @@ export function OperationsShell() {
     } catch (error) {
       setOperatorSession(null);
       state.setError(error instanceof Error ? error.message : "운영자 세션을 확인하지 못했습니다.");
-    }
-  }
-
-  async function handleOperatorLogin() {
-    if (!projectId) {
-      return;
-    }
-
-    setOperatorBusy(true);
-    state.setError("");
-
-    try {
-      const requestSession = async () => {
-        const response = await fetch(`/api/projects/${projectId}/operators/session`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: operatorLoginName,
-            accessKey: operatorLoginKey,
-          }),
-        });
-        return (await response.json().catch(() => null)) as
-          | { ok?: boolean; data?: { operator?: ProjectOperatorSession | null }; error?: { message?: string } }
-          | null;
-      };
-
-      let payload = await requestSession();
-
-      if (!payload?.ok && payload?.error?.message === "운영자 계정을 찾지 못했습니다.") {
-        const operatorsResponse = await fetch(`/api/projects/${projectId}/operators`, { cache: "no-store" });
-        const operatorsPayload = (await operatorsResponse.json().catch(() => null)) as
-          | { ok?: boolean; data?: { bootstrapRequired?: boolean }; error?: { message?: string } }
-          | null;
-
-        if (operatorsPayload?.ok && operatorsPayload.data?.bootstrapRequired) {
-          const bootstrapResponse = await fetch(`/api/projects/${projectId}/operators`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name: operatorLoginName,
-              accessKey: operatorLoginKey,
-              role: "owner",
-              bootstrapSecret: operatorLoginKey,
-            }),
-          });
-          const bootstrapPayload = (await bootstrapResponse.json().catch(() => null)) as
-            | { ok?: boolean; error?: { message?: string } }
-            | null;
-
-          if (!bootstrapPayload?.ok) {
-            throw new Error(bootstrapPayload?.error?.message || "운영자 계정을 생성하지 못했습니다.");
-          }
-
-          payload = await requestSession();
-        }
-      }
-
-      if (!payload?.ok || !payload.data?.operator) {
-        throw new Error(payload?.error?.message || "운영자 로그인에 실패했습니다.");
-      }
-
-      setOperatorSession(payload.data.operator);
-      setOperatorLoginKey("1111");
-    } catch (error) {
-      state.setError(error instanceof Error ? error.message : "운영자 로그인에 실패했습니다.");
-    } finally {
-      setOperatorBusy(false);
-    }
-  }
-
-  async function handleOperatorLogout() {
-    if (!projectId) {
-      return;
-    }
-
-    setOperatorBusy(true);
-    state.setError("");
-
-    try {
-      await fetch(`/api/projects/${projectId}/operators/session`, {
-        method: "DELETE",
-      });
-      setOperatorSession(null);
-    } catch (error) {
-      state.setError(error instanceof Error ? error.message : "운영자 로그아웃에 실패했습니다.");
-    } finally {
-      setOperatorBusy(false);
     }
   }
 
@@ -378,35 +273,16 @@ export function OperationsShell() {
           </details>
           {state.activeProject ? (
             <details className="sb-section" open>
-              <summary className="sb-section-title">운영자 로그인</summary>
+              <summary className="sb-section-title">운영자 세션</summary>
               <div className="sb-section-body">
                 <div className="sb-form">
                   <div className="sb-active-project">
                     <strong>{operatorSession ? `${operatorSession.name} · ${operatorSession.role}` : "로그인 안 됨"}</strong>
                     <span className="fine-print">
-                      {operatorSession ? "이 세션으로 자동 실행, 승인, 재시도를 수행합니다." : "프로젝트 운영 권한이 필요한 작업 전에 로그인하세요."}
+                      {operatorSession ? "이 세션으로 자동 실행, 승인, 재시도를 수행합니다." : "루트 로그인 화면에서 이 프로젝트로 먼저 로그인해야 운영 작업을 실행할 수 있습니다."}
                     </span>
                   </div>
-                  {!operatorSession ? (
-                    <>
-                      <div className="field-group">
-                        <label className="field-label">운영자 이름</label>
-                        <input className="text-input" value={operatorLoginName} onChange={(e) => setOperatorLoginName(e.target.value)} />
-                      </div>
-                      <div className="field-group">
-                        <label className="field-label">접근 키</label>
-                        <input className="text-input" type="password" value={operatorLoginKey} onChange={(e) => setOperatorLoginKey(e.target.value)} />
-                      </div>
-                      <button className="button primary sb-btn-full" disabled={operatorBusy || !operatorLoginName.trim() || !operatorLoginKey.trim()} onClick={() => void handleOperatorLogin()}>
-                        {operatorBusy ? "로그인 중…" : "운영자 로그인"}
-                      </button>
-                      <p className="fine-print">기본 입력값은 `admin / 1111`입니다.</p>
-                    </>
-                  ) : (
-                    <button className="button ghost sb-btn-full" disabled={operatorBusy} onClick={() => void handleOperatorLogout()}>
-                      {operatorBusy ? "처리 중…" : "로그아웃"}
-                    </button>
-                  )}
+                  {!operatorSession ? <p className="fine-print">로그인 후 `/studio/operations?projectId=...` 로 다시 들어오면 세션이 바로 연결됩니다.</p> : null}
                 </div>
               </div>
             </details>
@@ -417,16 +293,12 @@ export function OperationsShell() {
               <div className="sb-section-body">
                 <div className="sb-form">
                   <div className="field-group">
-                    <label className="field-label">WP 사이트 URL</label>
-                    <input className="text-input" value={publish.wordpressConfig.siteUrl} onChange={(e) => publish.handleWordPressConfigChange("siteUrl", e.target.value)} />
+                    <label className="field-label">Blogger Blog ID</label>
+                    <input className="text-input" value={publish.wordpressConfig.bloggerBlogId} onChange={(e) => publish.handleWordPressConfigChange("bloggerBlogId", e.target.value)} />
                   </div>
                   <div className="field-group">
-                    <label className="field-label">사용자명</label>
-                    <input className="text-input" value={publish.wordpressConfig.username} onChange={(e) => publish.handleWordPressConfigChange("username", e.target.value)} />
-                  </div>
-                  <div className="field-group">
-                    <label className="field-label">앱 비밀번호</label>
-                    <input className="text-input" type="password" value={publish.wordpressConfig.appPassword} onChange={(e) => publish.handleWordPressConfigChange("appPassword", e.target.value)} />
+                    <label className="field-label">Blogger Access Token</label>
+                    <input className="text-input" type="password" value={publish.wordpressConfig.bloggerAccessToken} onChange={(e) => publish.handleWordPressConfigChange("bloggerAccessToken", e.target.value)} />
                   </div>
                   <div className="field-group">
                     <label className="field-label">Meta Access Token</label>
