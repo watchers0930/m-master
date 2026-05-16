@@ -385,9 +385,6 @@ export function RootLoginShell() {
               <button type="submit" className="root-login-submit" disabled={loading || lookupBusy || submitting || !selectedProjectId}>
                 {submitting ? "로그인 중…" : "운영보드로 로그인"}
               </button>
-              <a className="root-login-secondary" href="/studio">
-                스튜디오만 열기
-              </a>
             </div>
 
             {claimableProjects.length > 0 ? (

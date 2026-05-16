@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AppHeader } from "@/features/site/app-header";
 import { usePipelineState } from "./hooks/use-pipeline-state";
 import { usePublishWorkflow } from "../dashboard/use-publish-workflow";
@@ -10,7 +11,9 @@ import type { CredentialHealthReport, ProjectOperatorSession } from "../dashboar
 type CredentialService = "blogger" | "meta" | "ga4" | "alerts";
 
 export function SettingsShell() {
+  const router = useRouter();
   const state = usePipelineState();
+  const [projectsResolved, setProjectsResolved] = useState(false);
   const [checkBusy, setCheckBusy] = useState<CredentialService | null>(null);
   const [credentialHealth, setCredentialHealth] = useState<CredentialHealthReport | null>(null);
   const [operatorSession, setOperatorSession] = useState<ProjectOperatorSession | null>(null);
@@ -25,8 +28,16 @@ export function SettingsShell() {
   });
 
   useEffect(() => {
-    void state.loadProjects();
+    void state.loadProjects().finally(() => {
+      setProjectsResolved(true);
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (projectsResolved && !state.loading && state.projects.length === 0) {
+      router.replace("/");
+    }
+  }, [projectsResolved, state.loading, state.projects.length, router]);
 
   useEffect(() => {
     if (!projectId && state.projects.length > 0) {

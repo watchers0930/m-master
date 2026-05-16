@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AppHeader } from "@/features/site/app-header";
 import { OperationsBoard } from "./components/operations-board";
 import { usePipelineState } from "./hooks/use-pipeline-state";
@@ -32,7 +33,9 @@ function getProjectShortId(projectId: string) {
 }
 
 export function OperationsShell() {
+  const router = useRouter();
   const state = usePipelineState();
+  const [projectsResolved, setProjectsResolved] = useState(false);
   const [planBusy, setPlanBusy] = useState(false);
   const [automationBusy, setAutomationBusy] = useState(false);
   const [automationRun, setAutomationRun] = useState<AutomationRunSummary | null>(null);
@@ -61,8 +64,16 @@ export function OperationsShell() {
   });
 
   useEffect(() => {
-    void state.loadProjects();
+    void state.loadProjects().finally(() => {
+      setProjectsResolved(true);
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (projectsResolved && !state.loading && state.projects.length === 0) {
+      router.replace("/");
+    }
+  }, [projectsResolved, state.loading, state.projects.length, router]);
 
   useEffect(() => {
     if (!projectId && state.projects.length > 0) {

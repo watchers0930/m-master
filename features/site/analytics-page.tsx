@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { AppHeader } from "@/features/site/app-header";
-import { getProjectList } from "@/server/services/project-service";
+import { getCurrentProjectOperatorAccessIdentity } from "@/server/services/project-operator-service";
+import { getProjectListForOperatorIdentity } from "@/server/services/project-service";
 import { getAnalyticsSnapshot, type AnalyticsRangeKey } from "@/server/services/analytics-service";
 
 export const analyticsMetadata: Metadata = {
@@ -32,7 +35,28 @@ type AnalyticsPageProps = {
 };
 
 export async function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
-  const projects = await getProjectList();
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore
+    .getAll()
+    .map((cookie) => `${cookie.name}=${encodeURIComponent(cookie.value)}`)
+    .join("; ");
+  const sessionRequest = new Request("http://localhost", {
+    headers: cookieHeader ? { cookie: cookieHeader } : undefined,
+  });
+  const identity = await getCurrentProjectOperatorAccessIdentity(sessionRequest);
+
+  if (!identity) {
+    redirect("/");
+  }
+
+  const projects = await getProjectListForOperatorIdentity({
+    name: identity.name,
+    accessKeyHash: identity.accessKeyHash,
+  });
+  if (projects.length === 0) {
+    redirect("/");
+  }
+
   const selectedRange = normalizeRange(searchParams?.range);
   const selectedProject = projects.find((project) => project.id === searchParams?.projectId) ?? projects[0] ?? null;
   const snapshot = await getAnalyticsSnapshot(selectedRange, selectedProject?.ga4PropertyId ?? undefined);
