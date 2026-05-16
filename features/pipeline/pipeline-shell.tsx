@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AppHeader } from "@/features/site/app-header";
 import { usePipelineState } from "./hooks/use-pipeline-state";
 import { useSourceRegistration } from "./hooks/use-source-registration";
@@ -15,7 +16,9 @@ import { ImagePanel } from "./sections/image-panel";
 import type { AutomationReviewResolution, AutomationRunSummary, BulkOperationReport, MonthlyContentPlan, ProjectDetail } from "./types";
 
 export function PipelineShell() {
+  const router = useRouter();
   const state = usePipelineState();
+  const [projectsResolved, setProjectsResolved] = useState(false);
   const [planBusy, setPlanBusy] = useState(false);
   const [automationBusy, setAutomationBusy] = useState(false);
   const [automationRun, setAutomationRun] = useState<AutomationRunSummary | null>(null);
@@ -70,8 +73,16 @@ export function PipelineShell() {
 
   // Initial load
   useEffect(() => {
-    state.loadProjects();
+    void state.loadProjects().finally(() => {
+      setProjectsResolved(true);
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (projectsResolved && !state.loading && state.projects.length === 0) {
+      router.replace("/");
+    }
+  }, [projectsResolved, state.loading, state.projects.length, router]);
 
   // When project changes
   useEffect(() => {
