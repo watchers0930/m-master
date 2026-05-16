@@ -25,6 +25,15 @@ const ROLE_RANK = {
 } as const;
 
 export type ProjectOperatorRole = keyof typeof ROLE_RANK;
+export type ProjectOperatorAccessIdentity = {
+  operatorId: string;
+  projectId: string;
+  name: string;
+  role: ProjectOperatorRole;
+  accessKeyHash: string;
+  active: boolean;
+  lastUsedAt?: string | null;
+};
 
 export class ProjectOperatorAuthError extends Error {
   status: number;
@@ -191,6 +200,38 @@ export async function getAuthorizedProjectOperator(request: Request, projectId: 
     projectId: session.operator.projectId,
     name: session.operator.name,
     role: normalizeRole(session.operator.role),
+    active: session.operator.active,
+    lastUsedAt: session.operator.lastUsedAt?.toISOString() ?? null,
+  };
+}
+
+export async function getCurrentProjectOperatorAccessIdentity(request: Request): Promise<ProjectOperatorAccessIdentity | null> {
+  await deleteExpiredProjectOperatorSessions();
+
+  const cookies = parseCookies(request);
+  const token = cookies[SESSION_COOKIE_NAME];
+
+  if (!token) {
+    return null;
+  }
+
+  const session = await getProjectOperatorSessionByTokenHash(hashValue(token));
+
+  if (!session || session.expiresAt.getTime() <= Date.now() || !session.operator.active) {
+    return null;
+  }
+
+  await touchProjectOperatorSession({
+    sessionId: session.id,
+    operatorId: session.operatorId,
+  });
+
+  return {
+    operatorId: session.operator.id,
+    projectId: session.operator.projectId,
+    name: session.operator.name,
+    role: normalizeRole(session.operator.role),
+    accessKeyHash: session.operator.accessKeyHash,
     active: session.operator.active,
     lastUsedAt: session.operator.lastUsedAt?.toISOString() ?? null,
   };

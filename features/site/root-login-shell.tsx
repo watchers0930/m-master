@@ -83,6 +83,7 @@ export function RootLoginShell() {
   const [operatorName, setOperatorName] = useState("admin");
   const [operatorKey, setOperatorKey] = useState("1111");
   const [loading, setLoading] = useState(true);
+  const [lookupBusy, setLookupBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -131,8 +132,51 @@ export function RootLoginShell() {
     [projects, selectedProjectId],
   );
 
+  async function handleLookupProjects() {
+    if (!operatorName.trim() || !operatorKey.trim()) {
+      setError("운영자 이름과 접근 키를 먼저 입력하세요.");
+      return false;
+    }
+
+    setLookupBusy(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/projects/access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: operatorName.trim(),
+          accessKey: operatorKey.trim(),
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as ProjectListResponse | null;
+
+      if (!payload?.ok) {
+        throw new Error(payload?.error?.message || "내 프로젝트를 확인하지 못했습니다.");
+      }
+
+      const nextProjects = payload.data?.projects ?? [];
+      setProjects(nextProjects);
+      setSelectedProjectId(nextProjects[0]?.id ?? "");
+      return true;
+    } catch (nextError) {
+      setProjects([]);
+      setSelectedProjectId("");
+      setError(nextError instanceof Error ? nextError.message : "내 프로젝트를 확인하지 못했습니다.");
+      return false;
+    } finally {
+      setLookupBusy(false);
+    }
+  }
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (projects.length === 0) {
+      await handleLookupProjects();
+      return;
+    }
 
     if (!selectedProjectId) {
       setError("로그인할 프로젝트를 먼저 선택하세요.");
@@ -231,7 +275,11 @@ export function RootLoginShell() {
           <form className="root-login-form" onSubmit={handleSubmit}>
             <label className="root-login-field">
               <span>프로젝트</span>
-              <select value={selectedProjectId} onChange={(event) => setSelectedProjectId(event.target.value)} disabled={loading || submitting}>
+              <select
+                value={selectedProjectId}
+                onChange={(event) => setSelectedProjectId(event.target.value)}
+                disabled={loading || lookupBusy || submitting || projects.length === 0}
+              >
                 {projects.length === 0 ? <option value="">등록된 프로젝트 없음</option> : null}
                 {projects.map((project) => (
                   <option key={project.id} value={project.id}>
@@ -252,26 +300,49 @@ export function RootLoginShell() {
             <div className="root-login-field-grid">
               <label className="root-login-field">
                 <span>운영자 이름</span>
-                <input value={operatorName} onChange={(event) => setOperatorName(event.target.value)} placeholder="admin" disabled={submitting} />
+                <input
+                  value={operatorName}
+                  onChange={(event) => {
+                    setOperatorName(event.target.value);
+                    setProjects([]);
+                    setSelectedProjectId("");
+                    setError("");
+                  }}
+                  placeholder="admin"
+                  disabled={lookupBusy || submitting}
+                />
               </label>
               <label className="root-login-field">
                 <span>접근 키</span>
                 <input
                   type="password"
                   value={operatorKey}
-                  onChange={(event) => setOperatorKey(event.target.value)}
+                  onChange={(event) => {
+                    setOperatorKey(event.target.value);
+                    setProjects([]);
+                    setSelectedProjectId("");
+                    setError("");
+                  }}
                   placeholder="1111"
-                  disabled={submitting}
+                  disabled={lookupBusy || submitting}
                 />
               </label>
             </div>
 
-            <p className="root-login-hint">기본 로컬 진입값은 `admin / 1111`입니다. owner가 없으면 첫 로그인 시 자동으로 owner를 등록합니다.</p>
+            <p className="root-login-hint">운영자 이름과 접근 키를 먼저 입력하면 이 계정으로 접근 가능한 프로젝트만 표시합니다.</p>
 
             {error ? <p className="root-login-error">{error}</p> : null}
 
             <div className="root-login-actions">
-              <button type="submit" className="root-login-submit" disabled={loading || submitting || !selectedProjectId}>
+              <button
+                type="button"
+                className="root-login-secondary"
+                onClick={() => void handleLookupProjects()}
+                disabled={loading || lookupBusy || submitting}
+              >
+                {lookupBusy ? "확인 중…" : "내 프로젝트 확인"}
+              </button>
+              <button type="submit" className="root-login-submit" disabled={loading || lookupBusy || submitting || !selectedProjectId}>
                 {submitting ? "로그인 중…" : "운영보드로 로그인"}
               </button>
               <a className="root-login-secondary" href="/studio">
