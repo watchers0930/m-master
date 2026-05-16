@@ -288,7 +288,7 @@ export function SettingsShell() {
                 </div>
                 <div className="field-group">
                   <label className="field-label">Blogger Access Token</label>
-                  <input className="text-input" type="password" value={publish.wordpressConfig.bloggerAccessToken} onChange={(e) => publish.handleWordPressConfigChange("bloggerAccessToken", e.target.value)} placeholder={state.activeProject.project.hasBloggerAccessToken ? "비워두면 기존 값 유지" : "OAuth access token"} />
+                  <input className="text-input" type="password" value={publish.wordpressConfig.bloggerAccessToken} onChange={(e) => publish.handleWordPressConfigChange("bloggerAccessToken", e.target.value)} placeholder={state.activeProject.project.hasBloggerAccessToken ? "********" : "OAuth access token"} />
                   {state.activeProject.project.hasBloggerAccessToken && !publish.wordpressConfig.bloggerAccessToken ? (
                     <p className="fine-print">저장된 토큰이 있습니다. 보안상 다시 표시하지 않습니다. 변경할 때만 새 토큰을 입력하세요.</p>
                   ) : null}
@@ -327,7 +327,7 @@ export function SettingsShell() {
               <div className="settings-form-grid">
                 <div className="field-group">
                   <label className="field-label">Meta Access Token</label>
-                  <input className="text-input" type="password" value={publish.wordpressConfig.metaAccessToken} onChange={(e) => publish.handleWordPressConfigChange("metaAccessToken", e.target.value)} placeholder={state.activeProject.project.hasMetaAccessToken ? "비워두면 기존 값 유지" : "Meta Graph access token"} />
+                  <input className="text-input" type="password" value={publish.wordpressConfig.metaAccessToken} onChange={(e) => publish.handleWordPressConfigChange("metaAccessToken", e.target.value)} placeholder={state.activeProject.project.hasMetaAccessToken ? "********" : "Meta Graph access token"} />
                 </div>
                 <div className="field-group">
                   <label className="field-label">Facebook Page ID</label>
