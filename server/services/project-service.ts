@@ -2084,8 +2084,6 @@ export async function generateProjectContent(params: {
   derivationMode?: "blog-first" | "independent";
 }) {
   const record = requireApprovedBrandProfile(await getProjectDetail(params.projectId), params.projectId);
-  const automationMode = normalizeAutomationMode(record.project.automationMode);
-  const storedBloggerAccessToken = decryptSecret(record.project.bloggerAccessTokenEncrypted);
 
   const selectedTopic =
     (params.topicId
@@ -2099,41 +2097,6 @@ export async function generateProjectContent(params: {
   }
 
   const normalizedTopic = normalizeTopicTitle(selectedTopic, record.project.name);
-
-  async function maybeAutoPublishAfterGenerate() {
-    if (params.planItemId) {
-      return;
-    }
-
-    if (automationMode === "draft-only") {
-      return;
-    }
-
-    if (!record.project.bloggerBlogId || !storedBloggerAccessToken) {
-      return;
-    }
-
-    await markProjectReadyForPublish(params.projectId, {
-      blogger: {
-        blogId: record.project.bloggerBlogId,
-        accessToken: storedBloggerAccessToken,
-        status: record.project.bloggerStatus === "publish" ? "publish" : "draft",
-      },
-    });
-
-    if (automationMode === "full-auto") {
-      const refreshedRecord = requireApprovedBrandProfile(await getProjectDetail(params.projectId), params.projectId);
-      const latestContentJob = refreshedRecord.latestContentJob;
-
-      if (latestContentJob) {
-        await publishProjectSocialChannels({
-          project: refreshedRecord.project,
-          latestContentJob,
-          metaAccessToken: decryptSecret(refreshedRecord.project.metaAccessTokenEncrypted),
-        });
-      }
-    }
-  }
 
   if (params.derivationMode === "blog-first") {
     const blogGenerated = await buildGeneratedStudioSeed({
@@ -2176,8 +2139,6 @@ export async function generateProjectContent(params: {
       });
     }
 
-    await maybeAutoPublishAfterGenerate();
-
     return getProjectStudioSeed(params.projectId);
   }
 
@@ -2207,8 +2168,6 @@ export async function generateProjectContent(params: {
     });
   }
 
-  await maybeAutoPublishAfterGenerate();
-
   return getProjectStudioSeed(params.projectId);
 }
 
@@ -2225,6 +2184,8 @@ export async function saveProjectContentDraft(params: {
   }>;
 }) {
   const record = requireApprovedBrandProfile(await getProjectDetail(params.projectId), params.projectId);
+  const automationMode = normalizeAutomationMode(record.project.automationMode);
+  const storedBloggerAccessToken = decryptSecret(record.project.bloggerAccessTokenEncrypted);
 
   const normalizedTopic = normalizeTopicTitle(params.topic, record.project.name);
 
@@ -2257,8 +2218,43 @@ export async function saveProjectContentDraft(params: {
     minRiskScore: refreshedRecord.project.automationMinRiskScore,
   });
   const nextStatus = guardrail.approved ? "ready_to_publish" : "needs_review";
+  let finalStatus = nextStatus;
 
   await updateLatestContentJobStatus(params.projectId, nextStatus);
+
+  const shouldAutoPublishEditedDraft =
+    automationMode !== "draft-only" &&
+    guardrail.approved &&
+    Boolean(refreshedRecord.project.bloggerBlogId) &&
+    Boolean(storedBloggerAccessToken) &&
+    Boolean(latestContentJob) &&
+    !latestContentJob?.externalPostId &&
+    !latestContentJob?.externalPostUrl;
+
+  if (shouldAutoPublishEditedDraft) {
+    const publish = await markProjectReadyForPublish(params.projectId, {
+      blogger: {
+        blogId: refreshedRecord.project.bloggerBlogId || "",
+        accessToken: storedBloggerAccessToken || "",
+        status: refreshedRecord.project.bloggerStatus === "publish" ? "publish" : "draft",
+      },
+    });
+
+    finalStatus = publish.status === "published" ? "published" : "ready_to_publish";
+
+    if (automationMode === "full-auto") {
+      const latestPublishedRecord = requireApprovedBrandProfile(await getProjectDetail(params.projectId), params.projectId);
+      const latestPublishedContentJob = latestPublishedRecord.latestContentJob;
+
+      if (latestPublishedContentJob) {
+        await publishProjectSocialChannels({
+          project: latestPublishedRecord.project,
+          latestContentJob: latestPublishedContentJob,
+          metaAccessToken: decryptSecret(latestPublishedRecord.project.metaAccessTokenEncrypted),
+        });
+      }
+    }
+  }
 
   if (latestContentJob?.id) {
     const linkedPlanItem = await getProjectContentPlanItemByContentJobId({
@@ -2269,7 +2265,7 @@ export async function saveProjectContentDraft(params: {
     if (linkedPlanItem) {
       await updateContentPlanItemReviewState({
         planItemId: linkedPlanItem.id,
-        status: nextStatus,
+        status: finalStatus,
         lastError: guardrail.approved ? null : guardrail.message,
         reviewSnapshot,
       });
