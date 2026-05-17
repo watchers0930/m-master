@@ -1632,6 +1632,7 @@ export async function retryProjectChannelPublication(params: {
       blogId: project.bloggerBlogId,
       accessToken: storedAccessToken,
       status: project.bloggerStatus === "publish" ? "publish" : "draft",
+      postId: publication.externalPostId || contentJob.externalPostId,
       title: publishPackage.title,
       content: publishPackage.bodyHtml,
       labels:
@@ -2452,6 +2453,23 @@ export async function markProjectReadyForPublish(
           status: options.blogger.status,
         }
       : null;
+
+  if (options?.blogger) {
+    const resolvedBlogId = effectiveBlogger?.blogId || "";
+    const resolvedAccessToken = effectiveBlogger?.accessToken || "";
+
+    if (!resolvedBlogId) {
+      throw new BloggerPublishError("Blogger 자동 등록을 진행하려면 Blog ID가 필요합니다. 설정 화면에서 저장 후 다시 시도하세요.");
+    }
+
+    if (!resolvedAccessToken) {
+      throw new BloggerPublishError(
+        record.project.bloggerAccessTokenEncrypted
+          ? "저장된 Blogger access token을 읽지 못했습니다. CREDENTIAL_ENCRYPTION_SECRET 또는 토큰 저장 상태를 확인하세요."
+          : "Blogger 자동 등록을 진행하려면 access token이 필요합니다. 설정 화면에서 저장 후 다시 시도하세요.",
+      );
+    }
+  }
 
   if (effectiveBlogger && !settings?.skipSafetyGate) {
     const review = buildReviewSummary({
