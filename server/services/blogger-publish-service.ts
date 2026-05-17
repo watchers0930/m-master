@@ -152,7 +152,6 @@ export async function publishToBlogger(input: BloggerPublishInput): Promise<Blog
 
     finalPayload = publishPayload;
   }
-
   return {
     postId: finalPayload.id || payload.id,
     url: finalPayload.url || finalPayload.selfLink || payload.url || payload.selfLink || "",
