@@ -28,7 +28,21 @@ type ApiError = {
 type ApiResponse<T> = ApiOk<T> | ApiError;
 
 async function parseJson<T>(response: Response): Promise<T> {
-  return response.json() as Promise<T>;
+  const text = await response.text();
+
+  try {
+    return (text ? JSON.parse(text) : null) as T;
+  } catch {
+    if (text.startsWith("Request Entity Too Large") || text.startsWith("Request Too Large")) {
+      throw new Error("요청이 너무 큽니다. 첨부 파일 수나 본문 길이를 줄여 다시 시도하세요.");
+    }
+
+    if (text.startsWith("Request contains an invalid argument")) {
+      throw new Error("Blogger 요청 형식이 올바르지 않습니다. 저장 후 다시 시도해 주세요.");
+    }
+
+    throw new Error(text.trim() || `요청에 실패했습니다. (${response.status})`);
+  }
 }
 
 function triggerTextDownload(filename: string, content: string) {
