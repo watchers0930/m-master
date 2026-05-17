@@ -113,7 +113,8 @@ export function OperationsShell() {
   async function loadOperatorSession(nextProjectId: string) {
     try {
       const response = await fetch(`/api/projects/${nextProjectId}/operators/session`, { cache: "no-store" });
-      const payload = (await response.json().catch(() => null)) as
+      const raw = await response.text();
+      const payload = (raw ? JSON.parse(raw) : null) as
         | { ok?: boolean; data?: { operator?: ProjectOperatorSession | null }; error?: { message?: string } }
         | null;
 
@@ -124,6 +125,10 @@ export function OperationsShell() {
       setOperatorSession(payload.data?.operator ?? null);
     } catch (error) {
       setOperatorSession(null);
+      if (error instanceof SyntaxError) {
+        state.setError("운영자 세션 응답을 해석하지 못했습니다.");
+        return;
+      }
       state.setError(error instanceof Error ? error.message : "운영자 세션을 확인하지 못했습니다.");
     }
   }
