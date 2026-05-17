@@ -116,7 +116,10 @@ export function RootLoginShell() {
         setAutoEnterProjectId(nextProjects.length === 1 ? nextProjects[0].id : null);
       } catch (nextError) {
         if (!cancelled) {
-          setError(nextError instanceof Error ? nextError.message : "프로젝트 목록을 불러오지 못했습니다.");
+          setProjects([]);
+          setClaimableProjects([]);
+          setSelectedProjectId("");
+          setAutoEnterProjectId(null);
         }
       } finally {
         if (!cancelled) {
@@ -364,27 +367,25 @@ export function RootLoginShell() {
               )}
             </label>
 
-            <div className="root-login-project-card">
-              <strong>
-                {selectedProject?.name ||
-                  (hasMultipleProjects
-                    ? "프로젝트를 선택하세요."
-                    : hasSingleProject
-                      ? "이 계정의 단일 프로젝트로 바로 연결됩니다."
-                      : "로그인하면 연결 가능한 프로젝트를 확인합니다.")}
-              </strong>
-              <span>
-                {selectedProject?.domain ||
-                  (hasMultipleProjects
-                    ? "선택한 프로젝트의 도메인이 여기에 표시됩니다."
-                    : hasSingleProject
-                      ? "프로젝트 선택 단계 없이 운영보드로 바로 이동합니다."
-                      : "운영자 이름과 접근 키로 프로젝트를 조회합니다.")}
-              </span>
-              {selectedProject ? (
-                <span>{`최근 수정 ${formatProjectTimestamp(selectedProject.updatedAt)} · ID ${getProjectShortId(selectedProject.id)}`}</span>
-              ) : null}
-            </div>
+            {selectedProject || hasMultipleProjects || hasSingleProject ? (
+              <div className="root-login-project-card">
+                <strong>
+                  {selectedProject?.name ||
+                    (hasMultipleProjects
+                      ? "프로젝트를 선택하세요."
+                      : "이 계정의 단일 프로젝트로 바로 연결됩니다.")}
+                </strong>
+                <span>
+                  {selectedProject?.domain ||
+                    (hasMultipleProjects
+                      ? "선택한 프로젝트의 도메인이 여기에 표시됩니다."
+                      : "프로젝트 선택 단계 없이 운영보드로 바로 이동합니다.")}
+                </span>
+                {selectedProject ? (
+                  <span>{`최근 수정 ${formatProjectTimestamp(selectedProject.updatedAt)} · ID ${getProjectShortId(selectedProject.id)}`}</span>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="root-login-field-grid">
               <label className="root-login-field">
