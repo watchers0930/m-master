@@ -36,6 +36,6 @@ export async function POST(request: Request) {
       error: error instanceof Error ? error.message : "unknown_error",
     });
 
-    return jsonError("내 프로젝트 목록을 불러오지 못했습니다.", 500);
+    return jsonError("로그인에 필요한 프로젝트 확인에 실패했습니다.", 500);
   }
 }
