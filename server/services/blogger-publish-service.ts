@@ -51,6 +51,21 @@ function normalizeLabels(value?: string[] | null) {
   return [...new Set(value.map((item) => item.trim()).filter(Boolean))].slice(0, 20);
 }
 
+type BloggerApiPostPayload = {
+  id?: string;
+  url?: string;
+  selfLink?: string;
+  status?: string;
+  labels?: string[];
+  error?: {
+    message?: string;
+  };
+};
+
+async function parseBloggerPayload(response: Response) {
+  return (await response.json().catch(() => null)) as BloggerApiPostPayload | null;
+}
+
 export async function publishToBlogger(input: BloggerPublishInput): Promise<BloggerPublishResult> {
   const blogId = normalizeBlogId(input.blogId);
   const accessToken = normalizeAccessToken(input.accessToken);
@@ -62,11 +77,7 @@ export async function publishToBlogger(input: BloggerPublishInput): Promise<Blog
       )
     : new URL(`https://www.googleapis.com/blogger/v3/blogs/${encodeURIComponent(blogId)}/posts`);
 
-  if (normalizedPostId) {
-    if (input.status === "publish") {
-      endpoint.searchParams.set("publish", "true");
-    }
-  } else if (input.status === "draft") {
+  if (!normalizedPostId && input.status === "draft") {
     endpoint.searchParams.set("isDraft", "true");
   }
 
@@ -79,37 +90,46 @@ export async function publishToBlogger(input: BloggerPublishInput): Promise<Blog
     body: JSON.stringify({
       kind: "blogger#post",
       id: normalizedPostId || undefined,
-      blog: {
-        id: blogId,
-      },
       title: input.title,
       content: input.content,
       labels: labels.length ? labels : undefined,
     }),
   });
 
-  const payload = (await response.json().catch(() => null)) as
-    | {
-        id?: string;
-        url?: string;
-        selfLink?: string;
-        status?: string;
-        labels?: string[];
-        error?: {
-          message?: string;
-        };
-      }
-    | null;
+  const payload = await parseBloggerPayload(response);
 
   if (!response.ok || !payload?.id) {
     throw new BloggerPublishError(payload?.error?.message || `Blogger 게시에 실패했습니다. HTTP ${response.status}`);
   }
 
+  let finalPayload = payload;
+
+  if (normalizedPostId && input.status === "publish" && !payload.url) {
+    const publishEndpoint = new URL(
+      `https://www.googleapis.com/blogger/v3/blogs/${encodeURIComponent(blogId)}/posts/${encodeURIComponent(payload.id)}/publish`,
+    );
+    const publishResponse = await fetch(publishEndpoint.toString(), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    const publishPayload = await parseBloggerPayload(publishResponse);
+
+    if (!publishResponse.ok || !publishPayload?.id) {
+      throw new BloggerPublishError(
+        publishPayload?.error?.message || `Blogger 게시 공개 전환에 실패했습니다. HTTP ${publishResponse.status}`,
+      );
+    }
+
+    finalPayload = publishPayload;
+  }
+
   return {
-    postId: payload.id,
-    url: payload.url || payload.selfLink || "",
+    postId: finalPayload.id || payload.id,
+    url: finalPayload.url || finalPayload.selfLink || payload.url || payload.selfLink || "",
     status: input.status,
-    selfLink: payload.selfLink || null,
-    labels: payload.labels || labels,
+    selfLink: finalPayload.selfLink || payload.selfLink || null,
+    labels: finalPayload.labels || payload.labels || labels,
   };
 }
