@@ -148,6 +148,13 @@ export function RootLoginShell() {
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
     [projects, selectedProjectId],
   );
+  const hasMultipleProjects = projects.length > 1;
+  const hasSingleProject = projects.length === 1;
+  const projectFieldValue = selectedProject
+    ? `${selectedProject.name} · ${selectedProject.domain || "도메인 없음"}`
+    : hasSingleProject
+      ? "이 계정의 프로젝트로 자동 연결됩니다."
+      : "로그인 후 자동 선택됩니다.";
 
   async function handleLookupProjects() {
     if (!operatorName.trim() || !operatorKey.trim()) {
@@ -335,7 +342,7 @@ export function RootLoginShell() {
           <form className="root-login-form" onSubmit={handleSubmit}>
             <label className="root-login-field">
               <span>프로젝트</span>
-              {projects.length > 1 ? (
+              {hasMultipleProjects ? (
                 <select
                   value={selectedProjectId}
                   onChange={(event) => setSelectedProjectId(event.target.value)}
@@ -350,7 +357,7 @@ export function RootLoginShell() {
                 </select>
               ) : (
                 <input
-                  value={selectedProject ? `${selectedProject.name} · ${selectedProject.domain || "도메인 없음"}` : "로그인 후 자동 선택됩니다."}
+                  value={projectFieldValue}
                   readOnly
                   disabled
                 />
@@ -358,8 +365,22 @@ export function RootLoginShell() {
             </label>
 
             <div className="root-login-project-card">
-              <strong>{selectedProject?.name || "프로젝트를 선택하세요."}</strong>
-              <span>{selectedProject?.domain || "도메인이 아직 없습니다."}</span>
+              <strong>
+                {selectedProject?.name ||
+                  (hasMultipleProjects
+                    ? "프로젝트를 선택하세요."
+                    : hasSingleProject
+                      ? "이 계정의 단일 프로젝트로 바로 연결됩니다."
+                      : "로그인하면 연결 가능한 프로젝트를 확인합니다.")}
+              </strong>
+              <span>
+                {selectedProject?.domain ||
+                  (hasMultipleProjects
+                    ? "선택한 프로젝트의 도메인이 여기에 표시됩니다."
+                    : hasSingleProject
+                      ? "프로젝트 선택 단계 없이 운영보드로 바로 이동합니다."
+                      : "운영자 이름과 접근 키로 프로젝트를 조회합니다.")}
+              </span>
               {selectedProject ? (
                 <span>{`최근 수정 ${formatProjectTimestamp(selectedProject.updatedAt)} · ID ${getProjectShortId(selectedProject.id)}`}</span>
               ) : null}
@@ -400,7 +421,7 @@ export function RootLoginShell() {
             </div>
 
             <p className="root-login-hint">
-              단독 사용자라면 로그인 시 프로젝트가 자동 선택됩니다. 여러 프로젝트에 접근 가능한 계정일 때만 선택 항목이 열립니다.
+              단독 사용자라면 프로젝트 선택 단계 없이 바로 연결됩니다. 여러 프로젝트에 접근 가능한 계정일 때만 선택 항목이 열립니다.
             </p>
 
             {error ? <p className="root-login-error">{error}</p> : null}
@@ -417,7 +438,7 @@ export function RootLoginShell() {
               <button
                 type="submit"
                 className="root-login-submit"
-                disabled={loading || lookupBusy || submitting || (projects.length > 1 && !selectedProjectId)}
+                disabled={loading || lookupBusy || submitting || (hasMultipleProjects && !selectedProjectId)}
               >
                 {submitting ? "로그인 중…" : "운영보드로 로그인"}
               </button>
