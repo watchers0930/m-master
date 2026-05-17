@@ -429,19 +429,11 @@ export function RootLoginShell() {
 
             <div className="root-login-actions">
               <button
-                type="button"
-                className="root-login-secondary"
-                onClick={() => void handleLookupProjects()}
-                disabled={loading || lookupBusy || submitting}
-              >
-                {lookupBusy ? "확인 중…" : "내 프로젝트 확인"}
-              </button>
-              <button
                 type="submit"
                 className="root-login-submit"
                 disabled={loading || lookupBusy || submitting || (hasMultipleProjects && !selectedProjectId)}
               >
-                {submitting ? "로그인 중…" : "운영보드로 로그인"}
+                {lookupBusy || submitting ? "진행 중…" : "운영보드로 로그인"}
               </button>
             </div>
 
