@@ -59,11 +59,41 @@ type BloggerApiPostPayload = {
   labels?: string[];
   error?: {
     message?: string;
+    errors?: Array<{
+      message?: string;
+      reason?: string;
+    }>;
   };
 };
 
-async function parseBloggerPayload(response: Response) {
-  return (await response.json().catch(() => null)) as BloggerApiPostPayload | null;
+async function readBloggerResponse(response: Response) {
+  const text = await response.text();
+  let payload: BloggerApiPostPayload | null = null;
+
+  try {
+    payload = text ? (JSON.parse(text) as BloggerApiPostPayload) : null;
+  } catch {
+    payload = null;
+  }
+
+  return { text, payload };
+}
+
+function formatBloggerError(
+  label: string,
+  response: Response,
+  payload: BloggerApiPostPayload | null,
+  text: string,
+) {
+  const reason = payload?.error?.errors?.map((item) => item.reason).filter(Boolean).join(", ");
+  const message =
+    payload?.error?.errors?.map((item) => item.message).filter(Boolean).join(" / ") ||
+    payload?.error?.message ||
+    text.trim();
+
+  return new BloggerPublishError(
+    `${label} 실패 (HTTP ${response.status})${reason ? ` · ${reason}` : ""}${message ? ` · ${message}` : ""}`.slice(0, 500),
+  );
 }
 
 export async function publishToBlogger(input: BloggerPublishInput): Promise<BloggerPublishResult> {
@@ -96,10 +126,10 @@ export async function publishToBlogger(input: BloggerPublishInput): Promise<Blog
     }),
   });
 
-  const payload = await parseBloggerPayload(response);
+  const { text, payload } = await readBloggerResponse(response);
 
   if (!response.ok || !payload?.id) {
-    throw new BloggerPublishError(payload?.error?.message || `Blogger 게시에 실패했습니다. HTTP ${response.status}`);
+    throw formatBloggerError(normalizedPostId ? "Blogger 글 업데이트" : "Blogger 글 생성", response, payload, text);
   }
 
   let finalPayload = payload;
@@ -114,12 +144,10 @@ export async function publishToBlogger(input: BloggerPublishInput): Promise<Blog
         Authorization: `Bearer ${accessToken}`,
       },
     });
-    const publishPayload = await parseBloggerPayload(publishResponse);
+    const { text: publishText, payload: publishPayload } = await readBloggerResponse(publishResponse);
 
     if (!publishResponse.ok || !publishPayload?.id) {
-      throw new BloggerPublishError(
-        publishPayload?.error?.message || `Blogger 게시 공개 전환에 실패했습니다. HTTP ${publishResponse.status}`,
-      );
+      throw formatBloggerError("Blogger 공개 전환", publishResponse, publishPayload, publishText);
     }
 
     finalPayload = publishPayload;
