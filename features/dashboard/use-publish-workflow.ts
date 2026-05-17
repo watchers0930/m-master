@@ -357,12 +357,12 @@ export function usePublishWorkflow(params: {
     setPublishBusy(true);
 
     try {
-      const hasBloggerCredentials = Boolean(publishPackage && wordpressConfig.bloggerBlogId);
+      const shouldPublishToBlogger = Boolean(wordpressConfig.bloggerBlogId.trim());
       const response = await fetch(`/api/projects/${projectId}/publish`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          blogger: hasBloggerCredentials
+          blogger: shouldPublishToBlogger
             ? {
                 blogId: wordpressConfig.bloggerBlogId,
                 accessToken: wordpressConfig.bloggerAccessToken || undefined,

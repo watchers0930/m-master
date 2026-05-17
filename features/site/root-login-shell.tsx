@@ -81,6 +81,7 @@ export function RootLoginShell() {
   const router = useRouter();
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [claimableProjects, setClaimableProjects] = useState<ProjectListItem[]>([]);
+  const [autoEnterProjectId, setAutoEnterProjectId] = useState<string | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [operatorName, setOperatorName] = useState("admin");
   const [operatorKey, setOperatorKey] = useState("1111");
@@ -112,6 +113,7 @@ export function RootLoginShell() {
         setProjects(nextProjects);
         setClaimableProjects([]);
         setSelectedProjectId(nextProjects[0]?.id ?? "");
+        setAutoEnterProjectId(nextProjects.length === 1 ? nextProjects[0].id : null);
       } catch (nextError) {
         if (!cancelled) {
           setError(nextError instanceof Error ? nextError.message : "프로젝트 목록을 불러오지 못했습니다.");
@@ -130,6 +132,18 @@ export function RootLoginShell() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!loading && projects.length === 1 && selectedProjectId !== projects[0]?.id) {
+      setSelectedProjectId(projects[0].id);
+    }
+  }, [loading, projects, selectedProjectId]);
+
+  useEffect(() => {
+    if (!loading && autoEnterProjectId) {
+      router.replace(`/studio/operations?projectId=${autoEnterProjectId}`);
+    }
+  }, [autoEnterProjectId, loading, router]);
+
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
     [projects, selectedProjectId],
@@ -138,7 +152,7 @@ export function RootLoginShell() {
   async function handleLookupProjects() {
     if (!operatorName.trim() || !operatorKey.trim()) {
       setError("운영자 이름과 접근 키를 먼저 입력하세요.");
-      return false;
+      return { ok: false as const, projects: [] as ProjectListItem[] };
     }
 
     setLookupBusy(true);
@@ -164,13 +178,13 @@ export function RootLoginShell() {
       setProjects(nextProjects);
       setClaimableProjects(nextClaimableProjects);
       setSelectedProjectId(nextProjects[0]?.id ?? "");
-      return true;
+      return { ok: true as const, projects: nextProjects };
     } catch (nextError) {
       setProjects([]);
       setClaimableProjects([]);
       setSelectedProjectId("");
       setError(nextError instanceof Error ? nextError.message : "내 프로젝트를 확인하지 못했습니다.");
-      return false;
+      return { ok: false as const, projects: [] as ProjectListItem[] };
     } finally {
       setLookupBusy(false);
     }
@@ -211,12 +225,20 @@ export function RootLoginShell() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (projects.length === 0) {
-      await handleLookupProjects();
-      return;
+    let availableProjects = projects;
+
+    if (availableProjects.length === 0) {
+      const lookup = await handleLookupProjects();
+      if (!lookup.ok) {
+        return;
+      }
+
+      availableProjects = lookup.projects;
     }
 
-    if (!selectedProjectId) {
+    const resolvedProjectId = availableProjects.length === 1 ? availableProjects[0].id : selectedProjectId;
+
+    if (!resolvedProjectId) {
       setError("로그인할 프로젝트를 먼저 선택하세요.");
       return;
     }
@@ -226,7 +248,7 @@ export function RootLoginShell() {
 
     try {
       const requestSession = async () => {
-        const response = await fetch(`/api/projects/${selectedProjectId}/operators/session`, {
+        const response = await fetch(`/api/projects/${resolvedProjectId}/operators/session`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -241,11 +263,11 @@ export function RootLoginShell() {
       let payload = await requestSession();
 
       if (!payload?.ok && payload?.error?.message === "운영자 계정을 찾지 못했습니다.") {
-        const operatorsResponse = await fetch(`/api/projects/${selectedProjectId}/operators`, { cache: "no-store" });
+        const operatorsResponse = await fetch(`/api/projects/${resolvedProjectId}/operators`, { cache: "no-store" });
         const operatorsPayload = (await operatorsResponse.json().catch(() => null)) as OperatorsResponse | null;
 
         if (operatorsPayload?.ok && operatorsPayload.data?.bootstrapRequired) {
-          const bootstrapResponse = await fetch(`/api/projects/${selectedProjectId}/operators`, {
+          const bootstrapResponse = await fetch(`/api/projects/${resolvedProjectId}/operators`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -266,7 +288,7 @@ export function RootLoginShell() {
       }
 
       if (!payload?.ok && operatorName.trim() && operatorKey.trim()) {
-        const recoverResponse = await fetch(`/api/projects/${selectedProjectId}/operators/recover`, {
+        const recoverResponse = await fetch(`/api/projects/${resolvedProjectId}/operators/recover`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -286,7 +308,7 @@ export function RootLoginShell() {
         throw new Error(payload?.error?.message || "로그인에 실패했습니다.");
       }
 
-      router.push(`/studio/operations?projectId=${selectedProjectId}`);
+      router.push(`/studio/operations?projectId=${resolvedProjectId}`);
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "로그인에 실패했습니다.");
     } finally {
@@ -313,18 +335,26 @@ export function RootLoginShell() {
           <form className="root-login-form" onSubmit={handleSubmit}>
             <label className="root-login-field">
               <span>프로젝트</span>
-              <select
-                value={selectedProjectId}
-                onChange={(event) => setSelectedProjectId(event.target.value)}
-                disabled={loading || lookupBusy || submitting || projects.length === 0}
-              >
-                {projects.length === 0 ? <option value="">등록된 프로젝트 없음</option> : null}
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {`${project.name} · ${project.domain || "도메인 없음"} · ${getProjectShortId(project.id)}`}
-                  </option>
-                ))}
-              </select>
+              {projects.length > 1 ? (
+                <select
+                  value={selectedProjectId}
+                  onChange={(event) => setSelectedProjectId(event.target.value)}
+                  disabled={loading || lookupBusy || submitting}
+                >
+                  <option value="">프로젝트 선택</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {`${project.name} · ${project.domain || "도메인 없음"} · ${getProjectShortId(project.id)}`}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  value={selectedProject ? `${selectedProject.name} · ${selectedProject.domain || "도메인 없음"}` : "로그인 후 자동 선택됩니다."}
+                  readOnly
+                  disabled
+                />
+              )}
             </label>
 
             <div className="root-login-project-card">
@@ -369,7 +399,9 @@ export function RootLoginShell() {
               </label>
             </div>
 
-            <p className="root-login-hint">운영자 이름과 접근 키를 먼저 입력하면 이 계정으로 접근 가능한 프로젝트만 표시합니다.</p>
+            <p className="root-login-hint">
+              단독 사용자라면 로그인 시 프로젝트가 자동 선택됩니다. 여러 프로젝트에 접근 가능한 계정일 때만 선택 항목이 열립니다.
+            </p>
 
             {error ? <p className="root-login-error">{error}</p> : null}
 
@@ -382,7 +414,11 @@ export function RootLoginShell() {
               >
                 {lookupBusy ? "확인 중…" : "내 프로젝트 확인"}
               </button>
-              <button type="submit" className="root-login-submit" disabled={loading || lookupBusy || submitting || !selectedProjectId}>
+              <button
+                type="submit"
+                className="root-login-submit"
+                disabled={loading || lookupBusy || submitting || (projects.length > 1 && !selectedProjectId)}
+              >
                 {submitting ? "로그인 중…" : "운영보드로 로그인"}
               </button>
             </div>
