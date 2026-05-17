@@ -159,7 +159,7 @@ export function RootLoginShell() {
       ? "이 계정의 프로젝트로 자동 연결됩니다."
       : "로그인 후 자동 선택됩니다.";
 
-  async function handleLookupProjects() {
+  async function handleLookupProjects(errorFallback = "이 계정으로 연결된 프로젝트를 확인하지 못했습니다.") {
     if (!operatorName.trim() || !operatorKey.trim()) {
       setError("운영자 이름과 접근 키를 먼저 입력하세요.");
       return { ok: false as const, projects: [] as ProjectListItem[] };
@@ -180,7 +180,7 @@ export function RootLoginShell() {
       const payload = (await response.json().catch(() => null)) as ProjectListResponse | null;
 
       if (!payload?.ok) {
-        throw new Error(payload?.error?.message || "내 프로젝트를 확인하지 못했습니다.");
+        throw new Error(payload?.error?.message || errorFallback);
       }
 
       const nextProjects = payload.data?.projects ?? [];
@@ -193,7 +193,7 @@ export function RootLoginShell() {
       setProjects([]);
       setClaimableProjects([]);
       setSelectedProjectId("");
-      setError(nextError instanceof Error ? nextError.message : "내 프로젝트를 확인하지 못했습니다.");
+      setError(nextError instanceof Error ? nextError.message : errorFallback);
       return { ok: false as const, projects: [] as ProjectListItem[] };
     } finally {
       setLookupBusy(false);
@@ -238,7 +238,7 @@ export function RootLoginShell() {
     let availableProjects = projects;
 
     if (availableProjects.length === 0) {
-      const lookup = await handleLookupProjects();
+      const lookup = await handleLookupProjects("로그인에 필요한 프로젝트 확인에 실패했습니다.");
       if (!lookup.ok) {
         return;
       }
