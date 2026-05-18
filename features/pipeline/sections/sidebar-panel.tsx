@@ -33,6 +33,9 @@ type Props = {
   sourceFiles: SourceFileDraft[];
   onSourceFilesChange: (files: SourceFileDraft[]) => void;
   projectBusy: boolean;
+  showProjectCreator: boolean;
+  onOpenProjectCreator: () => void;
+  onCloseProjectCreator: () => void;
   onCreateProject: () => void;
   onSelectProject: (id: string) => void;
   /* Generation */
@@ -95,7 +98,7 @@ export function SidebarPanel(props: Props) {
     projects, activeProject,
     name, onNameChange, domain, onDomainChange,
     workingPath, onWorkingPathChange, sourceFiles, onSourceFilesChange,
-    projectBusy, onCreateProject, onSelectProject,
+    projectBusy, showProjectCreator, onOpenProjectCreator, onCloseProjectCreator, onCreateProject, onSelectProject,
     editingHashtags, onEditingHashtagsChange, hashtagBusy, onGenerateHashtags,
     topicInput, onTopicInputChange, generateBusy, onGenerate,
     contentPlan, planBusy, onGenerateContentPlan, selectedPlannedTopicId, onSelectPlannedTopic,
@@ -208,7 +211,7 @@ export function SidebarPanel(props: Props) {
       <details className="sb-section" open>
         <summary className="sb-section-title">프로젝트</summary>
         <div className="sb-section-body">
-          {!activeProject ? (
+          {!activeProject || showProjectCreator ? (
             <>
               <div className="sb-form">
                 <InputField id="sb-name" label="프로젝트명" value={name} onChange={onNameChange} placeholder="프로젝트명" />
@@ -261,6 +264,11 @@ export function SidebarPanel(props: Props) {
                 <button className="button primary sb-btn-full" disabled={projectBusy || !name.trim()} onClick={onCreateProject}>
                   {projectBusy ? "생성 중…" : "프로젝트 생성"}
                 </button>
+                {activeProject ? (
+                  <button className="button ghost sb-btn-full" type="button" disabled={projectBusy} onClick={onCloseProjectCreator}>
+                    현재 프로젝트로 돌아가기
+                  </button>
+                ) : null}
               </div>
               {projects.length > 0 && (
                 <details className="sb-subsection">
@@ -281,6 +289,9 @@ export function SidebarPanel(props: Props) {
               <strong>{activeProject.project.name}</strong>
               <span className="fine-print">{activeProject.project.domain || "도메인 없음"}</span>
               {isApproved && <span className="status-pill active">콘텍스트 승인됨</span>}
+              <button className="button ghost sb-btn-full" type="button" onClick={onOpenProjectCreator}>
+                새 프로젝트 만들기
+              </button>
               <button className="button primary sb-btn-full" disabled={!isApproved || planBusy} onClick={onGenerateContentPlan}>
                 {planBusy ? "계획 생성 중…" : contentPlan ? "월간 계획 다시 생성" : "월간 계획 생성"}
               </button>
