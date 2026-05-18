@@ -9,7 +9,7 @@ import { useContentGeneration } from "./hooks/use-content-generation";
 import { useAbTesting } from "./hooks/use-ab-testing";
 import { usePublishWorkflow } from "./hooks/use-publish-workflow";
 import { useImageStudio } from "./hooks/use-image-studio";
-import { apiPost } from "./hooks/use-api";
+import { apiGet, apiPost } from "./hooks/use-api";
 import { SidebarPanel } from "./sections/sidebar-panel";
 import { ContentPanel } from "./sections/content-panel";
 import { ImagePanel } from "./sections/image-panel";
@@ -286,6 +286,22 @@ export function PipelineShell() {
     }
   }
 
+  async function handleSelectProject(nextProjectId: string) {
+    if (state.activeProject?.project?.id === nextProjectId) {
+      return;
+    }
+
+    state.setError("");
+
+    try {
+      await apiPost<{ operator: { id: string; name: string; role: string } }>(`/api/projects/${nextProjectId}/operators/session`);
+      await state.reloadProject(nextProjectId);
+      await apiGet<{ operator: { id: string; name: string; role: string } | null }>(`/api/projects/${nextProjectId}/operators/session`);
+    } catch (error) {
+      state.setError(error instanceof Error ? error.message : "프로젝트 전환에 실패했습니다.");
+    }
+  }
+
   return (
     <div className="app-shell">
       <AppHeader active="content" />
@@ -349,7 +365,7 @@ export function PipelineShell() {
           onCreateProject={source.handleCreateProject}
           onSelectProject={(id) => {
             setShowProjectCreator(false);
-            state.reloadProject(id);
+            void handleSelectProject(id);
           }}
           topicInput={content.topicInput}
           onTopicInputChange={content.setTopicInput}
