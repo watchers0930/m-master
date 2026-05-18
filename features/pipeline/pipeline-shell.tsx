@@ -496,6 +496,21 @@ export function PipelineShell() {
           contextReady={Boolean(state.activeProject?.brandProfile?.approved)}
           studio={state.studio}
           blogImageStudio={images.imageStudios.blog}
+          topicInput={content.topicInput}
+          onTopicInputChange={content.setTopicInput}
+          generateBusy={content.generateBusy}
+          onGenerate={() => {
+            if (projectId) {
+              const selectedPlanItem = state.contentPlan?.items.find((item) => item.id === content.selectedTopicId);
+              void content.handleGenerate(
+                projectId,
+                undefined,
+                content.topicInput.trim() || undefined,
+                content.selectedTopicId || undefined,
+                selectedPlanItem?.objective || undefined,
+              ).then(() => state.loadContentPlan(projectId));
+            }
+          }}
           activeChannel={content.activeChannel}
           onChannelChange={content.setActiveChannel}
           editingTitle={content.editingTitle}
