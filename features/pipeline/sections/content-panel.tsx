@@ -54,7 +54,7 @@ function renderBlogPreview(body: string, imageStudio: ImageStudioState | null): 
     if (imageCue) {
       flushParagraph();
       const imageIndex = Math.max(0, Number(imageCue[1]) - 1);
-      const imageUrl = imageUrls[imageIndex];
+      const imageUrl = imageUrls.length > 0 ? imageUrls[imageIndex % imageUrls.length] : null;
       const caption = imageCue[2] || `이미지 ${imageCue[1]}`;
       blocks.push(
         <figure key={`image-${index}`} style={{ margin: "16px 0 24px" }}>
@@ -186,46 +186,48 @@ export function ContentPanel(props: Props) {
     );
   }
 
-  if (!hasAssets) {
-    return (
-      <div className="content-panel">
-        <div className="stack">
-          <div className="cp-empty">
-            <span className="eyebrow">콘텐츠 생성</span>
-            <p className="fine-print">왼쪽 사이드바를 찾지 않아도 여기서 바로 주제를 넣고 초안을 만들 수 있습니다.</p>
-          </div>
+  return (
+    <div className="content-panel">
+      <div className="stack" style={{ marginBottom: 20 }}>
+        <div className="cp-empty">
+          <span className="eyebrow">콘텐츠 생성</span>
+          <p className="fine-print">주제 입력폼은 계속 유지되고, 생성 결과만 아래에 이어집니다.</p>
+        </div>
 
-          <div className="analytics-surface" style={{ padding: 24, borderRadius: 24 }}>
-            <div className="stack">
-              <div>
-                <strong style={{ display: "block", fontSize: 20, marginBottom: 8 }}>직접 주제 입력</strong>
-                <p className="fine-print">만들고 싶은 블로그 주제나 캠페인 테마를 바로 입력하면 블로그, 인스타그램, 페이스북 초안을 한 번에 생성합니다.</p>
-              </div>
-              <div className="field-group">
-                <label className="field-label">콘텐츠 주제</label>
-                <input
-                  className="text-input"
-                  value={topicInput}
-                  onChange={(e) => onTopicInputChange(e.target.value)}
-                  placeholder="예: 2026년 상반기 마케팅 자동화 체크리스트"
-                />
-              </div>
-              <div className="button-row">
-                <button className="button primary" type="button" disabled={generateBusy || !topicInput.trim()} onClick={onGenerate}>
-                  {generateBusy ? "초안 생성 중…" : "이 주제로 콘텐츠 만들기"}
-                </button>
-              </div>
+        <div className="analytics-surface" style={{ padding: 24, borderRadius: 24 }}>
+          <div className="stack">
+            <div>
+              <strong style={{ display: "block", fontSize: 20, marginBottom: 8 }}>직접 주제 입력</strong>
+              <p className="fine-print">만들고 싶은 블로그 주제나 캠페인 테마를 바로 입력하면 블로그, 인스타그램, 페이스북 초안을 한 번에 생성합니다.</p>
+            </div>
+            <div className="field-group">
+              <label className="field-label">콘텐츠 주제</label>
+              <input
+                className="text-input"
+                value={topicInput}
+                onChange={(e) => onTopicInputChange(e.target.value)}
+                placeholder="예: 2026년 상반기 마케팅 자동화 체크리스트"
+              />
+            </div>
+            <div className="button-row">
+              <button className="button primary" type="button" disabled={generateBusy || !topicInput.trim()} onClick={onGenerate}>
+                {generateBusy ? "초안 생성 중…" : "이 주제로 콘텐츠 만들기"}
+              </button>
             </div>
           </div>
         </div>
       </div>
-    );
-  }
 
-  return (
-    <div className="content-panel">
+      {!hasAssets ? (
+        <div className="cp-empty">
+          <span className="eyebrow">생성 결과 대기</span>
+          <p className="fine-print">위 입력폼에서 주제를 넣고 생성하면, 채널별 편집기와 미리보기가 아래에 이어서 열립니다.</p>
+        </div>
+      ) : null}
+
       {/* Channel tabs */}
-      <div className="cp-tabs">
+      {hasAssets ? (
+        <div className="cp-tabs">
         {(["blog", "instagram", "facebook"] as ChannelKey[]).map((ch) => (
           <button
             key={ch}
@@ -235,10 +237,11 @@ export function ContentPanel(props: Props) {
             {ch === "blog" ? "블로그" : ch === "instagram" ? "인스타" : "페이스북"}
           </button>
         ))}
-      </div>
+        </div>
+      ) : null}
 
       {/* Blog editor */}
-      {activeChannel === "blog" ? (
+      {hasAssets && activeChannel === "blog" ? (
         <div className="cp-editor">
           {seoCompliance && <SeoComplianceIndicator result={seoCompliance} />}
 
@@ -285,12 +288,12 @@ export function ContentPanel(props: Props) {
             {saveBusy ? "저장 중…" : "저장"}
           </button>
         </div>
-      ) : (
+      ) : hasAssets ? (
         <DerivedChannelPanel assets={studio?.draft?.assets ?? []} />
-      )}
+      ) : null}
 
       {/* A/B Variant comparison */}
-      {hasVariants && (
+      {hasAssets && hasVariants && (
         <div className="cp-variants">
           <span className="eyebrow">A/B 버전 비교</span>
           <div className="variant-comparison-grid">
@@ -302,7 +305,7 @@ export function ContentPanel(props: Props) {
       )}
 
       {/* Export preview */}
-      {exportPreview.bundle && (
+      {hasAssets && exportPreview.bundle && (
         <div className="cp-export">
           <div className="cp-tabs">
             {(["blog", "instagram", "facebook", "json"] as const).map((view) => (

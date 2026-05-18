@@ -25,6 +25,7 @@ const PRESET_MAP: Record<ImageChannel, { width: number; height: number; label: s
 const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1-mini";
 const OPENAI_API_URL = "https://api.openai.com/v1/images/generations";
 const OPENAI_IMAGE_QUALITY = "low";
+const MAX_BLOG_INLINE_IMAGES = 4;
 const VARIANT_DIRECTIONS = [
   "제품 핵심 메시지를 정면으로 전달하는 선명한 히어로형 구도",
   "신뢰감 있는 카드형 정보 구조와 여백 중심의 에디토리얼 구도",
@@ -43,7 +44,7 @@ function extractBlogImageCues(body: string) {
     .filter((line) => line.startsWith("[이미지 "))
     .map((line) => line.replace(/^\[이미지\s+\d+\]\s*/, "").trim())
     .filter(Boolean)
-    .slice(0, 4);
+    .slice(0, MAX_BLOG_INLINE_IMAGES);
 }
 
 function svgToDataUri(svg: string) {
@@ -113,11 +114,15 @@ function buildSvgVariant(params: {
 function buildSvgImageVariants(projectName: string, asset: AssetSeed, promptOverride?: string) {
   const preset = PRESET_MAP[asset.channel];
   const prompt = promptOverride?.trim() || buildImagePrompt(projectName, asset);
+  const desiredVariantCount =
+    asset.channel === "blog"
+      ? Math.max(1, Math.min(MAX_BLOG_INLINE_IMAGES, extractBlogImageCues(asset.body).length || 1))
+      : 1;
 
   return {
     prompt,
     preset,
-    images: [0, 1, 2].map((variantIndex): ImageVariantRecord => ({
+    images: Array.from({ length: desiredVariantCount }, (_, variantIndex): ImageVariantRecord => ({
       role: `variant-${variantIndex + 1}`,
       originalPath: buildSvgVariant({
         projectName,
@@ -196,7 +201,7 @@ async function buildOpenAiImageVariants(projectName: string, asset: AssetSeed, p
   const prompt = promptOverride?.trim() || buildImagePrompt(projectName, asset);
   const desiredVariantCount =
     asset.channel === "blog"
-      ? Math.max(1, Math.min(VARIANT_DIRECTIONS.length, extractBlogImageCues(asset.body).length || 3))
+      ? Math.max(1, Math.min(VARIANT_DIRECTIONS.length, extractBlogImageCues(asset.body).length || 1))
       : 1;
 
   const images = await Promise.all(
