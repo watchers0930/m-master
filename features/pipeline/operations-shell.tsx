@@ -69,7 +69,7 @@ export function OperationsShell() {
   useEffect(() => {
     if (!projectId && state.projects.length > 0) {
       const preferredProjectId = requestedProjectId && state.projects.some((project) => project.id === requestedProjectId) ? requestedProjectId : state.projects[0].id;
-      void state.reloadProject(preferredProjectId);
+      void state.loadOperationsProject(preferredProjectId);
     }
   }, [projectId, requestedProjectId, state.projects]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -107,7 +107,7 @@ export function OperationsShell() {
     setAutomationFeedback(null);
     setPublicationFeedback(null);
     setBulkReport(null);
-    await state.reloadProject(nextProject.id);
+    await state.loadOperationsProject(nextProject.id);
   }
 
   async function loadOperatorSession(nextProjectId: string) {
@@ -185,7 +185,7 @@ export function OperationsShell() {
       };
       setBulkReport(report);
       await persistBulkReport(report, Date.now() - startedAt).catch(() => null);
-      await state.reloadProject(projectId);
+      await state.refreshOperationsData(projectId);
     } finally {
       setAutomationBusy(false);
     }
@@ -202,7 +202,7 @@ export function OperationsShell() {
     try {
       const data = await apiPost<{ plan: MonthlyContentPlan }>(`/api/projects/${projectId}/content-plan`, {});
       state.setContentPlan(data.plan);
-      await state.reloadProject(projectId);
+      await state.refreshOperationsData(projectId);
     } catch (error) {
       state.setError(error instanceof Error ? error.message : "월간 계획 생성에 실패했습니다.");
     } finally {
@@ -264,7 +264,7 @@ export function OperationsShell() {
       };
       setBulkReport(report);
       await persistBulkReport(report, Date.now() - startedAt).catch(() => null);
-      await state.reloadProject(projectId);
+      await state.refreshOperationsData(projectId);
     } finally {
       setAutomationBusy(false);
     }
@@ -378,7 +378,7 @@ export function OperationsShell() {
                       executionSource: "studio/operations",
                     });
                     setAutomationRun(data.run);
-                    await state.reloadProject(projectId);
+                    await state.refreshOperationsData(projectId);
                   } catch (error) {
                     state.setError(error instanceof Error ? error.message : "프로젝트 자동 실행에 실패했습니다.");
                   } finally {
@@ -402,7 +402,7 @@ export function OperationsShell() {
                   })
                     .then(async (data) => {
                       setAutomationFeedback(data.resolution);
-                      await state.reloadProject(projectId);
+                      await state.refreshOperationsData(projectId);
                     })
                     .catch((error) => {
                       state.setError(error instanceof Error ? error.message : "검토 승인 처리에 실패했습니다.");
@@ -428,7 +428,7 @@ export function OperationsShell() {
                   })
                     .then(async (data) => {
                       setAutomationFeedback(data.resolution);
-                      await state.reloadProject(projectId);
+                      await state.refreshOperationsData(projectId);
                     })
                     .catch((error) => {
                       state.setError(error instanceof Error ? error.message : "자동화 재실행에 실패했습니다.");
@@ -461,7 +461,7 @@ export function OperationsShell() {
                           data.publication.externalPostUrl ? ` ${data.publication.externalPostUrl}` : ""
                         }`,
                       );
-                      await state.reloadProject(projectId);
+                      await state.refreshOperationsData(projectId);
                     })
                     .catch((error) => {
                       state.setError(error instanceof Error ? error.message : "채널 재시도에 실패했습니다.");

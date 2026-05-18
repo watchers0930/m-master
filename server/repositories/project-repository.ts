@@ -85,6 +85,22 @@ export type ProjectDetailRecord = {
   } | null;
 };
 
+export type ProjectSummaryDetailRecord = {
+  project: Project;
+  brandProfile: ProjectDetailRecord["brandProfile"];
+  topics: ProjectDetailRecord["topics"];
+  latestContentJob: {
+    id: string;
+    topic: string;
+    objective: string | null;
+    status: string;
+    publishProvider: string | null;
+    externalPostId: string | null;
+    externalPostUrl: string | null;
+    publishedAt: Date | null;
+  } | null;
+};
+
 export type ContentPlanRecord = {
   id: string;
   projectId: string;
@@ -367,6 +383,48 @@ export async function getProjectDetail(projectId: string): Promise<ProjectDetail
             },
           },
         },
+      },
+    }),
+  ]);
+
+  return {
+    project,
+    brandProfile,
+    topics,
+    latestContentJob,
+  };
+}
+
+export async function getProjectSummaryDetail(projectId: string): Promise<ProjectSummaryDetailRecord | null> {
+  const project = await prisma.project.findUnique({
+    where: { id: projectId },
+  });
+
+  if (!project) {
+    return null;
+  }
+
+  const [brandProfile, topics, latestContentJob] = await Promise.all([
+    prisma.brandProfile.findFirst({
+      where: { projectId },
+      orderBy: [{ version: "desc" }, { createdAt: "desc" }],
+    }),
+    prisma.topicCandidate.findMany({
+      where: { projectId },
+      orderBy: [{ score: "desc" }, { createdAt: "asc" }],
+    }),
+    prisma.contentJob.findFirst({
+      where: { projectId },
+      orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+      select: {
+        id: true,
+        topic: true,
+        objective: true,
+        status: true,
+        publishProvider: true,
+        externalPostId: true,
+        externalPostUrl: true,
+        publishedAt: true,
       },
     }),
   ]);

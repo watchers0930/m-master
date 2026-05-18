@@ -30,7 +30,7 @@ export function SettingsShell() {
     projectId,
     onError: state.setError,
     reloadProject: async (nextProjectId: string) => {
-      await state.reloadProject(nextProjectId);
+      await state.loadSettingsProject(nextProjectId);
     },
   });
 
@@ -48,7 +48,7 @@ export function SettingsShell() {
 
   useEffect(() => {
     if (!projectId && state.projects.length > 0) {
-      void state.reloadProject(state.projects[0].id);
+      void state.loadSettingsProject(state.projects[0].id);
     }
   }, [projectId, state.projects]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -161,7 +161,7 @@ export function SettingsShell() {
                   key={project.id}
                   type="button"
                   className={`settings-project-chip ${active ? "active" : ""}`}
-                  onClick={() => void state.reloadProject(project.id)}
+                  onClick={() => void state.loadSettingsProject(project.id)}
                 >
                   <strong>{project.name}</strong>
                   <span>{project.domain || "도메인 없음"}</span>

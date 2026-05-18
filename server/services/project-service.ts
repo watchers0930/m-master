@@ -22,6 +22,7 @@ import {
   getProjectContentPlanItemByContentJobId,
   getLatestVariantGroup,
   getProjectDetail,
+  getProjectSummaryDetail,
   getVariantGroup,
   listProjectBrandProfiles,
   listProjectAutomationBatchRuns,
@@ -797,6 +798,80 @@ function serializeProjectDetail(record: NonNullable<Awaited<ReturnType<typeof ge
   };
 }
 
+function serializeProjectSummaryDetail(record: NonNullable<Awaited<ReturnType<typeof getProjectSummaryDetail>>>) {
+  return {
+    project: {
+      id: record.project.id,
+      name: record.project.name,
+      domain: record.project.domain,
+      industry: record.project.industry,
+      workingPath: record.project.workingPath,
+      ga4PropertyId: record.project.ga4PropertyId,
+      status: record.project.status,
+      wordpressSiteUrl: record.project.wordpressSiteUrl,
+      wordpressUsername: record.project.wordpressUsername,
+      hasWordPressAppPassword: Boolean(record.project.wordpressAppPasswordEncrypted),
+      wordpressStatus: record.project.wordpressStatus,
+      wordpressCategoryNames: record.project.wordpressCategoryNames,
+      wordpressTagNames: record.project.wordpressTagNames,
+      bloggerBlogId: record.project.bloggerBlogId,
+      hasBloggerAccessToken: Boolean(record.project.bloggerAccessTokenEncrypted),
+      bloggerStatus: record.project.bloggerStatus,
+      hasMetaAccessToken: Boolean(record.project.metaAccessTokenEncrypted),
+      metaTokenExpiresAt: record.project.metaTokenExpiresAt?.toISOString() ?? null,
+      facebookPageId: record.project.facebookPageId,
+      instagramBusinessAccountId: record.project.instagramBusinessAccountId,
+      hasOperationsAlertWebhook: Boolean(record.project.operationsAlertWebhookEncrypted),
+      alertPolicyMode: record.project.alertPolicyMode,
+      alertQuietHoursStart: record.project.alertQuietHoursStart,
+      alertQuietHoursEnd: record.project.alertQuietHoursEnd,
+      alertTimezone: record.project.alertTimezone,
+      alertOnBlockedReadiness: record.project.alertOnBlockedReadiness,
+      automationMode: normalizeAutomationMode(record.project.automationMode),
+      automationRequireReview: record.project.automationRequireReview,
+      automationMinOverallScore: record.project.automationMinOverallScore,
+      automationMinRiskScore: record.project.automationMinRiskScore,
+      createdAt: record.project.createdAt,
+      updatedAt: record.project.updatedAt,
+    },
+    brandProfile: record.brandProfile
+      ? {
+          id: record.brandProfile.id,
+          version: record.brandProfile.version,
+          summary: record.brandProfile.summary,
+          audience: record.brandProfile.audience,
+          tone: record.brandProfile.tone,
+          cta: record.brandProfile.cta,
+          bannedTerms: record.brandProfile.bannedTerms,
+          approved: record.brandProfile.approved,
+          approvedAt: record.brandProfile.approvedAt,
+          createdAt: record.brandProfile.createdAt,
+          updatedAt: record.brandProfile.updatedAt,
+        }
+      : null,
+    topics: record.topics.map((topic) => ({
+      id: topic.id,
+      title: normalizeTopicTitle(topic.title, record.project.name),
+      intentType: topic.intentType,
+      score: topic.score,
+      rationale: topic.rationale,
+      createdAt: topic.createdAt,
+    })),
+    latestContentJob: record.latestContentJob
+      ? {
+          id: record.latestContentJob.id,
+          topic: record.latestContentJob.topic,
+          objective: record.latestContentJob.objective,
+          status: record.latestContentJob.status,
+          publishProvider: record.latestContentJob.publishProvider,
+          externalPostId: record.latestContentJob.externalPostId,
+          externalPostUrl: record.latestContentJob.externalPostUrl,
+          publishedAt: record.latestContentJob.publishedAt?.toISOString() ?? null,
+        }
+      : null,
+  };
+}
+
 function serializeContentPlan(plan: NonNullable<Awaited<ReturnType<typeof getProjectContentPlan>>>) {
   return {
     id: plan.id,
@@ -1060,14 +1135,14 @@ export async function saveProjectSettings(params: {
 }
 
 export async function getProjectById(projectId: string) {
-  const record = await getProjectDetail(projectId);
+  const record = await getProjectSummaryDetail(projectId);
 
   if (!record) {
     logger.error("project.get.not_found", { projectId });
     throw new ProjectNotFoundError(projectId);
   }
 
-  return serializeProjectDetail(record);
+  return serializeProjectSummaryDetail(record);
 }
 
 export async function getProjectMonthlyPlan(projectId: string, monthKey?: string) {
