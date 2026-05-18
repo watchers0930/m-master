@@ -20,6 +20,7 @@ export function PipelineShell() {
   const state = usePipelineState();
   const [projectsResolved, setProjectsResolved] = useState(false);
   const [requestedProjectId, setRequestedProjectId] = useState<string | null>(null);
+  const [showProjectCreator, setShowProjectCreator] = useState(false);
   const [planBusy, setPlanBusy] = useState(false);
   const [automationBusy, setAutomationBusy] = useState(false);
   const [automationRun, setAutomationRun] = useState<AutomationRunSummary | null>(null);
@@ -29,6 +30,7 @@ export function PipelineShell() {
 
   const source = useSourceRegistration({
     onProjectCreated: (project: ProjectDetail) => {
+      setShowProjectCreator(false);
       state.setActiveProject(project);
       state.loadProjects();
       if (project.project?.id) {
@@ -341,8 +343,14 @@ export function PipelineShell() {
           sourceFiles={source.sourceFiles}
           onSourceFilesChange={source.setSourceFiles}
           projectBusy={source.busy}
+          showProjectCreator={showProjectCreator}
+          onOpenProjectCreator={() => setShowProjectCreator(true)}
+          onCloseProjectCreator={() => setShowProjectCreator(false)}
           onCreateProject={source.handleCreateProject}
-          onSelectProject={(id) => { state.reloadProject(id); }}
+          onSelectProject={(id) => {
+            setShowProjectCreator(false);
+            state.reloadProject(id);
+          }}
           topicInput={content.topicInput}
           onTopicInputChange={content.setTopicInput}
           generateBusy={content.generateBusy}
