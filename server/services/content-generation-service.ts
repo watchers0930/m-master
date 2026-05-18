@@ -18,6 +18,7 @@ type TopicSeed = {
 
 const OPENAI_TEXT_API_URL = "https://api.openai.com/v1/responses";
 const OPENAI_TEXT_MODEL = process.env.OPENAI_TEXT_MODEL || "gpt-5.4-mini";
+const MAX_BLOG_INLINE_IMAGES = 4;
 const KOREAN_SUFFIXES = ["입니다", "하는", "하다", "에서", "으로", "에게", "까지", "처럼", "보다", "은", "는", "이", "가", "을", "를", "에", "의", "와", "과", "로", "도", "다"];
 const NAVER_BLOG_TARGET = {
   minChars: 1500,
@@ -255,7 +256,7 @@ function ensureBlogImageFlow(body: string) {
       continue;
     }
 
-    if (imageCount >= 5) {
+    if (imageCount >= MAX_BLOG_INLINE_IMAGES) {
       continue;
     }
 
@@ -280,9 +281,6 @@ function ensureBlogLength(body: string, profile: BrandProfileSeed, topic: string
     "## 4. 활용 전에 체크할 부분",
     `${topic}를 소개할 때는 정보가 많아 보이는 것보다, 실제로 어디서부터 읽으면 되는지가 더 중요합니다. 특히 ${audience} 같은 독자는 첫 화면에서 핵심을 이해하고 다음 단계로 바로 넘어갈 수 있어야 합니다.`,
     `${tone} 원칙을 유지하면 글이 길어져도 흐름이 무너지지 않습니다. 각 문단이 하나의 질문에 답하도록 구성하고, 이미지도 같은 메시지를 보강하도록 맞추면 읽는 속도가 안정됩니다.`,
-    "",
-    "[이미지 6] 실제 활용 전에 체크할 포인트를 정리한 보조 이미지",
-    "",
   ].join("\n");
 
   const expanded = normalized.includes("## 마무리")
@@ -371,7 +369,7 @@ function buildChannelPrompt(params: {
           "- blog는 네이버 블로그용 초안으로 작성한다.",
           '- 소제목은 "## 도입", "## 1. ...", "## 2. ...", "## 3. ...", "## 마무리" 형식을 우선 사용한다.',
           "- 각 주요 섹션 설명 다음에는 반드시 [이미지 N] 한 줄을 붙여 글-이미지-글-이미지 흐름을 만든다.",
-          "- [이미지 1]부터 [이미지 5]까지 자연스럽게 배치하고, 각 이미지는 바로 앞 문단 내용을 요약해야 한다.",
+          `- [이미지 1]부터 [이미지 ${MAX_BLOG_INLINE_IMAGES}]까지 자연스럽게 배치하고, 각 이미지는 바로 앞 문단 내용을 요약해야 한다.`,
           "- 4~5개 섹션 안팎으로 구성하고, 각 문단은 2~3문장 정도로 짧게 끊는다.",
           "- 블로그 본문은 대체로 1500~2200자 범위에서 작성한다.",
           "- 너무 짧게 끝내지 말고, 실무 적용 포인트나 체크 포인트를 포함한다.",
@@ -381,7 +379,7 @@ function buildChannelPrompt(params: {
           "- meta_description은 155자 이내 요약을 함께 작성한다. JSON에 \"metaDescription\" 필드로 반환한다.",
           "- H1 1개 + H2/H3 계층 구조를 유지한다.",
           "- 키워드 밀도 1-2%를 목표로 한다.",
-          "- 본문에 [이미지 N]을 3-5개 배치하고, 각 줄에서 이미지가 어떤 장면인지 짧게 설명한다.",
+          `- 본문에 [이미지 N]을 3-${MAX_BLOG_INLINE_IMAGES}개 배치하고, 각 줄에서 이미지가 어떤 장면인지 짧게 설명한다.`,
           "- 네이버 블로그 최적화 관점에서 긴 벽문단을 피하고, 모바일에서 스크롤할 때 리듬감 있게 읽히도록 쓴다.",
         ]
       : params.channel === "instagram"

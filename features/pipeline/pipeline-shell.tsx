@@ -314,36 +314,6 @@ export function PipelineShell() {
         </div>
       )}
 
-      {projectId && contextReady ? (
-        <section className="analytics-surface" style={{ padding: 20, borderRadius: 24, marginBottom: 20 }}>
-          <div className="stack">
-            <div>
-              <strong style={{ display: "block", fontSize: 20, marginBottom: 8 }}>빠른 주제 입력</strong>
-              <p className="fine-print">여기서 바로 주제를 입력하고 초안을 만들 수 있습니다. 아래 카드까지 내려갈 필요가 없습니다.</p>
-            </div>
-            <div className="button-row" style={{ alignItems: "flex-end", flexWrap: "wrap" }}>
-              <div className="field-group" style={{ flex: "1 1 420px", marginBottom: 0 }}>
-                <label className="field-label">콘텐츠 주제</label>
-                <input
-                  className="text-input"
-                  value={content.topicInput}
-                  onChange={(e) => content.setTopicInput(e.target.value)}
-                  placeholder="예: 계약 전에 꼭 확인해야 할 상가임대차 리스크 체크리스트"
-                />
-              </div>
-              <button
-                className="button primary"
-                type="button"
-                disabled={content.generateBusy || !content.topicInput.trim()}
-                onClick={handleGenerateFromTopicInput}
-              >
-                {content.generateBusy ? "생성 중…" : "바로 생성"}
-              </button>
-            </div>
-          </div>
-        </section>
-      ) : null}
-
       {/* 3-column layout */}
       <div className="pipeline-grid">
         {/* Left: Sidebar controls */}

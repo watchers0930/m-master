@@ -144,6 +144,8 @@ type AutomationReadinessIssue = {
   recommendation?: string | null;
 };
 
+const MAX_BLOG_INLINE_IMAGES = 4;
+
 function isLegacyContentShape(params: {
   topic: string;
   assets: Array<{ body: string }>;
@@ -303,6 +305,50 @@ function classifyFailureCategory(message?: string | null): "auth" | "config" | "
   }
 
   return "unknown";
+}
+
+function normalizeBlogInlineImageCues(body: string) {
+  let nextImageNumber = 1;
+
+  return body
+    .split("\n")
+    .flatMap((line) => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("[이미지 ")) {
+        return [line];
+      }
+
+      if (nextImageNumber > MAX_BLOG_INLINE_IMAGES) {
+        return [];
+      }
+
+      const description = trimmed.replace(/^\[이미지\s+\d+\]\s*/, "").trim() || `이미지 ${nextImageNumber}`;
+      const normalizedLine = `[이미지 ${nextImageNumber}] ${description}`;
+      nextImageNumber += 1;
+      return [normalizedLine];
+    })
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function normalizeDraftAssets(
+  assets: Array<{
+    channel: "blog" | "instagram" | "facebook";
+    title?: string;
+    body: string;
+    cta?: string;
+    hashtags?: string;
+  }>,
+) {
+  return assets.map((asset) =>
+    asset.channel === "blog"
+      ? {
+          ...asset,
+          body: normalizeBlogInlineImageCues(asset.body),
+        }
+      : asset,
+  );
 }
 
 function getAverageReviewScore(scores: {
@@ -2293,14 +2339,14 @@ export async function saveProjectContentDraft(params: {
   const record = requireApprovedBrandProfile(await getProjectDetail(params.projectId), params.projectId);
   const automationMode = normalizeAutomationMode(record.project.automationMode);
   const storedBloggerAccessToken = decryptSecret(record.project.bloggerAccessTokenEncrypted);
-
+  const normalizedAssets = normalizeDraftAssets(params.assets);
   const normalizedTopic = normalizeTopicTitle(params.topic, record.project.name);
 
   await saveLatestContentJobAssets({
     projectId: params.projectId,
     topic: normalizedTopic,
     objective: params.objective,
-    assets: params.assets,
+    assets: normalizedAssets,
   });
 
   const refreshedRecord = requireApprovedBrandProfile(await getProjectDetail(params.projectId), params.projectId);
@@ -2309,7 +2355,7 @@ export async function saveProjectContentDraft(params: {
     summary: refreshedRecord.brandProfile.summary,
     cta: refreshedRecord.brandProfile.cta,
     bannedTerms: refreshedRecord.brandProfile.bannedTerms,
-    assets: params.assets,
+    assets: normalizedAssets,
   });
   const guardrail = evaluateReviewGuardrail({
     requireReview: refreshedRecord.project.automationRequireReview,
