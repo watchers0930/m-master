@@ -7,6 +7,7 @@ import {
   getAuthorizedProjectOperator,
   ProjectOperatorAuthError,
   revokeProjectOperatorSession,
+  switchProjectOperatorSession,
 } from "@/server/services/project-operator-service";
 
 type RouteContext = {
@@ -43,15 +44,17 @@ export async function POST(request: Request, context: RouteContext) {
         }
       | null;
 
-    if (!body?.name?.trim() || !body?.accessKey?.trim()) {
-      return jsonError("운영자 이름과 접근 키가 필요합니다.", 400);
-    }
-
-    const session = await authenticateProjectOperator({
-      projectId,
-      name: body.name.trim(),
-      accessKey: body.accessKey.trim(),
-    });
+    const session =
+      body?.name?.trim() && body?.accessKey?.trim()
+        ? await authenticateProjectOperator({
+            projectId,
+            name: body.name.trim(),
+            accessKey: body.accessKey.trim(),
+          })
+        : await switchProjectOperatorSession({
+            request,
+            projectId,
+          });
 
     const response = jsonOk({
       operator: session.operator,
@@ -85,4 +88,3 @@ export async function DELETE(request: Request) {
     return jsonError("운영자 로그아웃에 실패했습니다.", 500);
   }
 }
-
