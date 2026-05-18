@@ -109,6 +109,10 @@ type Props = {
   contextReady: boolean;
   studio: StudioDetail | null;
   blogImageStudio: ImageStudioState | null;
+  topicInput: string;
+  onTopicInputChange: (value: string) => void;
+  generateBusy: boolean;
+  onGenerate: () => void;
   /* Channel */
   activeChannel: ChannelKey;
   onChannelChange: (ch: ChannelKey) => void;
@@ -146,6 +150,10 @@ export function ContentPanel(props: Props) {
     contextReady,
     studio,
     blogImageStudio,
+    topicInput,
+    onTopicInputChange,
+    generateBusy,
+    onGenerate,
     activeChannel, onChannelChange,
     editingTitle, onEditingTitleChange,
     editingBody, onEditingBodyChange,
@@ -181,9 +189,34 @@ export function ContentPanel(props: Props) {
   if (!hasAssets) {
     return (
       <div className="content-panel">
-        <div className="cp-empty">
-          <span className="eyebrow">콘텐츠 미리보기</span>
-          <p className="fine-print">좌측에서 프로젝트를 등록하고 콘텐츠를 생성하면 여기에 표시됩니다.</p>
+        <div className="stack">
+          <div className="cp-empty">
+            <span className="eyebrow">콘텐츠 생성</span>
+            <p className="fine-print">왼쪽 사이드바를 찾지 않아도 여기서 바로 주제를 넣고 초안을 만들 수 있습니다.</p>
+          </div>
+
+          <div className="analytics-surface" style={{ padding: 24, borderRadius: 24 }}>
+            <div className="stack">
+              <div>
+                <strong style={{ display: "block", fontSize: 20, marginBottom: 8 }}>직접 주제 입력</strong>
+                <p className="fine-print">만들고 싶은 블로그 주제나 캠페인 테마를 바로 입력하면 블로그, 인스타그램, 페이스북 초안을 한 번에 생성합니다.</p>
+              </div>
+              <div className="field-group">
+                <label className="field-label">콘텐츠 주제</label>
+                <input
+                  className="text-input"
+                  value={topicInput}
+                  onChange={(e) => onTopicInputChange(e.target.value)}
+                  placeholder="예: 2026년 상반기 마케팅 자동화 체크리스트"
+                />
+              </div>
+              <div className="button-row">
+                <button className="button primary" type="button" disabled={generateBusy || !topicInput.trim()} onClick={onGenerate}>
+                  {generateBusy ? "초안 생성 중…" : "이 주제로 콘텐츠 만들기"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
