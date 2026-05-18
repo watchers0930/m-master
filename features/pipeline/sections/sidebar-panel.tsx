@@ -298,6 +298,27 @@ export function SidebarPanel(props: Props) {
           <summary className="sb-section-title">콘텐츠 생성</summary>
           <div className="sb-section-body">
             <div className="sb-plan-card">
+              <div className="stack">
+                <div>
+                  <strong style={{ display: "block" }}>직접 주제 입력</strong>
+                  <span className="fine-print">만들고 싶은 콘텐츠 주제를 바로 넣고 초안을 생성하세요.</span>
+                </div>
+                <div className="field-group" style={{ marginBottom: 0 }}>
+                  <label className="field-label">토픽</label>
+                  <input
+                    className="text-input"
+                    value={topicInput}
+                    onChange={(e) => onTopicInputChange(e.target.value)}
+                    placeholder="생성할 콘텐츠의 테마를 입력하세요"
+                  />
+                </div>
+                <button className="button primary sb-btn-full" disabled={generateBusy || !topicInput.trim()} onClick={onGenerate}>
+                  {generateBusy ? "생성 중…" : "이 주제로 전체 생성"}
+                </button>
+              </div>
+            </div>
+
+            <div className="sb-plan-card">
               <div className="row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <div>
                   <strong style={{ display: "block" }}>월간 마케팅 계획</strong>
@@ -346,18 +367,6 @@ export function SidebarPanel(props: Props) {
                 </div>
               ) : null}
             </div>
-            <div className="field-group">
-              <label className="field-label">토픽</label>
-              <input
-                className="text-input"
-                value={topicInput}
-                onChange={(e) => onTopicInputChange(e.target.value)}
-                placeholder="생성할 콘텐츠의 테마를 입력하세요"
-              />
-            </div>
-            <button className="button primary sb-btn-full" disabled={generateBusy || !topicInput.trim()} onClick={onGenerate}>
-              {generateBusy ? "생성 중…" : "전체 생성"}
-            </button>
 
             {/* SEO */}
             {seoCompliance && (
