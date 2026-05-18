@@ -130,12 +130,28 @@ export function PipelineShell() {
   const projectId = state.activeProject?.project?.id;
   const topic = state.studio?.draft?.topic || "";
   const hasContent = (state.studio?.draft?.assets?.length ?? 0) > 0;
+  const contextReady = Boolean(state.activeProject?.brandProfile?.approved);
   const reviewQueue = state.contentPlan?.items.filter((item) => item.status === "needs_review") || [];
   const readyQueue = state.contentPlan?.items.filter((item) => item.status === "ready_to_publish") || [];
   const failedQueue = state.contentPlan?.items.filter((item) => item.status === "failed") || [];
   const publishedQueue = state.contentPlan?.items.filter((item) => item.status === "published").slice(0, 5) || [];
   const failedPublications = state.publications.filter((publication) => publication.status === "failed").slice(0, 8);
   const publishedPublications = state.publications.filter((publication) => publication.status === "published").slice(0, 8);
+
+  function handleGenerateFromTopicInput() {
+    if (!projectId) {
+      return;
+    }
+
+    const selectedPlanItem = state.contentPlan?.items.find((item) => item.id === content.selectedTopicId);
+    void content.handleGenerate(
+      projectId,
+      undefined,
+      content.topicInput.trim() || undefined,
+      content.selectedTopicId || undefined,
+      selectedPlanItem?.objective || undefined,
+    ).then(() => state.loadContentPlan(projectId));
+  }
 
   async function persistBulkReport(report: BulkOperationReport, durationMs: number) {
     if (!projectId) {
@@ -280,6 +296,36 @@ export function PipelineShell() {
         </div>
       )}
 
+      {projectId && contextReady ? (
+        <section className="analytics-surface" style={{ padding: 20, borderRadius: 24, marginBottom: 20 }}>
+          <div className="stack">
+            <div>
+              <strong style={{ display: "block", fontSize: 20, marginBottom: 8 }}>빠른 주제 입력</strong>
+              <p className="fine-print">여기서 바로 주제를 입력하고 초안을 만들 수 있습니다. 아래 카드까지 내려갈 필요가 없습니다.</p>
+            </div>
+            <div className="button-row" style={{ alignItems: "flex-end", flexWrap: "wrap" }}>
+              <div className="field-group" style={{ flex: "1 1 420px", marginBottom: 0 }}>
+                <label className="field-label">콘텐츠 주제</label>
+                <input
+                  className="text-input"
+                  value={content.topicInput}
+                  onChange={(e) => content.setTopicInput(e.target.value)}
+                  placeholder="예: 계약 전에 꼭 확인해야 할 상가임대차 리스크 체크리스트"
+                />
+              </div>
+              <button
+                className="button primary"
+                type="button"
+                disabled={content.generateBusy || !content.topicInput.trim()}
+                onClick={handleGenerateFromTopicInput}
+              >
+                {content.generateBusy ? "생성 중…" : "바로 생성"}
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       {/* 3-column layout */}
       <div className="pipeline-grid">
         {/* Left: Sidebar controls */}
@@ -300,18 +346,7 @@ export function PipelineShell() {
           topicInput={content.topicInput}
           onTopicInputChange={content.setTopicInput}
           generateBusy={content.generateBusy}
-          onGenerate={() => {
-            if (projectId) {
-              const selectedPlanItem = state.contentPlan?.items.find((item) => item.id === content.selectedTopicId);
-              void content.handleGenerate(
-                projectId,
-                undefined,
-                content.topicInput.trim() || undefined,
-                content.selectedTopicId || undefined,
-                selectedPlanItem?.objective || undefined,
-              ).then(() => state.loadContentPlan(projectId));
-            }
-          }}
+          onGenerate={handleGenerateFromTopicInput}
           contentPlan={state.contentPlan}
           planBusy={planBusy}
           onGenerateContentPlan={async () => {
@@ -493,24 +528,13 @@ export function PipelineShell() {
         {/* Center: Content preview */}
         <ContentPanel
           projectId={projectId}
-          contextReady={Boolean(state.activeProject?.brandProfile?.approved)}
+          contextReady={contextReady}
           studio={state.studio}
           blogImageStudio={images.imageStudios.blog}
           topicInput={content.topicInput}
           onTopicInputChange={content.setTopicInput}
           generateBusy={content.generateBusy}
-          onGenerate={() => {
-            if (projectId) {
-              const selectedPlanItem = state.contentPlan?.items.find((item) => item.id === content.selectedTopicId);
-              void content.handleGenerate(
-                projectId,
-                undefined,
-                content.topicInput.trim() || undefined,
-                content.selectedTopicId || undefined,
-                selectedPlanItem?.objective || undefined,
-              ).then(() => state.loadContentPlan(projectId));
-            }
-          }}
+          onGenerate={handleGenerateFromTopicInput}
           activeChannel={content.activeChannel}
           onChannelChange={content.setActiveChannel}
           editingTitle={content.editingTitle}
