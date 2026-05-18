@@ -137,26 +137,7 @@ export async function authenticateProjectOperator(params: {
     throw new ProjectOperatorAuthError("운영자 접근 키가 올바르지 않습니다.", 401);
   }
 
-  const token = crypto.randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000);
-  await createProjectOperatorSession({
-    operatorId: operator.id,
-    tokenHash: hashValue(token),
-    expiresAt,
-  });
-
-  return {
-    token,
-    expiresAt,
-    operator: {
-      id: operator.id,
-      projectId: operator.projectId,
-      name: operator.name,
-      role: normalizeRole(operator.role),
-      active: operator.active,
-      lastUsedAt: operator.lastUsedAt?.toISOString() ?? null,
-    },
-  };
+  return issueProjectOperatorSession(operator);
 }
 
 export async function revokeProjectOperatorSession(request: Request) {
@@ -235,6 +216,59 @@ export async function getCurrentProjectOperatorAccessIdentity(request: Request):
     active: session.operator.active,
     lastUsedAt: session.operator.lastUsedAt?.toISOString() ?? null,
   };
+}
+
+async function issueProjectOperatorSession(operator: {
+  id: string;
+  projectId: string;
+  name: string;
+  role: string;
+  active: boolean;
+  lastUsedAt?: Date | null;
+}) {
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + SESSION_MAX_AGE_SECONDS * 1000);
+  await createProjectOperatorSession({
+    operatorId: operator.id,
+    tokenHash: hashValue(token),
+    expiresAt,
+  });
+
+  return {
+    token,
+    expiresAt,
+    operator: {
+      id: operator.id,
+      projectId: operator.projectId,
+      name: operator.name,
+      role: normalizeRole(operator.role),
+      active: operator.active,
+      lastUsedAt: operator.lastUsedAt?.toISOString() ?? null,
+    },
+  };
+}
+
+export async function switchProjectOperatorSession(params: {
+  request: Request;
+  projectId: string;
+}) {
+  await deleteExpiredProjectOperatorSessions();
+
+  const identity = await getCurrentProjectOperatorAccessIdentity(params.request);
+  if (!identity) {
+    throw new ProjectOperatorAuthError("운영자 로그인 세션이 필요합니다.", 401);
+  }
+
+  const operator = await getProjectOperatorByName({
+    projectId: params.projectId,
+    name: identity.name.trim(),
+  });
+
+  if (!operator || !operator.active || operator.accessKeyHash !== identity.accessKeyHash) {
+    throw new ProjectOperatorAuthError("이 프로젝트로 전환할 운영자 계정을 찾지 못했습니다.", 403);
+  }
+
+  return issueProjectOperatorSession(operator);
 }
 
 export async function requireProjectOperatorRole(
