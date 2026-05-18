@@ -61,7 +61,11 @@ export function PipelineShell() {
     projectId: state.activeProject?.project?.id,
     onError: state.setError,
     reloadProject: async (projectId: string) => {
-      await state.reloadProject(projectId);
+      await Promise.all([
+        state.loadProject(projectId),
+        state.loadPublications(projectId),
+        state.loadAutomationReadiness(projectId),
+      ]);
     },
   });
 
@@ -383,7 +387,7 @@ export function PipelineShell() {
                 executionSource: "studio",
               });
               setAutomationRun(data.run);
-              await state.reloadProject(projectId);
+              await state.refreshOperationsData(projectId);
             } catch (error) {
               state.setError(error instanceof Error ? error.message : "프로젝트 자동 실행에 실패했습니다.");
             } finally {
@@ -407,7 +411,7 @@ export function PipelineShell() {
             })
               .then(async (data) => {
                 setAutomationFeedback(data.resolution);
-                await state.reloadProject(projectId);
+                await state.refreshOperationsData(projectId);
               })
               .catch((error) => {
                 state.setError(error instanceof Error ? error.message : "검토 승인 처리에 실패했습니다.");
@@ -433,7 +437,7 @@ export function PipelineShell() {
             })
               .then(async (data) => {
                 setAutomationFeedback(data.resolution);
-                await state.reloadProject(projectId);
+                await state.refreshOperationsData(projectId);
               })
               .catch((error) => {
                 state.setError(error instanceof Error ? error.message : "자동화 재실행에 실패했습니다.");
@@ -466,7 +470,7 @@ export function PipelineShell() {
                     data.publication.externalPostUrl ? ` ${data.publication.externalPostUrl}` : ""
                   }`,
                 );
-                await state.reloadProject(projectId);
+                await state.refreshOperationsData(projectId);
               })
               .catch((error) => {
                 state.setError(error instanceof Error ? error.message : "채널 재시도에 실패했습니다.");

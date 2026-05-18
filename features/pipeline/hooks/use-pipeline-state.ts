@@ -131,6 +131,32 @@ export function usePipelineState() {
     ]);
   }, [loadProject, loadStudio, loadContentPlan, loadPublications, loadBulkOperationHistory, loadAutomationReadiness]);
 
+  const loadSettingsProject = useCallback(async (projectId: string) => {
+    await Promise.all([
+      loadProject(projectId),
+      loadAutomationReadiness(projectId),
+    ]);
+  }, [loadProject, loadAutomationReadiness]);
+
+  const loadOperationsProject = useCallback(async (projectId: string) => {
+    await Promise.all([
+      loadProject(projectId),
+      loadContentPlan(projectId),
+      loadPublications(projectId),
+      loadBulkOperationHistory(projectId),
+      loadAutomationReadiness(projectId),
+    ]);
+  }, [loadProject, loadContentPlan, loadPublications, loadBulkOperationHistory, loadAutomationReadiness]);
+
+  const refreshOperationsData = useCallback(async (projectId: string) => {
+    await Promise.all([
+      loadContentPlan(projectId),
+      loadPublications(projectId),
+      loadBulkOperationHistory(projectId),
+      loadAutomationReadiness(projectId),
+    ]);
+  }, [loadContentPlan, loadPublications, loadBulkOperationHistory, loadAutomationReadiness]);
+
   const clearError = useCallback(() => setError(""), []);
 
   return {
@@ -162,6 +188,9 @@ export function usePipelineState() {
     loadBulkOperationHistory,
     loadAutomationReadiness,
     reloadProject,
+    loadSettingsProject,
+    loadOperationsProject,
+    refreshOperationsData,
     clearError,
   };
 }
