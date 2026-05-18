@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type AppHeaderProps = {
   active: "content" | "analytics" | "operations" | "settings";
@@ -8,7 +9,9 @@ type AppHeaderProps = {
 };
 
 export function AppHeader({ active, title = "콘텐츠 스튜디오" }: AppHeaderProps) {
+  const router = useRouter();
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [logoutBusy, setLogoutBusy] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -20,6 +23,24 @@ export function AppHeader({ active, title = "콘텐츠 스튜디오" }: AppHeade
   }, []);
 
   const withProjectId = (path: string) => (projectId ? `${path}?projectId=${projectId}` : path);
+
+  async function handleLogout() {
+    if (!projectId || logoutBusy) {
+      router.replace("/");
+      return;
+    }
+
+    setLogoutBusy(true);
+
+    try {
+      await fetch(`/api/projects/${projectId}/operators/session`, {
+        method: "DELETE",
+      });
+    } finally {
+      router.replace("/");
+      router.refresh();
+    }
+  }
 
   return (
     <header className="pipeline-header">
@@ -48,6 +69,11 @@ export function AppHeader({ active, title = "콘텐츠 스튜디오" }: AppHeade
             방문자 분석
           </a>
         </nav>
+      </div>
+      <div className="pipeline-header-right">
+        <button className="button ghost" type="button" onClick={() => void handleLogout()} disabled={logoutBusy}>
+          {logoutBusy ? "로그아웃 중..." : "로그아웃"}
+        </button>
       </div>
     </header>
   );
