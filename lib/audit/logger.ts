@@ -51,6 +51,7 @@ export const AUDIT_ACTIONS = {
   AB_TEST_UPDATE: 'ab_test.update',
   AB_TEST_DELETE: 'ab_test.delete',
   AB_TEST_AUTO_COMPLETE: 'ab_test.auto_complete',
+  CRON_CONTENT_GENERATE: 'cron.content_generate',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

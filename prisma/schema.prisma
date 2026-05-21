@@ -127,6 +127,47 @@ model AbTest {
 }
 
 // ----------------------------------------------------------------
+// content_plans — 월간 콘텐츠 계획
+// ----------------------------------------------------------------
+model ContentPlan {
+  id             String    @id @default(cuid())
+  ownerId        String    @map("owner_id")
+  monthKey       String    @map("month_key") // 'YYYY-MM'
+  status         String    @default("active") // active | paused | completed
+  autoGenerate   Boolean   @default(true) @map("auto_generate")
+  lastExecutedAt DateTime? @map("last_executed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  items ContentPlanItem[]
+
+  @@unique([ownerId, monthKey])
+  @@map("content_plans")
+}
+
+// ----------------------------------------------------------------
+// content_plan_items — 월간 계획 개별 토픽
+// ----------------------------------------------------------------
+model ContentPlanItem {
+  id            String    @id @default(cuid())
+  contentPlanId String    @map("content_plan_id")
+  sortOrder     Int       @default(0) @map("sort_order")
+  topic         String
+  scheduledDate String    @map("scheduled_date") // 'YYYY-MM-DD'
+  status        String    @default("planned") // planned | generating | generated | failed
+  contentJobId  String?   @map("content_job_id") // 생성된 content.id
+  generatedAt   DateTime? @map("generated_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  plan ContentPlan @relation(fields: [contentPlanId], references: [id], onDelete: Cascade)
+
+  @@index([contentPlanId, sortOrder])
+  @@index([scheduledDate, status])
+  @@map("content_plan_items")
+}
+
+// ----------------------------------------------------------------
 // rag_documents — RAG 문서 메타
 // ----------------------------------------------------------------
 model RagDocument {

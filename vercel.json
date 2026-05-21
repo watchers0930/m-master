@@ -2,8 +2,8 @@
   "framework": "nextjs",
   "crons": [
     {
-      "path": "/api/automation/monthly-content",
-      "schedule": "0 1 * * *"
+      "path": "/api/cron/content-generate",
+      "schedule": "0 22 * * *"
     }
   ]
 }
