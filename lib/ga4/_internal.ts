@@ -35,22 +35,41 @@ export interface ReportRow {
 }
 
 function loadCredentials(): object | undefined {
+  // 1) 서비스 계정 JSON (인라인 또는 파일)
   const value =
     process.env.GA4_SERVICE_ACCOUNT_JSON ||
     process.env.GOOGLE_APPLICATION_CREDENTIALS ||
     process.env.GA4_KEY_FILE;
-  if (!value) return undefined;
-  const trimmed = value.trim();
-  if (trimmed.startsWith('{')) {
-    try {
-      return JSON.parse(trimmed);
-    } catch {
-      return undefined;
+  if (value) {
+    const trimmed = value.trim();
+    if (trimmed.startsWith('{')) {
+      try {
+        return JSON.parse(trimmed);
+      } catch {
+        /* fall through */
+      }
+    } else {
+      const resolved = path.resolve(trimmed);
+      if (fs.existsSync(resolved)) {
+        return JSON.parse(fs.readFileSync(resolved, 'utf-8'));
+      }
     }
   }
-  const resolved = path.resolve(value);
-  if (!fs.existsSync(resolved)) return undefined;
-  return JSON.parse(fs.readFileSync(resolved, 'utf-8'));
+
+  // 2) OAuth refresh token → authorized_user 형식
+  const clientId = process.env.GA4_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GA4_OAUTH_CLIENT_SECRET;
+  const refreshToken = process.env.GA4_OAUTH_REFRESH_TOKEN;
+  if (clientId && clientSecret && refreshToken) {
+    return {
+      type: 'authorized_user',
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+    };
+  }
+
+  return undefined;
 }
 
 export function isGa4Available(): boolean {
