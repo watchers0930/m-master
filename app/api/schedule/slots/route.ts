@@ -5,6 +5,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+/* Prisma returns camelCase; frontend expects snake_case */
+function toSnake(row: Record<string, unknown>) {
+  return {
+    id:           row.id,
+    content_id:   row.contentId ?? null,
+    channel:      row.channel,
+    scheduled_at: row.scheduledAt,
+    published_at: row.publishedAt ?? null,
+    status:       row.status,
+    mode:         row.mode,
+    external_id:  row.externalId ?? null,
+    external_url: row.externalUrl ?? null,
+    retry_count:  row.retryCount ?? 0,
+    last_error:   row.lastError ?? null,
+    created_at:   row.createdAt,
+    content:      row.content ?? null,
+  };
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const year  = searchParams.get('year');
@@ -22,12 +41,13 @@ export async function GET(req: NextRequest) {
       where.scheduledAt = { gte: from, lt: to };
     }
 
-    const data = await prisma.scheduleSlot.findMany({
+    const rows = await prisma.scheduleSlot.findMany({
       where,
       orderBy: { scheduledAt: 'asc' },
       include: { content: { select: { topic: true } } },
     });
 
+    const data = rows.map((r) => toSnake(r as unknown as Record<string, unknown>));
     return NextResponse.json({ data, error: null });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -40,12 +60,21 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const rows = Array.isArray(body) ? body : [body];
 
-    const data = await prisma.$transaction(
+    const created = await prisma.$transaction(
       rows.map((row: Record<string, unknown>) =>
-        prisma.scheduleSlot.create({ data: row as never }),
+        prisma.scheduleSlot.create({
+          data: {
+            contentId:   (row.content_id ?? row.contentId ?? null) as string | null,
+            channel:     row.channel as string,
+            scheduledAt: new Date((row.scheduled_at ?? row.scheduledAt) as string),
+            status:      (row.status as string) ?? 'scheduled',
+            mode:        (row.mode as string) ?? 'manual',
+          },
+        }),
       ),
     );
 
+    const data = created.map((r) => toSnake(r as unknown as Record<string, unknown>));
     return NextResponse.json({ data, error: null });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';

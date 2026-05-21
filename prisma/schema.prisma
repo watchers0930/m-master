@@ -43,7 +43,7 @@ model Content {
 // ----------------------------------------------------------------
 model ScheduleSlot {
   id          String    @id @default(cuid())
-  contentId   String    @map("content_id")
+  contentId   String?   @map("content_id")
   channel     String
   scheduledAt DateTime  @map("scheduled_at")
   publishedAt DateTime? @map("published_at")
@@ -55,7 +55,7 @@ model ScheduleSlot {
   lastError   String?   @map("last_error") @db.Text
   createdAt   DateTime  @default(now()) @map("created_at")
 
-  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  content Content? @relation(fields: [contentId], references: [id], onDelete: Cascade)
 
   @@index([contentId])
   @@index([status, scheduledAt])
