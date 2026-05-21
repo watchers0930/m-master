@@ -265,22 +265,17 @@ interface ContentBodyProps {
 }
 
 export function ContentBody({ result, imageState, onReset }: ContentBodyProps) {
+  const [htmlCopied, setHtmlCopied] = useState(false);
   const avgColor = result.scores.avg >= 80 ? 'var(--blue-500)' : result.scores.avg >= 60 ? 'var(--amber-500)' : '#ef4444';
   const blocks = parseMarkdown(result.text);
   const titleBlock = blocks.find((b): b is { type: 'h1'; text: string } => b.type === 'h1');
   const title = titleBlock?.text ?? '';
   const bodyBlocks = blocks.filter(b => b.type !== 'h1');
 
-  const handleDownload = () => {
-    const titleText = title || result.topic || 'content';
-    const slug = titleText.replace(/\s+/g, '-').replace(/[^\w가-힣-]/g, '').toLowerCase();
-    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const filename = `blog_${date}_${slug}.html`;
-
+  const buildBodyHtml = () => {
     const inlineHtml = (text: string) =>
       text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 
-    const liGroups: string[] = [];
     let bodyHtml = '';
     let inList = false;
     let dlImgIdx = 0;
@@ -323,8 +318,15 @@ export function ContentBody({ result, imageState, onReset }: ContentBodyProps) {
       }
     }
     if (inList) bodyHtml += '</ul>\n';
-    void liGroups;
+    return bodyHtml;
+  };
 
+  const handleDownload = () => {
+    const titleText = title || result.topic || 'content';
+    const slug = titleText.replace(/\s+/g, '-').replace(/[^\w가-힣-]/g, '').toLowerCase();
+    const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const filename = `blog_${date}_${slug}.html`;
+    const bodyHtml = buildBodyHtml();
     const html = `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -341,6 +343,25 @@ ${bodyHtml}
     const a = document.createElement('a');
     a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleCopyHtml = async () => {
+    const bodyHtml = buildBodyHtml();
+    try {
+      await navigator.clipboard.writeText(bodyHtml);
+      setHtmlCopied(true);
+      setTimeout(() => setHtmlCopied(false), 2000);
+    } catch (_) {
+      // fallback
+      const ta = document.createElement('textarea');
+      ta.value = bodyHtml;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setHtmlCopied(true);
+      setTimeout(() => setHtmlCopied(false), 2000);
+    }
   };
 
   return (
@@ -460,6 +481,18 @@ ${bodyHtml}
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
             HTML 다운로드
+          </button>
+          <button onClick={handleCopyHtml} className="btn btn-ghost" style={{ fontSize: 12, gap: 6, color: htmlCopied ? '#22c55e' : undefined }}>
+            {htmlCopied ? (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round">
+                <polyline points="20,6 9,17 4,12"/>
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+              </svg>
+            )}
+            {htmlCopied ? '복사 완료' : 'HTML 복사'}
           </button>
           <ConvertBtn channel="instagram" contentId={result.id} disabled={imageState.convertingChannel !== undefined} loading={imageState.convertingChannel === 'instagram'} onClick={imageState.onConvert} />
           <ConvertBtn channel="facebook" contentId={result.id} disabled={imageState.convertingChannel !== undefined} loading={imageState.convertingChannel === 'facebook'} onClick={imageState.onConvert} />

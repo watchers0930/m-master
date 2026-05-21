@@ -43,6 +43,7 @@ export const AUDIT_ACTIONS = {
   PUBLISH_BLOG: 'publish.blog',
   PUBLISH_INSTAGRAM: 'publish.instagram',
   PUBLISH_FACEBOOK: 'publish.facebook',
+  PUBLISH_NAVER_CAFE: 'publish.naver_cafe',
   SCHEDULE_CREATE: 'schedule.create',
   SCHEDULE_UPDATE: 'schedule.update',
   SCHEDULE_DELETE: 'schedule.delete',

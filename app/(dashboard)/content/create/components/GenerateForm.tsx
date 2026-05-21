@@ -7,6 +7,11 @@ import type { ContentGenerateResponse } from '@/types/api';
 import { ScheduleCalendarPicker } from './ScheduleCalendarPicker';
 import { TopicSuggestionModal } from './TopicSuggestionModal';
 
+interface AutoPublishChannelStatus {
+  status: 'converting' | 'publishing' | 'success' | 'failed';
+  error?: string;
+}
+
 interface GenerateFormProps {
   initialTopic?: string;
   onResult: (result: ContentGenerateResponse) => void;
@@ -30,6 +35,8 @@ export function GenerateForm({ initialTopic, onResult, onStreamStart, onStreamDe
 
   const [scheduledDate, setScheduledDate] = useState<string | null>(null);
   const [topicModalOpen, setTopicModalOpen] = useState(false);
+  const [autoPublish, setAutoPublish] = useState<Record<string, AutoPublishChannelStatus>>({});
+  const [autoPublishDone, setAutoPublishDone] = useState(false);
 
   const applySuggestedTopic = async (t: string) => {
     setTopic(t);
@@ -103,6 +110,8 @@ export function GenerateForm({ initialTopic, onResult, onStreamStart, onStreamDe
     setError('');
     setLoading(true);
     onStreamStart();
+    setAutoPublish({});
+    setAutoPublishDone(false);
 
     try {
       const res = await fetch('/api/content/generate', {
@@ -136,13 +145,28 @@ export function GenerateForm({ initialTopic, onResult, onStreamStart, onStreamDe
         buf = lines.pop() ?? '';
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
-          const json = JSON.parse(line.slice(6)) as { type: string; text?: string; data?: ContentGenerateResponse; message?: string };
+          const json = JSON.parse(line.slice(6)) as {
+            type: string; text?: string; data?: ContentGenerateResponse; message?: string;
+            channel?: 'instagram' | 'facebook' | 'naver_cafe'; status?: string; error?: string;
+          };
           if (json.type === 'delta' && json.text) {
             onStreamDelta(json.text);
           } else if (json.type === 'done' && json.data) {
             onResult(json.data);
             if (scheduledDate) {
               await createSlot({ content_id: json.data.id, channel: 'blog', scheduled_at: `${scheduledDate}T09:00:00Z` });
+            }
+          } else if (json.type === 'auto_publish') {
+            if (json.status === 'completed') {
+              setAutoPublishDone(true);
+            } else if (json.channel) {
+              setAutoPublish(prev => ({
+                ...prev,
+                [json.channel!]: {
+                  status: json.status as AutoPublishChannelStatus['status'],
+                  ...(json.error ? { error: json.error } : {}),
+                },
+              }));
             }
           } else if (json.type === 'error') {
             setError(json.message ?? 'AI 생성 실패');
@@ -349,6 +373,35 @@ export function GenerateForm({ initialTopic, onResult, onStreamStart, onStreamDe
         <label style={fieldLabel}>발행 예정일 <span style={{ fontWeight: 400, color: 'var(--n400)' }}>(선택)</span></label>
         <ScheduleCalendarPicker value={scheduledDate} onChange={(d) => setScheduledDate(d || null)} />
       </div>
+
+      {/* 자동 발행 상태 */}
+      {Object.keys(autoPublish).length > 0 && (
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--sub)' }}>
+            {autoPublishDone ? '자동 발행 완료' : '자동 발행 중...'}
+          </span>
+          {(['naver_cafe', 'facebook', 'instagram'] as const).map(ch => {
+            const s = autoPublish[ch];
+            if (!s) return null;
+            const label = ch === 'instagram' ? 'Instagram' : ch === 'facebook' ? 'Facebook' : '네이버 카페';
+            const icon = ch === 'instagram' ? '📸' : ch === 'facebook' ? '📘' : '📗';
+            const statusText = s.status === 'converting' ? '변환 중...'
+              : s.status === 'publishing' ? '발행 중...'
+              : s.status === 'success' ? '성공'
+              : `실패: ${s.error ?? '알 수 없는 오류'}`;
+            const color = s.status === 'success' ? '#22c55e'
+              : s.status === 'failed' ? '#ef4444'
+              : 'var(--sub)';
+            return (
+              <div key={ch} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color }}>
+                <span>{icon}</span>
+                <span style={{ fontWeight: 600 }}>{label}:</span>
+                <span>{statusText}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* 생성 버튼 */}
       <button type="submit" disabled={loading} className="btn btn-primary btn-full" style={{ fontSize: 13, padding: '11px 0', opacity: loading ? 0.7 : 1 }}>

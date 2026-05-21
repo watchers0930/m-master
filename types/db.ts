@@ -2,7 +2,7 @@
 
 export type SourceType = 'pdf' | 'md' | 'docx' | 'url' | 'manual';
 export type DocumentStatus = 'uploaded' | 'indexed' | 'failed';
-export type Channel = 'blog' | 'instagram' | 'facebook';
+export type Channel = 'blog' | 'instagram' | 'facebook' | 'naver_cafe';
 export type ContentStatus = 'draft' | 'scheduled' | 'published' | 'failed';
 export type SlotStatus = 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled';
 export type SlotMode = 'manual' | 'ai_auto';
