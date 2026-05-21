@@ -35,7 +35,20 @@ export interface ReportRow {
 }
 
 function loadCredentials(): object | undefined {
-  // 1) 서비스 계정 JSON (인라인 또는 파일)
+  // 1) OAuth refresh token → authorized_user 형식 (우선)
+  const clientId = process.env.GA4_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GA4_OAUTH_CLIENT_SECRET;
+  const refreshToken = process.env.GA4_OAUTH_REFRESH_TOKEN;
+  if (clientId && clientSecret && refreshToken) {
+    return {
+      type: 'authorized_user',
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+    };
+  }
+
+  // 2) 서비스 계정 JSON (인라인 또는 파일) — fallback
   const value =
     process.env.GA4_SERVICE_ACCOUNT_JSON ||
     process.env.GOOGLE_APPLICATION_CREDENTIALS ||
@@ -56,27 +69,10 @@ function loadCredentials(): object | undefined {
     }
   }
 
-  // 2) OAuth refresh token → authorized_user 형식
-  const clientId = process.env.GA4_OAUTH_CLIENT_ID;
-  const clientSecret = process.env.GA4_OAUTH_CLIENT_SECRET;
-  const refreshToken = process.env.GA4_OAUTH_REFRESH_TOKEN;
-  if (clientId && clientSecret && refreshToken) {
-    return {
-      type: 'authorized_user',
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
-    };
-  }
-
   return undefined;
 }
 
 export function isGa4Available(): boolean {
-  // TODO: GA4 서비스 계정의 property 접근 권한이 올바르게 설정되면 아래 주석 해제
-  // 현재 서비스 계정에 property 권한이 없어 gRPC 호출이 event loop를 블로킹함
-  if (!process.env.GA4_ENABLED) return false;
-
   if (ga4Disabled && Date.now() < ga4DisabledUntil) return false;
   if (ga4Disabled) ga4Disabled = false; // TTL 만료 → 재시도
   const credentials = loadCredentials();

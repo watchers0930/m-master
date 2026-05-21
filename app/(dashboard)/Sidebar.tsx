@@ -65,34 +65,16 @@ export function Sidebar() {
           </svg>
           콘텐츠 생성
         </Link>
-        <Link href="/content/manage" prefetch={false} className={`sb-item${active('/content/manage') ? ' active' : ''}`}>
-          <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
-          </svg>
-          콘텐츠 관리
-          <Badge count={draftCount} />
-        </Link>
-      </div>
-
-      <div className="sb-section">
-        <div className="sb-label">운영</div>
-        <Link href="/scheduler" prefetch={false} className={`sb-item${active('/scheduler') ? ' active' : ''}`}>
-          <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
-          </svg>
-          스케줄러
-        </Link>
-        <Link href="/channels" prefetch={false} className={`sb-item${active('/channels') ? ' active' : ''}`}>
-          <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
-            <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
-          </svg>
-          채널 연동
-        </Link>
       </div>
 
       <div className="sb-section">
         <div className="sb-label">분석</div>
+        <Link href="/ab-test" prefetch={false} className={`sb-item${active('/ab-test') ? ' active' : ''}`}>
+          <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M9 3h6M9 3v8L5 21h14L15 11V3"/>
+          </svg>
+          A/B 테스트
+        </Link>
         <Link href="/analytics" prefetch={false} className={`sb-item${active('/analytics') ? ' active' : ''}`}>
           <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
             <path d="M18 20V10M12 20V4M6 20v-6"/>
@@ -107,28 +89,42 @@ export function Sidebar() {
           </svg>
           방문자 분석
         </Link>
-        <Link href="/ab-test" prefetch={false} className={`sb-item${active('/ab-test') ? ' active' : ''}`}>
+      </div>
+
+      <div className="sb-section">
+        <div className="sb-label">운영</div>
+        <Link href="/scheduler" prefetch={false} className={`sb-item${active('/scheduler') ? ' active' : ''}`}>
           <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M9 3h6M9 3v8L5 21h14L15 11V3"/>
+            <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
           </svg>
-          A/B 테스트
+          스케줄러
+        </Link>
+        <Link href="/content/manage" prefetch={false} className={`sb-item${active('/content/manage') ? ' active' : ''}`}>
+          <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+          </svg>
+          콘텐츠 관리
+          <Badge count={draftCount} />
         </Link>
       </div>
 
       <div className="sb-section">
-        <div className="sb-label">AI</div>
+        <div className="sb-label">설정</div>
         <Link href="/rag" prefetch={false} className={`sb-item${active('/rag') ? ' active' : ''}`}>
           <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
             <ellipse cx="12" cy="5" rx="9" ry="3"/>
             <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
             <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
           </svg>
-          RAG 지식베이스
+          RAG 문서 DB
         </Link>
-      </div>
-
-      <div className="sb-section">
-        <div className="sb-label">설정</div>
+        <Link href="/channels" prefetch={false} className={`sb-item${active('/channels') ? ' active' : ''}`}>
+          <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
+          </svg>
+          채널 연동
+        </Link>
         <Link href="/settings" prefetch={false} className={`sb-item${active('/settings') ? ' active' : ''}`}>
           <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
             <circle cx="12" cy="12" r="3"/>
