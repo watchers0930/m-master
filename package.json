@@ -11,17 +11,26 @@
     "db:status": "prisma migrate status"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.97.1",
+    "@google-analytics/data": "^6.0.0",
     "@prisma/client": "^6.19.2",
-    "@resvg/resvg-js": "^2.6.2",
+    "@tanstack/react-query": "^5.100.9",
+    "mammoth": "^1.12.0",
     "next": "16.1.6",
+    "openai": "^6.38.0",
+    "pdf-parse": "^2.4.5",
     "prisma": "^6.19.2",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "tailwindcss": "^4",
     "typescript": "^5"
   }
 }

@@ -7,3 +7,9 @@ generated
 dist
 *.tsbuildinfo
 .env*.local
+
+# screenshots / temp images
+*.png
+*.jpg
+*.jpeg
+!public/**

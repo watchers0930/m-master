@@ -1,20 +1,31 @@
-import type { Metadata } from "next";
-import type { ReactNode } from "react";
-import Script from "next/script";
+import type { Metadata } from 'next';
+import { Noto_Sans_KR } from 'next/font/google';
+import './globals.css';
+import { Providers } from './providers';
 
-import "./globals.css";
-
-import "./globals.css";
+// Paperlogy 폰트 파일 없음 → Noto Sans KR (Google Fonts) 대체
+const notoSansKR = Noto_Sans_KR({
+  variable: '--font-noto-kr',
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
-  title: "m-master",
-  description: "Context-aware marketing studio for multi-channel content operations",
+  title: 'VESTRA 마케팅 자동화',
+  description: 'VESTRA 마케팅 콘텐츠 자동 생성·편성·발행 관리 시스템',
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <html lang="ko">
-      <body>{children}</body>
+    <html lang="ko" className={`${notoSansKR.variable} h-full antialiased`}>
+      <body className="h-full">
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }
