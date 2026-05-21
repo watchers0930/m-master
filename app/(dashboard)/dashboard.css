@@ -59,12 +59,12 @@ a { text-decoration: none; color: inherit; }
 .sb-logo-box { width: 28px; height: 28px; border-radius: 7px; background: var(--blue-400); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .sb-brand { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: -0.2px; }
 .sb-url { font-size: 10px; color: rgba(255,255,255,0.35); margin-top: 1px; }
-.sb-section { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
-.sb-label { font-size: 9.5px; color: rgba(255,255,255,0.32); padding: 4px 16px 5px; letter-spacing: 0.8px; text-transform: uppercase; }
-.sb-item { display: flex; align-items: center; gap: 9px; padding: 8px 16px; color: rgba(255,255,255,0.58); font-size: 12.5px; border-left: 2px solid transparent; transition: all 0.12s; cursor: pointer; }
-.sb-item:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.9); }
-.sb-item.active { background: rgba(37,99,235,0.22); color: #fff; border-left-color: var(--blue-400); }
-.sb-badge { margin-left: auto; background: var(--blue-400); color: #fff; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 8px; }
+.sb-section { padding: 14px 0 6px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.sb-label { font-size: 10px; color: rgba(255,255,255,0.42); padding: 2px 18px 8px; letter-spacing: 0.6px; text-transform: uppercase; font-weight: 600; }
+.sb-item { display: flex; align-items: center; gap: 10px; padding: 9px 18px; color: rgba(255,255,255,0.65); font-size: 13px; font-weight: 500; border-left: 2px solid transparent; transition: all 0.12s; cursor: pointer; text-decoration: none; }
+.sb-item:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.95); }
+.sb-item.active { background: rgba(37,99,235,0.22); color: #fff; border-left-color: var(--blue-400); font-weight: 600; }
+.sb-badge { margin-left: auto; background: var(--blue-400); color: #fff; font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 8px; }
 .sb-bottom { margin-top: auto; padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 9px; }
 .sb-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--blue-500); border: 2px solid var(--blue-300); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; }
 .sb-uname { font-size: 12px; font-weight: 600; color: #fff; }
