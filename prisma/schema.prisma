@@ -1,330 +1,229 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [vector]
 }
 
-model Project {
-  id                     String         @id @default(cuid())
-  name                   String
-  domain                 String?
-  industry               String?
-  workingPath            String?
-  ga4PropertyId          String?
-  status                 String         @default("active")
-  wordpressSiteUrl       String?
-  wordpressUsername      String?
-  wordpressAppPasswordEncrypted String?
-  wordpressStatus        String?
-  wordpressCategoryNames String?
-  wordpressTagNames      String?
-  bloggerBlogId          String?
-  bloggerAccessTokenEncrypted String?
-  bloggerStatus          String?
-  metaAccessTokenEncrypted String?
-  metaTokenExpiresAt     DateTime?
-  facebookPageId         String?
-  instagramBusinessAccountId String?
-  operationsAlertWebhookEncrypted String?
-  alertPolicyMode        String         @default("failures-and-review")
-  alertQuietHoursStart   String?
-  alertQuietHoursEnd     String?
-  alertTimezone          String         @default("Asia/Seoul")
-  alertOnBlockedReadiness Boolean      @default(true)
-  automationMode         String         @default("draft-only")
-  automationRequireReview Boolean      @default(true)
-  automationMinOverallScore Int        @default(75)
-  automationMinRiskScore Int           @default(80)
-  createdAt              DateTime       @default(now())
-  updatedAt              DateTime       @updatedAt
-  analyticsAccessKey     String?
-  analyticsConnectedAt   DateTime?
-  analyticsEndpointUrl   String?
-  analyticsSourceId      String?
-  analyticsSourceLabel   String?
-  analyticsSourceType    String?
-  brandProfiles          BrandProfile[]
-  topics                 TopicCandidate[]
-  contentJobs            ContentJob[]
-  contentPlans           ContentPlan[]
-  automationBatchRuns    AutomationBatchRun[]
-  operators              ProjectOperator[]
-  credentialChecks       CredentialCheckRun[]
-}
-
-model ProjectOperator {
-  id            String                 @id @default(cuid())
-  projectId     String
-  name          String
-  role          String
-  accessKeyHash String
-  active        Boolean                @default(true)
-  lastUsedAt    DateTime?
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
-  project       Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  sessions      ProjectOperatorSession[]
-
-  @@unique([projectId, name])
-  @@index([projectId, active, role])
-}
-
-model ProjectOperatorSession {
-  id            String          @id @default(cuid())
-  operatorId     String
-  tokenHash      String
-  expiresAt      DateTime
-  lastUsedAt     DateTime?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  operator       ProjectOperator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
-
-  @@unique([tokenHash])
-  @@index([operatorId, expiresAt])
-}
-
-model CredentialCheckRun {
-  id          String   @id @default(cuid())
-  projectId   String
-  service     String
-  kind        String
-  status      String
-  actorLabel  String?
-  summary     String
-  detail      String?  @db.Text
-  expiresAt   DateTime?
-  checkedAt   DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([projectId, service, checkedAt])
-  @@index([projectId, createdAt])
-}
-
-model BrandProfile {
-  id           String   @id @default(cuid())
-  projectId    String
-  version      Int      @default(1)
-  summary      String   @db.Text
-  audience     String?  @db.Text
-  tone         String?
-  cta          String?  @db.Text
-  bannedTerms  String?  @db.Text
-  approved     Boolean  @default(false)
-  approvedAt   DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([projectId, approved])
-}
-
-model TopicCandidate {
-  id         String   @id @default(cuid())
-  projectId  String
-  title      String
-  intentType String?
-  score      Float?
-  rationale  String?  @db.Text
-  createdAt  DateTime @default(now())
-  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([projectId])
-}
-
-model ContentJob {
-  id              String         @id @default(cuid())
-  projectId       String
-  topic           String
-  objective       String?
-  status          String         @default("pending")
-  generationProvider String?
-  publishProvider String?
-  externalPostId  String?
-  externalPostUrl String?
-  publishedAt     DateTime?
-  variantGroupId  String?
-  variantLabel    String?
-  adopted         Boolean        @default(false)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  project         Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assets          ContentAsset[]
-  publications    ChannelPublication[]
-
-  @@index([projectId, status])
-  @@index([projectId, variantGroupId])
-}
-
-model ChannelPublication {
-  id              String     @id @default(cuid())
-  contentJobId    String
-  channel         String
-  provider        String
-  status          String     @default("pending")
-  externalPostId  String?
-  externalPostUrl String?
-  payloadSummary  String?    @db.Text
-  errorMessage    String?    @db.Text
-  publishedAt     DateTime?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  contentJob      ContentJob @relation(fields: [contentJobId], references: [id], onDelete: Cascade)
-
-  @@index([contentJobId, channel, createdAt])
-  @@index([status, publishedAt])
-}
-
-model AutomationBatchRun {
-  id           String   @id @default(cuid())
-  projectId    String
-  kind         String
-  label        String
-  actorLabel   String? 
-  executionSource String?
-  durationMs   Int?
-  completedCount Int    @default(0)
-  failedCount  Int      @default(0)
-  itemsSnapshot String? @db.Text
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([projectId, createdAt])
-}
-
-model ContentAsset {
-  id              String        @id @default(cuid())
-  contentJobId    String
-  channel         String
-  title           String?
-  body            String        @db.Text
-  cta             String?       @db.Text
-  hashtags        String?       @db.Text
-  metaDescription String?       @db.Text
-  version         Int           @default(1)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  contentJob      ContentJob    @relation(fields: [contentJobId], references: [id], onDelete: Cascade)
-  imageJobs       ImageJob[]
-
-  @@index([contentJobId, channel])
-}
-
-model ImageJob {
-  id             String       @id @default(cuid())
-  contentAssetId String
-  channelPreset  String
-  prompt         String       @db.Text
-  status         String       @default("pending")
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  contentAsset   ContentAsset @relation(fields: [contentAssetId], references: [id], onDelete: Cascade)
-  imageAssets    ImageAsset[]
-
-  @@index([contentAssetId, status])
-}
-
-model ImageAsset {
-  id            String   @id @default(cuid())
-  imageJobId    String
-  role          String
-  originalPath  String?
-  composedPath  String?
-  width         Int?
-  height        Int?
-  selected      Boolean  @default(false)
-  version       Int      @default(1)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  imageJob      ImageJob @relation(fields: [imageJobId], references: [id], onDelete: Cascade)
-
-  @@index([imageJobId, selected])
-}
-
-model CmsItem {
-  id          String     @id
-  sectionId   String
-  slug        String
-  title       String
-  subtitle    String?
-  clientName  String?
-  periodLabel String?
-  summary     String     @db.Text
-  body        String?    @db.Text
-  tags        String?    @db.Text
-  imageUrl    String?
-  linkUrl     String?
-  status      String     @default("published")
-  featured    Boolean    @default(false)
-  visible     Boolean    @default(true)
-  sortOrder   Int        @default(0)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime
-  section     CmsSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
-
-  @@unique([sectionId, slug])
-  @@index([sectionId, visible, sortOrder])
-}
-
-model CmsSection {
-  id          String    @id
-  key         String    @unique
-  title       String
-  description String?   @db.Text
-  visible     Boolean   @default(true)
-  sortOrder   Int       @default(0)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime
-  items       CmsItem[]
-
-  @@index([visible, sortOrder])
-}
-
-model ContentPlan {
-  id             String            @id
-  projectId      String
-  monthKey       String
-  status         String            @default("draft")
-  basisSummary   String?           @db.Text
-  autoGenerate   Boolean           @default(false)
-  generatedAt    DateTime?
-  lastExecutedAt DateTime?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime
-  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  items          ContentPlanItem[]
-
-  @@unique([projectId, monthKey])
-  @@index([projectId, monthKey])
-}
-
-model ContentPlanItem {
-  id            String      @id
-  contentPlanId String
-  sortOrder     Int         @default(0)
-  weekLabel     String
-  publishAt     DateTime?
+// ----------------------------------------------------------------
+// contents — 핵심 콘텐츠
+// ----------------------------------------------------------------
+model Content {
+  id            String    @id @default(cuid())
+  ownerId       String    @map("owner_id")
+  channel       String    // 'blog' | 'instagram' | 'facebook'
   topic         String
-  intentType    String?
-  objective     String?
-  rationale     String?     @db.Text
-  status        String      @default("planned")
-  attemptCount  Int         @default(0)
-  lastError     String?     @db.Text
-  reviewSnapshot String?    @db.Text
-  lastProcessedAt DateTime?
-  contentJobId  String?
-  generatedAt   DateTime?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime
-  contentPlan   ContentPlan @relation(fields: [contentPlanId], references: [id], onDelete: Cascade)
+  tone          String?
+  keywords      String[]  // PostgreSQL text[]
+  textBody      String?   @map("text_body") @db.Text
+  imageUrl      String?   @map("image_url")
+  bodyImageUrls String[]  @map("body_image_urls") // text[]
+  scores        Json?     // { seo, readability, brand, legal, avg }
+  costKrw       Float     @default(0) @map("cost_krw")
+  status        String    @default("draft") // draft | scheduled | published | failed
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  @@index([contentPlanId, sortOrder])
-  @@index([contentPlanId, status])
+  scheduleSlots ScheduleSlot[]
+  abTestsAsA    AbTest[]       @relation("AbTestVariantA")
+  abTestsAsB    AbTest[]       @relation("AbTestVariantB")
+
+  @@index([ownerId, status])
+  @@index([ownerId, createdAt])
+  @@map("contents")
+}
+
+// ----------------------------------------------------------------
+// schedule_slots — 발행 스케줄
+// ----------------------------------------------------------------
+model ScheduleSlot {
+  id          String    @id @default(cuid())
+  contentId   String    @map("content_id")
+  channel     String
+  scheduledAt DateTime  @map("scheduled_at")
+  publishedAt DateTime? @map("published_at")
+  status      String    @default("scheduled") // scheduled | publishing | published | failed | cancelled
+  mode        String    @default("manual") // manual | ai_auto
+  externalId  String?   @map("external_id")
+  externalUrl String?   @map("external_url")
+  retryCount  Int       @default(0) @map("retry_count")
+  lastError   String?   @map("last_error") @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([contentId])
+  @@index([status, scheduledAt])
+  @@map("schedule_slots")
+}
+
+// ----------------------------------------------------------------
+// settings — 싱글톤 (id=1)
+// ----------------------------------------------------------------
+model Setting {
+  id              Int   @id @default(1)
+  brandGuide      Json  @default("{}") @map("brand_guide")
+  promptTemplates Json  @default("{}") @map("prompt_templates")
+  budgetMonthly   Int   @default(500000) @map("budget_monthly")
+  alertThreshold  Float @default(0.8) @map("alert_threshold")
+  notifications   Json  @default("{}") @map("notifications")
+
+  @@map("settings")
+}
+
+// ----------------------------------------------------------------
+// topic_recommendations — 월별 주제 추천
+// ----------------------------------------------------------------
+model TopicRecommendation {
+  id        String   @id @default(cuid())
+  month     String   // 'YYYY-MM'
+  topic     String
+  score     Float
+  factors   Json?
+  channel   String   @default("blog")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([month, channel])
+  @@map("topic_recommendations")
+}
+
+// ----------------------------------------------------------------
+// ab_tests — A/B 테스트 (Content 2중 FK)
+// ----------------------------------------------------------------
+model AbTest {
+  id              String    @id @default(cuid())
+  ownerId         String    @map("owner_id")
+  topic           String
+  channel         String
+  tone            String?
+  keywords        String[]
+  variantAId      String    @map("variant_a_id")
+  variantBId      String    @map("variant_b_id")
+  status          String    @default("draft") // draft | running | completed | cancelled
+  winner          String?   // 'a' | 'b' | 'tie'
+  winnerDecidedBy String?   @map("winner_decided_by") // 'auto' | 'manual'
+  measureDays     Int       @default(14) @map("measure_days")
+  variantAUrl     String?   @map("variant_a_url")
+  variantBUrl     String?   @map("variant_b_url")
+  variantAPath    String?   @map("variant_a_path")
+  variantBPath    String?   @map("variant_b_path")
+  startedAt       DateTime? @map("started_at")
+  completedAt     DateTime? @map("completed_at")
+  ga4Snapshot     Json?     @map("ga4_snapshot")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  variantA Content @relation("AbTestVariantA", fields: [variantAId], references: [id], onDelete: Cascade)
+  variantB Content @relation("AbTestVariantB", fields: [variantBId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, status])
+  @@index([status, startedAt])
+  @@map("ab_tests")
+}
+
+// ----------------------------------------------------------------
+// rag_documents — RAG 문서 메타
+// ----------------------------------------------------------------
+model RagDocument {
+  id          String   @id @default(cuid())
+  ownerId     String   @map("owner_id")
+  title       String
+  sourceType  String   @map("source_type") // pdf | md | docx | url | manual
+  storagePath String?  @map("storage_path")
+  status      String   @default("uploaded") // uploaded | indexed | failed
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  chunks RagChunk[]
+
+  @@index([ownerId, status])
+  @@map("rag_documents")
+}
+
+// ----------------------------------------------------------------
+// rag_chunks — 벡터 임베딩
+// ----------------------------------------------------------------
+model RagChunk {
+  id         String                       @id @default(cuid())
+  docId      String                       @map("doc_id")
+  chunkIndex Int                          @map("chunk_index")
+  content    String                       @db.Text
+  embedding  Unsupported("vector(1536)")?
+  tokens     Int
+
+  document RagDocument @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@index([docId])
+  @@map("rag_chunks")
+}
+
+// ----------------------------------------------------------------
+// cost_ledger — AI 비용 원장
+// ----------------------------------------------------------------
+model CostLedger {
+  id         String   @id @default(cuid())
+  occurredAt DateTime @default(now()) @map("occurred_at")
+  kind       String   // 'chat' | 'embedding' | 'image'
+  tokensIn   Int      @default(0) @map("tokens_in")
+  tokensOut  Int      @default(0) @map("tokens_out")
+  krw        Float    @default(0)
+  contentId  String?  @map("content_id")
+
+  @@index([occurredAt])
+  @@map("cost_ledger")
+}
+
+// ----------------------------------------------------------------
+// audit_log — 감사 로그 (INSERT only)
+// ----------------------------------------------------------------
+model AuditLog {
+  id         String   @id @default(cuid())
+  actor      String?
+  action     String
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id")
+  payload    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([action, createdAt])
+  @@map("audit_log")
+}
+
+// ----------------------------------------------------------------
+// analytics_daily — 일별 분석
+// ----------------------------------------------------------------
+model AnalyticsDaily {
+  id        String   @id @default(cuid())
+  date      String   // 'YYYY-MM-DD'
+  channel   String
+  contentId String?  @map("content_id")
+  views     Int      @default(0)
+  clicks    Int      @default(0)
+  reach     Int      @default(0)
+  saves     Int      @default(0)
+  ctr       Float    @default(0)
+  source    String   @default("ga4") // ga4 | naver | instagram | facebook
+
+  @@unique([date, channel, contentId, source])
+  @@index([date, channel])
+  @@map("analytics_daily")
+}
+
+// ----------------------------------------------------------------
+// channel_credentials — 채널 자격증명
+// ----------------------------------------------------------------
+model ChannelCredential {
+  id           String   @id @default(cuid())
+  channel      String   @unique // 'instagram' | 'facebook'
+  accessToken  String?  @map("access_token") @db.Text
+  refreshToken String?  @map("refresh_token") @db.Text
+  expiresAt    String?  @map("expires_at")
+  meta         Json?
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("channel_credentials")
 }
