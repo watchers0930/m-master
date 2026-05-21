@@ -19,6 +19,7 @@ import { calcEmbeddingKrw } from '@/lib/openai/embedding';
 import { generateThumbnail, calcImageKrw } from '@/lib/openai/image';
 import { trackCost } from '@/lib/cost/tracker';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
+import { autoPublishToSocial } from '@/lib/publish/auto-publish';
 import type { ContentGenerateRequest } from '@/types/api';
 
 const RequestSchema = z.object({
@@ -206,6 +207,19 @@ export async function POST(request: NextRequest) {
         });
 
         send({ type: 'done', data: { id: contentData.id, text, image_url: imageUrl, body_image_urls: bodyImageUrls, scores, cost_krw: totalKrw } });
+
+        // 블로그 채널일 때 인스타/페북 자동 발행
+        if (req.channel === 'blog') {
+          await autoPublishToSocial({
+            blogContentId: contentData.id,
+            ownerId,
+            blogText: text,
+            topic: req.topic,
+            imageUrl,
+            bodyImageUrls,
+            onProgress: (evt) => send(evt),
+          });
+        }
 
       } catch (err) {
         console.error('[generate] 스트리밍 오류:', err);

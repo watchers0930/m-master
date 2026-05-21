@@ -2,7 +2,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { CLAUDE_MODEL, calcChatKrw, getClient, toChatUsage, type ChatUsage } from './chat';
 
-export type ConvertChannel = 'instagram' | 'facebook';
+export type ConvertChannel = 'instagram' | 'facebook' | 'naver_cafe';
 
 const CHANNEL_PROMPTS: Record<ConvertChannel, string> = {
   instagram: `당신은 VESTRA(AI 기반 부동산 권리분석·시세분석 서비스) 인스타그램 카드뉴스 전문 작가입니다.
@@ -56,6 +56,26 @@ const CHANNEL_PROMPTS: Record<ConvertChannel, string> = {
 #해시태그1 #해시태그2 #해시태그3 #해시태그4 #해시태그5
 
 설명 텍스트·JSON·코드블록 표시 없이 본문 + 해시태그만 출력하세요.`,
+
+  naver_cafe: `당신은 VESTRA(AI 기반 부동산 권리분석·시세분석 서비스) 네이버 카페 게시글 전문 작가입니다.
+주어진 블로그 글을 네이버 카페 게시글로 변환하세요.
+
+## 규칙
+- 총 1500~2500자, 정보형 게시글 톤
+- 소제목(##) 2~3개로 본문을 구조화 — 가독성 극대화
+- 첫 문단에 핵심 결론 또는 실용 정보 요약 — "이 글에서 알 수 있는 것" 명시
+- 전문적이되 친근한 톤 ("~습니다", "~인데요", "~거든요")
+- 어려운 부동산·법률 용어는 풀어서 설명 (괄호 안에 짧은 부연)
+- 본문 중간에 VESTRA 핵심 메시지 1회 자연스럽게 (AI 권리분석 / 실시간 시세 확인 / 100% 비대면)
+- 마지막 단락에 CTA 1개 ("궁금한 점은 댓글로", "VESTRA에서 무료 분석")
+- 마지막 줄에 해시태그 5~7개
+
+## 출력 형식
+본문 텍스트 (소제목 포함, 3~4개 섹션)
+빈 줄
+#해시태그1 #해시태그2 #해시태그3 #해시태그4 #해시태그5
+
+설명 텍스트·JSON·코드블록 표시 없이 본문 + 해시태그만 출력하세요.`,
 };
 
 export interface ConvertResult {
@@ -78,7 +98,7 @@ export async function convertBlogToChannel(
     '[원본 블로그 본문]',
     blogText,
     '',
-    `위 블로그 글을 ${channel === 'instagram' ? '인스타그램 카드뉴스(10슬라이드)' : '페이스북 피드 게시물'} 형식으로 변환해주세요.`,
+    `위 블로그 글을 ${channel === 'instagram' ? '인스타그램 카드뉴스(10슬라이드)' : channel === 'facebook' ? '페이스북 피드 게시물' : '네이버 카페 게시글'} 형식으로 변환해주세요.`,
   ].join('\n');
 
   const response = await client.messages.create({
