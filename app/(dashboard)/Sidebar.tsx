@@ -39,7 +39,7 @@ export function Sidebar() {
       <div className="sb-logo">
         <div className="sb-logo-mark">
           <div className="sb-logo-box">
-            <svg width="16" height="16" viewBox="0 0 90 90" fill="none">
+            <svg width="18" height="18" viewBox="0 0 90 90" fill="none">
               <path d="M16 66L32 22L45 46L58 22L74 66" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
