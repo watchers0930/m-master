@@ -80,23 +80,37 @@ export function buildNaverCafeContent(markdown: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// 더블인코딩 body 구성
+// URLSearchParams는 내부적으로 공백을 '+'로 인코딩하는데, 네이버 서버가
+// 이를 올바르게 디코딩하지 못해 한글이 깨질 수 있다.
+// encodeURIComponent를 2회 적용하면 네이버 서버가 1차 디코딩 후에도
+// percent-encoded 상태가 유지되어, 최종 렌더링 시 정상 한글이 표시된다.
+// ---------------------------------------------------------------------------
+function buildFormBody(fields: Record<string, string>): string {
+  return Object.entries(fields)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(encodeURIComponent(v))}`)
+    .join('&');
+}
+
+// ---------------------------------------------------------------------------
 // 카페 API 호출 (401 시 토큰 갱신 후 1회 재시도)
 // ---------------------------------------------------------------------------
 async function cafeApiPost(
   clubId: string,
   menuId: string,
-  params: URLSearchParams,
+  fields: Record<string, string>,
 ): Promise<{ res: Response; json: Record<string, unknown> }> {
   const url = `https://openapi.naver.com/v1/cafe/${clubId}/menu/${menuId}/articles`;
+  const body = buildFormBody(fields);
 
   let token = await getAccessToken();
   let res = await fetch(url, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
     },
-    body: params,
+    body,
   });
 
   // 401 → 토큰 만료 → 자동 갱신 후 재시도
@@ -106,9 +120,9 @@ async function cafeApiPost(
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
       },
-      body: params,
+      body,
     });
   }
 
@@ -134,7 +148,7 @@ export async function publishNaverCafePost(opts: {
   const { res, json } = await cafeApiPost(
     clubId,
     menuId,
-    new URLSearchParams({ subject: opts.subject, content: body }),
+    { subject: opts.subject, content: body },
   );
 
   if (!res.ok) {
