@@ -26,6 +26,23 @@ export default function ChannelsPage() {
           <button className="btn btn-ghost" style={{ fontSize: 11.5, flexShrink: 0 }}>연결 해제</button>
         </div>
 
+        {/* 네이버 카페 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px' }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: '#E8F5E9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#03C75A">
+              <path d="M16.273 12.845L7.376 0H0v24h7.727V11.155L16.624 24H24V0h-7.727z"/>
+            </svg>
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>네이버 카페</span>
+              <span style={{ background: '#E8F5E9', border: '1px solid #A5D6A7', color: '#2E7D32', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>연결됨</span>
+            </div>
+            <p style={{ fontSize: 11.5, color: 'var(--sub)' }}>네이버 카페 OpenAPI를 통해 게시글을 자동 발행합니다. 토큰 자동 갱신 지원.</p>
+          </div>
+          <button className="btn btn-ghost" style={{ fontSize: 11.5, flexShrink: 0 }}>연결 해제</button>
+        </div>
+
         {/* Instagram */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 18px' }}>
           <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--n50)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
