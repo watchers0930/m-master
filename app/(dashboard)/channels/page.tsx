@@ -1,4 +1,5 @@
 // 서버 컴포넌트 — 환경변수 존재 여부로 채널 연결 상태 동적 표시
+export const dynamic = 'force-dynamic';
 
 function getChannelStatus() {
   const naver = !!(process.env.NAVER_CAFE_ACCESS_TOKEN && process.env.NAVER_CAFE_CLUB_ID && process.env.NAVER_CAFE_MENU_ID);
