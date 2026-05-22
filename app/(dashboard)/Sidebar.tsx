@@ -39,13 +39,13 @@ export function Sidebar() {
       <div className="sb-logo">
         <div className="sb-logo-mark">
           <div className="sb-logo-box">
-            <svg className="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
-              <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+            <svg width="16" height="16" viewBox="0 0 90 90" fill="none">
+              <path d="M16 66L32 22L45 46L58 22L74 66" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
-          <span className="sb-brand">m-master</span>
+          <span className="sb-brand">MINTEQ</span>
         </div>
-        <div className="sb-url">m-master.vercel.app</div>
+        <div className="sb-url">minteq.vercel.app</div>
       </div>
 
       <div className="sb-section">
@@ -137,8 +137,8 @@ export function Sidebar() {
       <div className="sb-bottom">
         <div className="sb-avatar">M</div>
         <div>
-          <div className="sb-uname">m-master</div>
-          <div className="sb-uemail">m-master.vercel.app</div>
+          <div className="sb-uname">MINTEQ</div>
+          <div className="sb-uemail">minteq.vercel.app</div>
         </div>
       </div>
     </aside>

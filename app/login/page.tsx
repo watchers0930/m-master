@@ -27,13 +27,13 @@ export default function LoginPage() {
         {/* 로고 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
           <div style={{ width: 36, height: 36, borderRadius: 9, background: 'linear-gradient(135deg,#1E3A6E,#2563EB)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
-              <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
+            <svg width="16" height="16" viewBox="0 0 90 90" fill="none">
+              <path d="M16 66L32 22L45 46L58 22L74 66" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#1E3A6E' }}>m-master</div>
-            <div style={{ fontSize: 11, color: '#64748b' }}>m-master.vercel.app</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#1E3A6E' }}>MINTEQ</div>
+            <div style={{ fontSize: 11, color: '#64748b' }}>minteq.vercel.app</div>
           </div>
         </div>
 

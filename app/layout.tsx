@@ -12,8 +12,8 @@ const notoSansKR = Noto_Sans_KR({
 });
 
 export const metadata: Metadata = {
-  title: 'VESTRA 마케팅 자동화',
-  description: 'VESTRA 마케팅 콘텐츠 자동 생성·편성·발행 관리 시스템',
+  title: 'MINTEQ - 마케팅 자동화',
+  description: 'MINTEQ 마케팅 콘텐츠 자동 생성·편성·발행 관리 시스템',
 };
 
 export default function RootLayout({
