@@ -49,9 +49,8 @@ export async function fetchPopularPages(days = 30): Promise<PopularPage[] | null
       dimensions: [{ name: 'pagePath' }],
       metrics: [{ name: 'sessions' }],
       orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
-      limit: 10,
     });
-    return (res.rows ?? [])
+    return (res.rows ?? []).slice(0, 10)
       .map((row) => ({
         path: row.dimensionValues?.[0]?.value ?? '',
         sessions: Math.round(parseNum(row.metricValues?.[0]?.value)),

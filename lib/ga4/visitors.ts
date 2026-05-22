@@ -190,9 +190,8 @@ export async function fetchTrafficSources(period: Period): Promise<TrafficSource
       dimensions: [{ name: 'sessionDefaultChannelGroup' }],
       metrics: [{ name: 'sessions' }],
       orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
-      limit: 15,
     });
-    const rows = res.rows ?? [];
+    const rows = (res.rows ?? []).slice(0, 15);
     const total = rows.reduce((sum, row) => sum + parseNum(row.metricValues?.[0]?.value), 0);
     return rows.map((row) => {
       const sessions = parseNum(row.metricValues?.[0]?.value);
@@ -247,9 +246,8 @@ export async function fetchTopPages(period: Period, limit = 20): Promise<TopPage
       dimensions: [{ name: 'pagePath' }, { name: 'pageTitle' }],
       metrics: [{ name: 'screenPageViews' }, { name: 'averageSessionDuration' }, { name: 'bounceRate' }],
       orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
-      limit,
     });
-    return (res.rows ?? []).map((row) => ({
+    return (res.rows ?? []).slice(0, limit).map((row) => ({
       path: row.dimensionValues?.[0]?.value ?? '/',
       title: row.dimensionValues?.[1]?.value ?? '(no title)',
       views: parseNum(row.metricValues?.[0]?.value),
@@ -276,7 +274,6 @@ export async function fetchReferrals(period: Period): Promise<{ sources: Referra
         dimensions: [{ name: 'sessionSource' }, { name: 'sessionMedium' }],
         metrics: [{ name: 'sessions' }],
         orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
-        limit: 20,
       }),
       client.runReport({
         property,
@@ -284,10 +281,9 @@ export async function fetchReferrals(period: Period): Promise<{ sources: Referra
         dimensions: [{ name: 'searchTerm' }],
         metrics: [{ name: 'sessions' }],
         orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
-        limit: 30,
       }),
     ]);
-    const sourceRows = sourceRes[0]?.rows ?? [];
+    const sourceRows = (sourceRes[0]?.rows ?? []).slice(0, 20);
     const total = sourceRows.reduce((sum, row) => sum + parseNum(row.metricValues?.[0]?.value), 0);
     const sources = sourceRows.map((row) => {
       const sessions = parseNum(row.metricValues?.[0]?.value);
@@ -298,7 +294,7 @@ export async function fetchReferrals(period: Period): Promise<{ sources: Referra
         percentage: total > 0 ? Math.round((sessions / total) * 1000) / 10 : 0,
       };
     });
-    const searchTerms = (termRes[0]?.rows ?? [])
+    const searchTerms = (termRes[0]?.rows ?? []).slice(0, 30)
       .map((row) => ({ term: row.dimensionValues?.[0]?.value ?? '', sessions: parseNum(row.metricValues?.[0]?.value) }))
       .filter(({ term }) => {
         const value = term.trim();
@@ -323,8 +319,8 @@ export async function fetchDemographics(period: Period): Promise<{ ages: AgeGrou
     const dates = [periodToDates(period)];
     const [ageGenderRes, cityRes, countryRes] = await Promise.all([
       client.runReport({ property, dateRanges: dates, dimensions: [{ name: 'userAgeBracket' }, { name: 'userGender' }], metrics: [{ name: 'activeUsers' }] }),
-      client.runReport({ property, dateRanges: dates, dimensions: [{ name: 'city' }], metrics: [{ name: 'activeUsers' }], orderBys: [{ metric: { metricName: 'activeUsers' }, desc: true }], limit: 20 }),
-      client.runReport({ property, dateRanges: dates, dimensions: [{ name: 'country' }], metrics: [{ name: 'activeUsers' }], orderBys: [{ metric: { metricName: 'activeUsers' }, desc: true }], limit: 15 }),
+      client.runReport({ property, dateRanges: dates, dimensions: [{ name: 'city' }], metrics: [{ name: 'activeUsers' }], orderBys: [{ metric: { metricName: 'activeUsers' }, desc: true }] }),
+      client.runReport({ property, dateRanges: dates, dimensions: [{ name: 'country' }], metrics: [{ name: 'activeUsers' }], orderBys: [{ metric: { metricName: 'activeUsers' }, desc: true }] }),
     ]);
     const ageMap = new Map<string, number>();
     const genderMap = new Map<string, number>();
@@ -341,12 +337,12 @@ export async function fetchDemographics(period: Period): Promise<{ ages: AgeGrou
     return {
       ages: Array.from(ageMap.entries()).sort((a, b) => b[1] - a[1]).map(([bracket, users]) => ({ bracket, users, percentage: mapPercent(users) })),
       genders: Array.from(genderMap.entries()).sort((a, b) => b[1] - a[1]).map(([gender, users]) => ({ gender, users, percentage: mapPercent(users) })),
-      cities: (cityRes[0]?.rows ?? []).map((row, _, rows) => {
+      cities: (cityRes[0]?.rows ?? []).slice(0, 20).map((row, _, rows) => {
         const users = parseNum(row.metricValues?.[0]?.value);
         const rowTotal = rows.reduce((sum, entry) => sum + parseNum(entry.metricValues?.[0]?.value), 0);
         return { city: row.dimensionValues?.[0]?.value ?? '(not set)', users, percentage: rowTotal > 0 ? Math.round((users / rowTotal) * 1000) / 10 : 0 };
       }),
-      countries: (countryRes[0]?.rows ?? []).map((row, _, rows) => {
+      countries: (countryRes[0]?.rows ?? []).slice(0, 15).map((row, _, rows) => {
         const users = parseNum(row.metricValues?.[0]?.value);
         const rowTotal = rows.reduce((sum, entry) => sum + parseNum(entry.metricValues?.[0]?.value), 0);
         return { country: row.dimensionValues?.[0]?.value ?? '(not set)', users, percentage: rowTotal > 0 ? Math.round((users / rowTotal) * 1000) / 10 : 0 };
@@ -367,8 +363,8 @@ export async function fetchDevices(period: Period): Promise<{ devices: DeviceRow
     const dates = [periodToDates(period)];
     const [deviceRes, browserRes, osRes] = await Promise.all([
       client.runReport({ property, dateRanges: dates, dimensions: [{ name: 'deviceCategory' }], metrics: [{ name: 'sessions' }] }),
-      client.runReport({ property, dateRanges: dates, dimensions: [{ name: 'browser' }], metrics: [{ name: 'sessions' }], orderBys: [{ metric: { metricName: 'sessions' }, desc: true }], limit: 10 }),
-      client.runReport({ property, dateRanges: dates, dimensions: [{ name: 'operatingSystem' }], metrics: [{ name: 'sessions' }], orderBys: [{ metric: { metricName: 'sessions' }, desc: true }], limit: 10 }),
+      client.runReport({ property, dateRanges: dates, dimensions: [{ name: 'browser' }], metrics: [{ name: 'sessions' }], orderBys: [{ metric: { metricName: 'sessions' }, desc: true }] }),
+      client.runReport({ property, dateRanges: dates, dimensions: [{ name: 'operatingSystem' }], metrics: [{ name: 'sessions' }], orderBys: [{ metric: { metricName: 'sessions' }, desc: true }] }),
     ]);
     const mapRows = (rows: ReportRow[], keyName: 'device' | 'browser' | 'os') => {
       const total = rows.reduce((sum, row) => sum + parseNum(row.metricValues?.[0]?.value), 0);
@@ -383,8 +379,8 @@ export async function fetchDevices(period: Period): Promise<{ devices: DeviceRow
     };
     return {
       devices: mapRows(deviceRes[0]?.rows ?? [], 'device') as DeviceRow[],
-      browsers: mapRows(browserRes[0]?.rows ?? [], 'browser') as BrowserRow[],
-      os: mapRows(osRes[0]?.rows ?? [], 'os') as OsRow[],
+      browsers: (mapRows(browserRes[0]?.rows ?? [], 'browser') as BrowserRow[]).slice(0, 10),
+      os: (mapRows(osRes[0]?.rows ?? [], 'os') as OsRow[]).slice(0, 10),
     };
   }, 'devices', { devices: [] as DeviceRow[], browsers: [] as BrowserRow[], os: [] as OsRow[] });
   setCache(key, result, TTL.DETAIL);
@@ -400,7 +396,7 @@ export async function fetchEntryExit(period: Period): Promise<{ landings: Landin
     const property = getPropertyId();
     const dates = [periodToDates(period)];
     const [landingRes, exitRes] = await Promise.all([
-      client.runReport({ property, dateRanges: dates, dimensions: [{ name: 'landingPage' }], metrics: [{ name: 'sessions' }, { name: 'bounceRate' }], orderBys: [{ metric: { metricName: 'sessions' }, desc: true }], limit: 15 }),
+      client.runReport({ property, dateRanges: dates, dimensions: [{ name: 'landingPage' }], metrics: [{ name: 'sessions' }, { name: 'bounceRate' }], orderBys: [{ metric: { metricName: 'sessions' }, desc: true }] }),
       client.runReport({
         property,
         dateRanges: dates,
@@ -408,16 +404,15 @@ export async function fetchEntryExit(period: Period): Promise<{ landings: Landin
         metrics: [{ name: 'eventCount' }],
         dimensionFilter: { filter: { fieldName: 'eventName', stringFilter: { value: 'session_end' } } },
         orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
-        limit: 15,
       }),
     ]);
     return {
-      landings: (landingRes[0]?.rows ?? []).map((row) => ({
+      landings: (landingRes[0]?.rows ?? []).slice(0, 15).map((row) => ({
         path: row.dimensionValues?.[0]?.value ?? '/',
         sessions: parseNum(row.metricValues?.[0]?.value),
         bounceRate: parseNum(row.metricValues?.[1]?.value),
       })),
-      exits: (exitRes[0]?.rows ?? []).map((row) => ({
+      exits: (exitRes[0]?.rows ?? []).slice(0, 15).map((row) => ({
         path: row.dimensionValues?.[0]?.value ?? '/',
         exits: parseNum(row.metricValues?.[0]?.value),
       })),
