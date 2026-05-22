@@ -7,7 +7,7 @@
     },
     {
       "path": "/api/cron/schedule-publish",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 9 * * *"
     }
   ]
 }
