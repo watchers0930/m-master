@@ -4,7 +4,6 @@ import {
   fetchReferrals, fetchDemographics, fetchDevices, fetchEntryExit,
   type Period,
 } from '@/lib/ga4/visitors';
-import { getDebugErrors } from '@/lib/ga4/_internal';
 
 const VALID: Period[] = ['today', 'this_week', 'this_month', '7d', '30d', '90d', '365d'];
 
@@ -37,7 +36,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       data: { kpi, traffic, daily, pages, refs, demo, devs, entry },
       error: null,
-      _debug: getDebugErrors(),
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error';

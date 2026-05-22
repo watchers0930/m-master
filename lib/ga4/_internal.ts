@@ -198,16 +198,9 @@ export function calcDelta(cur: number, prev: number): number {
   return ((cur - prev) / prev) * 100;
 }
 
-// 디버그: 최근 에러 수집 (진단 후 제거)
-const _debugErrors: string[] = [];
-export function getDebugErrors(): string[] { return _debugErrors; }
-
 export async function safe<T>(fn: () => Promise<T>, label: string, fallback: T): Promise<T> {
   // GA4가 비활성 상태면 즉시 fallback 반환
-  if (!isGa4Available()) {
-    _debugErrors.push(`${label}: GA4_DISABLED`);
-    return fallback;
-  }
+  if (!isGa4Available()) return fallback;
 
   try {
     const timeout = new Promise<never>((_, reject) =>
@@ -217,7 +210,6 @@ export async function safe<T>(fn: () => Promise<T>, label: string, fallback: T):
     return result;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    _debugErrors.push(`${label}: ${msg.slice(0, 200)}`);
     console.error(`[ga4] ${label} failed:`, msg);
     // 403/권한 에러 시 GA4 전체 비활성화 (429 rate limit은 일시적이므로 제외)
     if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) {
