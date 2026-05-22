@@ -61,6 +61,11 @@ function Badge({ state }: { state: ChannelState }) {
   );
 }
 
+function maskId(value: string | undefined): string {
+  if (!value || value.length < 5) return '***';
+  return value.slice(0, 3) + '***' + value.slice(-2);
+}
+
 const DESC: Record<string, Record<ChannelState, string>> = {
   naver: {
     connected: '네이버 카페 OpenAPI를 통해 게시글을 자동 발행합니다. 토큰 자동 갱신 지원.',
@@ -123,6 +128,11 @@ export default async function ChannelsPage() {
               <Badge state={status.naver} />
             </div>
             <p style={{ fontSize: 11.5, color: 'var(--sub)' }}>{DESC.naver[status.naver]}</p>
+            {status.naver === 'connected' && (
+              <p style={{ fontSize: 10, color: 'var(--sub)', marginTop: 4, fontFamily: 'monospace' }}>
+                카페 ID: {maskId(process.env.NAVER_CAFE_CLUB_ID)} / 게시판: {maskId(process.env.NAVER_CAFE_MENU_ID)}
+              </p>
+            )}
           </div>
           {status.naver === 'connected' && <button className="btn btn-ghost" style={{ fontSize: 11.5, flexShrink: 0 }}>연결 해제</button>}
         </div>

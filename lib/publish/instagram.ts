@@ -69,6 +69,64 @@ async function graphPost(path: string, body: Record<string, string>): Promise<un
 }
 
 /**
+ * IG 캐러셀(여러 장) 게시 — 3단계:
+ * 1) 각 이미지 URL로 child container 생성 (is_carousel_item=true)
+ * 2) carousel container 생성 (media_type=CAROUSEL, children=[ids])
+ * 3) media_publish 호출
+ */
+export async function publishInstagramCarousel(opts: {
+  imageUrls: string[];
+  caption: string;
+}): Promise<InstagramPublishResult> {
+  if (opts.imageUrls.length < 2) {
+    throw new Error('캐러셀 발행에는 최소 2장의 이미지가 필요합니다');
+  }
+
+  const token = getEnv('INSTAGRAM_ACCESS_TOKEN');
+  const igUserId = getEnv('INSTAGRAM_BUSINESS_ID');
+  const caption = buildInstagramCaption(opts.caption);
+
+  // 1단계: 각 이미지로 child container 생성
+  const childIds: string[] = [];
+  for (const imageUrl of opts.imageUrls) {
+    const child = (await graphPost(`${igUserId}/media`, {
+      image_url: imageUrl,
+      is_carousel_item: 'true',
+      access_token: token,
+    })) as { id?: string };
+
+    if (!child.id) {
+      throw new Error('Instagram 캐러셀 child 컨테이너 생성 실패 — id 누락');
+    }
+    childIds.push(child.id);
+  }
+
+  // 2단계: carousel container 생성
+  const carousel = (await graphPost(`${igUserId}/media`, {
+    media_type: 'CAROUSEL',
+    children: childIds.join(','),
+    caption,
+    access_token: token,
+  })) as { id?: string };
+
+  if (!carousel.id) {
+    throw new Error('Instagram 캐러셀 컨테이너 생성 실패 — id 누락');
+  }
+
+  // 3단계: 게시
+  const published = (await graphPost(`${igUserId}/media_publish`, {
+    creation_id: carousel.id,
+    access_token: token,
+  })) as { id?: string };
+
+  if (!published.id) {
+    throw new Error('Instagram 캐러셀 게시 실패 — id 누락');
+  }
+
+  return { id: published.id };
+}
+
+/**
  * IG 단일 이미지 게시.
  * caption은 markdown을 그대로 받아도 buildInstagramCaption으로 변환됨.
  */

@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { convertBlogToChannel, type ConvertChannel } from '@/lib/claude/convert';
-import { publishInstagramImage } from './instagram';
+import { publishInstagramImage, publishInstagramCarousel } from './instagram';
 import { publishFacebookPost } from './facebook';
 import { publishNaverCafePost } from './naver-cafe';
 import { trackCost } from '@/lib/cost/tracker';
@@ -92,11 +92,22 @@ async function publishToChannel(
 
   let externalId: string | undefined;
   if (channel === 'instagram') {
-    const result = await publishInstagramImage({
-      imageUrl: imageUrl ?? '',
-      caption: converted.text,
-    });
-    externalId = result.id;
+    // bodyImageUrls가 2장 이상이면 캐러셀 발행
+    if (params.bodyImageUrls.length >= 2) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
+      const absoluteUrls = params.bodyImageUrls.map(u => u.startsWith('http') ? u : `${appUrl}${u}`);
+      const result = await publishInstagramCarousel({
+        imageUrls: absoluteUrls,
+        caption: converted.text,
+      });
+      externalId = result.id;
+    } else {
+      const result = await publishInstagramImage({
+        imageUrl: imageUrl ?? '',
+        caption: converted.text,
+      });
+      externalId = result.id;
+    }
   } else if (channel === 'facebook') {
     const result = await publishFacebookPost({
       imageUrl,

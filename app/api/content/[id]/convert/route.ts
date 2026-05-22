@@ -9,9 +9,11 @@ import { isBudgetExceeded } from '@/lib/cost/budget';
 import { convertBlogToChannel } from '@/lib/claude/convert';
 import { trackCost } from '@/lib/cost/tracker';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
+import { generateInstagramCard, type CardData } from '@/lib/imagen/instagram-card';
+import { upload, getPublicUrl } from '@/lib/storage';
 
 const RequestSchema = z.object({
-  channel: z.enum(['instagram', 'facebook']),
+  channel: z.enum(['instagram', 'facebook', 'naver_cafe']),
 });
 
 function jsonError(code: string, message: string, status: number) {
@@ -74,7 +76,54 @@ export async function POST(
     return jsonError('convert_failed', '변환 실패. 다시 시도해주세요.', 502);
   }
 
-  // 4) DB insert — 새 채널의 contents row
+  // 4) 인스타그램 카드 이미지 파이프라인
+  let bodyImageUrls: string[] = [];
+  let captionText = convertResult.text;
+
+  if (channel === 'instagram') {
+    try {
+      // Claude 응답에서 JSON 배열 + 해시태그 분리
+      const lines = convertResult.text.trim().split('\n');
+      let jsonLine = '';
+      const hashtagLines: string[] = [];
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('[') && trimmed.includes('{')) {
+          jsonLine = trimmed;
+        } else if (trimmed.startsWith('#')) {
+          hashtagLines.push(trimmed);
+        }
+      }
+
+      if (jsonLine) {
+        const cards = JSON.parse(jsonLine) as Array<{ title: string; body: string; footnote?: string }>;
+        const totalCards = cards.length;
+
+        // 각 카드 → PNG → storage 업로드
+        for (let i = 0; i < totalCards; i++) {
+          const cardData: CardData = {
+            title: cards[i].title,
+            body: cards[i].body,
+            footnote: cards[i].footnote || '',
+            cardIndex: i,
+            totalCards,
+          };
+          const pngBuffer = await generateInstagramCard(cardData);
+          const fileName = `${id}_card_${i}.png`;
+          await upload('card-images', fileName, pngBuffer);
+          bodyImageUrls.push(getPublicUrl('card-images', fileName));
+        }
+
+        // 캡션은 해시태그만 (카드에 본문이 들어가므로)
+        captionText = hashtagLines.join('\n') || convertResult.text;
+      }
+    } catch (cardErr) {
+      // 카드 생성 실패 시 원본 텍스트 유지, 이미지 없이 진행
+      console.error('[convert/instagram] 카드 이미지 생성 실패:', cardErr);
+    }
+  }
+
+  // 5) DB insert — 새 채널의 contents row
   const newRow = await prisma.content.create({
     data: {
       ownerId,
@@ -82,9 +131,9 @@ export async function POST(
       topic: source.topic,
       tone: source.tone,
       keywords: (source.keywords as string[]) ?? [],
-      textBody: convertResult.text,
+      textBody: captionText,
       imageUrl: source.imageUrl,
-      bodyImageUrls: [],
+      bodyImageUrls,
       scores: Prisma.DbNull,
       costKrw: convertResult.krw,
       status: 'draft',

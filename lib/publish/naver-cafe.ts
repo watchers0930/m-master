@@ -63,15 +63,25 @@ async function getAccessToken(): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
+// HTML 이스케이프 (마크다운 변환 전 원문에 적용)
+// ---------------------------------------------------------------------------
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ---------------------------------------------------------------------------
 // 마크다운 → HTML 변환
 // ---------------------------------------------------------------------------
 /** 마크다운 → HTML 변환 (카페 API는 HTML 본문 지원) */
 export function buildNaverCafeContent(markdown: string): string {
-  return markdown
+  // 1) 원문 HTML 이스케이프 (마크다운 기호 제외한 사용자 텍스트 보호)
+  const escaped = escapeHtml(markdown);
+  // 2) 마크다운 → HTML 태그 변환 (이스케이프된 텍스트 기반)
+  return escaped
     .replace(/^\[이미지:.*\]$/gm, '')
     .replace(/^#{1,6}\s+(.+)$/gm, '<h3>$1</h3>')
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
-    .replace(/^>\s+(.+)$/gm, '<blockquote>$1</blockquote>')
+    .replace(/^&gt;\s+(.+)$/gm, '<blockquote>$1</blockquote>')
     .replace(/^-\s+(.+)$/gm, '<li>$1</li>')
     .replace(/(<li>.*<\/li>\n?)+/g, (match) => `<ul>${match}</ul>`)
     .replace(/\n{2,}/g, '<br><br>')
@@ -127,6 +137,15 @@ async function cafeApiPost(
   }
 
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+
+  // 403 + code:999 → 네이버 카페 스팸 방지 감지
+  if (
+    res.status === 403 ||
+    (json?.message as { error?: { code?: string } })?.error?.code === '999'
+  ) {
+    throw new Error('네이버 카페 스팸 방지 감지 — 발행 간격을 늘려주세요 (최소 10초)');
+  }
+
   return { res, json };
 }
 

@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { publishNaverCafePost } from '@/lib/publish/naver-cafe';
 import { publishFacebookPost } from '@/lib/publish/facebook';
-import { publishInstagramImage } from '@/lib/publish/instagram';
+import { publishInstagramImage, publishInstagramCarousel } from '@/lib/publish/instagram';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
 
 export const maxDuration = 300; // 5분 (Vercel Pro)
@@ -44,10 +44,11 @@ export async function GET(request: NextRequest) {
     },
     include: {
       content: {
-        select: { id: true, textBody: true, imageUrl: true, topic: true },
+        select: { id: true, textBody: true, imageUrl: true, bodyImageUrls: true, topic: true },
       },
     },
-    orderBy: { scheduledAt: 'asc' },
+    // 정렬: channel ASC (facebook → instagram → naver_cafe) + scheduledAt ASC
+    orderBy: [{ channel: 'asc' }, { scheduledAt: 'asc' }],
   });
 
   if (slots.length === 0) {
@@ -64,8 +65,17 @@ export async function GET(request: NextRequest) {
     error?: string;
   }> = [];
 
+  let prevWasNaverCafe = false;
+
   for (const slot of slots) {
     const content = slot.content;
+
+    // naver_cafe 슬롯 사이에 10초 대기 (스팸 방지)
+    if (slot.channel === 'naver_cafe' && prevWasNaverCafe) {
+      console.log('[cron/schedule-publish] 네이버 카페 스팸 방지 10초 대기');
+      await new Promise(r => setTimeout(r, 10_000));
+    }
+    prevWasNaverCafe = slot.channel === 'naver_cafe';
 
     // 콘텐츠 없거나 본문 비어있으면 즉시 실패
     if (!content?.textBody) {
@@ -109,15 +119,27 @@ export async function GET(request: NextRequest) {
         externalId = result.id;
         externalUrl = `https://facebook.com/${result.id}`;
       } else if (slot.channel === 'instagram') {
-        if (!content.imageUrl) {
-          throw new Error('인스타그램 발행에 이미지 URL 필수');
+        const bodyUrls = (content.bodyImageUrls as string[]) ?? [];
+        if (bodyUrls.length >= 2) {
+          // 캐러셀 발행 (카드 이미지 2장 이상)
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
+          const absoluteUrls = bodyUrls.map(u => u.startsWith('http') ? u : `${appUrl}${u}`);
+          const result = await publishInstagramCarousel({
+            imageUrls: absoluteUrls,
+            caption: content.textBody,
+          });
+          externalId = result.id;
+        } else {
+          if (!content.imageUrl) {
+            throw new Error('인스타그램 발행에 이미지 URL 필수');
+          }
+          const result = await publishInstagramImage({
+            imageUrl: content.imageUrl,
+            caption: content.textBody,
+          });
+          externalId = result.id;
+          externalUrl = result.permalink ?? null;
         }
-        const result = await publishInstagramImage({
-          imageUrl: content.imageUrl,
-          caption: content.textBody,
-        });
-        externalId = result.id;
-        externalUrl = result.permalink ?? null;
       }
 
       // 성공: published 상태 + 발행 정보 저장
