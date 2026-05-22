@@ -12,15 +12,25 @@ export async function GET(req: NextRequest) {
   const period: Period = (VALID as string[]).includes(raw) ? (raw as Period) : '30d';
 
   try {
-    const [kpi, traffic, daily, pages, refs, demo, devs, entry] = await Promise.all([
+    // GA4 API 동시 요청 제한(~10) 회피를 위해 3단계로 분산
+    // Phase 1: KPI(2) + daily(1) = 3 concurrent GA4 calls
+    const [kpi, daily] = await Promise.all([
       fetchOverviewKpi(period),
-      fetchTrafficSources(period),
       fetchDailySeries(period),
+    ]);
+
+    // Phase 2: traffic(1) + pages(1) + entry(2) = 4 concurrent
+    const [traffic, pages, entry] = await Promise.all([
+      fetchTrafficSources(period),
       fetchTopPages(period, 20),
+      fetchEntryExit(period),
+    ]);
+
+    // Phase 3: refs(2) + demo(3) + devs(3) = 8 concurrent
+    const [refs, demo, devs] = await Promise.all([
       fetchReferrals(period),
       fetchDemographics(period),
       fetchDevices(period),
-      fetchEntryExit(period),
     ]);
 
     return NextResponse.json({

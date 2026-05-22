@@ -204,15 +204,15 @@ export async function safe<T>(fn: () => Promise<T>, label: string, fallback: T):
 
   try {
     const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`GA4 timeout: ${label}`)), 10_000),
+      setTimeout(() => reject(new Error(`GA4 timeout: ${label}`)), 15_000),
     );
     const result = await Promise.race([fn(), timeout]);
     return result;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error(`[ga4] ${label} failed:`, msg);
-    // 403/권한 에러 시 GA4 전체 비활성화
-    if (msg.includes('PERMISSION_DENIED') || msg.includes('403') || msg.includes('timeout')) {
+    // 403/권한 에러 시 GA4 전체 비활성화 (429 rate limit은 일시적이므로 제외)
+    if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) {
       disableGa4(msg);
     }
     return fallback;
