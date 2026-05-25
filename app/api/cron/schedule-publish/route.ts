@@ -1,5 +1,5 @@
 // app/api/cron/schedule-publish/route.ts — 예약 발행 자동화 cron
-// Vercel Cron: 0 9 * * * (UTC) = 오후 6시 KST
+// Vercel Cron: 0 23 * * * (UTC) = 오전 8시 KST
 // 1) 소셜 슬롯(naver_cafe/facebook/instagram) 발행
 // 2) 블로그 슬롯 → 네이버 카페 자동 변환·발행
 
