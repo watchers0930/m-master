@@ -90,16 +90,15 @@ export function buildNaverCafeContent(markdown: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// 더블인코딩 body 구성
-// URLSearchParams는 내부적으로 공백을 '+'로 인코딩하는데, 네이버 서버가
-// 이를 올바르게 디코딩하지 못해 한글이 깨질 수 있다.
-// encodeURIComponent를 2회 적용하면 네이버 서버가 1차 디코딩 후에도
-// percent-encoded 상태가 유지되어, 최종 렌더링 시 정상 한글이 표시된다.
+// form body 구성 — 표준 URLSearchParams 사용
+// 더블인코딩은 네이버 API에서 500/999 에러를 유발하므로 제거
 // ---------------------------------------------------------------------------
 function buildFormBody(fields: Record<string, string>): string {
-  return Object.entries(fields)
-    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(encodeURIComponent(v))}`)
-    .join('&');
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(fields)) {
+    params.set(k, v);
+  }
+  return params.toString();
 }
 
 // ---------------------------------------------------------------------------
