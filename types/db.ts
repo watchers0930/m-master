@@ -124,7 +124,7 @@ export interface AnalyticsDaily {
 // ----------------------------------------------------------------
 export interface ChannelCredential {
   id: string;
-  channel: 'instagram' | 'facebook';
+  channel: 'naver_cafe' | 'instagram' | 'facebook';
   access_token: string | null;
   refresh_token: string | null;
   expires_at: string | null;

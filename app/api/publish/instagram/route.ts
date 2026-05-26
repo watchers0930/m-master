@@ -10,7 +10,7 @@ import { publishInstagramImage } from '@/lib/publish/instagram';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
 
 const RequestSchema = z.object({
-  content_id: z.string().uuid('content_id는 UUID 형식이어야 합니다'),
+  content_id: z.string().min(1, 'content_id는 필수입니다'),
 });
 
 export async function POST(request: NextRequest) {

@@ -11,6 +11,8 @@
 //   NAVER_CAFE_CLUB_ID        — 카페 고유 ID
 //   NAVER_CAFE_MENU_ID        — 게시판 메뉴 ID
 
+import { getNaverCafeCreds } from '@/lib/channel-credentials';
+
 export interface NaverCafePublishResult {
   articleId: string;
   cafeUrl: string;
@@ -24,15 +26,38 @@ function getEnv(name: string): string {
   return v;
 }
 
+/** DB 자격증명 resolve 결과 */
+interface ResolvedNaverCreds {
+  accessToken: string; refreshToken: string;
+  clientId: string; clientSecret: string;
+  clubId: string; menuId: string;
+}
+
+/** DB 우선 → 환경변수 fallback으로 자격증명 해석 */
+async function resolveCredentials(): Promise<ResolvedNaverCreds> {
+  const creds = await getNaverCafeCreds();
+  if (creds) return creds;
+  return {
+    accessToken: getEnv('NAVER_CAFE_ACCESS_TOKEN'),
+    refreshToken: process.env.NAVER_CAFE_REFRESH_TOKEN ?? '',
+    clientId: process.env.NAVER_CLIENT_ID ?? '',
+    clientSecret: process.env.NAVER_CLIENT_SECRET ?? '',
+    clubId: getEnv('NAVER_CAFE_CLUB_ID'),
+    menuId: getEnv('NAVER_CAFE_MENU_ID'),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // 토큰 자동 갱신 (access_token 만료 시 refresh_token으로 재발급)
 // ---------------------------------------------------------------------------
 let cachedAccessToken: string | null = null;
 
 async function refreshAccessToken(): Promise<string> {
-  const clientId = getEnv('NAVER_CLIENT_ID');
-  const clientSecret = getEnv('NAVER_CLIENT_SECRET');
-  const refreshToken = getEnv('NAVER_CAFE_REFRESH_TOKEN');
+  // DB 자격증명 우선, 없으면 env fallback
+  const resolved = await resolveCredentials();
+  const clientId = resolved.clientId || getEnv('NAVER_CLIENT_ID');
+  const clientSecret = resolved.clientSecret || getEnv('NAVER_CLIENT_SECRET');
+  const refreshToken = resolved.refreshToken || getEnv('NAVER_CAFE_REFRESH_TOKEN');
 
   const res = await fetch(
     `https://nid.naver.com/oauth2.0/token?${new URLSearchParams({
@@ -300,8 +325,11 @@ export async function publishNaverCafePost(opts: {
   content: string;
   imageUrls?: string[];
 }): Promise<NaverCafePublishResult> {
-  const clubId = getEnv('NAVER_CAFE_CLUB_ID');
-  const menuId = getEnv('NAVER_CAFE_MENU_ID');
+  const resolved = await resolveCredentials();
+  const clubId = resolved.clubId;
+  const menuId = resolved.menuId;
+  // DB 자격증명이 있으면 cachedAccessToken에 반영
+  if (resolved.accessToken) cachedAccessToken = resolved.accessToken;
 
   const htmlBody = buildNaverCafeContent(opts.content);
   const fields = { subject: opts.subject, content: htmlBody };

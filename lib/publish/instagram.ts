@@ -13,6 +13,8 @@
 //   - 이미지 URL은 공개 접근 가능해야 함
 //   - 캡션 2200자 제한 (긴 본문은 자동 축약)
 
+import { getInstagramCreds } from '@/lib/channel-credentials';
+
 export interface InstagramPublishResult {
   id: string; // media_publish 응답의 게시 ID
   permalink?: string;
@@ -24,6 +26,13 @@ function getEnv(name: string): string {
     throw new Error(`${name} 환경변수 미설정 — 인스타 발행 불가`);
   }
   return v;
+}
+
+/** DB 우선 → 환경변수 fallback으로 자격증명 해석 */
+async function resolveCredentials(): Promise<{ token: string; igUserId: string }> {
+  const creds = await getInstagramCreds();
+  if (creds) return { token: creds.accessToken, igUserId: creds.businessId };
+  return { token: getEnv('INSTAGRAM_ACCESS_TOKEN'), igUserId: getEnv('INSTAGRAM_BUSINESS_ID') };
 }
 
 function getGraphVersion(): string {
@@ -82,8 +91,7 @@ export async function publishInstagramCarousel(opts: {
     throw new Error('캐러셀 발행에는 최소 2장의 이미지가 필요합니다');
   }
 
-  const token = getEnv('INSTAGRAM_ACCESS_TOKEN');
-  const igUserId = getEnv('INSTAGRAM_BUSINESS_ID');
+  const { token, igUserId } = await resolveCredentials();
   const caption = buildInstagramCaption(opts.caption);
 
   // 1단계: 각 이미지로 child container 생성
@@ -134,8 +142,7 @@ export async function publishInstagramImage(opts: {
   imageUrl: string;
   caption: string;
 }): Promise<InstagramPublishResult> {
-  const token = getEnv('INSTAGRAM_ACCESS_TOKEN');
-  const igUserId = getEnv('INSTAGRAM_BUSINESS_ID');
+  const { token, igUserId } = await resolveCredentials();
   const caption = buildInstagramCaption(opts.caption);
 
   // 1단계: 컨테이너 생성

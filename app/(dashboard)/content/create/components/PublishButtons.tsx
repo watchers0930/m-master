@@ -137,6 +137,12 @@ export function PublishAllBtn({
   const [publishing, setPublishing] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
+  const CHANNEL_ROUTES: Record<PublishAllChannel, string> = {
+    naver_cafe: '/api/publish/naver-cafe',
+    facebook: '/api/publish/facebook',
+    instagram: '/api/publish/instagram',
+  };
+
   const handlePublishAll = async () => {
     if (!window.confirm('모든 활성 채널(네이버 카페, 페이스북, 인스타그램)에 순차 발행합니다.\n\n발행은 취소할 수 없습니다. 계속하시겠습니까?')) {
       return;
@@ -152,10 +158,10 @@ export function PublishAllBtn({
 
     for (const channel of channels) {
       try {
-        const res = await fetch(`/api/content/${contentId}/publish`, {
+        const res = await fetch(CHANNEL_ROUTES[channel], {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ channel }),
+          body: JSON.stringify({ content_id: contentId }),
         });
         const json = await res.json();
         if (res.ok && !json.error) {

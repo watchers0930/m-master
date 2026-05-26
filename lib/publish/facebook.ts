@@ -9,6 +9,8 @@
 //   FACEBOOK_PAGE_ID       — 페이지 ID
 //   META_GRAPH_VERSION     — 선택, 기본 'v20.0'
 
+import { getFacebookCreds } from '@/lib/channel-credentials';
+
 export interface FacebookPublishResult {
   id: string;          // 게시물 ID (page_id_post_id 형식일 수 있음)
   postId?: string;     // photos 응답의 추가 post_id
@@ -20,6 +22,13 @@ function getEnv(name: string): string {
     throw new Error(`${name} 환경변수 미설정 — 페이스북 발행 불가`);
   }
   return v;
+}
+
+/** DB 우선 → 환경변수 fallback으로 자격증명 해석 */
+async function resolveCredentials(): Promise<{ token: string; pageId: string }> {
+  const creds = await getFacebookCreds();
+  if (creds) return { token: creds.accessToken, pageId: creds.pageId };
+  return { token: getEnv('FACEBOOK_ACCESS_TOKEN'), pageId: getEnv('FACEBOOK_PAGE_ID') };
 }
 
 function getGraphVersion(): string {
@@ -60,8 +69,7 @@ export async function publishFacebookPost(opts: {
   imageUrl: string | null;
   message: string;
 }): Promise<FacebookPublishResult> {
-  const token = getEnv('FACEBOOK_ACCESS_TOKEN');
-  const pageId = getEnv('FACEBOOK_PAGE_ID');
+  const { token, pageId } = await resolveCredentials();
   const message = buildFacebookMessage(opts.message);
 
   if (opts.imageUrl) {

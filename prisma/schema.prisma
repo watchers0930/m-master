@@ -259,7 +259,7 @@ model AnalyticsDaily {
 // ----------------------------------------------------------------
 model ChannelCredential {
   id           String   @id @default(cuid())
-  channel      String   @unique // 'instagram' | 'facebook'
+  channel      String   @unique // 'naver_cafe' | 'instagram' | 'facebook'
   accessToken  String?  @map("access_token") @db.Text
   refreshToken String?  @map("refresh_token") @db.Text
   expiresAt    String?  @map("expires_at")
