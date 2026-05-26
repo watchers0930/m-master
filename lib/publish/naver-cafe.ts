@@ -151,6 +151,39 @@ function inlineMd(text: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// 이미지 다운로드 (외부 URL → Buffer, 실패 시 스킵)
+// ---------------------------------------------------------------------------
+interface DownloadedImage {
+  buffer: Buffer;
+  name: string;
+  type: string;
+}
+
+async function downloadImages(urls: string[]): Promise<DownloadedImage[]> {
+  const results: DownloadedImage[] = [];
+  for (let i = 0; i < urls.length; i++) {
+    try {
+      const url = urls[i];
+      if (!url || url.trim() === '') continue;
+      // 상대 경로 → 절대 경로
+      const absUrl = url.startsWith('http') ? url : `${process.env.NEXT_PUBLIC_APP_URL ?? ''}${url}`;
+      const res = await fetch(absUrl, { signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) continue;
+      const arrayBuffer = await res.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      if (buffer.length < 1000) continue; // 너무 작으면 스킵
+      const contentType = res.headers.get('content-type') ?? 'image/jpeg';
+      const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
+      results.push({ buffer, name: `image${i}.${ext}`, type: contentType });
+      console.log(`[naver-cafe] 이미지 다운로드 [${i}]: ${buffer.length} bytes`);
+    } catch {
+      console.warn(`[naver-cafe] 이미지 다운로드 실패 [${i}]: ${urls[i]}`);
+    }
+  }
+  return results;
+}
+
+// ---------------------------------------------------------------------------
 // form body 구성 — 값 2중 인코딩 (네이버 API 한글 깨짐 방지)
 // 네이버 카페 API는 서버 측에서 추가 URL 디코딩을 수행하므로
 // 값을 2중 인코딩해야 한글이 정상 표시된다.
@@ -163,7 +196,7 @@ function buildFormBody(fields: Record<string, string>): string {
 }
 
 // ---------------------------------------------------------------------------
-// 카페 API 호출 (401 시 토큰 갱신 후 1회 재시도)
+// 카페 API 호출 — urlencoded (텍스트 전용)
 // ---------------------------------------------------------------------------
 async function cafeApiPost(
   clubId: string,
@@ -196,9 +229,56 @@ async function cafeApiPost(
     });
   }
 
+  return handleCafeResponse(res);
+}
+
+// ---------------------------------------------------------------------------
+// 카페 API 호출 — multipart (이미지 첨부)
+// ---------------------------------------------------------------------------
+async function cafeApiPostWithImages(
+  clubId: string,
+  menuId: string,
+  fields: Record<string, string>,
+  images: DownloadedImage[],
+): Promise<{ res: Response; json: Record<string, unknown> }> {
+  const url = `https://openapi.naver.com/v1/cafe/${clubId}/menu/${menuId}/articles`;
+
+  function buildFormData(): FormData {
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(fields)) {
+      fd.append(k, v);
+    }
+    for (let i = 0; i < images.length; i++) {
+      fd.append(`image[${i}]`, new Blob([new Uint8Array(images[i].buffer)], { type: images[i].type }), images[i].name);
+    }
+    return fd;
+  }
+
+  let token = await getAccessToken();
+  let res = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: buildFormData(),
+  });
+
+  if (res.status === 401) {
+    token = await refreshAccessToken();
+    res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: buildFormData(),
+    });
+  }
+
+  return handleCafeResponse(res);
+}
+
+// ---------------------------------------------------------------------------
+// 응답 처리 공통
+// ---------------------------------------------------------------------------
+async function handleCafeResponse(res: Response): Promise<{ res: Response; json: Record<string, unknown> }> {
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
-  // 403 + code:999 → 네이버 카페 스팸 방지 감지
   if (
     res.status === 403 ||
     (json?.message as { error?: { code?: string } })?.error?.code === '999'
@@ -213,22 +293,36 @@ async function cafeApiPost(
 // 게시글 발행
 // ---------------------------------------------------------------------------
 /**
- * 네이버 카페에 게시글 작성
+ * 네이버 카페에 게시글 작성 (이미지 첨부 지원)
  */
 export async function publishNaverCafePost(opts: {
   subject: string;
   content: string;
+  imageUrls?: string[];
 }): Promise<NaverCafePublishResult> {
   const clubId = getEnv('NAVER_CAFE_CLUB_ID');
   const menuId = getEnv('NAVER_CAFE_MENU_ID');
 
-  const body = buildNaverCafeContent(opts.content);
+  const htmlBody = buildNaverCafeContent(opts.content);
+  const fields = { subject: opts.subject, content: htmlBody };
 
-  const { res, json } = await cafeApiPost(
-    clubId,
-    menuId,
-    { subject: opts.subject, content: body },
-  );
+  // 이미지가 있으면 다운로드 후 multipart 업로드
+  const urls = (opts.imageUrls ?? []).filter(u => u && u.trim() !== '');
+  let res: Response;
+  let json: Record<string, unknown>;
+
+  if (urls.length > 0) {
+    console.log(`[naver-cafe] 이미지 ${urls.length}건 다운로드 시작`);
+    const images = await downloadImages(urls);
+    if (images.length > 0) {
+      console.log(`[naver-cafe] 이미지 ${images.length}건 첨부 발행`);
+      ({ res, json } = await cafeApiPostWithImages(clubId, menuId, fields, images));
+    } else {
+      ({ res, json } = await cafeApiPost(clubId, menuId, fields));
+    }
+  } else {
+    ({ res, json } = await cafeApiPost(clubId, menuId, fields));
+  }
 
   if (!res.ok) {
     const msg = (json?.message as { error?: { msg?: string } })?.error?.msg ?? `HTTP ${res.status}`;

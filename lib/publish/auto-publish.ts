@@ -122,6 +122,7 @@ async function publishToChannel(
     const result = await publishNaverCafePost({
       subject: topic,
       content: converted.text,
+      imageUrls: params.bodyImageUrls,
     });
     externalId = result.articleId;
     externalUrl = result.cafeUrl;

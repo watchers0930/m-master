@@ -88,7 +88,8 @@ async function publishSocialSlots(): Promise<SlotResult[]> {
       let externalUrl: string | null = null;
 
       if (slot.channel === 'naver_cafe') {
-        const result = await publishNaverCafePost({ subject: content.topic, content: content.textBody });
+        const bodyUrls = (content.bodyImageUrls as string[]) ?? [];
+        const result = await publishNaverCafePost({ subject: content.topic, content: content.textBody, imageUrls: bodyUrls });
         externalId = result.articleId;
         externalUrl = result.cafeUrl;
       } else if (slot.channel === 'facebook') {
@@ -174,7 +175,7 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
     },
     include: {
       content: {
-        select: { id: true, textBody: true, topic: true, ownerId: true },
+        select: { id: true, textBody: true, topic: true, ownerId: true, bodyImageUrls: true },
       },
     },
     orderBy: { scheduledAt: 'asc' },
@@ -210,10 +211,12 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
         contentId: content.id,
       });
 
-      // 네이버 카페 발행
+      // 네이버 카페 발행 (본문 이미지 첨부)
+      const blogImageUrls = (content.bodyImageUrls as string[]) ?? [];
       const cafeResult = await publishNaverCafePost({
         subject: content.topic,
         content: converted.text,
+        imageUrls: blogImageUrls,
       });
 
       // 변환+발행 성공 후 블로그 슬롯 → published
