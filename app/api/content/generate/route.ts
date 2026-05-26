@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { isBudgetExceeded } from '@/lib/cost/budget';
-import { retrieveTopK, buildRagContext } from '@/lib/rag/retriever';
+import { retrieveTopK, buildRagContext, hasIndexedDocs } from '@/lib/rag/retriever';
 import {
   buildSystemPrompt,
   calcChatKrw,
@@ -27,7 +27,7 @@ const RequestSchema = z.object({
   channel: z.enum(['blog', 'instagram', 'facebook']),
   tone: z.string().max(100).optional(),
   keywords: z.array(z.string().max(50)).max(20).optional(),
-  use_rag: z.boolean(),
+  use_rag: z.boolean().optional(),
 });
 
 const REVIEW_PASS_SCORE = 75;
@@ -67,10 +67,10 @@ export async function POST(request: NextRequest) {
   const brandGuide = (settingsData?.brandGuide ?? {}) as Record<string, unknown>;
   const channelTemplate = ((settingsData?.promptTemplates ?? {}) as Record<string, string>)[req.channel];
 
-  // 5) RAG
+  // 5) RAG — 인덱싱된 문서가 있으면 자동 참조
   let ragContext = '';
   let embeddingTokens = 0;
-  if (req.use_rag) {
+  if (await hasIndexedDocs(ownerId)) {
     const ragQuery = [req.topic, ...(req.keywords ?? [])].join(' ');
     try {
       const chunks = await retrieveTopK({ query: ragQuery, ownerId, k: 5 });

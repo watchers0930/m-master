@@ -191,7 +191,6 @@ export async function GET(request: NextRequest) {
         topic: item.topic,
         channel: 'blog',
         ownerId,
-        useRag: true,
       });
 
       // 소셜 자동 발행 (onProgress는 no-op)

@@ -19,7 +19,7 @@ import { calcHaikuKrw, translateImagePrompts } from '@/lib/claude/translate';
 import { extractImagePrompts, searchMany } from '@/lib/unsplash/search';
 import { calcEmbeddingKrw } from '@/lib/openai/embedding';
 import { calcImageKrw, generateThumbnail } from '@/lib/openai/image';
-import { buildRagContext, retrieveTopK } from '@/lib/rag/retriever';
+import { buildRagContext, retrieveTopK, hasIndexedDocs } from '@/lib/rag/retriever';
 import { trackCost } from '@/lib/cost/tracker';
 import { prisma } from '@/lib/prisma';
 import type {
@@ -36,7 +36,6 @@ export interface GeneratePairOptions {
   channel: Channel;
   tone?: string | null;
   keywords?: string[];
-  useRag: boolean;
 }
 
 export interface VariantGenerated {
@@ -72,7 +71,7 @@ async function loadSettings(): Promise<SettingsLite> {
 }
 
 async function buildRag(opts: GeneratePairOptions): Promise<{ ragContext: string; embeddingTokens: number }> {
-  if (!opts.useRag) return { ragContext: '', embeddingTokens: 0 };
+  if (!(await hasIndexedDocs(opts.ownerId))) return { ragContext: '', embeddingTokens: 0 };
   const ragQuery = [opts.topic, ...(opts.keywords ?? [])].join(' ');
   try {
     const chunks = await retrieveTopK({ query: ragQuery, ownerId: opts.ownerId, k: 5 });
@@ -250,7 +249,6 @@ export interface GenerateVariantBOptions {
   channel: Channel;
   tone?: string | null;
   keywords?: string[];
-  useRag: boolean;
 }
 
 export async function generateVariantBFromSource(

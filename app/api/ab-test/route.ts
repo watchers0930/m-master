@@ -80,7 +80,6 @@ export async function POST(request: NextRequest) {
       channel: source.channel,
       tone: source.tone,
       keywords: (source.keywords as string[]) ?? [],
-      useRag: false,
     });
   } catch (err) {
     if (err instanceof GenerateFailedError) {

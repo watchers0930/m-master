@@ -3,7 +3,7 @@
 
 import { prisma } from '@/lib/prisma';
 import { isBudgetExceeded } from '@/lib/cost/budget';
-import { retrieveTopK, buildRagContext } from '@/lib/rag/retriever';
+import { retrieveTopK, buildRagContext, hasIndexedDocs } from '@/lib/rag/retriever';
 import {
   buildSystemPrompt,
   calcChatKrw,
@@ -25,7 +25,6 @@ export interface HeadlessGenerateOptions {
   topic: string;
   channel: 'blog' | 'instagram' | 'facebook';
   ownerId: string;
-  useRag?: boolean;
   tone?: string;
   keywords?: string[];
 }
@@ -44,7 +43,7 @@ export interface HeadlessGenerateResult {
 export async function generateContentHeadless(
   opts: HeadlessGenerateOptions,
 ): Promise<HeadlessGenerateResult> {
-  const { topic, channel, ownerId, useRag = true, tone, keywords = [] } = opts;
+  const { topic, channel, ownerId, tone, keywords = [] } = opts;
 
   // 1) 예산 체크
   if (await isBudgetExceeded()) {
@@ -59,10 +58,10 @@ export async function generateContentHeadless(
   const brandGuide = (settingsData?.brandGuide ?? {}) as Record<string, unknown>;
   const channelTemplate = ((settingsData?.promptTemplates ?? {}) as Record<string, string>)[channel];
 
-  // 3) RAG
+  // 3) RAG — 인덱싱된 문서가 있으면 자동 참조
   let ragContext = '';
   let embeddingTokens = 0;
-  if (useRag) {
+  if (await hasIndexedDocs(ownerId)) {
     const ragQuery = [topic, ...keywords].join(' ');
     try {
       const chunks = await retrieveTopK({ query: ragQuery, ownerId, k: 5 });

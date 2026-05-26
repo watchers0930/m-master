@@ -57,6 +57,16 @@ export async function retrieveTopK(
 }
 
 // ----------------------------------------------------------------
+// 인덱싱된 RAG 문서 존재 여부 확인
+// ----------------------------------------------------------------
+export async function hasIndexedDocs(ownerId: string): Promise<boolean> {
+  const count = await prisma.ragDocument.count({
+    where: { ownerId, status: 'indexed' },
+  });
+  return count > 0;
+}
+
+// ----------------------------------------------------------------
 // RAG 컨텍스트 문자열 조합 (프롬프트 주입용)
 // ----------------------------------------------------------------
 export function buildRagContext(chunks: RetrievedChunk[]): string {

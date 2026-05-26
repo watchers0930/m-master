@@ -24,7 +24,6 @@ export function GenerateForm({ initialTopic, onResult, onStreamStart, onStreamDe
   const [tone, setTone] = useState('전문적');
   const [keywordInput, setKeywordInput] = useState('');
   const [keywords, setKeywords] = useState<string[]>([]);
-  const [useRag, setUseRag] = useState(true);
   const [refUrl, setRefUrl] = useState('');
   const [refFiles, setRefFiles] = useState<File[]>([]);
   const [error, setError] = useState('');
@@ -122,7 +121,7 @@ export function GenerateForm({ initialTopic, onResult, onStreamStart, onStreamDe
           channel: 'blog',
           tone: tone.trim() || undefined,
           keywords: keywords.length > 0 ? keywords : undefined,
-          use_rag: useRag,
+          use_rag: true,
         }),
       });
 
@@ -302,13 +301,8 @@ export function GenerateForm({ initialTopic, onResult, onStreamStart, onStreamDe
         )}
       </div>
 
-      {/* RAG 참조 */}
+      {/* 참조 자료 */}
       <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--sub)' }}>
-          <input type="checkbox" checked={useRag} onChange={(e) => setUseRag(e.target.checked)} style={{ width: 14, height: 14, accentColor: 'var(--blue-500)', cursor: 'pointer' }} />
-          RAG 문서 DB에서 관련 내용 참조
-        </label>
-
         {/* 참조 URL */}
         <div>
           <label style={fieldLabel}>참조 사이트 URL <span style={{ fontWeight: 400, color: 'var(--n400)' }}>(크롤링 후 컨텍스트 사용)</span></label>

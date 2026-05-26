@@ -62,7 +62,7 @@ export interface ContentGenerateRequest {
   channel: Channel;
   tone?: string;
   keywords?: string[];
-  use_rag: boolean;
+  use_rag?: boolean; // deprecated — 인덱싱된 문서 있으면 자동 참조
 }
 
 export interface ContentGenerateResponse {
