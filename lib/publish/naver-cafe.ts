@@ -83,15 +83,15 @@ export function buildNaverCafeContent(text: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// form body 구성 — 표준 URLSearchParams 사용
-// 더블인코딩은 네이버 API에서 500/999 에러를 유발하므로 제거
+// form body 구성 — 값 2중 인코딩 (네이버 API 한글 깨짐 방지)
+// 네이버 카페 API는 서버 측에서 추가 URL 디코딩을 수행하므로
+// 값을 2중 인코딩해야 한글이 정상 표시된다.
+// (500/999 에러는 인코딩이 아닌 스팸 필터 원인으로 확인됨)
 // ---------------------------------------------------------------------------
 function buildFormBody(fields: Record<string, string>): string {
-  const params = new URLSearchParams();
-  for (const [k, v] of Object.entries(fields)) {
-    params.set(k, v);
-  }
-  return params.toString();
+  return Object.entries(fields)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(encodeURIComponent(v))}`)
+    .join('&');
 }
 
 // ---------------------------------------------------------------------------
