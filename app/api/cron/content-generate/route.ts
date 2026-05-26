@@ -1,5 +1,5 @@
 // app/api/cron/content-generate/route.ts — 일일 자동 콘텐츠 생성 + 매월 1일 토픽 리프레시
-// Vercel Cron: 0 22 * * * (UTC) = 오전 7시 KST
+// Vercel Cron: 0 23 * * * (UTC) = 오전 8시 KST
 // 1) 매월 1일: 추천 토픽 자동 생성 (topics-refresh 통합)
 // 2) 매일: ContentPlanItem(scheduledDate=오늘, status=planned, plan.autoGenerate=true) 순차 생성·발행
 

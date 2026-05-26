@@ -7,6 +7,7 @@ import { publishFacebookPost } from './facebook';
 import { publishNaverCafePost } from './naver-cafe';
 import { trackCost } from '@/lib/cost/tracker';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
+import { getNaverCafeCreds, getInstagramCreds, getFacebookCreds } from '@/lib/channel-credentials';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -30,20 +31,19 @@ interface AutoPublishParams {
 }
 
 // ---------------------------------------------------------------------------
-// 환경변수 존재 여부로 활성 채널 판별
+// DB 자격증명 + 환경변수 모두 확인하여 활성 채널 판별
 // ---------------------------------------------------------------------------
-function getActiveChannels(): ConvertChannel[] {
+async function getActiveChannels(): Promise<ConvertChannel[]> {
   const channels: ConvertChannel[] = [];
   // 순서: 카페 → 페이스북 → 인스타
-  if (process.env.NAVER_CAFE_ACCESS_TOKEN && process.env.NAVER_CAFE_CLUB_ID && process.env.NAVER_CAFE_MENU_ID) {
-    channels.push('naver_cafe');
-  }
-  if (process.env.FACEBOOK_ACCESS_TOKEN && process.env.FACEBOOK_PAGE_ID) {
-    channels.push('facebook');
-  }
-  if (process.env.INSTAGRAM_ACCESS_TOKEN && process.env.INSTAGRAM_BUSINESS_ID) {
-    channels.push('instagram');
-  }
+  const [naverCreds, fbCreds, igCreds] = await Promise.all([
+    getNaverCafeCreds(),
+    getFacebookCreds(),
+    getInstagramCreds(),
+  ]);
+  if (naverCreds) channels.push('naver_cafe');
+  if (fbCreds) channels.push('facebook');
+  if (igCreds) channels.push('instagram');
   return channels;
 }
 
@@ -170,7 +170,7 @@ async function publishToChannel(
 // 메인 오케스트레이터
 // ---------------------------------------------------------------------------
 export async function autoPublishToSocial(params: AutoPublishParams): Promise<void> {
-  const channels = getActiveChannels();
+  const channels = await getActiveChannels();
   if (channels.length === 0) return; // 활성 채널 없으면 스킵
 
   for (const channel of channels) {
