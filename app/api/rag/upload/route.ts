@@ -1,11 +1,13 @@
 // app/api/rag/upload/route.ts
-// POST multipart/form-data: file → Storage → rag_documents insert
+// POST multipart/form-data: file → 즉시 텍스트추출 → 청킹 → 임베딩 → DB 저장
 // 인증 필수, audit_log 적재
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { upload, remove } from '@/lib/storage';
+import { chunkFile } from '@/lib/rag/chunker';
+import { embedTexts, calcEmbeddingKrw } from '@/lib/openai/embedding';
+import { trackCost } from '@/lib/cost/tracker';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
 import type { SourceType } from '@/types/db';
 
@@ -17,6 +19,7 @@ const ALLOWED_MIME: Record<string, SourceType> = {
 };
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+const EMBED_BATCH_SIZE = 50;
 
 export async function POST(request: NextRequest) {
   // 1) 세션 검증
@@ -39,7 +42,6 @@ export async function POST(request: NextRequest) {
   // 3) 파일 검증
   const sourceType = ALLOWED_MIME[file.type];
   if (!sourceType) {
-    // 확장자로 재판단
     const ext = file.name.split('.').pop()?.toLowerCase();
     const extMap: Record<string, SourceType> = { pdf: 'pdf', md: 'md', docx: 'docx' };
     const fallback = ext ? extMap[ext] : undefined;
@@ -64,23 +66,60 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const timestamp = Date.now();
-  const safeFilename = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-  const storagePath = `rag/${ownerId}/${timestamp}_${safeFilename}`;
-
-  // 4) Storage 업로드
+  // 4) 텍스트 추출 + 청킹
   const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  let chunks;
   try {
-    await upload('rag-documents', storagePath, Buffer.from(arrayBuffer));
-  } catch (storageError) {
-    console.error('[rag/upload] storage upload error:', storageError);
-    return NextResponse.json(
-      { error: { code: 'internal', message: 'Storage 업로드 실패' } },
-      { status: 500 },
+    chunks = await chunkFile(
+      buffer,
+      finalSourceType as Extract<SourceType, 'pdf' | 'md' | 'docx'>,
     );
+  } catch (err) {
+    console.error('[rag/upload] chunking error:', err);
+    return NextResponse.json({ error: { code: 'internal', message: '텍스트 추출/청킹 실패' } }, { status: 500 });
   }
 
-  // 5) rag_documents insert
+  if (chunks.length === 0) {
+    return NextResponse.json({ error: { code: 'bad_request', message: '추출된 텍스트 없음' } }, { status: 400 });
+  }
+
+  // 5) 배치 임베딩
+  let totalTokens = 0;
+  const chunkInserts: Array<{
+    chunkIndex: number;
+    content: string;
+    embedding: number[];
+    tokens: number;
+  }> = [];
+
+  for (let i = 0; i < chunks.length; i += EMBED_BATCH_SIZE) {
+    const batch = chunks.slice(i, i + EMBED_BATCH_SIZE);
+    const texts = batch.map((c) => c.content);
+
+    let embedResults;
+    try {
+      embedResults = await embedTexts(texts);
+    } catch (err) {
+      console.error('[rag/upload] embedding error:', err);
+      return NextResponse.json({ error: { code: 'internal', message: '임베딩 실패' } }, { status: 500 });
+    }
+
+    for (let j = 0; j < batch.length; j++) {
+      const chunk = batch[j];
+      const embed = embedResults[j];
+      totalTokens += embed.tokens;
+      chunkInserts.push({
+        chunkIndex: chunk.chunk_index,
+        content: chunk.content,
+        embedding: embed.embedding,
+        tokens: chunk.tokens,
+      });
+    }
+  }
+
+  // 6) rag_documents INSERT (즉시 indexed 상태, storagePath 없음)
   let docData;
   try {
     docData = await prisma.ragDocument.create({
@@ -88,29 +127,54 @@ export async function POST(request: NextRequest) {
         ownerId,
         title: file.name,
         sourceType: finalSourceType,
-        storagePath,
-        status: 'uploaded',
+        storagePath: null,
+        status: 'indexed',
       },
       select: { id: true },
     });
   } catch (dbError) {
     console.error('[rag/upload] db insert error:', dbError);
-    // storage 롤백 시도
-    await remove('rag-documents', [storagePath]);
-    return NextResponse.json(
-      { error: { code: 'internal', message: 'DB insert 실패' } },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: { code: 'internal', message: 'DB insert 실패' } }, { status: 500 });
   }
 
-  // 6) audit_log
+  // 7) rag_chunks 일괄 insert + pgvector 임베딩
+  try {
+    for (const chunk of chunkInserts) {
+      const created = await prisma.ragChunk.create({
+        data: {
+          docId: docData.id,
+          chunkIndex: chunk.chunkIndex,
+          content: chunk.content,
+          tokens: chunk.tokens,
+        },
+        select: { id: true },
+      });
+
+      const vectorLiteral = `[${chunk.embedding.join(',')}]`;
+      await prisma.$executeRaw`
+        UPDATE rag_chunks SET embedding = ${vectorLiteral}::vector
+        WHERE id = ${created.id}
+      `;
+    }
+  } catch (chunkError) {
+    console.error('[rag/upload] chunk insert error:', chunkError);
+    // 실패 시 문서 상태를 failed로 변경
+    await prisma.ragDocument.update({ where: { id: docData.id }, data: { status: 'failed' } });
+    return NextResponse.json({ error: { code: 'internal', message: '청크 저장 실패' } }, { status: 500 });
+  }
+
+  // 8) cost_ledger 적재
+  const krw = calcEmbeddingKrw(totalTokens);
+  await trackCost({ kind: 'embedding', tokensIn: totalTokens, tokensOut: 0, krw });
+
+  // 9) audit_log
   await logAudit({
     actor: ownerId,
     action: AUDIT_ACTIONS.RAG_UPLOAD,
     targetType: 'rag_document',
     targetId: docData.id,
-    payload: { filename: file.name, source_type: finalSourceType, size: file.size },
+    payload: { filename: file.name, source_type: finalSourceType, size: file.size, chunks: chunks.length, tokens: totalTokens, krw },
   });
 
-  return NextResponse.json({ data: { doc_id: docData.id }, error: null }, { status: 201 });
+  return NextResponse.json({ data: { doc_id: docData.id, chunks: chunks.length }, error: null }, { status: 201 });
 }

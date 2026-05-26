@@ -34,20 +34,10 @@ export interface ApiError {
 export type ApiResponse<T> = ApiSuccess<T> | ApiError;
 
 // ----------------------------------------------------------------
-// RAG - Upload
+// RAG - Upload (즉시 인덱싱 통합)
 // ----------------------------------------------------------------
 export interface RagUploadResponse {
   doc_id: string;
-}
-
-// ----------------------------------------------------------------
-// RAG - Index
-// ----------------------------------------------------------------
-export interface RagIndexRequest {
-  doc_id: string;
-}
-
-export interface RagIndexResponse {
   chunks: number;
 }
 

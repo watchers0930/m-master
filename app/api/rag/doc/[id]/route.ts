@@ -1,11 +1,10 @@
 // app/api/rag/doc/[id]/route.ts
-// DELETE /api/rag/doc/:id → rag_documents 삭제 (cascade로 chunks도 삭제) + Storage 파일 제거
+// DELETE /api/rag/doc/:id → rag_documents 삭제 (cascade로 chunks도 삭제)
 // 인증 필수, audit_log 적재
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { remove } from '@/lib/storage';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
 
 interface RouteParams {
@@ -27,7 +26,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   // 2) 문서 조회 (owner 확인)
   const doc = await prisma.ragDocument.findFirst({
     where: { id: docId, ownerId },
-    select: { id: true, storagePath: true },
+    select: { id: true },
   });
 
   if (!doc) {
@@ -42,17 +41,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: { code: 'internal', message: 'DB 삭제 실패' } }, { status: 500 });
   }
 
-  // 4) Storage 파일 제거 (best-effort)
-  if (doc.storagePath) {
-    try {
-      await remove('rag-documents', [doc.storagePath]);
-    } catch (storageError) {
-      console.error('[rag/doc] storage remove error:', storageError);
-      // 서비스 중단 불필요 — 로그만
-    }
-  }
-
-  // 5) audit_log
+  // 4) audit_log
   await logAudit({
     actor: ownerId,
     action: AUDIT_ACTIONS.RAG_DELETE,

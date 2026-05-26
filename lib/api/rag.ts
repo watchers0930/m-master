@@ -1,5 +1,5 @@
 // lib/api/rag.ts — RAG 문서 관리 API 래퍼 (실제 서버 연동)
-import type { ApiResponse, RagUploadResponse, RagIndexResponse } from '@/types/api';
+import type { ApiResponse, RagUploadResponse } from '@/types/api';
 import type { RagDocument } from '@/types/db';
 
 // ── API 함수 ──────────────────────────────────────────────────────
@@ -17,19 +17,6 @@ export async function uploadRagDoc(
   const fd = new FormData();
   fd.append('file', file);
   const res = await fetch('/api/rag/upload', { method: 'POST', body: fd });
-  const json = await res.json();
-  if (!res.ok) return { data: null, error: json.error ?? { message: `HTTP ${res.status}` } };
-  return { data: json.data, error: null };
-}
-
-export async function indexRagDoc(
-  docId: string,
-): Promise<ApiResponse<RagIndexResponse>> {
-  const res = await fetch('/api/rag/index', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ doc_id: docId }),
-  });
   const json = await res.json();
   if (!res.ok) return { data: null, error: json.error ?? { message: `HTTP ${res.status}` } };
   return { data: json.data, error: null };

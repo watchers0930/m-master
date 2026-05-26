@@ -21,13 +21,13 @@ export default function RagPage() {
     const newDoc: RagDocument = {
       id: docId, owner_id: 'owner', title: filename,
       source_type: filename.endsWith('.pdf') ? 'pdf' : filename.endsWith('.md') ? 'md' : 'docx',
-      storage_path: null, status: 'uploaded', created_at: new Date().toISOString(),
+      storage_path: null, status: 'indexed', created_at: new Date().toISOString(),
     };
     setDocs((prev) => [...prev, newDoc]);
   };
 
   const indexedCount = docs.filter((d) => d.status === 'indexed').length;
-  const pendingCount = docs.filter((d) => d.status === 'uploaded').length;
+  const failedCount = docs.filter((d) => d.status === 'failed').length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 860 }}>
@@ -43,10 +43,10 @@ export default function RagPage() {
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--green-500)', display: 'inline-block' }} />
           인덱싱 완료 {indexedCount}건
         </div>
-        {pendingCount > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--amber-100)', border: '1px solid #fde68a', borderRadius: 8, padding: '5px 12px', fontSize: 11, color: 'var(--amber-700)' }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--amber-500)', display: 'inline-block' }} />
-            인덱싱 대기 {pendingCount}건
+        {failedCount > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 8, padding: '5px 12px', fontSize: 11, color: '#dc2626' }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#dc2626', display: 'inline-block' }} />
+            실패 {failedCount}건
           </div>
         )}
         <span style={{ fontSize: 11, color: 'var(--sub)', display: 'flex', alignItems: 'center' }}>총 {docs.length}건</span>
@@ -91,7 +91,7 @@ export default function RagPage() {
         <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 1 }}>
           <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
-        <span>업로드 후 <strong>인덱싱</strong> 버튼을 클릭해야 콘텐츠 생성 시 참조됩니다. 인덱싱은 OpenAI text-embedding-3-small을 사용하며 문서 크기에 따라 수초~수십초 소요됩니다.</span>
+        <span>파일을 업로드하면 자동으로 텍스트 추출 → 청킹 → 임베딩이 수행됩니다. 인덱싱 완료된 문서는 콘텐츠 생성 시 자동 참조됩니다.</span>
       </div>
 
     </div>

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { RagDocument } from '@/types/db';
-import { indexRagDoc, deleteRagDoc } from '@/lib/api/rag';
+import { deleteRagDoc } from '@/lib/api/rag';
 
 interface DocListProps {
   docs: RagDocument[];
@@ -17,26 +17,12 @@ const SOURCE_TYPE_COLOR: Record<string, string> = {
 };
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  uploaded: { bg: 'var(--amber-100)', color: 'var(--amber-700)', label: '업로드됨' },
-  indexing: { bg: 'var(--blue-100)',  color: 'var(--blue-600)',  label: '인덱싱 중' },
-  indexed:  { bg: 'var(--green-100)', color: 'var(--green-700)', label: '인덱싱 완료' },
-  failed:   { bg: '#fee2e2',          color: '#dc2626',          label: '실패' },
+  indexed: { bg: 'var(--green-100)', color: 'var(--green-700)', label: '인덱싱 완료' },
+  failed:  { bg: '#fee2e2',          color: '#dc2626',          label: '실패' },
 };
 
 export function DocList({ docs, onDocsChange }: DocListProps) {
-  const [indexingIds, setIndexingIds] = useState<Set<string>>(new Set());
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
-  const [indexedChunks, setIndexedChunks] = useState<Record<string, number>>({});
-
-  const handleIndex = async (docId: string) => {
-    setIndexingIds((prev) => new Set(prev).add(docId));
-    const res = await indexRagDoc(docId);
-    setIndexingIds((prev) => { const s = new Set(prev); s.delete(docId); return s; });
-    if (res.data) {
-      setIndexedChunks((prev) => ({ ...prev, [docId]: res.data!.chunks }));
-      onDocsChange(docs.map((d) => d.id === docId ? { ...d, status: 'indexed' as const } : d));
-    }
-  };
 
   const handleDelete = async (docId: string) => {
     setDeletingIds((prev) => new Set(prev).add(docId));
@@ -60,10 +46,8 @@ export function DocList({ docs, onDocsChange }: DocListProps) {
   return (
     <div>
       {docs.map((doc) => {
-        const isIndexing = indexingIds.has(doc.id);
         const isDeleting = deletingIds.has(doc.id);
-        const chunks = indexedChunks[doc.id];
-        const st = STATUS_STYLE[doc.status] ?? STATUS_STYLE.uploaded;
+        const st = STATUS_STYLE[doc.status] ?? STATUS_STYLE.indexed;
         const typeColor = SOURCE_TYPE_COLOR[doc.source_type] ?? '#6b7280';
         const typeLabel = SOURCE_TYPE_LABEL[doc.source_type] ?? '?';
 
@@ -79,20 +63,12 @@ export function DocList({ docs, onDocsChange }: DocListProps) {
               <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.title}</p>
               <p style={{ fontSize: 10.5, color: 'var(--sub)' }}>
                 {new Date(doc.created_at).toLocaleDateString('ko-KR')}
-                {chunks !== undefined && ` · ${chunks}개 청크`}
               </p>
             </div>
             <span style={{ background: st.bg, color: st.color, fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 4, flexShrink: 0 }}>{st.label}</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-              {doc.status === 'uploaded' && (
-                <button onClick={() => handleIndex(doc.id)} disabled={isIndexing} className="btn btn-teal" style={{ fontSize: 11, padding: '4px 10px', opacity: isIndexing ? 0.6 : 1 }}>
-                  {isIndexing ? '인덱싱 중...' : '인덱싱'}
-                </button>
-              )}
-              <button onClick={() => handleDelete(doc.id)} disabled={isDeleting} className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 10px', color: '#dc2626', borderColor: '#fecaca', opacity: isDeleting ? 0.6 : 1 }}>
-                {isDeleting ? '삭제 중...' : '삭제'}
-              </button>
-            </div>
+            <button onClick={() => handleDelete(doc.id)} disabled={isDeleting} className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 10px', color: '#dc2626', borderColor: '#fecaca', opacity: isDeleting ? 0.6 : 1 }}>
+              {isDeleting ? '삭제 중...' : '삭제'}
+            </button>
           </div>
         );
       })}
