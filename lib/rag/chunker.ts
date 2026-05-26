@@ -145,8 +145,9 @@ export async function extractPdfText(buffer: Buffer): Promise<string> {
   }
 
   const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '';
   const data = new Uint8Array(buffer);
-  const doc = await pdfjsLib.getDocument({ data, useSystemFonts: true }).promise;
+  const doc = await pdfjsLib.getDocument({ data, useSystemFonts: true, isEvalSupported: false }).promise;
 
   const pages: string[] = [];
   for (let i = 1; i <= doc.numPages; i++) {
