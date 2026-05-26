@@ -22,6 +22,7 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 const EMBED_BATCH_SIZE = 50;
 
 export async function POST(request: NextRequest) {
+  try {
   // 1) 세션 검증
   const session = await requireSession();
   const ownerId = session.user.id;
@@ -177,4 +178,10 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ data: { doc_id: docData.id, chunks: chunks.length }, error: null }, { status: 201 });
+
+  } catch (err) {
+    console.error('[rag/upload] unhandled error:', err);
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ error: { code: 'internal', message: `업로드 처리 실패: ${message}` } }, { status: 500 });
+  }
 }
