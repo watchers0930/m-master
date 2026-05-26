@@ -5,16 +5,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { chunkFile } from '@/lib/rag/chunker';
-import { embedTexts, calcEmbeddingKrw } from '@/lib/openai/embedding';
-import { trackCost } from '@/lib/cost/tracker';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
 import type { SourceType } from '@/types/db';
 
 const ALLOWED_MIME: Record<string, SourceType> = {
   'application/pdf': 'pdf',
   'text/markdown': 'md',
-  'text/plain': 'md', // .md 파일이 text/plain으로 오는 경우
+  'text/plain': 'md',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
 };
 
@@ -67,9 +64,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 4) 텍스트 추출 + 청킹
+  // 4) 텍스트 추출 + 청킹 (동적 import — 서버리스 번들링 호환)
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
+
+  const { chunkFile } = await import('@/lib/rag/chunker');
 
   let chunks;
   try {
@@ -79,14 +78,17 @@ export async function POST(request: NextRequest) {
     );
   } catch (err) {
     console.error('[rag/upload] chunking error:', err);
-    return NextResponse.json({ error: { code: 'internal', message: '텍스트 추출/청킹 실패' } }, { status: 500 });
+    const detail = err instanceof Error ? err.message : '';
+    return NextResponse.json({ error: { code: 'internal', message: `텍스트 추출/청킹 실패: ${detail}` } }, { status: 500 });
   }
 
   if (chunks.length === 0) {
     return NextResponse.json({ error: { code: 'bad_request', message: '추출된 텍스트 없음' } }, { status: 400 });
   }
 
-  // 5) 배치 임베딩
+  // 5) 배치 임베딩 (동적 import)
+  const { embedTexts, calcEmbeddingKrw } = await import('@/lib/openai/embedding');
+
   let totalTokens = 0;
   const chunkInserts: Array<{
     chunkIndex: number;
@@ -104,7 +106,8 @@ export async function POST(request: NextRequest) {
       embedResults = await embedTexts(texts);
     } catch (err) {
       console.error('[rag/upload] embedding error:', err);
-      return NextResponse.json({ error: { code: 'internal', message: '임베딩 실패' } }, { status: 500 });
+      const detail = err instanceof Error ? err.message : '';
+      return NextResponse.json({ error: { code: 'internal', message: `임베딩 실패: ${detail}` } }, { status: 500 });
     }
 
     for (let j = 0; j < batch.length; j++) {
@@ -159,12 +162,12 @@ export async function POST(request: NextRequest) {
     }
   } catch (chunkError) {
     console.error('[rag/upload] chunk insert error:', chunkError);
-    // 실패 시 문서 상태를 failed로 변경
     await prisma.ragDocument.update({ where: { id: docData.id }, data: { status: 'failed' } });
     return NextResponse.json({ error: { code: 'internal', message: '청크 저장 실패' } }, { status: 500 });
   }
 
   // 8) cost_ledger 적재
+  const { trackCost } = await import('@/lib/cost/tracker');
   const krw = calcEmbeddingKrw(totalTokens);
   await trackCost({ kind: 'embedding', tokensIn: totalTokens, tokensOut: 0, krw });
 
