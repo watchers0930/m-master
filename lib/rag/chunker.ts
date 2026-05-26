@@ -128,9 +128,22 @@ export function chunkMarkdown(text: string): TextChunk[] {
 }
 
 // ----------------------------------------------------------------
-// PDF 텍스트 추출 (pdfjs-dist legacy — DOMMatrix 불필요, 서버리스 호환)
+// PDF 텍스트 추출 (pdfjs-dist — 서버리스 DOMMatrix 폴리필 포함)
 // ----------------------------------------------------------------
 export async function extractPdfText(buffer: Buffer): Promise<string> {
+  // pdfjs-dist가 DOMMatrix를 참조 — 서버리스 환경엔 없으므로 폴리필
+  if (typeof globalThis.DOMMatrix === 'undefined') {
+    (globalThis as Record<string, unknown>).DOMMatrix = class DOMMatrix {
+      m: number[];
+      constructor(init?: number[]) { this.m = init ?? [1,0,0,1,0,0]; }
+      get a() { return this.m[0]; } get b() { return this.m[1]; }
+      get c() { return this.m[2]; } get d() { return this.m[3]; }
+      get e() { return this.m[4]; } get f() { return this.m[5]; }
+      isIdentity = true;
+      is2D = true;
+    };
+  }
+
   const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const data = new Uint8Array(buffer);
   const doc = await pdfjsLib.getDocument({ data, useSystemFonts: true }).promise;
