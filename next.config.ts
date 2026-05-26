@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: currentDirectory,
   },
+  serverExternalPackages: ['pdf-parse', 'mammoth'],
 };
 
 export default nextConfig;
