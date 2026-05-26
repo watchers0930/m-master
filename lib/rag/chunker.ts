@@ -128,38 +128,13 @@ export function chunkMarkdown(text: string): TextChunk[] {
 }
 
 // ----------------------------------------------------------------
-// PDF 텍스트 추출 (pdfjs-dist — 서버리스 DOMMatrix 폴리필 포함)
+// PDF 텍스트 추출 (unpdf — 서버리스 네이티브 지원)
 // ----------------------------------------------------------------
 export async function extractPdfText(buffer: Buffer): Promise<string> {
-  // pdfjs-dist가 DOMMatrix를 참조 — 서버리스 환경엔 없으므로 폴리필
-  if (typeof globalThis.DOMMatrix === 'undefined') {
-    (globalThis as Record<string, unknown>).DOMMatrix = class DOMMatrix {
-      m: number[];
-      constructor(init?: number[]) { this.m = init ?? [1,0,0,1,0,0]; }
-      get a() { return this.m[0]; } get b() { return this.m[1]; }
-      get c() { return this.m[2]; } get d() { return this.m[3]; }
-      get e() { return this.m[4]; } get f() { return this.m[5]; }
-      isIdentity = true;
-      is2D = true;
-    };
-  }
-
-  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-  const data = new Uint8Array(buffer);
-  const doc = await pdfjsLib.getDocument({ data, useSystemFonts: true, isEvalSupported: false }).promise;
-
-  const pages: string[] = [];
-  for (let i = 1; i <= doc.numPages; i++) {
-    const page = await doc.getPage(i);
-    const content = await page.getTextContent();
-    const text = content.items
-      .filter((item) => 'str' in item)
-      .map((item) => (item as { str: string }).str)
-      .join(' ');
-    pages.push(text);
-  }
-  return pages.join('\n');
+  const { extractText, getDocumentProxy } = await import('unpdf');
+  const pdf = await getDocumentProxy(new Uint8Array(buffer));
+  const { text } = await extractText(pdf, { mergePages: true });
+  return text as string;
 }
 
 // ----------------------------------------------------------------
