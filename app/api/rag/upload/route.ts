@@ -163,7 +163,8 @@ export async function POST(request: NextRequest) {
   } catch (chunkError) {
     console.error('[rag/upload] chunk insert error:', chunkError);
     await prisma.ragDocument.update({ where: { id: docData.id }, data: { status: 'failed' } });
-    return NextResponse.json({ error: { code: 'internal', message: '청크 저장 실패' } }, { status: 500 });
+    const detail = chunkError instanceof Error ? chunkError.message : '';
+    return NextResponse.json({ error: { code: 'internal', message: `청크 저장 실패: ${detail}` } }, { status: 500 });
   }
 
   // 8) cost_ledger 적재
