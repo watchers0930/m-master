@@ -3,6 +3,12 @@
 
 import type { SourceType } from '@/types/db';
 
+// null 바이트 및 PostgreSQL 비호환 문자 제거
+function sanitizeText(text: string): string {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/\x00/g, '');
+}
+
 // 토큰 추정 (영어 4자/토큰, 한글 1.5자/토큰 근사)
 function estimateTokens(text: string): number {
   const korean = (text.match(/[가-힣]/g) ?? []).length;
@@ -158,15 +164,15 @@ export async function chunkFile(
 ): Promise<TextChunk[]> {
   switch (sourceType) {
     case 'pdf': {
-      const text = await extractPdfText(buffer);
+      const text = sanitizeText(await extractPdfText(buffer));
       return chunkBySlidingWindow(text);
     }
     case 'docx': {
-      const text = await extractDocxText(buffer);
+      const text = sanitizeText(await extractDocxText(buffer));
       return chunkBySlidingWindow(text);
     }
     case 'md': {
-      const text = buffer.toString('utf-8');
+      const text = sanitizeText(buffer.toString('utf-8'));
       return chunkMarkdown(text);
     }
     default: {
