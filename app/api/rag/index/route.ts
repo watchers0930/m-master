@@ -14,7 +14,7 @@ import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
 import type { SourceType } from '@/types/db';
 
 const RequestSchema = z.object({
-  doc_id: z.string().uuid('doc_id는 UUID 형식이어야 합니다'),
+  doc_id: z.string().min(1, 'doc_id는 필수입니다'),
 });
 
 // 배치 사이즈: OpenAI embedding API 한 번에 처리할 청크 수

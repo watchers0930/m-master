@@ -19,9 +19,8 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
   const { id: docId } = await params;
 
-  // UUID 형식 최소 검증
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!UUID_RE.test(docId)) {
+  // ID 최소 검증 (cuid 형식)
+  if (!docId || docId.length < 5) {
     return NextResponse.json({ error: { code: 'validation', message: '유효하지 않은 id' } }, { status: 400 });
   }
 
