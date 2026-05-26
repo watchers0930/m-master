@@ -128,15 +128,24 @@ export function chunkMarkdown(text: string): TextChunk[] {
 }
 
 // ----------------------------------------------------------------
-// PDF 텍스트 추출 (pdf-parse)
+// PDF 텍스트 추출 (pdfjs-dist legacy — DOMMatrix 불필요, 서버리스 호환)
 // ----------------------------------------------------------------
 export async function extractPdfText(buffer: Buffer): Promise<string> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const pdfParse = require('pdf-parse') as (
-    buf: Buffer,
-  ) => Promise<{ text: string }>;
-  const result = await pdfParse(buffer);
-  return result.text;
+  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const data = new Uint8Array(buffer);
+  const doc = await pdfjsLib.getDocument({ data, useSystemFonts: true }).promise;
+
+  const pages: string[] = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i);
+    const content = await page.getTextContent();
+    const text = content.items
+      .filter((item) => 'str' in item)
+      .map((item) => (item as { str: string }).str)
+      .join(' ');
+    pages.push(text);
+  }
+  return pages.join('\n');
 }
 
 // ----------------------------------------------------------------
