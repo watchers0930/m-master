@@ -63,29 +63,22 @@ async function getAccessToken(): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
-// HTML 이스케이프 (마크다운 변환 전 원문에 적용)
+// 순수 텍스트 정리 (마크다운/HTML → 순수 텍스트)
+// 네이버 카페 스팸 필터가 HTML 태그, 번호 목록, 해시태그를 감지하므로
+// 순수 텍스트만 전송한다.
 // ---------------------------------------------------------------------------
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-// ---------------------------------------------------------------------------
-// 마크다운 → HTML 변환
-// ---------------------------------------------------------------------------
-/** 마크다운 → HTML 변환 (카페 API는 HTML 본문 지원) */
-export function buildNaverCafeContent(markdown: string): string {
-  // 1) 원문 HTML 이스케이프 (마크다운 기호 제외한 사용자 텍스트 보호)
-  const escaped = escapeHtml(markdown);
-  // 2) 마크다운 → HTML 태그 변환 (이스케이프된 텍스트 기반)
-  return escaped
+/** 마크다운/HTML을 순수 텍스트로 정리 */
+export function buildNaverCafeContent(text: string): string {
+  return text
     .replace(/^\[이미지:.*\]$/gm, '')
-    .replace(/^#{1,6}\s+(.+)$/gm, '<h3>$1</h3>')
-    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
-    .replace(/^&gt;\s+(.+)$/gm, '<blockquote>$1</blockquote>')
-    .replace(/^-\s+(.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>\n?)+/g, (match) => `<ul>${match}</ul>`)
-    .replace(/\n{2,}/g, '<br><br>')
-    .replace(/\n/g, '<br>')
+    .replace(/^#{1,6}\s+/gm, '')           // 마크다운 헤딩 기호 제거
+    .replace(/\*\*([^*]+)\*\*/g, '$1')     // 볼드 기호 제거
+    .replace(/^>\s+/gm, '')                // 인용 기호 제거
+    .replace(/^-\s+/gm, '- ')             // 리스트 기호 유지 (순수 텍스트)
+    .replace(/<[^>]+>/g, '')               // HTML 태그 제거
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
     .trim();
 }
 
