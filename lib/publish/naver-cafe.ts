@@ -63,23 +63,91 @@ async function getAccessToken(): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
-// 순수 텍스트 정리 (마크다운/HTML → 순수 텍스트)
-// 네이버 카페 스팸 필터가 HTML 태그, 번호 목록, 해시태그를 감지하므로
-// 순수 텍스트만 전송한다.
+// 마크다운 → HTML 변환 (네이버 카페 API는 HTML content 지원)
+// 블로그 수준의 구조(소제목, 강조, 목록, 이미지 플레이스홀더)를 유지한다.
 // ---------------------------------------------------------------------------
-/** 마크다운/HTML을 순수 텍스트로 정리 */
+/** 마크다운을 네이버 카페용 HTML로 변환 */
 export function buildNaverCafeContent(text: string): string {
+  const lines = text.split('\n');
+  const htmlParts: string[] = [];
+  let inList = false;
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+
+    // 빈 줄 → 목록 종료 + 여백
+    if (line.trim() === '') {
+      if (inList) { htmlParts.push('</ul>'); inList = false; }
+      continue;
+    }
+
+    // 이미지 플레이스홀더 → 스타일 박스
+    const imgMatch = line.match(/^\[이미지:\s*(.+)\]$/);
+    if (imgMatch) {
+      if (inList) { htmlParts.push('</ul>'); inList = false; }
+      htmlParts.push(
+        `<div style="border:1.5px dashed #d1d5db;border-radius:8px;padding:16px;margin:12px 0;text-align:center;color:#6b7280;font-size:14px;">📷 ${imgMatch[1]}</div>`,
+      );
+      continue;
+    }
+
+    // 헤딩
+    const h2Match = line.match(/^##\s+(.+)$/);
+    if (h2Match) {
+      if (inList) { htmlParts.push('</ul>'); inList = false; }
+      htmlParts.push(`<h2 style="font-size:18px;font-weight:bold;margin:20px 0 8px;color:#1a1a1a;">${inlineMd(h2Match[1])}</h2>`);
+      continue;
+    }
+    const h3Match = line.match(/^###\s+(.+)$/);
+    if (h3Match) {
+      if (inList) { htmlParts.push('</ul>'); inList = false; }
+      htmlParts.push(`<h3 style="font-size:16px;font-weight:bold;margin:16px 0 6px;color:#1a1a1a;">${inlineMd(h3Match[1])}</h3>`);
+      continue;
+    }
+    const h1Match = line.match(/^#\s+(.+)$/);
+    if (h1Match) {
+      if (inList) { htmlParts.push('</ul>'); inList = false; }
+      htmlParts.push(`<h1 style="font-size:22px;font-weight:bold;margin:24px 0 10px;color:#1a1a1a;">${inlineMd(h1Match[1])}</h1>`);
+      continue;
+    }
+
+    // 목록 항목
+    const liMatch = line.match(/^[-*]\s+(.+)$/);
+    if (liMatch) {
+      if (!inList) { htmlParts.push('<ul style="margin:8px 0;padding-left:20px;">'); inList = true; }
+      htmlParts.push(`<li style="margin:4px 0;line-height:1.7;">${inlineMd(liMatch[1])}</li>`);
+      continue;
+    }
+
+    // 인용
+    const bqMatch = line.match(/^>\s+(.+)$/);
+    if (bqMatch) {
+      if (inList) { htmlParts.push('</ul>'); inList = false; }
+      htmlParts.push(`<blockquote style="border-left:3px solid #3b82f6;padding:8px 12px;margin:10px 0;color:#4b5563;font-style:italic;">${inlineMd(bqMatch[1])}</blockquote>`);
+      continue;
+    }
+
+    // 구분선
+    if (/^---+$/.test(line.trim())) {
+      if (inList) { htmlParts.push('</ul>'); inList = false; }
+      htmlParts.push('<hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0;">');
+      continue;
+    }
+
+    // 일반 문단
+    if (inList) { htmlParts.push('</ul>'); inList = false; }
+    htmlParts.push(`<p style="margin:8px 0;line-height:1.8;font-size:15px;color:#333;">${inlineMd(line)}</p>`);
+  }
+
+  if (inList) htmlParts.push('</ul>');
+  return htmlParts.join('\n');
+}
+
+/** 인라인 마크다운 변환 (볼드, 이탤릭) */
+function inlineMd(text: string): string {
   return text
-    .replace(/^\[이미지:.*\]$/gm, '')
-    .replace(/^#{1,6}\s+/gm, '')           // 마크다운 헤딩 기호 제거
-    .replace(/\*\*([^*]+)\*\*/g, '$1')     // 볼드 기호 제거
-    .replace(/^>\s+/gm, '')                // 인용 기호 제거
-    .replace(/^-\s+/gm, '')               // 불릿 기호 제거 (스팸 필터 대응)
-    .replace(/<[^>]+>/g, '')               // HTML 태그 제거
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .trim();
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/\*([^*]+)\*/g, '<i>$1</i>');
 }
 
 // ---------------------------------------------------------------------------
