@@ -197,13 +197,7 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
     }
 
     try {
-      // 블로그 슬롯 → published (블로그 자체는 HTML 다운로드)
-      await prisma.scheduleSlot.update({
-        where: { id: slot.id },
-        data: { status: 'published', publishedAt: new Date() },
-      });
-
-      // Claude로 블로그 → 네이버 카페 변환
+      // Claude로 블로그 → 네이버 카페 변환 (변환 먼저 — 실패 시 슬롯 상태 보존)
       console.log(`[cron/schedule-publish] 카페 변환 중: ${content.topic}`);
       const converted = await convertBlogToChannel(content.textBody, content.topic, 'naver_cafe');
 
@@ -220,6 +214,12 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
       const cafeResult = await publishNaverCafePost({
         subject: content.topic,
         content: converted.text,
+      });
+
+      // 변환+발행 성공 후 블로그 슬롯 → published
+      await prisma.scheduleSlot.update({
+        where: { id: slot.id },
+        data: { status: 'published', publishedAt: new Date() },
       });
 
       // 카페 슬롯 생성 (published)
@@ -258,6 +258,7 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
       const errorMsg = err instanceof Error ? err.message : String(err);
       console.error(`[cron/schedule-publish] ✗ 블로그→카페 — slot ${slot.id}:`, errorMsg);
 
+      // 실패 시 블로그 슬롯 상태 유지 (scheduled) → 다음 크론에서 재시도 가능
       await logAudit({
         actor: null,
         action: AUDIT_ACTIONS.CRON_SCHEDULE_PUBLISH,

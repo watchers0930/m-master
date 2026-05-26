@@ -39,7 +39,7 @@ export async function patchSlot(
   id: string,
   updates: { scheduled_at?: string; status?: SlotStatus }
 ): Promise<ApiResponse<ScheduleSlot>> {
-  const res = await fetch(`/api/schedule/slots/${id}`, {
+  const res = await fetch(`/api/schedule/slot/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),
@@ -48,7 +48,7 @@ export async function patchSlot(
 }
 
 export async function deleteSlot(id: string): Promise<ApiResponse<null>> {
-  const res = await fetch(`/api/schedule/slots/${id}`, { method: 'DELETE' });
+  const res = await fetch(`/api/schedule/slot/${id}`, { method: 'DELETE' });
   return res.json();
 }
 

@@ -1,24 +1,27 @@
 // GET /api/content/[id] — 단건 콘텐츠 조회
 import { NextRequest, NextResponse } from 'next/server';
+import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { toSnakeCase } from '@/lib/utils/case';
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  await requireSession();
   const { id } = await params;
 
   try {
-    const data = await prisma.content.findUnique({ where: { id } });
+    const row = await prisma.content.findUnique({ where: { id } });
 
-    if (!data) {
+    if (!row) {
       return NextResponse.json(
         { data: null, error: { code: 'not_found', message: '콘텐츠를 찾을 수 없습니다' } },
         { status: 404 },
       );
     }
 
-    return NextResponse.json({ data, error: null });
+    return NextResponse.json({ data: toSnakeCase(row), error: null });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(

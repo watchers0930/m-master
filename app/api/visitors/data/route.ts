@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireSession } from '@/lib/auth';
 import {
   fetchOverviewKpi, fetchTrafficSources, fetchDailySeries, fetchTopPages,
   fetchReferrals, fetchDemographics, fetchDevices, fetchEntryExit,
@@ -8,6 +9,7 @@ import {
 const VALID: Period[] = ['today', 'this_week', 'this_month', '7d', '30d', '90d', '365d'];
 
 export async function GET(req: NextRequest) {
+  await requireSession();
   const raw = req.nextUrl.searchParams.get('period') ?? '30d';
   const period: Period = (VALID as string[]).includes(raw) ? (raw as Period) : '30d';
 

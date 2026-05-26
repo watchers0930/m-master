@@ -3,6 +3,7 @@
 // DELETE /api/schedule/slots?year=2026&month=5 → 월 전체 초기화
 
 import { NextRequest, NextResponse } from 'next/server';
+import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 /* Prisma returns camelCase; frontend expects snake_case */
@@ -25,6 +26,7 @@ function toSnake(row: Record<string, unknown>) {
 }
 
 export async function GET(req: NextRequest) {
+  await requireSession();
   const { searchParams } = new URL(req.url);
   const year  = searchParams.get('year');
   const month = searchParams.get('month');
@@ -56,6 +58,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  await requireSession();
   try {
     const body = await req.json();
     const rows = Array.isArray(body) ? body : [body];
@@ -83,6 +86,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  await requireSession();
   const { searchParams } = new URL(req.url);
   const year  = searchParams.get('year');
   const month = searchParams.get('month');

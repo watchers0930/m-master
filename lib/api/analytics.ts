@@ -85,18 +85,17 @@ export async function getSettings(): Promise<
     budget_monthly: number;
     alert_threshold: number;
     notifications: Record<string, boolean>;
-    analytics_keys: { ga4_property_id?: string; ga4_service_account?: string };
+    analytics_keys: { ga4_property_id?: string };
   }>
 > {
   // TODO: BE 연동 (현재 BE 미구현 — env 우선)
-  let analytics_keys = { ga4_property_id: '', ga4_service_account: '' };
+  let analytics_keys = { ga4_property_id: '' };
   try {
     const res = await fetch('/api/settings/ga4', { cache: 'no-store' });
     if (res.ok) {
       const j = await res.json();
       analytics_keys = {
         ga4_property_id: j.ga4_property_id ?? '',
-        ga4_service_account: j.ga4_service_account ?? '',
       };
     }
   } catch {

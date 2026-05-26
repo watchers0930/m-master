@@ -74,7 +74,7 @@ export function buildNaverCafeContent(text: string): string {
     .replace(/^#{1,6}\s+/gm, '')           // 마크다운 헤딩 기호 제거
     .replace(/\*\*([^*]+)\*\*/g, '$1')     // 볼드 기호 제거
     .replace(/^>\s+/gm, '')                // 인용 기호 제거
-    .replace(/^-\s+/gm, '- ')             // 리스트 기호 유지 (순수 텍스트)
+    .replace(/^-\s+/gm, '')               // 불릿 기호 제거 (스팸 필터 대응)
     .replace(/<[^>]+>/g, '')               // HTML 태그 제거
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')

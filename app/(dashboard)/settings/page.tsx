@@ -9,7 +9,7 @@ interface SettingsState {
   budget_monthly: number;
   alert_threshold: number;
   notifications: Record<string, boolean>;
-  analytics_keys: { ga4_property_id: string; ga4_service_account: string };
+  analytics_keys: { ga4_property_id: string };
 }
 
 const NOTIF_LABELS: Record<string, string> = {
@@ -45,7 +45,6 @@ export default function SettingsPage() {
           notifications: res.data.notifications as Record<string, boolean>,
           analytics_keys: {
             ga4_property_id: res.data.analytics_keys?.ga4_property_id ?? '',
-            ga4_service_account: res.data.analytics_keys?.ga4_service_account ?? '',
           },
         });
       }
@@ -118,20 +117,12 @@ export default function SettingsPage() {
               style={fieldStyle}
               placeholder="예: 271430539 (숫자만 입력)"
               value={settings.analytics_keys?.ga4_property_id ?? ''}
-              onChange={(e) => setSettings((prev) => prev ? { ...prev, analytics_keys: { ...(prev.analytics_keys ?? { ga4_property_id: '', ga4_service_account: '' }), ga4_property_id: e.target.value } } : prev)}
+              onChange={(e) => setSettings((prev) => prev ? { ...prev, analytics_keys: { ...(prev.analytics_keys ?? { ga4_property_id: '' }), ga4_property_id: e.target.value } } : prev)}
             />
             <p style={{ fontSize: 10.5, color: 'var(--sub)', marginTop: 4 }}>GA4 관리 → 속성 설정 → 속성 ID</p>
           </div>
           <div>
-            <label style={labelStyle}>서비스 계정 키 (JSON)</label>
-            <textarea
-              rows={6}
-              style={{ ...fieldStyle, resize: 'vertical', fontFamily: 'monospace', lineHeight: 1.5 }}
-              placeholder={'{\n  "type": "service_account",\n  "project_id": "...",\n  "private_key": "..."\n}'}
-              value={settings.analytics_keys?.ga4_service_account ?? ''}
-              onChange={(e) => setSettings((prev) => prev ? { ...prev, analytics_keys: { ...(prev.analytics_keys ?? { ga4_property_id: '', ga4_service_account: '' }), ga4_service_account: e.target.value } } : prev)}
-            />
-            <p style={{ fontSize: 10.5, color: 'var(--sub)', marginTop: 4 }}>Google Cloud Console → IAM 및 관리자 → 서비스 계정 → 키 발급 (JSON 전체 붙여넣기)</p>
+            <p style={{ fontSize: 11, color: 'var(--sub)' }}>서비스 계정 키는 보안을 위해 서버 환경변수(GA4_SERVICE_ACCOUNT_JSON)로 관리됩니다.</p>
           </div>
         </div>
       </div>

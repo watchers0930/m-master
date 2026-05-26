@@ -3,6 +3,7 @@
 // { data: DowPattern, channel_totals: ChannelTotals, ga4_fallback: boolean }
 
 import { NextResponse } from 'next/server';
+import { requireSession } from '@/lib/auth';
 import { fetchDowChannelPattern } from '@/lib/ga4/visitors';
 
 // GA4 sessionDefaultChannelGroup → 우리 채널 매핑
@@ -39,6 +40,7 @@ export interface DowMatrix {
 }
 
 export async function GET() {
+  await requireSession();
   try {
     const rows = await fetchDowChannelPattern();
     if (rows === null) {

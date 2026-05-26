@@ -1,11 +1,13 @@
 // GET /api/content/[id]/download — 콘텐츠를 단일 HTML 파일로 다운로드
 import { NextRequest, NextResponse } from 'next/server';
+import { requireSession } from '@/lib/auth';
 import { generateBlogHtml } from '@/lib/publish/blog-html';
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  await requireSession();
   const { id } = await params;
 
   try {

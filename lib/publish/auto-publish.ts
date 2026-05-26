@@ -91,6 +91,7 @@ async function publishToChannel(
   onProgress({ type: 'auto_publish', channel, status: 'publishing' });
 
   let externalId: string | undefined;
+  let externalUrl: string | undefined;
   if (channel === 'instagram') {
     // bodyImageUrls가 2장 이상이면 캐러셀 발행
     if (params.bodyImageUrls.length >= 2) {
@@ -102,11 +103,13 @@ async function publishToChannel(
       });
       externalId = result.id;
     } else {
+      if (!imageUrl) throw new Error('Instagram 단일 이미지 발행에 이미지 URL 필수');
       const result = await publishInstagramImage({
-        imageUrl: imageUrl ?? '',
+        imageUrl,
         caption: converted.text,
       });
       externalId = result.id;
+      externalUrl = result.permalink ?? undefined;
     }
   } else if (channel === 'facebook') {
     const result = await publishFacebookPost({
@@ -114,12 +117,14 @@ async function publishToChannel(
       message: converted.text,
     });
     externalId = result.id;
+    externalUrl = `https://facebook.com/${result.id}`;
   } else if (channel === 'naver_cafe') {
     const result = await publishNaverCafePost({
       subject: topic,
       content: converted.text,
     });
     externalId = result.articleId;
+    externalUrl = result.cafeUrl;
   }
 
   // 5) Content status → published
@@ -138,6 +143,7 @@ async function publishToChannel(
       status: 'published',
       mode: 'ai_auto',
       externalId: externalId ?? null,
+      externalUrl: externalUrl ?? null,
     },
   });
 

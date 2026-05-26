@@ -1,8 +1,11 @@
 // GET /api/content — contents 목록 조회
 import { NextRequest, NextResponse } from 'next/server';
+import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { toSnakeCase } from '@/lib/utils/case';
 
 export async function GET(request: NextRequest) {
+  await requireSession();
   const { searchParams } = request.nextUrl;
   const status    = searchParams.get('status') ?? undefined;
   const channel   = searchParams.get('channel') ?? undefined;
@@ -14,7 +17,7 @@ export async function GET(request: NextRequest) {
     if (status) where.status = status;
     if (channel) where.channel = channel;
 
-    const [items, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       prisma.content.findMany({
         where,
         select: {
@@ -33,6 +36,8 @@ export async function GET(request: NextRequest) {
       }),
       prisma.content.count({ where }),
     ]);
+
+    const items = rows.map(toSnakeCase);
 
     return NextResponse.json({
       data: { items, total, page, per_page },

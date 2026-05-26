@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { extractPath, InvalidUrlError } from '@/lib/ab-test/url-utils';
 import {
@@ -42,6 +43,7 @@ function ymd(d: Date): string {
 }
 
 export async function GET(request: NextRequest) {
+  await requireSession();
   const url = new URL(request.url);
   const daysRaw = parseInt(url.searchParams.get('days') ?? '30', 10);
   const days = Math.max(1, Math.min(Number.isFinite(daysRaw) ? daysRaw : 30, 90));
