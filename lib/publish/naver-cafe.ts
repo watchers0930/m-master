@@ -267,7 +267,8 @@ async function cafeApiPostWithImages(
   function buildFormData(): FormData {
     const fd = new FormData();
     for (const [k, v] of Object.entries(fields)) {
-      fd.append(k, v);
+      // 네이버 서버가 추가 URL 디코딩을 수행하므로 1중 인코딩 필요
+      fd.append(k, encodeURIComponent(v));
     }
     for (let i = 0; i < images.length; i++) {
       fd.append(`image[${i}]`, new Blob([new Uint8Array(images[i].buffer)], { type: images[i].type }), images[i].name);
