@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
   const content = await prisma.content.findFirst({
     where: { id: content_id, ownerId },
-    select: { id: true, textBody: true, topic: true },
+    select: { id: true, textBody: true, topic: true, bodyImageUrls: true },
   });
 
   if (!content) {
@@ -42,12 +42,14 @@ export async function POST(request: NextRequest) {
 
   const subject = content.topic || '새 게시글';
   const contentText = content.textBody || content.topic || '';
+  const imageUrls = (content.bodyImageUrls ?? []).filter((u: string) => u && u.trim() !== '');
 
   let publishResult;
   try {
     publishResult = await publishNaverCafePost({
       subject,
       content: contentText,
+      imageUrls,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
