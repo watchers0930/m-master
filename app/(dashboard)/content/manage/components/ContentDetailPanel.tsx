@@ -18,7 +18,7 @@ const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
   failed:    { bg: '#fee2e2',          color: '#dc2626' },
 };
 const CHANNEL_LABEL: Record<string, string> = {
-  blog: '블로그', instagram: '인스타그램', facebook: '페이스북',
+  blog: '블로그', naver_cafe: '네이버 카페', instagram: '인스타그램', facebook: '페이스북',
 };
 
 interface Props {
@@ -107,7 +107,7 @@ export default function ContentDetailPanel({ contentId }: Props) {
   const [abStarting, setAbStarting] = useState(false);
   const [abError, setAbError] = useState<string | null>(null);
   const [convertingChannel, setConvertingChannel] = useState<'instagram' | 'facebook' | undefined>(undefined);
-  const [publishingChannel, setPublishingChannel] = useState<'instagram' | 'facebook' | undefined>(undefined);
+  const [publishingChannel, setPublishingChannel] = useState<string | undefined>(undefined);
 
   const { data: content, isFetching, error: queryError } = useQuery<Content | null>({
     queryKey: ['content', 'detail', contentId],
@@ -147,23 +147,28 @@ export default function ContentDetailPanel({ contentId }: Props) {
     }
   };
 
-  const handlePublish = async (channel: 'instagram' | 'facebook', contentId: string) => {
+  const handlePublish = async (channel: string, contentId: string) => {
     if (publishingChannel) return;
+    const chLabel = CHANNEL_LABEL[channel] ?? channel;
+    // naver_cafe → API 경로는 naver-cafe
+    const apiChannel = channel.replace('_', '-');
     setPublishingChannel(channel);
     try {
-      const res = await fetch(`/api/publish/${channel}`, {
+      const res = await fetch(`/api/publish/${apiChannel}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content_id: contentId }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert(`${channel === 'instagram' ? '인스타' : '페이스북'} 발행 실패: ${j?.error?.message ?? res.status}`);
+        alert(`${chLabel} 발행 실패: ${j?.error?.message ?? res.status}`);
         return;
       }
-      const url = j?.data?.url;
-      if (url && window.confirm(`발행 완료. 게시물을 열어볼까요?\n${url}`)) {
+      const url = j?.data?.url ?? j?.data?.download_url;
+      if (url && window.confirm(`${chLabel} 발행 완료!\n${url}\n\n게시물을 열어볼까요?`)) {
         window.open(url, '_blank', 'noopener,noreferrer');
+      } else {
+        alert(`${chLabel} 발행 완료`);
       }
     } catch (err) {
       alert(`발행 오류: ${err instanceof Error ? err.message : String(err)}`);
@@ -313,7 +318,7 @@ export default function ContentDetailPanel({ contentId }: Props) {
               {abError}
             </div>
           )}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, padding: '10px 16px', borderTop: '1px solid var(--border)', background: 'var(--n50)' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 8, padding: '10px 16px', borderTop: '1px solid var(--border)', background: 'var(--n50)', flexWrap: 'wrap' }}>
             {data.channel === 'blog' && (
               <>
                 <select
@@ -354,40 +359,59 @@ export default function ContentDetailPanel({ contentId }: Props) {
                   )}
                   A/B 테스트 시작
                 </button>
-              </>
-            )}
-            <a
-              href={`/api/content/${data.id}/download`}
-              aria-disabled={data.channel !== 'blog'}
-              onClick={(e) => { if (data.channel !== 'blog') e.preventDefault(); }}
-              title={data.channel !== 'blog' ? '블로그 채널만 HTML 다운로드를 지원합니다' : 'HTML 파일로 다운로드'}
-              style={{
-                padding: '8px 14px', borderRadius: 6,
-                border: '1px solid var(--blue-400)',
-                background: data.channel !== 'blog' ? 'var(--n200)' : 'var(--blue-400)',
-                color: '#fff', fontSize: 12, fontWeight: 600,
-                cursor: data.channel !== 'blog' ? 'not-allowed' : 'pointer',
-                fontFamily: 'inherit', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6,
-              }}
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7 10 12 15 17 10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
-              </svg>
-              HTML 다운로드
-            </a>
-            {data.channel === 'blog' && (
-              <>
                 <ConvertBtn channel="instagram" contentId={data.id} disabled={convertingChannel !== undefined} loading={convertingChannel === 'instagram'} onClick={handleConvert} />
                 <ConvertBtn channel="facebook"  contentId={data.id} disabled={convertingChannel !== undefined} loading={convertingChannel === 'facebook'}  onClick={handleConvert} />
               </>
             )}
-            {data.channel === 'instagram' && (
-              <PublishBtn channel="instagram" contentId={data.id} disabled={publishingChannel !== undefined} loading={publishingChannel === 'instagram'} onClick={handlePublish} />
+            {data.channel === 'blog' && (
+              <a
+                href={`/api/content/${data.id}/download`}
+                title="HTML 파일로 다운로드"
+                style={{
+                  padding: '8px 14px', borderRadius: 6,
+                  border: '1px solid var(--blue-400)',
+                  background: 'var(--blue-400)',
+                  color: '#fff', fontSize: 12, fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                HTML 다운로드
+              </a>
             )}
-            {data.channel === 'facebook' && (
-              <PublishBtn channel="facebook" contentId={data.id} disabled={publishingChannel !== undefined} loading={publishingChannel === 'facebook'} onClick={handlePublish} />
+            {/* 발행/재발행 버튼 — 모든 채널 공통 */}
+            {(data.channel === 'naver_cafe' || data.channel === 'instagram' || data.channel === 'facebook') && (
+              <button
+                type="button"
+                onClick={() => handlePublish(data.channel, data.id)}
+                disabled={!!publishingChannel}
+                style={{
+                  padding: '8px 14px', borderRadius: 6,
+                  border: '1px solid var(--green-600, #16a34a)',
+                  background: publishingChannel === data.channel ? 'var(--n100)' : 'var(--green-600, #16a34a)',
+                  color: publishingChannel === data.channel ? 'var(--sub)' : '#fff',
+                  fontSize: 12, fontWeight: 600,
+                  cursor: publishingChannel ? 'wait' : 'pointer',
+                  fontFamily: 'inherit',
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                {publishingChannel === data.channel ? (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
+                    <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                  </svg>
+                ) : (
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                  </svg>
+                )}
+                {data.status === 'published' ? '재발행' : '발행'}
+              </button>
             )}
           </div>
         </>
