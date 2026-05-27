@@ -173,15 +173,19 @@ export async function autoPublishToSocial(params: AutoPublishParams): Promise<vo
   const channels = await getActiveChannels();
   if (channels.length === 0) return; // 활성 채널 없으면 스킵
 
-  for (const channel of channels) {
-    try {
-      await publishToChannel(channel, params);
-    } catch (err) {
-      // 한 채널 실패해도 다른 채널 계속 진행
-      console.error(`[auto-publish] ${channel} 실패:`, err);
+  // 3채널 병렬 실행 — Vercel Hobby 60초 제한 대응
+  const results = await Promise.allSettled(
+    channels.map((channel) => publishToChannel(channel, params)),
+  );
+
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    if (result.status === 'rejected') {
+      const err = result.reason;
+      console.error(`[auto-publish] ${channels[i]} 실패:`, err);
       params.onProgress({
         type: 'auto_publish',
-        channel,
+        channel: channels[i],
         status: 'failed',
         error: err instanceof Error ? err.message : String(err),
       });

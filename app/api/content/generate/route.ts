@@ -24,11 +24,13 @@ import type { ContentGenerateRequest } from '@/types/api';
 
 const RequestSchema = z.object({
   topic: z.string().min(1).max(500),
-  channel: z.enum(['blog', 'instagram', 'facebook']),
+  channel: z.enum(['blog', 'instagram', 'facebook', 'naver_cafe']),
   tone: z.string().max(100).optional(),
   keywords: z.array(z.string().max(50)).max(20).optional(),
   use_rag: z.boolean().optional(),
 });
+
+export const maxDuration = 60; // Hobby 플랜 최대 60초
 
 const REVIEW_PASS_SCORE = 75;
 const enc = new TextEncoder();

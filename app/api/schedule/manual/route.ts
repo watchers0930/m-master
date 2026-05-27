@@ -10,7 +10,7 @@ import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
 
 const RequestSchema = z.object({
   content_id: z.string().uuid('content_id는 UUID 형식이어야 합니다'),
-  channel: z.enum(['blog', 'instagram', 'facebook']),
+  channel: z.enum(['blog', 'instagram', 'facebook', 'naver_cafe']),
   scheduled_at: z
     .string()
     .datetime({ message: 'scheduled_at은 ISO 8601 형식이어야 합니다' })
