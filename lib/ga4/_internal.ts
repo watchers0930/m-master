@@ -91,10 +91,24 @@ export function getClient(): BetaAnalyticsDataClient {
   if (client && Date.now() < clientExp) return client;
   const credentials = loadCredentials();
   if (!credentials) throw new Error('GA4 credentials are not configured.');
-  client = new BetaAnalyticsDataClient({
-    credentials,
-    fallback: 'rest',
-  });
+
+  // google-auth-library의 fromJSON은 authorized_user 타입에서
+  // 반드시 client_id / client_secret 키를 요구한다.
+  // credentials 객체가 올바른 형식인지 확인 후 전달.
+  const cred = credentials as Record<string, unknown>;
+  if (cred.type === 'authorized_user' && cred.client_id && cred.client_secret && cred.refresh_token) {
+    // UserRefreshClient를 직접 생성하여 credentials 전달
+    const { UserRefreshClient } = require('google-auth-library') as typeof import('google-auth-library');
+    const authClient = new UserRefreshClient(
+      cred.client_id as string,
+      cred.client_secret as string,
+      cred.refresh_token as string,
+    );
+    client = new BetaAnalyticsDataClient({ authClient, fallback: 'rest' });
+  } else {
+    client = new BetaAnalyticsDataClient({ credentials, fallback: 'rest' });
+  }
+
   clientExp = Date.now() + CLIENT_TTL;
   return client;
 }
