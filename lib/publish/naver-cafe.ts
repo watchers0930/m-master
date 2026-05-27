@@ -91,7 +91,7 @@ async function getAccessToken(): Promise<string> {
 // 마크다운 → HTML 변환 (네이버 카페 API는 HTML content 지원)
 // 블로그 수준의 구조(소제목, 강조, 목록, 이미지 플레이스홀더)를 유지한다.
 // ---------------------------------------------------------------------------
-/** 마크다운을 네이버 카페용 HTML로 변환 */
+/** 마크다운을 네이버 카페용 HTML로 변환 (인라인 스타일 최소화 — 스팸 필터 방지) */
 export function buildNaverCafeContent(text: string): string {
   const lines = text.split('\n');
   const htmlParts: string[] = [];
@@ -100,19 +100,15 @@ export function buildNaverCafeContent(text: string): string {
   for (const raw of lines) {
     const line = raw.trimEnd();
 
-    // 빈 줄 → 목록 종료 + 여백
+    // 빈 줄 → 목록 종료
     if (line.trim() === '') {
       if (inList) { htmlParts.push('</ul>'); inList = false; }
       continue;
     }
 
-    // 이미지 플레이스홀더 → 스타일 박스
-    const imgMatch = line.match(/^\[이미지:\s*(.+)\]$/);
-    if (imgMatch) {
+    // 이미지 플레이스홀더 제거
+    if (/^\[이미지:\s*.+\]$/.test(line)) {
       if (inList) { htmlParts.push('</ul>'); inList = false; }
-      htmlParts.push(
-        `<div style="border:1.5px dashed #d1d5db;border-radius:8px;padding:16px;margin:12px 0;text-align:center;color:#6b7280;font-size:14px;">📷 ${imgMatch[1]}</div>`,
-      );
       continue;
     }
 
@@ -120,27 +116,27 @@ export function buildNaverCafeContent(text: string): string {
     const h2Match = line.match(/^##\s+(.+)$/);
     if (h2Match) {
       if (inList) { htmlParts.push('</ul>'); inList = false; }
-      htmlParts.push(`<h2 style="font-size:18px;font-weight:bold;margin:20px 0 8px;color:#1a1a1a;">${inlineMd(h2Match[1])}</h2>`);
+      htmlParts.push(`<h2>${inlineMd(h2Match[1])}</h2>`);
       continue;
     }
     const h3Match = line.match(/^###\s+(.+)$/);
     if (h3Match) {
       if (inList) { htmlParts.push('</ul>'); inList = false; }
-      htmlParts.push(`<h3 style="font-size:16px;font-weight:bold;margin:16px 0 6px;color:#1a1a1a;">${inlineMd(h3Match[1])}</h3>`);
+      htmlParts.push(`<h3>${inlineMd(h3Match[1])}</h3>`);
       continue;
     }
     const h1Match = line.match(/^#\s+(.+)$/);
     if (h1Match) {
       if (inList) { htmlParts.push('</ul>'); inList = false; }
-      htmlParts.push(`<h1 style="font-size:22px;font-weight:bold;margin:24px 0 10px;color:#1a1a1a;">${inlineMd(h1Match[1])}</h1>`);
+      htmlParts.push(`<h1>${inlineMd(h1Match[1])}</h1>`);
       continue;
     }
 
     // 목록 항목
     const liMatch = line.match(/^[-*]\s+(.+)$/);
     if (liMatch) {
-      if (!inList) { htmlParts.push('<ul style="margin:8px 0;padding-left:20px;">'); inList = true; }
-      htmlParts.push(`<li style="margin:4px 0;line-height:1.7;">${inlineMd(liMatch[1])}</li>`);
+      if (!inList) { htmlParts.push('<ul>'); inList = true; }
+      htmlParts.push(`<li>${inlineMd(liMatch[1])}</li>`);
       continue;
     }
 
@@ -148,20 +144,20 @@ export function buildNaverCafeContent(text: string): string {
     const bqMatch = line.match(/^>\s+(.+)$/);
     if (bqMatch) {
       if (inList) { htmlParts.push('</ul>'); inList = false; }
-      htmlParts.push(`<blockquote style="border-left:3px solid #3b82f6;padding:8px 12px;margin:10px 0;color:#4b5563;font-style:italic;">${inlineMd(bqMatch[1])}</blockquote>`);
+      htmlParts.push(`<blockquote>${inlineMd(bqMatch[1])}</blockquote>`);
       continue;
     }
 
     // 구분선
     if (/^---+$/.test(line.trim())) {
       if (inList) { htmlParts.push('</ul>'); inList = false; }
-      htmlParts.push('<hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0;">');
+      htmlParts.push('<hr>');
       continue;
     }
 
     // 일반 문단
     if (inList) { htmlParts.push('</ul>'); inList = false; }
-    htmlParts.push(`<p style="margin:8px 0;line-height:1.8;font-size:15px;color:#333;">${inlineMd(line)}</p>`);
+    htmlParts.push(`<p>${inlineMd(line)}</p>`);
   }
 
   if (inList) htmlParts.push('</ul>');
