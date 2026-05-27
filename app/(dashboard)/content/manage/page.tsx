@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { listContents } from '@/lib/api/content';
-import type { ContentStatus } from '@/types/db';
+import type { ContentStatus, Channel } from '@/types/db';
+import type { ContentListItem } from '@/types/api';
 import ContentDetailPanel from './components/ContentDetailPanel';
 
 const STATUS_OPTIONS: { value: ContentStatus | ''; label: string }[] = [
@@ -24,9 +25,29 @@ const STATUS_LABEL: Record<string, string> = {
   draft: '초안', scheduled: '예약됨', published: '발행됨', failed: '실패',
 };
 
+const CHANNEL_LABEL: Record<Channel, string> = {
+  blog: '블로그',
+  naver_cafe: '카페',
+  instagram: '인스타',
+  facebook: '페이스북',
+};
+const CHANNEL_COLOR: Record<Channel, { bg: string; color: string }> = {
+  blog:       { bg: '#e0f2fe', color: '#0369a1' },
+  naver_cafe: { bg: '#dcfce7', color: '#15803d' },
+  instagram:  { bg: '#fce7f3', color: '#be185d' },
+  facebook:   { bg: '#dbeafe', color: '#1d4ed8' },
+};
+
+interface TopicGroup {
+  topic: string;
+  items: ContentListItem[];
+  latestDate: string;
+}
+
 export default function ContentManagePage() {
   const [statusFilter, setStatusFilter] = useState<ContentStatus | ''>('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
 
   const { data: items = [], isPending: loading } = useQuery({
     queryKey: ['contents', 'list', statusFilter || 'all'],
@@ -35,6 +56,29 @@ export default function ContentManagePage() {
       return res.data?.items ?? [];
     },
   });
+
+  // 토픽 기준 그룹핑
+  const groups = useMemo<TopicGroup[]>(() => {
+    const map = new Map<string, ContentListItem[]>();
+    for (const item of items) {
+      const list = map.get(item.topic) ?? [];
+      list.push(item);
+      map.set(item.topic, list);
+    }
+    return Array.from(map.entries()).map(([topic, groupItems]) => ({
+      topic,
+      items: groupItems,
+      latestDate: groupItems.reduce((d, i) => i.created_at > d ? i.created_at : d, ''),
+    })).sort((a, b) => b.latestDate.localeCompare(a.latestDate));
+  }, [items]);
+
+  function toggleTopic(topic: string) {
+    setExpandedTopics((prev) => {
+      const next = new Set(prev);
+      if (next.has(topic)) next.delete(topic); else next.add(topic);
+      return next;
+    });
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, flex: 1, minHeight: 0 }}>
@@ -63,8 +107,8 @@ export default function ContentManagePage() {
         {/* 좌측: 목록 카드 */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }}>
           {/* 헤더 행 */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 70px', gap: 8, padding: '10px 14px', borderBottom: '1px solid var(--border)', background: 'var(--n50)', flexShrink: 0 }}>
-            {['토픽', '상태', '생성일'].map((h) => (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 70px', gap: 8, padding: '10px 14px', borderBottom: '1px solid var(--border)', background: 'var(--n50)', flexShrink: 0 }}>
+            {['토픽', '채널', '생성일'].map((h) => (
               <span key={h} style={{ fontSize: 11, fontWeight: 600, color: 'var(--sub)' }}>{h}</span>
             ))}
           </div>
@@ -77,48 +121,69 @@ export default function ContentManagePage() {
               </svg>
               <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </div>
-          ) : items.length === 0 ? (
+          ) : groups.length === 0 ? (
             <p style={{ textAlign: 'center', padding: '48px 0', fontSize: 12, color: 'var(--sub)' }}>콘텐츠가 없습니다</p>
           ) : (
-            items.map((item) => {
-              const st = STATUS_STYLE[item.status] ?? STATUS_STYLE.draft;
-              const avgScore = item.scores?.avg;
-              const scoreColor = avgScore !== undefined ? (avgScore >= 80 ? 'var(--green-700)' : avgScore >= 60 ? 'var(--amber-700)' : '#dc2626') : undefined;
-              const scoreBg = avgScore !== undefined ? (avgScore >= 80 ? 'var(--green-100)' : avgScore >= 60 ? 'var(--amber-100)' : '#fee2e2') : undefined;
-              const isSelected = selectedId === item.id;
+            groups.map((group) => {
+              const isOpen = expandedTopics.has(group.topic);
               return (
-                <div key={item.id}
-                  style={{
-                    display: 'grid', gridTemplateColumns: '1fr 70px 70px', gap: 8, alignItems: 'center',
-                    padding: '10px 14px', borderBottom: '1px solid var(--border2)',
-                    borderLeft: isSelected ? '3px solid var(--blue-400)' : '3px solid transparent',
-                    background: isSelected ? 'var(--blue-50, #eff6ff)' : '',
-                    transition: 'background 0.1s', cursor: 'pointer',
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  aria-pressed={isSelected}
-                  onClick={() => setSelectedId(item.id)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedId(item.id); } }}
-                  onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = 'var(--n50)'; }}
-                  onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = ''; }}
-                >
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{item.topic}</p>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 2 }}>
-                      <span style={{ fontSize: 10.5, color: 'var(--sub)' }}>블로그</span>
-                      {avgScore !== undefined && (
-                        <>
-                          <span style={{ color: 'var(--border)', fontSize: 10 }}>·</span>
-                          <span style={{ fontSize: 10.5, padding: '1px 6px', borderRadius: 3, fontWeight: 600, background: scoreBg, color: scoreColor }}>{avgScore}점</span>
-                        </>
-                      )}
-                      <span style={{ color: 'var(--border)', fontSize: 10 }}>·</span>
-                      <span style={{ fontSize: 10.5, color: 'var(--sub)' }}>{item.cost_krw.toLocaleString()}원</span>
+                <div key={group.topic}>
+                  {/* 아코디언 헤더 — 토픽 제목 */}
+                  <div
+                    style={{
+                      display: 'grid', gridTemplateColumns: '1fr 60px 70px', gap: 8, alignItems: 'center',
+                      padding: '10px 14px', borderBottom: '1px solid var(--border2)',
+                      cursor: 'pointer', transition: 'background 0.1s',
+                      background: isOpen ? 'var(--n50)' : '',
+                    }}
+                    role="button" tabIndex={0}
+                    onClick={() => toggleTopic(group.topic)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleTopic(group.topic); } }}
+                    onMouseEnter={(e) => { if (!isOpen) e.currentTarget.style.background = 'var(--n50)'; }}
+                    onMouseLeave={(e) => { if (!isOpen) e.currentTarget.style.background = ''; }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ flexShrink: 0, transition: 'transform 0.15s', transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)' }}>
+                        <path d="M4.5 2.5L8 6L4.5 9.5" stroke="var(--sub)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{group.topic}</p>
                     </div>
+                    <span style={{ fontSize: 10.5, color: 'var(--sub)' }}>{group.items.length}개</span>
+                    <span style={{ fontSize: 11, color: 'var(--sub)' }}>{new Date(group.latestDate).toLocaleDateString('ko-KR')}</span>
                   </div>
-                  <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 10.5, fontWeight: 600, background: st.bg, color: st.color, justifySelf: 'start' }}>{STATUS_LABEL[item.status] ?? item.status}</span>
-                  <span style={{ fontSize: 11, color: 'var(--sub)' }}>{new Date(item.created_at).toLocaleDateString('ko-KR')}</span>
+
+                  {/* 아코디언 바디 — 채널별 콘텐츠 */}
+                  {isOpen && group.items.map((item) => {
+                    const st = STATUS_STYLE[item.status] ?? STATUS_STYLE.draft;
+                    const ch = CHANNEL_COLOR[item.channel] ?? CHANNEL_COLOR.blog;
+                    const isSelected = selectedId === item.id;
+                    return (
+                      <div key={item.id}
+                        style={{
+                          display: 'grid', gridTemplateColumns: '1fr 60px 70px', gap: 8, alignItems: 'center',
+                          padding: '8px 14px 8px 32px', borderBottom: '1px solid var(--border2)',
+                          borderLeft: isSelected ? '3px solid var(--blue-400)' : '3px solid transparent',
+                          background: isSelected ? 'var(--blue-50, #eff6ff)' : '',
+                          transition: 'background 0.1s', cursor: 'pointer',
+                        }}
+                        role="button" tabIndex={0} aria-pressed={isSelected}
+                        onClick={() => setSelectedId(item.id)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedId(item.id); } }}
+                        onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = 'var(--n50)'; }}
+                        onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = ''; }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                          <span style={{ fontSize: 10.5, fontWeight: 700, padding: '1px 6px', borderRadius: 3, background: ch.bg, color: ch.color, flexShrink: 0 }}>{CHANNEL_LABEL[item.channel] ?? item.channel}</span>
+                          <span style={{ display: 'inline-block', padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: st.bg, color: st.color, flexShrink: 0 }}>{STATUS_LABEL[item.status] ?? item.status}</span>
+                          {item.scores?.avg !== undefined && (
+                            <span style={{ fontSize: 10, color: 'var(--sub)' }}>{item.scores.avg}점</span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: 10.5, color: 'var(--sub)' }}>{item.cost_krw.toLocaleString()}원</span>
+                        <span style={{ fontSize: 10.5, color: 'var(--sub)' }}>{new Date(item.created_at).toLocaleDateString('ko-KR')}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })
