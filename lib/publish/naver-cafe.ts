@@ -92,7 +92,9 @@ async function getAccessToken(): Promise<string> {
 // 블로그 수준의 구조(소제목, 강조, 목록, 이미지 플레이스홀더)를 유지한다.
 // ---------------------------------------------------------------------------
 /** 마크다운을 네이버 카페용 HTML로 변환 (인라인 스타일 최소화 — 스팸 필터 방지) */
-export function buildNaverCafeContent(text: string): string {
+export function buildNaverCafeContent(text: string, imageUrls?: string[]): string {
+  const imgs = (imageUrls ?? []).filter(u => u && u.trim() !== '');
+  let imgIdx = 0;
   const lines = text.split('\n');
   const htmlParts: string[] = [];
   let inList = false;
@@ -145,9 +147,13 @@ export function buildNaverCafeContent(text: string): string {
       continue;
     }
 
-    // 이미지 플레이스홀더 제거
+    // 이미지 플레이스홀더 → <img> 태그 삽입 (URL이 있는 경우)
     if (/^\[이미지:\s*.+\]$/.test(line)) {
       flushList();
+      if (imgIdx < imgs.length) {
+        htmlParts.push(`<p><img src="${imgs[imgIdx]}" alt="" /></p>`);
+        imgIdx++;
+      }
       continue;
     }
 
@@ -368,26 +374,14 @@ export async function publishNaverCafePost(opts: {
   // DB 자격증명이 있으면 cachedAccessToken에 반영
   if (resolved.accessToken) cachedAccessToken = resolved.accessToken;
 
-  const htmlBody = buildNaverCafeContent(opts.content);
+  // 이미지 URL을 HTML <img> 태그로 본문에 인라인 삽입 (글→이미지→글 배치 유지)
+  const urls = (opts.imageUrls ?? []).filter(u => u && u.trim() !== '');
+  if (urls.length > 0) console.log(`[naver-cafe] 이미지 ${urls.length}건 인라인 삽입`);
+  const htmlBody = buildNaverCafeContent(opts.content, urls);
   const fields = { subject: opts.subject, content: htmlBody };
 
-  // 이미지가 있으면 다운로드 후 multipart 업로드
-  const urls = (opts.imageUrls ?? []).filter(u => u && u.trim() !== '');
-  let res: Response;
-  let json: Record<string, unknown>;
-
-  if (urls.length > 0) {
-    console.log(`[naver-cafe] 이미지 ${urls.length}건 다운로드 시작`);
-    const images = await downloadImages(urls);
-    if (images.length > 0) {
-      console.log(`[naver-cafe] 이미지 ${images.length}건 첨부 발행`);
-      ({ res, json } = await cafeApiPostWithImages(clubId, menuId, fields, images));
-    } else {
-      ({ res, json } = await cafeApiPost(clubId, menuId, fields));
-    }
-  } else {
-    ({ res, json } = await cafeApiPost(clubId, menuId, fields));
-  }
+  // 항상 URL-encoded 전송 (이미지는 HTML <img>로 삽입됨)
+  const { res, json } = await cafeApiPost(clubId, menuId, fields);
 
   if (!res.ok) {
     const msg = (json?.message as { error?: { msg?: string } })?.error?.msg ?? `HTTP ${res.status}`;
