@@ -54,6 +54,7 @@ export async function POST(
       textBody: true,
       imageUrl: true,
       bodyImageUrls: true,
+      scores: true,
     },
   });
 
@@ -134,7 +135,7 @@ export async function POST(
       textBody: captionText,
       imageUrl: source.imageUrl,
       bodyImageUrls,
-      scores: Prisma.DbNull,
+      scores: source.scores ?? Prisma.DbNull,
       costKrw: convertResult.krw,
       status: 'draft',
     },
