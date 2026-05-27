@@ -1,4 +1,4 @@
-// POST → 예산체크 → RAG → Claude Sonnet 4.6(SSE stream) → 검수 → DB insert
+// POST → 예산체크 → RAG → GPT-4o (SSE stream) → 검수 → DB insert
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { requireSession } from '@/lib/auth';
@@ -101,25 +101,32 @@ export async function POST(request: NextRequest) {
         const client = getClient();
         let text = '';
 
-        // 7) Claude Sonnet 4.6 스트리밍 생성 (시스템 프롬프트 캐시)
-        const claudeStream = client.messages.stream({
+        // 7) GPT-4o 스트리밍 생성
+        const openaiStream = await client.chat.completions.create({
           model: CLAUDE_MODEL,
           max_tokens: 5000,
-          system: [
-            { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } },
-          ],
           messages: [
+            { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
           ],
+          stream: true,
+          stream_options: { include_usage: true },
         });
 
-        claudeStream.on('text', (delta) => {
-          text += delta;
-          send({ type: 'delta', text: delta });
-        });
+        let streamUsage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null = null;
 
-        const finalMessage = await claudeStream.finalMessage();
-        const usage = toChatUsage(finalMessage.usage);
+        for await (const chunk of openaiStream) {
+          const delta = chunk.choices[0]?.delta?.content;
+          if (delta) {
+            text += delta;
+            send({ type: 'delta', text: delta });
+          }
+          if (chunk.usage) {
+            streamUsage = chunk.usage;
+          }
+        }
+
+        const usage = toChatUsage(streamUsage);
         const chatKrw = calcChatKrw(usage);
 
         // 본문 마커 폴백을 먼저 적용 (이후 작업들이 갱신된 text를 참조)
@@ -132,7 +139,7 @@ export async function POST(request: NextRequest) {
           reviewContent(text, req.channel),
           // 썸네일 (DALL-E)
           generateThumbnail(req.topic).then((img) => ({ url: img.url, krw: calcImageKrw() })),
-          // 본문 이미지 (Haiku 번역 → Unsplash 일괄 병렬 검색)
+          // 본문 이미지 (GPT-4o-mini 번역 → Unsplash 일괄 병렬 검색)
           (async () => {
             const koreanPrompts = extractImagePrompts(text);
             console.log(`[generate] 본문 마커 ${koreanPrompts.length}개 추출`);

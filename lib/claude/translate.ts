@@ -1,23 +1,15 @@
 // lib/claude/translate.ts — 한국어 이미지 설명 → 영어 Unsplash 검색 쿼리 일괄 변환
-// Claude Haiku 4.5 사용 — 글당 ~10원
-import type Anthropic from '@anthropic-ai/sdk';
-import { getClient, toChatUsage, calcChatKrw, type ChatUsage } from './chat';
+// GPT-4o-mini 사용 — 글당 ~2원
+import { getClient, toChatUsage, type ChatUsage } from './chat';
 
-const HAIKU_MODEL = 'claude-haiku-4-5';
+const MINI_MODEL = 'gpt-4o-mini';
 
-// Haiku 4.5 단가 (per 1M tokens, 환율 1400)
-// input $1 / output $5 / cache-write $1.25 / cache-read $0.10
+// GPT-4o-mini 단가 (per 1M tokens, 환율 1400)
+// input $0.15 / output $0.60
 export function calcHaikuKrw(usage: ChatUsage): number {
-  const cacheCreate = usage.cache_creation_input_tokens ?? 0;
-  const cacheRead = usage.cache_read_input_tokens ?? 0;
-  const regularInput = Math.max(0, usage.prompt_tokens - cacheCreate - cacheRead);
-
-  const inputUsd = (regularInput / 1_000_000) * 1;
-  const cacheCreateUsd = (cacheCreate / 1_000_000) * 1.25;
-  const cacheReadUsd = (cacheRead / 1_000_000) * 0.10;
-  const outputUsd = (usage.completion_tokens / 1_000_000) * 5;
-
-  return Math.ceil((inputUsd + cacheCreateUsd + cacheReadUsd + outputUsd) * 1400);
+  const inputUsd = (usage.prompt_tokens / 1_000_000) * 0.15;
+  const outputUsd = (usage.completion_tokens / 1_000_000) * 0.60;
+  return Math.ceil((inputUsd + outputUsd) * 1400);
 }
 
 export interface TranslateResult {
@@ -46,7 +38,7 @@ export async function translateImagePrompts(
 4. 키워드는 공백으로 구분된 단어들로만 (문장 X)
 5. 입력 배열 순서대로 동일 개수의 결과 배열을 반환
 
-submit_translations 도구를 반드시 호출하여 결과를 제출하세요.`;
+submit_translations 함수를 반드시 호출하여 결과를 제출하세요.`;
 
   const userPrompt = [
     '다음 한국어 이미지 설명들을 영어 Unsplash 검색 쿼리로 변환하세요:',
@@ -54,39 +46,42 @@ submit_translations 도구를 반드시 호출하여 결과를 제출하세요.`
     ...koreanPrompts.map((p, i) => `${i + 1}. ${p}`),
   ].join('\n');
 
-  const response = await client.messages.create({
-    model: HAIKU_MODEL,
+  const response = await client.chat.completions.create({
+    model: MINI_MODEL,
     max_tokens: 1024,
-    system: systemPrompt,
-    messages: [{ role: 'user', content: userPrompt }],
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
     tools: [{
-      name: 'submit_translations',
-      description: '영어 검색 쿼리 배열을 제출합니다 (입력 순서와 동일 길이)',
-      input_schema: {
-        type: 'object',
-        properties: {
-          queries: {
-            type: 'array',
-            items: { type: 'string' },
-            description: '각 입력 설명에 대응하는 영어 검색 쿼리',
+      type: 'function',
+      function: {
+        name: 'submit_translations',
+        description: '영어 검색 쿼리 배열을 제출합니다 (입력 순서와 동일 길이)',
+        parameters: {
+          type: 'object',
+          properties: {
+            queries: {
+              type: 'array',
+              items: { type: 'string' },
+              description: '각 입력 설명에 대응하는 영어 검색 쿼리',
+            },
           },
+          required: ['queries'],
         },
-        required: ['queries'],
       },
     }],
-    tool_choice: { type: 'tool', name: 'submit_translations' },
+    tool_choice: { type: 'function', function: { name: 'submit_translations' } },
   });
 
-  const toolUse = response.content.find(
-    (b): b is Anthropic.Messages.ToolUseBlock => b.type === 'tool_use',
-  );
+  const toolCall = response.choices[0]?.message?.tool_calls?.[0];
 
   let queries: string[];
-  if (!toolUse) {
-    console.warn('[translate] tool_use 응답 없음 — 한국어 원본 사용');
+  if (!toolCall || toolCall.type !== 'function') {
+    console.warn('[translate] function call 응답 없음 — 한국어 원본 사용');
     queries = koreanPrompts;
   } else {
-    const parsed = toolUse.input as { queries?: unknown };
+    const parsed = JSON.parse(toolCall.function.arguments) as { queries?: unknown };
     const arr = Array.isArray(parsed.queries) ? parsed.queries : [];
     // 길이 보정: 부족하면 원본으로 채우고, 초과하면 자름
     queries = koreanPrompts.map((orig, i) => {
@@ -99,4 +94,4 @@ submit_translations 도구를 반드시 호출하여 결과를 제출하세요.`
 }
 
 // 비용 계산 export (호출부에서 사용)
-export { calcChatKrw as calcSonnetKrw };
+export { calcChatKrw as calcSonnetKrw } from './chat';

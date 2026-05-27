@@ -1,5 +1,5 @@
 // lib/claude/convert.ts — 블로그 본문을 인스타/페이스북 형식으로 변환
-import type Anthropic from '@anthropic-ai/sdk';
+// OpenAI GPT-4o 사용
 import { CLAUDE_MODEL, calcChatKrw, getClient, toChatUsage, type ChatUsage } from './chat';
 
 export type ConvertChannel = 'instagram' | 'facebook' | 'naver_cafe';
@@ -99,19 +99,16 @@ export async function convertBlogToChannel(
 
   const maxTokens = channel === 'naver_cafe' ? 4096 : 2500;
 
-  const response = await client.messages.create({
+  const response = await client.chat.completions.create({
     model: CLAUDE_MODEL,
     max_tokens: maxTokens,
-    system: [
-      { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } },
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
     ],
-    messages: [{ role: 'user', content: userPrompt }],
   });
 
-  const textBlock = response.content.find(
-    (b): b is Anthropic.Messages.TextBlock => b.type === 'text',
-  );
-  const text = textBlock?.text ?? '';
+  const text = response.choices[0]?.message?.content ?? '';
   if (!text) throw new Error(`${channel} 변환 텍스트 빈 응답`);
 
   const usage = toChatUsage(response.usage);

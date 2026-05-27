@@ -1,5 +1,5 @@
 // lib/content/generate-headless.ts — SSE 없는 콘텐츠 생성 (cron·배치용)
-// 기존 app/api/content/generate/route.ts 핵심 로직을 재사용 가능한 함수로 추출
+// GPT-4o 비스트리밍 생성
 
 import { prisma } from '@/lib/prisma';
 import { isBudgetExceeded } from '@/lib/cost/budget';
@@ -81,23 +81,18 @@ export async function generateContentHeadless(
     `${channel} 채널에 최적화된 마케팅 콘텐츠를 작성해주세요.`,
   ].filter(Boolean).join('\n\n');
 
-  // 5) Claude Sonnet — 비스트리밍 생성
+  // 5) GPT-4o — 비스트리밍 생성
   const client = getClient();
-  const response = await client.messages.create({
+  const response = await client.chat.completions.create({
     model: CLAUDE_MODEL,
     max_tokens: 5000,
-    system: [
-      { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } },
-    ],
     messages: [
+      { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ],
   });
 
-  let text = response.content
-    .filter((b) => b.type === 'text')
-    .map((b) => ('text' in b ? b.text : ''))
-    .join('');
+  let text = response.choices[0]?.message?.content ?? '';
 
   const usage = toChatUsage(response.usage);
   const chatKrw = calcChatKrw(usage);

@@ -1,17 +1,17 @@
-// lib/claude/chat.ts — Claude Sonnet 4.6 채팅 완성 래퍼 (서버 전용)
-// 시스템 프롬프트에 prompt caching 적용 — 반복 호출 시 입력 비용 ~90% 절감
-import Anthropic from '@anthropic-ai/sdk';
+// lib/claude/chat.ts — GPT-4o 채팅 완성 래퍼 (서버 전용)
+// Anthropic Sonnet → OpenAI GPT-4o 전환 (2026-05-27)
+import OpenAI from 'openai';
 import type { Channel } from '@/types/db';
 
-export const CLAUDE_MODEL = 'claude-sonnet-4-6';
+export const CLAUDE_MODEL = 'gpt-4o'; // 변수명은 호환성을 위해 유지
 
-let _client: Anthropic | null = null;
+let _client: OpenAI | null = null;
 
-export function getClient(): Anthropic {
+export function getClient(): OpenAI {
   if (_client) return _client;
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) throw new Error('ANTHROPIC_API_KEY 환경변수 미설정');
-  _client = new Anthropic({ apiKey: key });
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) throw new Error('OPENAI_API_KEY 환경변수 미설정');
+  _client = new OpenAI({ apiKey: key });
   return _client;
 }
 
@@ -105,7 +105,7 @@ ${toneGuide}
 - 독자의 검색 의도를 첫 2문장 안에 직접 충족
 - **1인칭 경험담**으로 시작 권장 ("저희가 작년에만 X건 처리하면서 가장 많이 받은 질문은…") — C-Rank 신뢰도 신호
 - 또는 공감형 도입("이런 상황이 생기면…") / 핵심 결론 먼저 제시
-- ❌ 금지: "안녕하세요" "오늘은 ~에 대해 알아보겠습니다" 같은 정형구
+- 금지: "안녕하세요" "오늘은 ~에 대해 알아보겠습니다" 같은 정형구
 
 ### 결론부 (마지막 H2 이전)
 - 본문 내용 3줄 요약
@@ -119,7 +119,7 @@ ${toneGuide}
 
 ---
 
-## 5. 이미지 마커 — ⚠️ **절대 필수 / 누락 금지 / 다른 모든 규칙보다 우선**
+## 5. 이미지 마커 — **절대 필수 / 누락 금지 / 다른 모든 규칙보다 우선**
 
 본문에 정확히 \`[이미지: 구체적인 한국어 설명]\` 형식의 마커를 **반드시 6~10개** 삽입하세요.
 이 규칙을 어기면 콘텐츠 전체가 무효 처리됩니다.
@@ -139,11 +139,11 @@ ${toneGuide}
 \`\`\`
 
 ### 잘못된 예시 (절대 금지):
-- ❌ "📷 [이미지: ...]" (이모지와 결합)
-- ❌ "[이미지] 설명입니다" (대괄호 안에 설명 없음)
-- ❌ 본문에 마커가 0~5개 (반드시 6개 이상)
-- ❌ 이모지(🏠 📋 📊 등)나 ASCII art로 마커 대체
-- ❌ 한 줄에 텍스트와 마커 혼합
+- "[이미지: ...]" (이모지와 결합)
+- "[이미지] 설명입니다" (대괄호 안에 설명 없음)
+- 본문에 마커가 0~5개 (반드시 6개 이상)
+- 이모지나 ASCII art로 마커 대체
+- 한 줄에 텍스트와 마커 혼합
 
 ### 필수 배치 위치 (모두 포함 — 합산 6~10개)
 1. 도입부(첫 문단 직후) — **1개**
@@ -152,11 +152,9 @@ ${toneGuide}
 
 ### 설명 작성 가이드
 설명은 Unsplash에서 검색 가능한 구체적 시각 키워드여야 합니다:
-- ✅ "부동산 매매 계약서에 도장을 찍는 손" (구체적 장면)
-- ✅ "현대적인 사무실에서 노트북으로 작업하는 사람"
-- ✅ "동전을 쌓아 올리는 손 클로즈업"
-- ❌ "등기의 중요성" (추상적)
-- ❌ "법무사" (한국 특수 직업명, Unsplash 매칭 X)
+- "부동산 매매 계약서에 도장을 찍는 손" (구체적 장면)
+- "현대적인 사무실에서 노트북으로 작업하는 사람"
+- "동전을 쌓아 올리는 손 클로즈업"
 
 ---
 
@@ -179,10 +177,7 @@ ${toneGuide}
   - 국토교통부 실거래가: https://rt.molit.go.kr
   - 위택스(취득세): https://www.wetax.go.kr
   - 국세청 홈택스: https://www.hometax.go.kr
-- 이모지(🏠 📋 📊 ✅ 등): 한 H2 섹션당 **최대 2~3개**까지만 사용 (과다 사용 시 가독성·전문성 저하)
-  - ❌ 모든 bullet 앞에 이모지 붙이기 (과도)
-  - ❌ STEP 1️⃣ 2️⃣ 3️⃣ 같은 키캡 이모지 남발
-  - ✅ 핵심 강조 1~2곳에만 자연스럽게
+- 이모지: 한 H2 섹션당 **최대 2~3개**까지만 사용
 
 ---
 
@@ -227,14 +222,14 @@ JSON, 코드블록(\`\`\`), 설명 텍스트 없이 콘텐츠만 출력합니다
 
 ---
 
-## 🚨 출력 직전 자가 점검 (생략 절대 금지)
+## 출력 직전 자가 점검 (생략 절대 금지)
 
 콘텐츠 작성을 마치기 전에 아래 항목을 모두 확인하세요:
 
 ### A. 이미지 마커 (가장 자주 누락됨)
 - 본문에서 \`[이미지:\` 문자열 개수 세기 → **반드시 6~10개**
 - 부족하면 H2 시작 직후마다 추가, 초과하면 가장 덜 중요한 위치에서 제거
-- 이모지(🏠 📋 📊 📷 등)는 마커가 아닙니다 — 반드시 \`[이미지: 설명]\` 형식
+- 이모지는 마커가 아닙니다 — 반드시 \`[이미지: 설명]\` 형식
 
 ### B. 도입부 / 결론부
 - 도입부 첫 3줄에 핵심 키워드 + 클릭 유도 문구 들어있는가?
@@ -243,7 +238,7 @@ JSON, 코드블록(\`\`\`), 설명 텍스트 없이 콘텐츠만 출력합니다
 
 ### C. E-E-A-T
 - 공식 URL(인터넷등기소·정부24 등) 최소 1개 인용했는가?
-- 이모지를 H2 섹션당 2~3개 이하로 자제했는가? (STEP 1️⃣ 2️⃣ 남발 X)
+- 이모지를 H2 섹션당 2~3개 이하로 자제했는가?
 - 외부 도메인 링크 본문 전체 2개 이하인가?
 
 ### D. 태그
@@ -257,13 +252,10 @@ JSON, 코드블록(\`\`\`), 설명 텍스트 없이 콘텐츠만 출력합니다
 // ----------------------------------------------------------------
 // 사용량 / 비용
 // ----------------------------------------------------------------
-// OpenAI 호환 필드명 유지 + Anthropic 캐시 필드 추가
 export interface ChatUsage {
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
-  cache_creation_input_tokens?: number;
-  cache_read_input_tokens?: number;
 }
 
 export interface ChatResult {
@@ -271,37 +263,27 @@ export interface ChatResult {
   usage: ChatUsage;
 }
 
-// Anthropic Usage → ChatUsage 매핑 헬퍼
-export function toChatUsage(usage: Anthropic.Messages.Usage): ChatUsage {
-  const cacheCreate = usage.cache_creation_input_tokens ?? 0;
-  const cacheRead = usage.cache_read_input_tokens ?? 0;
-  const prompt = usage.input_tokens + cacheCreate + cacheRead;
+// OpenAI Usage → ChatUsage 매핑 헬퍼
+export function toChatUsage(
+  usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null | undefined,
+): ChatUsage {
   return {
-    prompt_tokens: prompt,
-    completion_tokens: usage.output_tokens,
-    total_tokens: prompt + usage.output_tokens,
-    cache_creation_input_tokens: cacheCreate,
-    cache_read_input_tokens: cacheRead,
+    prompt_tokens: usage?.prompt_tokens ?? 0,
+    completion_tokens: usage?.completion_tokens ?? 0,
+    total_tokens: usage?.total_tokens ?? 0,
   };
 }
 
-// claude-sonnet-4-6 단가 (per 1M tokens, 환율 1400 가정)
-// input $3 / cache-write $3.75 (1.25x) / cache-read $0.30 (0.1x) / output $15
+// GPT-4o 단가 (per 1M tokens, 환율 1400 가정)
+// input $2.50 / output $10.00
 export function calcChatKrw(usage: ChatUsage): number {
-  const cacheCreate = usage.cache_creation_input_tokens ?? 0;
-  const cacheRead = usage.cache_read_input_tokens ?? 0;
-  const regularInput = Math.max(0, usage.prompt_tokens - cacheCreate - cacheRead);
-
-  const inputUsd = (regularInput / 1_000_000) * 3;
-  const cacheCreateUsd = (cacheCreate / 1_000_000) * 3.75;
-  const cacheReadUsd = (cacheRead / 1_000_000) * 0.30;
-  const outputUsd = (usage.completion_tokens / 1_000_000) * 15;
-
-  return Math.ceil((inputUsd + cacheCreateUsd + cacheReadUsd + outputUsd) * 1400);
+  const inputUsd = (usage.prompt_tokens / 1_000_000) * 2.5;
+  const outputUsd = (usage.completion_tokens / 1_000_000) * 10;
+  return Math.ceil((inputUsd + outputUsd) * 1400);
 }
 
 // ----------------------------------------------------------------
-// AI 검수 (4축 점수) — Claude tool_use 사용
+// AI 검수 (4축 점수) — OpenAI function calling
 // ----------------------------------------------------------------
 export interface ReviewScores {
   seo: number;
@@ -327,39 +309,40 @@ export async function reviewContent(
 - brand(0~100): VESTRA CTA 섹션 존재 / 핵심 메시지(AI권리분석·실시간시세·비대면·전세사기예방) 포함 / 금지어 미사용 / 과장 표현 없음
 - legal(0~100): 부동산등기법·상법·민법 근거 반영 / 구체적 수치·법령 출처 명시 / 허위·과장 표현 없음
 
-submit_scores 도구를 반드시 호출하여 점수를 제출하세요.`;
+submit_scores 함수를 반드시 호출하여 점수를 제출하세요.`;
 
-  const response = await client.messages.create({
+  const response = await client.chat.completions.create({
     model: CLAUDE_MODEL,
     max_tokens: 1024,
-    system: systemPrompt,
     messages: [
+      { role: 'system', content: systemPrompt },
       { role: 'user', content: `채널: ${channel}\n\n텍스트:\n${text}` },
     ],
     tools: [{
-      name: 'submit_scores',
-      description: '콘텐츠 검수 점수를 제출합니다',
-      input_schema: {
-        type: 'object',
-        properties: {
-          seo: { type: 'number', description: '0~100' },
-          readability: { type: 'number', description: '0~100' },
-          brand: { type: 'number', description: '0~100' },
-          legal: { type: 'number', description: '0~100' },
-          suggestions: { type: 'array', items: { type: 'string' } },
+      type: 'function',
+      function: {
+        name: 'submit_scores',
+        description: '콘텐츠 검수 점수를 제출합니다',
+        parameters: {
+          type: 'object',
+          properties: {
+            seo: { type: 'number', description: '0~100' },
+            readability: { type: 'number', description: '0~100' },
+            brand: { type: 'number', description: '0~100' },
+            legal: { type: 'number', description: '0~100' },
+            suggestions: { type: 'array', items: { type: 'string' } },
+          },
+          required: ['seo', 'readability', 'brand', 'legal', 'suggestions'],
         },
-        required: ['seo', 'readability', 'brand', 'legal', 'suggestions'],
       },
     }],
-    tool_choice: { type: 'tool', name: 'submit_scores' },
+    tool_choice: { type: 'function', function: { name: 'submit_scores' } },
   });
 
-  const toolUse = response.content.find(
-    (b): b is Anthropic.Messages.ToolUseBlock => b.type === 'tool_use',
-  );
-  if (!toolUse) throw new Error('검수 tool_use 응답 없음');
+  const toolCall = response.choices[0]?.message?.tool_calls?.[0];
+  if (!toolCall || toolCall.type !== 'function') throw new Error('검수 function call 응답 없음');
 
-  const parsed = toolUse.input as {
+  const parsed = JSON.parse(toolCall.function.arguments) as {
     seo: number;
     readability: number;
     brand: number;

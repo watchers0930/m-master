@@ -1,7 +1,6 @@
-// lib/topics/recommend.ts — Claude Sonnet 4.6 tool_use 추천기 (TOP5 선정)
+// lib/topics/recommend.ts — GPT-4o tool_use 추천기 (TOP5 선정)
 // 후보 15~20개 -> score(0~100) + tags(s/e/t) + reason 부여
 
-import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
 import { CLAUDE_MODEL, getClient, toChatUsage, type ChatUsage } from '@/lib/claude/chat';
 import type { Candidate } from './candidates';
@@ -158,61 +157,60 @@ export async function recommendTopFive(input: RecommendInput): Promise<Recommend
     '위 후보에서 TOP 5를 선정하여 submit_recommendations를 호출하세요.',
   ].join('\n');
 
-  const response = await client.messages.create({
+  const response = await client.chat.completions.create({
     model: CLAUDE_MODEL,
     max_tokens: 2048,
-    system: systemPrompt,
     messages: [
+      { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ],
     tools: [{
-      name: 'submit_recommendations',
-      description: '이번 달 블로그 추천 토픽 TOP 5를 제출합니다',
-      input_schema: {
-        type: 'object',
-        properties: {
-          items: {
-            type: 'array',
-            minItems: 5,
-            maxItems: 5,
+      type: 'function',
+      function: {
+        name: 'submit_recommendations',
+        description: '이번 달 블로그 추천 토픽 TOP 5를 제출합니다',
+        parameters: {
+          type: 'object',
+          properties: {
             items: {
-              type: 'object',
-              properties: {
-                rank: { type: 'integer', minimum: 1, maximum: 5 },
-                topic: { type: 'string', maxLength: 80 },
-                score: { type: 'number', minimum: 0, maximum: 100 },
-                tags: {
-                  type: 'array',
-                  maxItems: 3,
-                  items: {
-                    type: 'object',
-                    properties: {
-                      label: { type: 'string' },
-                      type: { type: 'string', enum: ['s', 'e', 't'] },
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  rank: { type: 'integer', minimum: 1, maximum: 5 },
+                  topic: { type: 'string', maxLength: 80 },
+                  score: { type: 'number', minimum: 0, maximum: 100 },
+                  tags: {
+                    type: 'array',
+                    maxItems: 3,
+                    items: {
+                      type: 'object',
+                      properties: {
+                        label: { type: 'string' },
+                        type: { type: 'string', enum: ['s', 'e', 't'] },
+                      },
+                      required: ['label', 'type'],
                     },
-                    required: ['label', 'type'],
                   },
+                  reason: { type: 'string', maxLength: 60 },
                 },
-                reason: { type: 'string', maxLength: 60 },
+                required: ['rank', 'topic', 'score', 'tags', 'reason'],
               },
-              required: ['rank', 'topic', 'score', 'tags', 'reason'],
             },
           },
+          required: ['items'],
         },
-        required: ['items'],
       },
     }],
-    tool_choice: { type: 'tool', name: 'submit_recommendations' },
+    tool_choice: { type: 'function', function: { name: 'submit_recommendations' } },
   });
 
-  const toolUse = response.content.find(
-    (b): b is Anthropic.Messages.ToolUseBlock => b.type === 'tool_use',
-  );
-  if (!toolUse) {
-    throw new Error('추천 tool_use 응답 없음');
+  const toolCall = response.choices[0]?.message?.tool_calls?.[0];
+  if (!toolCall || toolCall.type !== 'function') {
+    throw new Error('추천 function call 응답 없음');
   }
 
-  const parsedRaw: unknown = toolUse.input;
+  const parsedRaw: unknown = JSON.parse(toolCall.function.arguments);
 
   // zod 검증 — 실패 시 부분만 통과시키고 후처리에서 보정
   const safe = ResponseSchema.safeParse(parsedRaw);

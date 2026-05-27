@@ -1,11 +1,6 @@
 // lib/ab-test/generate-pair.ts — A/B 변형 동시 생성 + 롤백
-// plan.md §7.1:
-//   - SSE generate 라우트 재사용 금지 → claude/chat.ts 헬퍼 직접 호출 (단발 비-SSE)
-//   - Promise.allSettled로 두 변형 병렬 생성
-//   - 한쪽 실패 → 성공한 쪽 contents row admin client로 delete (best-effort 롤백)
-//   - 검수/이미지/cost_ledger는 generate route와 동일 패턴 따르되 본 헬퍼 내부에서 처리
+// GPT-4o 비스트리밍 호출
 
-import type Anthropic from '@anthropic-ai/sdk';
 import {
   buildSystemPrompt,
   calcChatKrw,
@@ -24,9 +19,7 @@ import { trackCost } from '@/lib/cost/tracker';
 import { prisma } from '@/lib/prisma';
 import type {
   Channel,
-  ContentInsert,
   ContentScores,
-  Settings,
 } from '@/types/db';
 import { getVariantSeed, type AbVariantKey } from './prompts';
 
@@ -111,23 +104,18 @@ async function generateOneVariant(
     `(본 콘텐츠는 A/B 테스트 변형 ${variantKey.toUpperCase()}입니다 — 위 변형 지시를 반드시 준수)`,
   ].filter(Boolean).join('\n\n');
 
-  // 1) Claude Sonnet 4.6 비스트리밍 호출 (시스템 프롬프트 캐시)
+  // 1) GPT-4o 비스트리밍 호출
   const client = getClient();
-  const completion = await client.messages.create({
+  const completion = await client.chat.completions.create({
     model: CLAUDE_MODEL,
     max_tokens: 5000,
-    system: [
-      { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } },
-    ],
     messages: [
+      { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },
     ],
   });
 
-  const textBlock = completion.content.find(
-    (b): b is Anthropic.Messages.TextBlock => b.type === 'text',
-  );
-  const text = textBlock?.text ?? '';
+  const text = completion.choices[0]?.message?.content ?? '';
   if (!text) throw new Error(`variant ${variantKey} 텍스트 빈 응답`);
 
   const usage: ChatUsage = toChatUsage(completion.usage);
