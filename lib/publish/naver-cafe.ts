@@ -96,38 +96,77 @@ export function buildNaverCafeContent(text: string): string {
   const lines = text.split('\n');
   const htmlParts: string[] = [];
   let inList = false;
+  let inTable = false;
+  let tableRows: string[][] = [];
+
+  function flushList() {
+    if (inList) { htmlParts.push('</ul>'); inList = false; }
+  }
+
+  function flushTable() {
+    if (!inTable || tableRows.length === 0) return;
+    const [header, ...body] = tableRows;
+    htmlParts.push('<table>');
+    htmlParts.push('<thead><tr>' + header.map(c => `<th>${inlineMd(c)}</th>`).join('') + '</tr></thead>');
+    if (body.length > 0) {
+      htmlParts.push('<tbody>');
+      for (const row of body) {
+        htmlParts.push('<tr>' + row.map(c => `<td>${inlineMd(c)}</td>`).join('') + '</tr>');
+      }
+      htmlParts.push('</tbody>');
+    }
+    htmlParts.push('</table>');
+    inTable = false;
+    tableRows = [];
+  }
 
   for (const raw of lines) {
     const line = raw.trimEnd();
 
+    // 테이블 행 감지 (| col | col |)
+    if (/^\|(.+)\|$/.test(line.trim())) {
+      // 구분선 행(|---|---| 등)은 스킵
+      if (/^\|[\s:|-]+\|$/.test(line.trim())) {
+        continue;
+      }
+      flushList();
+      const cells = line.trim().slice(1, -1).split('|').map(c => c.trim());
+      if (!inTable) inTable = true;
+      tableRows.push(cells);
+      continue;
+    }
+
+    // 테이블 행이 아닌 줄 → 테이블 종료
+    if (inTable) flushTable();
+
     // 빈 줄 → 목록 종료
     if (line.trim() === '') {
-      if (inList) { htmlParts.push('</ul>'); inList = false; }
+      flushList();
       continue;
     }
 
     // 이미지 플레이스홀더 제거
     if (/^\[이미지:\s*.+\]$/.test(line)) {
-      if (inList) { htmlParts.push('</ul>'); inList = false; }
+      flushList();
       continue;
     }
 
     // 헤딩
     const h2Match = line.match(/^##\s+(.+)$/);
     if (h2Match) {
-      if (inList) { htmlParts.push('</ul>'); inList = false; }
+      flushList();
       htmlParts.push(`<h2>${inlineMd(h2Match[1])}</h2>`);
       continue;
     }
     const h3Match = line.match(/^###\s+(.+)$/);
     if (h3Match) {
-      if (inList) { htmlParts.push('</ul>'); inList = false; }
+      flushList();
       htmlParts.push(`<h3>${inlineMd(h3Match[1])}</h3>`);
       continue;
     }
     const h1Match = line.match(/^#\s+(.+)$/);
     if (h1Match) {
-      if (inList) { htmlParts.push('</ul>'); inList = false; }
+      flushList();
       htmlParts.push(`<h1>${inlineMd(h1Match[1])}</h1>`);
       continue;
     }
@@ -143,23 +182,24 @@ export function buildNaverCafeContent(text: string): string {
     // 인용
     const bqMatch = line.match(/^>\s+(.+)$/);
     if (bqMatch) {
-      if (inList) { htmlParts.push('</ul>'); inList = false; }
+      flushList();
       htmlParts.push(`<blockquote>${inlineMd(bqMatch[1])}</blockquote>`);
       continue;
     }
 
     // 구분선
     if (/^---+$/.test(line.trim())) {
-      if (inList) { htmlParts.push('</ul>'); inList = false; }
+      flushList();
       htmlParts.push('<hr>');
       continue;
     }
 
     // 일반 문단
-    if (inList) { htmlParts.push('</ul>'); inList = false; }
+    flushList();
     htmlParts.push(`<p>${inlineMd(line)}</p>`);
   }
 
+  if (inTable) flushTable();
   if (inList) htmlParts.push('</ul>');
   return htmlParts.join('\n');
 }
