@@ -52,7 +52,7 @@ export function RefreshTopicsButton() {
         background: 'transparent', border: 'none', cursor: state === 'loading' ? 'wait' : 'pointer',
         fontSize: 11, color, fontFamily: 'inherit', padding: 0,
       }}
-      title="이번 달 추천 토픽 다시 생성"
+      title="이번 주 추천 토픽 다시 생성"
     >
       <svg
         width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"

@@ -1,5 +1,5 @@
-// POST /api/topics/refresh — 이번 달 추천 토픽 5건 재생성 후 INSERT
-// 절차: 세션 → 후보 생성(룰 + GA4) → Claude Sonnet 4.6 TOP5 → 같은 월 DELETE → 5건 INSERT → cost 적재 → audit
+// POST /api/topics/refresh — 이번 주 추천 토픽 5건 재생성 후 INSERT
+// 절차: 세션 → 후보 생성(룰 + GA4) → GPT-4o TOP5 → 같은 주 DELETE → 5건 INSERT → cost 적재 → audit
 
 import { requireSession } from '@/lib/auth';
 import { Prisma } from '@prisma/client';
@@ -10,6 +10,7 @@ import { logAudit } from '@/lib/audit/logger';
 import { fetchPopularPages, type PopularPage } from '@/lib/ga4/popular-pages';
 import { buildCandidates } from '@/lib/topics/candidates';
 import { recommendTopFive } from '@/lib/topics/recommend';
+import { getMondayOfWeekKST } from '@/lib/topics/week-utils';
 import type { TopicRecommendation } from '@/types/db';
 
 function jsonError(code: string, message: string, status: number) {
@@ -26,19 +27,13 @@ function jsonOk<T>(body: T) {
   });
 }
 
-function getMonthYmd(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}-01`;
-}
-
 export async function POST() {
   // 1) 세션
   const session = await requireSession();
   const ownerId = session.user.id;
 
-  const monthYmd = getMonthYmd();
+  const weekStart = getMondayOfWeekKST();
+  const monthYmd = weekStart.slice(0, 7) + '-01'; // candidates 생성용
 
   try {
     // 2) 이미 발행된 토픽 (회피)
@@ -71,7 +66,7 @@ export async function POST() {
       return jsonError('no_candidates', '추천 후보를 생성하지 못했습니다', 500);
     }
 
-    // 5) Claude Sonnet 4.6 TOP5
+    // 5) GPT-4o TOP5
     let recommended;
     try {
       recommended = await recommendTopFive({
@@ -84,10 +79,10 @@ export async function POST() {
       return jsonError('recommend_failed', '추천 생성에 실패했습니다', 500);
     }
 
-    // 6) 같은 월 DELETE
+    // 6) 같은 주 DELETE
     await prisma.topicRecommendation.deleteMany({
       where: {
-        month: monthYmd,
+        weekStart,
         channel: 'blog',
       },
     });
@@ -102,7 +97,7 @@ export async function POST() {
       };
       if (ga4Unavailable) factors.ga4_unavailable = true;
       return {
-        month: monthYmd,
+        weekStart,
         topic: item.topic,
         score: item.score,
         channel: 'blog' as const,
@@ -116,6 +111,7 @@ export async function POST() {
         select: {
           id: true,
           month: true,
+          weekStart: true,
           topic: true,
           score: true,
           factors: true,
@@ -139,9 +135,9 @@ export async function POST() {
       actor: ownerId,
       action: 'topics.refresh',
       targetType: 'topic_recommendations',
-      targetId: monthYmd,
+      targetId: weekStart,
       payload: {
-        month: monthYmd,
+        weekStart,
         count: inserted.length,
         ga4_unavailable: ga4Unavailable,
         cost_krw: krw,

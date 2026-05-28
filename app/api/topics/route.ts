@@ -1,7 +1,8 @@
-// GET /api/topics — 이번 달 추천 토픽 TOP5 조회 (GenerateForm 모달용)
+// GET /api/topics — 이번 주 추천 토픽 TOP5 조회 (GenerateForm 모달용)
 
 import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getMondayOfWeekKST } from '@/lib/topics/week-utils';
 import type { TopicRecommendation } from '@/types/db';
 
 function jsonError(code: string, message: string, status: number) {
@@ -18,26 +19,22 @@ function jsonOk<T>(body: T) {
   });
 }
 
-function getMonthYmd(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}-01`;
-}
-
 export async function GET() {
   const session = await requireSession();
   const _ownerId = session.user.id;
 
   try {
+    const weekStart = getMondayOfWeekKST();
+
     const data = await prisma.topicRecommendation.findMany({
       where: {
-        month: getMonthYmd(),
+        weekStart,
         channel: 'blog',
       },
       select: {
         id: true,
         month: true,
+        weekStart: true,
         topic: true,
         score: true,
         factors: true,

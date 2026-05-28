@@ -204,7 +204,7 @@ export function GenerateForm({ initialTopic, onResult, onStreamStart, onStreamDe
             onClick={() => setTopicModalOpen(true)}
             className="btn btn-ghost"
             style={{ fontSize: 10, padding: '3px 9px', gap: 4 }}
-            title="이달 추천 토픽 TOP 5 보기"
+            title="이번 주 추천 토픽 TOP 5 보기"
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/>

@@ -59,12 +59,16 @@ export default async function DashboardPage() {
       fetchMonthlyVisitorsPair().catch(() => null),
       fetchAvgScorePair(monthStr),
       fetchUpcomingMonthScheduleCount(),
-      prisma.topicRecommendation.findMany({
-        where: { month: monthYmd, channel: 'blog' },
-        orderBy: { score: 'desc' },
-        take: 5,
-        select: { id: true, topic: true, score: true, factors: true },
-      }),
+      (async () => {
+        const { getMondayOfWeekKST } = await import('@/lib/topics/week-utils');
+        const weekStart = getMondayOfWeekKST();
+        return prisma.topicRecommendation.findMany({
+          where: { weekStart, channel: 'blog' },
+          orderBy: { score: 'desc' },
+          take: 5,
+          select: { id: true, topic: true, score: true, factors: true },
+        });
+      })(),
     ]);
 
   const budgetPct = ((costMtd / BUDGET_MONTHLY) * 100).toFixed(1);
@@ -256,16 +260,16 @@ export default async function DashboardPage() {
               <svg className="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c400)" strokeWidth="1.8" strokeLinecap="round">
                 <polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/>
               </svg>
-              <span className="card-title">이달 추천 토픽 TOP 5</span>
+              <span className="card-title">이번 주 추천 토픽 TOP 5</span>
               <span style={{fontSize:10,color:'var(--sub)',marginLeft:'auto',display:'inline-flex',alignItems:'center',gap:8}}>
-                <span>매월 1일 갱신</span>
+                <span>매주 월요일 갱신</span>
                 <RefreshTopicsButton />
               </span>
             </div>
             {recommendations.length === 0 ? (
               <div style={{padding:'24px 16px',textAlign:'center',color:'var(--sub)',fontSize:12,lineHeight:1.6}}>
                 아직 추천이 없습니다.<br/>
-                상단 갱신 버튼을 눌러 이번 달 추천을 생성하세요.
+                상단 갱신 버튼을 눌러 이번 주 추천을 생성하세요.
               </div>
             ) : (
               <div className="topic-list">

@@ -1,5 +1,6 @@
-// app/api/cron/topics-refresh/route.ts — 매월 1일 추천 토픽 자동 생성 cron
-// Vercel Cron: 0 21 1 * * (UTC) = 매월 1일 오전 6시 KST
+// app/api/cron/topics-refresh/route.ts — 주간 추천 토픽 자동 생성 cron (독립 엔드포인트)
+// 참고: content-generate cron에도 동일 로직이 통합되어 있음 (매주 월요일 자동 실행)
+// 이 엔드포인트는 수동 호출 용도로 유지
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -9,6 +10,7 @@ import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
 import { fetchPopularPages, type PopularPage } from '@/lib/ga4/popular-pages';
 import { buildCandidates } from '@/lib/topics/candidates';
 import { recommendTopFive } from '@/lib/topics/recommend';
+import { getMondayOfWeekKST } from '@/lib/topics/week-utils';
 import { Prisma } from '@prisma/client';
 
 export const maxDuration = 120;
@@ -21,30 +23,23 @@ function verifyCronSecret(request: NextRequest): boolean {
   return authHeader === `Bearer ${secret}`;
 }
 
-function getMonthYmd(): string {
-  const now = new Date();
-  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  const y = kst.getFullYear();
-  const m = String(kst.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}-01`;
-}
-
 export async function GET(request: NextRequest) {
   if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const monthYmd = getMonthYmd();
-  console.log(`[cron/topics-refresh] 실행 시작 — ${monthYmd}`);
+  const weekStart = getMondayOfWeekKST();
+  const monthYmd = weekStart.slice(0, 7) + '-01';
+  console.log(`[cron/topics-refresh] 실행 시작 — weekStart=${weekStart}`);
 
   try {
-    // 이미 이번 달 토픽이 있으면 스킵
+    // 이미 이번 주 토픽이 있으면 스킵
     const existing = await prisma.topicRecommendation.count({
-      where: { month: monthYmd, channel: 'blog' },
+      where: { weekStart, channel: 'blog' },
     });
     if (existing >= 5) {
       console.log(`[cron/topics-refresh] 이미 ${existing}건 존재 — 스킵`);
-      return NextResponse.json({ ok: true, skipped: true, existing, month: monthYmd });
+      return NextResponse.json({ ok: true, skipped: true, existing, weekStart });
     }
 
     // 발행된 토픽 (회피)
@@ -75,19 +70,19 @@ export async function GET(request: NextRequest) {
 
     if (candidates.length === 0) {
       console.error('[cron/topics-refresh] 후보 0건');
-      return NextResponse.json({ ok: false, error: 'no_candidates', month: monthYmd }, { status: 500 });
+      return NextResponse.json({ ok: false, error: 'no_candidates', weekStart }, { status: 500 });
     }
 
-    // Claude TOP5 추천
+    // GPT-4o TOP5 추천
     const recommended = await recommendTopFive({
       monthYmd,
       candidates,
       channel: 'blog',
     });
 
-    // 같은 월 DELETE → INSERT
+    // 같은 주 DELETE → INSERT
     await prisma.topicRecommendation.deleteMany({
-      where: { month: monthYmd, channel: 'blog' },
+      where: { weekStart, channel: 'blog' },
     });
 
     const signalsByTopic = new Map(candidates.map(c => [c.topic, c.signal]));
@@ -99,7 +94,7 @@ export async function GET(request: NextRequest) {
       };
       if (ga4Unavailable) factors.ga4_unavailable = true;
       return {
-        month: monthYmd,
+        weekStart,
         topic: item.topic,
         score: item.score,
         channel: 'blog' as const,
@@ -125,9 +120,9 @@ export async function GET(request: NextRequest) {
       actor: null,
       action: AUDIT_ACTIONS.CRON_TOPICS_REFRESH,
       targetType: 'topic_recommendations',
-      targetId: monthYmd,
+      targetId: weekStart,
       payload: {
-        month: monthYmd,
+        weekStart,
         count: inserted.length,
         ga4_unavailable: ga4Unavailable,
         cost_krw: krw,
@@ -135,10 +130,10 @@ export async function GET(request: NextRequest) {
     });
 
     console.log(`[cron/topics-refresh] 완료 — ${inserted.length}건 생성`);
-    return NextResponse.json({ ok: true, month: monthYmd, count: inserted.length });
+    return NextResponse.json({ ok: true, weekStart, count: inserted.length });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[cron/topics-refresh] 실패:', msg);
-    return NextResponse.json({ ok: false, error: msg, month: monthYmd }, { status: 500 });
+    return NextResponse.json({ ok: false, error: msg, weekStart }, { status: 500 });
   }
 }

@@ -214,7 +214,8 @@ export type AuditLogInsert = {
 // ----------------------------------------------------------------
 export interface TopicRecommendation {
   id: string;
-  month: string;
+  month: string | null;
+  week_start: string | null;
   topic: string;
   score: number;
   factors: Record<string, unknown> | null;

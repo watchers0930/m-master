@@ -1,7 +1,8 @@
-// app/api/cron/content-generate/route.ts — 일일 자동 콘텐츠 생성 + 매월 1일 토픽 리프레시
+// app/api/cron/content-generate/route.ts — 일일 자동 콘텐츠 생성 + 매주 월요일 토픽 리프레시
 // Vercel Cron: 0 23 * * * (UTC) = 오전 8시 KST
-// 1) 매월 1일: 추천 토픽 자동 생성 (topics-refresh 통합)
-// 2) 매일: ContentPlanItem(scheduledDate=오늘, status=planned, plan.autoGenerate=true) 순차 생성·발행
+// 1) 매주 월요일: 추천 토픽 자동 생성 → ContentPlan + Items 자동 생성 (topics-refresh 통합)
+// 2) 평일(월~금): ContentPlanItem(scheduledDate=오늘, status=planned, plan.autoGenerate=true) 순차 생성·발행
+// 3) 주말(토/일): 스킵
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -13,6 +14,7 @@ import { trackCost } from '@/lib/cost/tracker';
 import { fetchPopularPages, type PopularPage } from '@/lib/ga4/popular-pages';
 import { buildCandidates } from '@/lib/topics/candidates';
 import { recommendTopFive } from '@/lib/topics/recommend';
+import { getMondayOfWeekKST, getWeekdayDates, isWeekdayKST, isMondayKST } from '@/lib/topics/week-utils';
 import { Prisma } from '@prisma/client';
 
 export const maxDuration = 300; // 5분 (Vercel Pro)
@@ -38,18 +40,19 @@ function getTodayKST(): string {
 }
 
 // ---------------------------------------------------------------------------
-// 매월 1일: 추천 토픽 리프레시 (topics-refresh 통합)
+// 매주 월요일: 추천 토픽 리프레시 (주간 전환)
 // ---------------------------------------------------------------------------
-async function maybeRefreshTopics(today: string): Promise<{ ran: boolean; count?: number; error?: string }> {
-  const day = parseInt(today.slice(8, 10), 10);
-  if (day !== 1) return { ran: false };
+async function maybeRefreshWeeklyTopics(today: string): Promise<{ ran: boolean; count?: number; error?: string }> {
+  if (!isMondayKST(today)) return { ran: false };
 
-  const monthYmd = today.slice(0, 7) + '-01'; // YYYY-MM-01
-  console.log(`[cron/content-generate] 매월 1일 — 토픽 리프레시 시작 (${monthYmd})`);
+  const weekStart = getMondayOfWeekKST(today); // 오늘이 월요일이므로 today와 동일
+  const monthYmd = today.slice(0, 7) + '-01'; // candidates 생성용 (시즌 키워드)
+  console.log(`[cron/content-generate] 월요일 — 주간 토픽 리프레시 시작 (weekStart=${weekStart})`);
 
   try {
+    // 이미 이번 주 토픽이 있으면 스킵 (idempotent)
     const existing = await prisma.topicRecommendation.count({
-      where: { month: monthYmd, channel: 'blog' },
+      where: { weekStart, channel: 'blog' },
     });
     if (existing >= 5) {
       console.log(`[cron/content-generate] 토픽 이미 ${existing}건 존재 — 스킵`);
@@ -84,8 +87,9 @@ async function maybeRefreshTopics(today: string): Promise<{ ran: boolean; count?
 
     const recommended = await recommendTopFive({ monthYmd, candidates, channel: 'blog' });
 
+    // 같은 주 기존 토픽 삭제 (재실행 대비)
     await prisma.topicRecommendation.deleteMany({
-      where: { month: monthYmd, channel: 'blog' },
+      where: { weekStart, channel: 'blog' },
     });
 
     const signalsByTopic = new Map(candidates.map(c => [c.topic, c.signal]));
@@ -97,7 +101,7 @@ async function maybeRefreshTopics(today: string): Promise<{ ran: boolean; count?
       };
       if (ga4Unavailable) factors.ga4_unavailable = true;
       return {
-        month: monthYmd,
+        weekStart,
         topic: item.topic,
         score: item.score,
         channel: 'blog' as const,
@@ -121,8 +125,8 @@ async function maybeRefreshTopics(today: string): Promise<{ ran: boolean; count?
       actor: null,
       action: AUDIT_ACTIONS.CRON_TOPICS_REFRESH,
       targetType: 'topic_recommendations',
-      targetId: monthYmd,
-      payload: { month: monthYmd, count: inserted.length, ga4_unavailable: ga4Unavailable, cost_krw: krw },
+      targetId: weekStart,
+      payload: { weekStart, count: inserted.length, ga4_unavailable: ga4Unavailable, cost_krw: krw },
     });
 
     console.log(`[cron/content-generate] 토픽 리프레시 완료 — ${inserted.length}건`);
@@ -130,6 +134,83 @@ async function maybeRefreshTopics(today: string): Promise<{ ran: boolean; count?
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[cron/content-generate] 토픽 리프레시 실패:', msg);
+    return { ran: true, error: msg };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 매주 월요일: 토픽 5개 → ContentPlan + ContentPlanItem 자동 생성
+// ---------------------------------------------------------------------------
+async function autoCreateWeeklyPlan(today: string): Promise<{ ran: boolean; planId?: string; itemCount?: number; error?: string }> {
+  if (!isMondayKST(today)) return { ran: false };
+
+  const weekStart = getMondayOfWeekKST(today);
+  console.log(`[cron/content-generate] 월요일 — 주간 플랜 자동 생성 (weekStart=${weekStart})`);
+
+  try {
+    // 이미 이번 주 플랜이 있으면 스킵 (idempotent)
+    const existingPlan = await prisma.contentPlan.findFirst({
+      where: { weekKey: weekStart },
+    });
+    if (existingPlan) {
+      console.log(`[cron/content-generate] 주간 플랜 이미 존재 — 스킵 (${existingPlan.id})`);
+      return { ran: true, planId: existingPlan.id, itemCount: 0 };
+    }
+
+    // 이번 주 토픽 조회
+    const topics = await prisma.topicRecommendation.findMany({
+      where: { weekStart, channel: 'blog' },
+      orderBy: { score: 'desc' },
+      take: 5,
+    });
+
+    if (topics.length === 0) {
+      console.log('[cron/content-generate] 이번 주 토픽이 없어 플랜 생성 불가');
+      return { ran: true, error: 'no_topics' };
+    }
+
+    // ownerId 결정: 첫 번째 기존 플랜의 ownerId 또는 'system'
+    const anyPlan = await prisma.contentPlan.findFirst({
+      select: { ownerId: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    const ownerId = anyPlan?.ownerId ?? 'system';
+
+    // 월~금 날짜 배열
+    const weekdays = getWeekdayDates(weekStart);
+
+    // ContentPlan + Items 생성
+    const plan = await prisma.contentPlan.create({
+      data: {
+        ownerId,
+        weekKey: weekStart,
+        status: 'active',
+        autoGenerate: true,
+        items: {
+          create: topics.map((topic, idx) => ({
+            sortOrder: idx,
+            topic: topic.topic,
+            scheduledDate: weekdays[idx] ?? weekdays[weekdays.length - 1],
+            status: 'planned',
+          })),
+        },
+      },
+      include: { items: true },
+    });
+
+    await logAudit({
+      actor: null,
+      action: AUDIT_ACTIONS.CRON_WEEKLY_PLAN,
+      targetType: 'content_plan',
+      targetId: plan.id,
+      payload: { weekStart, ownerId, itemCount: plan.items.length },
+    });
+
+    console.log(`[cron/content-generate] 주간 플랜 생성 완료 — ${plan.items.length}건 (planId=${plan.id})`);
+    return { ran: true, planId: plan.id, itemCount: plan.items.length };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[cron/content-generate] 주간 플랜 생성 실패:', msg);
     return { ran: true, error: msg };
   }
 }
@@ -145,10 +226,22 @@ export async function GET(request: NextRequest) {
   const today = getTodayKST();
   console.log(`[cron/content-generate] 실행 시작 — 날짜: ${today}`);
 
-  // 매월 1일: 토픽 리프레시
-  const topicsResult = await maybeRefreshTopics(today);
+  // 주말 스킵
+  if (!isWeekdayKST(today)) {
+    console.log(`[cron/content-generate] 주말 — 스킵`);
+    return NextResponse.json({ ok: true, date: today, skipped: 'weekend' });
+  }
+
+  // 매주 월요일: 토픽 리프레시
+  const topicsResult = await maybeRefreshWeeklyTopics(today);
   if (topicsResult.ran) {
     console.log(`[cron/content-generate] 토픽 리프레시: ${topicsResult.error ? '실패 - ' + topicsResult.error : topicsResult.count + '건'}`);
+  }
+
+  // 매주 월요일: 주간 플랜 자동 생성
+  const planResult = await autoCreateWeeklyPlan(today);
+  if (planResult.ran) {
+    console.log(`[cron/content-generate] 주간 플랜: ${planResult.error ? '실패 - ' + planResult.error : planResult.itemCount + '건'}`);
   }
 
   // 오늘 예정된 planned 항목 조회 (autoGenerate=true인 플랜만)
@@ -169,7 +262,13 @@ export async function GET(request: NextRequest) {
 
   if (items.length === 0) {
     console.log('[cron/content-generate] 오늘 예정 항목 없음');
-    return NextResponse.json({ ok: true, processed: 0, date: today });
+    return NextResponse.json({
+      ok: true,
+      processed: 0,
+      date: today,
+      topicsRefresh: topicsResult.ran ? topicsResult : undefined,
+      weeklyPlan: planResult.ran ? planResult : undefined,
+    });
   }
 
   console.log(`[cron/content-generate] ${items.length}건 처리 시작`);
@@ -266,5 +365,6 @@ export async function GET(request: NextRequest) {
     failed,
     results,
     topicsRefresh: topicsResult.ran ? topicsResult : undefined,
+    weeklyPlan: planResult.ran ? planResult : undefined,
   });
 }

@@ -54,6 +54,7 @@ export const AUDIT_ACTIONS = {
   CRON_CONTENT_GENERATE: 'cron.content_generate',
   CRON_SCHEDULE_PUBLISH: 'cron.schedule_publish',
   CRON_TOPICS_REFRESH: 'cron.topics_refresh',
+  CRON_WEEKLY_PLAN: 'cron.weekly_plan',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];

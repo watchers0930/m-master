@@ -59,7 +59,8 @@ const ResponseSchema = z.object({
 function buildSystemPrompt(monthYmd: string): string {
   const month = parseInt(monthYmd.slice(5, 7), 10);
   return `당신은 VESTRA(AI 기반 부동산 권리분석·시세분석 서비스) 콘텐츠 전략가입니다.
-이번 달은 ${monthYmd.slice(0, 7)} (${month}월)이며, 채널은 네이버 블로그입니다.
+이번 주는 ${monthYmd} 주차 (${month}월)이며, 채널은 네이버 블로그입니다.
+월~금 5일간 매일 1건씩 발행할 토픽을 선정합니다.
 
 [VESTRA 도메인]
 - 권리분석: AI 등기부등본 분석 / 근저당·가압류·소유권 확인 / 전세사기 예방
@@ -68,7 +69,7 @@ function buildSystemPrompt(monthYmd: string): string {
 - 부동산 세금: 취득세·양도세·종부세 계산
 
 [작업]
-주어진 후보 토픽 중 이번 달 블로그 발행에 가장 적합한 TOP 5를 선정하고,
+주어진 후보 토픽 중 이번 주 블로그 발행에 가장 적합한 TOP 5를 선정하고,
 각 항목에 score(0~100), tags(최대 3개), reason(60자 이내)을 부여합니다.
 
 [score 기준]
@@ -85,7 +86,7 @@ function buildSystemPrompt(monthYmd: string): string {
 
 [제약]
 - topic은 후보 목록의 표현을 그대로 사용하거나 80자 이내로 다듬을 수 있음
-- reason은 60자 이내, 왜 이번 달 추천인지 1문장
+- reason은 60자 이내, 왜 이번 주 추천인지 1문장
 - 5개 정확히 선정 (rank 1~5, score 내림차순 정렬)`;
 }
 
@@ -168,7 +169,7 @@ export async function recommendTopFive(input: RecommendInput): Promise<Recommend
       type: 'function',
       function: {
         name: 'submit_recommendations',
-        description: '이번 달 블로그 추천 토픽 TOP 5를 제출합니다',
+        description: '이번 주 블로그 추천 토픽 TOP 5를 제출합니다',
         parameters: {
           type: 'object',
           properties: {

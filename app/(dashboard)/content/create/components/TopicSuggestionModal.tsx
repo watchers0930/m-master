@@ -74,7 +74,7 @@ export function TopicSuggestionModal({ open, onClose, onSelect }: Props) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c400)" strokeWidth="1.8" strokeLinecap="round">
               <polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/>
             </svg>
-            <h2 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', margin: 0 }}>이달 추천 토픽 TOP 5</h2>
+            <h2 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', margin: 0 }}>이번 주 추천 토픽 TOP 5</h2>
           </div>
           <button onClick={onClose} aria-label="닫기" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sub)', padding: 0, lineHeight: 1 }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

@@ -77,17 +77,19 @@ model Setting {
 }
 
 // ----------------------------------------------------------------
-// topic_recommendations — 월별 주제 추천
+// topic_recommendations — 주간 주제 추천
 // ----------------------------------------------------------------
 model TopicRecommendation {
   id        String   @id @default(cuid())
-  month     String   // 'YYYY-MM'
+  month     String?  // 'YYYY-MM' (레거시, nullable)
+  weekStart String?  @map("week_start") // 'YYYY-MM-DD' (해당 주 월요일)
   topic     String
   score     Float
   factors   Json?
   channel   String   @default("blog")
   createdAt DateTime @default(now()) @map("created_at")
 
+  @@index([weekStart, channel])
   @@index([month, channel])
   @@map("topic_recommendations")
 }
@@ -127,12 +129,13 @@ model AbTest {
 }
 
 // ----------------------------------------------------------------
-// content_plans — 월간 콘텐츠 계획
+// content_plans — 주간/월간 콘텐츠 계획
 // ----------------------------------------------------------------
 model ContentPlan {
   id             String    @id @default(cuid())
   ownerId        String    @map("owner_id")
-  monthKey       String    @map("month_key") // 'YYYY-MM'
+  monthKey       String?   @map("month_key") // 'YYYY-MM' (레거시, nullable)
+  weekKey        String?   @map("week_key")  // 'YYYY-MM-DD' (해당 주 월요일)
   status         String    @default("active") // active | paused | completed
   autoGenerate   Boolean   @default(true) @map("auto_generate")
   lastExecutedAt DateTime? @map("last_executed_at")
@@ -141,6 +144,7 @@ model ContentPlan {
 
   items ContentPlanItem[]
 
+  @@unique([ownerId, weekKey])
   @@unique([ownerId, monthKey])
   @@map("content_plans")
 }
