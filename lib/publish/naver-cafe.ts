@@ -358,6 +358,21 @@ async function handleCafeResponse(res: Response): Promise<{ res: Response; json:
 }
 
 // ---------------------------------------------------------------------------
+// 카페 글 하단 고정 푸터 (VESTRA 소개 + 도메인 + 해시태그)
+// ---------------------------------------------------------------------------
+const CAFE_FOOTER = [
+  '<hr>',
+  '<p></p>',
+  '<p><b>VESTRA | AI 부동산 권리분석·시세분석 서비스</b></p>',
+  '<p>등기부등본 AI 분석부터 실거래가 조회, 전세 안전 진단까지</p>',
+  '<p>부동산 거래의 모든 것을 한곳에서 확인하세요.</p>',
+  '<p></p>',
+  '<p>https://vestra-plum.vercel.app</p>',
+  '<p></p>',
+  '<p>#부동산 #권리분석 #등기부등본 #전세사기예방 #아파트시세 #실거래가 #전세보증보험 #부동산세금 #VESTRA #베스트라</p>',
+].join('\n');
+
+// ---------------------------------------------------------------------------
 // 게시글 발행
 // ---------------------------------------------------------------------------
 /**
@@ -377,7 +392,7 @@ export async function publishNaverCafePost(opts: {
   // 이미지 URL을 HTML <img> 태그로 본문에 인라인 삽입 (글→이미지→글 배치 유지)
   const urls = (opts.imageUrls ?? []).filter(u => u && u.trim() !== '');
   if (urls.length > 0) console.log(`[naver-cafe] 이미지 ${urls.length}건 인라인 삽입`);
-  const htmlBody = buildNaverCafeContent(opts.content, urls);
+  const htmlBody = buildNaverCafeContent(opts.content, urls) + '\n' + CAFE_FOOTER;
   const fields = { subject: opts.subject, content: htmlBody };
 
   // 항상 URL-encoded 전송 (이미지는 HTML <img>로 삽입됨)
