@@ -120,12 +120,21 @@ export function buildCandidates(input: BuildCandidatesInput): Candidate[] {
     candidates.push({ topic: t, signal, weight });
   };
 
-  // 1) 시즌 × 코어 조합 (가중치 10)
+  // 1) 시즌 × 코어 조합 — 5개 도메인 골고루 (가중치 10~9)
+  // 도메인: 권리분석, 시세/전망, 전세/임대, 세금, 동네정보
+  const domainCores = [
+    { core: RIGHTS_CORE, suffix: '핵심 정리' },
+    { core: MARKET_CORE, suffix: '분석' },
+    { core: LEASE_CORE, suffix: '꼭 확인하세요' },
+  ];
   for (const season of seasonals) {
-    push(`${season} 시 ${RIGHTS_CORE[0]} 핵심 정리`, 'season', 10);
-    push(`${season} ${LEASE_CORE[0]} 꼭 확인하세요`, 'season', 9);
-    push(`${season} ${MARKET_CORE[2]} 분석`, 'season', 9);
-    if (candidates.length >= 8) break;
+    for (const { core, suffix } of domainCores) {
+      // 매 시즌마다 다른 인덱스의 코어 키워드 사용
+      const idx = candidates.length % core.length;
+      push(`${season} ${core[idx]} ${suffix}`, 'season', 10 - (candidates.length % 2));
+      if (candidates.length >= 9) break;
+    }
+    if (candidates.length >= 9) break;
   }
 
   // 2) GA4 인기 path → 토픽 매핑 (가중치 9)
@@ -143,11 +152,14 @@ export function buildCandidates(input: BuildCandidatesInput): Candidate[] {
     if (candidates.length >= 18) break;
   }
 
-  // 4) gap (발행 부족 영역) — 세금·전문가연결 등은 발행이 적은 편이라 보강
+  // 4) gap (발행 부족 영역) — 5개 도메인 균형 보강
   const gapTopics = [
-    '부동산 세금 종류와 계산 방법 총정리',
-    '전세사기 유형별 예방법과 대처 방안',
-    '초보 매수자가 놓치기 쉬운 등기부등본 체크포인트',
+    '부동산 세금 종류와 계산 방법 총정리',               // 세금
+    '취득세·양도세·종부세 절세 전략 한눈에 정리',         // 세금
+    '우리 동네 아파트 시세 비교 분석 방법',              // 동네정보
+    '학군·역세권별 아파트 시세 차이 분석',               // 시세분석
+    '초보 매수자가 놓치기 쉬운 등기부등본 체크포인트',    // 권리분석
+    '전세보증보험 미가입 시 위험과 대처법',              // 전세/임대
   ];
   for (const g of gapTopics) {
     push(g, 'gap', 6);
