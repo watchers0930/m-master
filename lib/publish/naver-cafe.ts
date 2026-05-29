@@ -391,12 +391,22 @@ export async function publishNaverCafePost(opts: {
   // DB 자격증명이 있으면 cachedAccessToken에 반영
   if (resolved.accessToken) cachedAccessToken = resolved.accessToken;
 
-  // 네이버 카페 API는 외부 <img> 태그를 스팸으로 감지하므로 이미지 제외
+  // 본문 HTML 생성 (외부 <img> 태그 제외 — 이미지는 multipart로 네이버 서버에 업로드)
   const htmlBody = buildNaverCafeContent(opts.content, []) + '\n' + CAFE_FOOTER;
   const fields = { subject: opts.subject, content: htmlBody };
 
-  // 항상 URL-encoded 전송 (이미지는 HTML <img>로 삽입됨)
-  const { res, json } = await cafeApiPost(clubId, menuId, fields);
+  // 이미지가 있으면 다운로드 → multipart 업로드, 없으면 텍스트만
+  const urls = (opts.imageUrls ?? []).filter(u => u && u.trim() !== '');
+  const images = urls.length > 0 ? await downloadImages(urls) : [];
+
+  let res: Response;
+  let json: Record<string, unknown>;
+  if (images.length > 0) {
+    console.log(`[naver-cafe] 이미지 ${images.length}건 multipart 업로드`);
+    ({ res, json } = await cafeApiPostWithImages(clubId, menuId, fields, images));
+  } else {
+    ({ res, json } = await cafeApiPost(clubId, menuId, fields));
+  }
 
   if (!res.ok) {
     const msg = (json?.message as { error?: { msg?: string } })?.error?.msg ?? `HTTP ${res.status}`;
