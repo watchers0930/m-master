@@ -144,7 +144,7 @@ export function buildNaverCafeContent(text: string, imageUrls?: string[]): strin
     // 빈 줄 → 목록 종료 + 문단 간격
     if (line.trim() === '') {
       flushList();
-      htmlParts.push('<p></p>');
+      htmlParts.push('<br>');
       continue;
     }
 
