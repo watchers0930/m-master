@@ -65,6 +65,13 @@ export function Sidebar() {
           </svg>
           콘텐츠 생성
         </Link>
+        <Link href="/content/manage" prefetch={false} className={`sb-item${active('/content/manage') ? ' active' : ''}`}>
+          <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
+          </svg>
+          콘텐츠 관리
+          <Badge count={draftCount} />
+        </Link>
       </div>
 
       <div className="sb-section">
@@ -91,22 +98,7 @@ export function Sidebar() {
         </Link>
       </div>
 
-      <div className="sb-section">
-        <div className="sb-label">운영</div>
-        <Link href="/scheduler" prefetch={false} className={`sb-item${active('/scheduler') ? ' active' : ''}`}>
-          <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
-          </svg>
-          스케줄러
-        </Link>
-        <Link href="/content/manage" prefetch={false} className={`sb-item${active('/content/manage') ? ' active' : ''}`}>
-          <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
-          </svg>
-          콘텐츠 관리
-          <Badge count={draftCount} />
-        </Link>
-      </div>
+      {/* 운영 섹션: 스케줄러는 자동 크론으로 운영 — 메뉴 숨김 */}
 
       <div className="sb-section">
         <div className="sb-label">설정</div>
