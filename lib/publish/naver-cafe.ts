@@ -389,10 +389,8 @@ export async function publishNaverCafePost(opts: {
   // DB 자격증명이 있으면 cachedAccessToken에 반영
   if (resolved.accessToken) cachedAccessToken = resolved.accessToken;
 
-  // 이미지 URL을 HTML <img> 태그로 본문에 인라인 삽입 (글→이미지→글 배치 유지)
-  const urls = (opts.imageUrls ?? []).filter(u => u && u.trim() !== '');
-  if (urls.length > 0) console.log(`[naver-cafe] 이미지 ${urls.length}건 인라인 삽입`);
-  const htmlBody = buildNaverCafeContent(opts.content, urls) + '\n' + CAFE_FOOTER;
+  // 네이버 카페 API는 외부 <img> 태그를 스팸으로 감지하므로 이미지 제외
+  const htmlBody = buildNaverCafeContent(opts.content, []) + '\n' + CAFE_FOOTER;
   const fields = { subject: opts.subject, content: htmlBody };
 
   // 항상 URL-encoded 전송 (이미지는 HTML <img>로 삽입됨)
