@@ -35,15 +35,9 @@ interface AutoPublishParams {
 // ---------------------------------------------------------------------------
 async function getActiveChannels(): Promise<ConvertChannel[]> {
   const channels: ConvertChannel[] = [];
-  // 순서: 카페 → 페이스북 → 인스타
-  const [naverCreds, fbCreds, igCreds] = await Promise.all([
-    getNaverCafeCreds(),
-    getFacebookCreds(),
-    getInstagramCreds(),
-  ]);
+  // 현재 카페만 활성 (페이스북·인스타는 토큰 재발급 후 복원)
+  const naverCreds = await getNaverCafeCreds();
   if (naverCreds) channels.push('naver_cafe');
-  if (fbCreds) channels.push('facebook');
-  if (igCreds) channels.push('instagram');
   return channels;
 }
 
