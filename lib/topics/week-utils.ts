@@ -24,13 +24,13 @@ export function getMondayOfWeekKST(dateStr?: string): string {
 }
 
 /**
- * 주어진 월요일(weekStart)로부터 월~금 5일의 날짜 배열 반환
- * @returns ['YYYY-MM-DD', ...] 5개
+ * 주어진 월요일(weekStart)로부터 월~일 7일의 날짜 배열 반환
+ * @returns ['YYYY-MM-DD', ...] 7개
  */
 export function getWeekdayDates(weekStart: string): string[] {
   const d = new Date(`${weekStart}T00:00:00Z`);
   const dates: string[] = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 7; i++) {
     const cur = new Date(d.getTime() + i * 24 * 60 * 60 * 1000);
     dates.push(cur.toISOString().slice(0, 10));
   }

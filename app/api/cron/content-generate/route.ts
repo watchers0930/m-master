@@ -1,8 +1,7 @@
 // app/api/cron/content-generate/route.ts — 일일 자동 콘텐츠 생성 + 매주 월요일 토픽 리프레시
 // Vercel Cron: 0 23 * * * (UTC) = 오전 8시 KST
 // 1) 매주 월요일: 추천 토픽 자동 생성 → ContentPlan + Items 자동 생성 (topics-refresh 통합)
-// 2) 평일(월~금): ContentPlanItem(scheduledDate=오늘, status=planned, plan.autoGenerate=true) 순차 생성·발행
-// 3) 주말(토/일): 스킵
+// 2) 매일(월~일): ContentPlanItem(scheduledDate=오늘, status=planned, plan.autoGenerate=true) 순차 생성·발행
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -14,7 +13,7 @@ import { trackCost } from '@/lib/cost/tracker';
 import { fetchPopularPages, type PopularPage } from '@/lib/ga4/popular-pages';
 import { buildCandidates } from '@/lib/topics/candidates';
 import { recommendTopFive } from '@/lib/topics/recommend';
-import { getMondayOfWeekKST, getWeekdayDates, isWeekdayKST, isMondayKST } from '@/lib/topics/week-utils';
+import { getMondayOfWeekKST, getWeekdayDates, isMondayKST } from '@/lib/topics/week-utils';
 import { Prisma } from '@prisma/client';
 
 export const maxDuration = 300; // 5분 (Vercel Pro)
@@ -54,7 +53,7 @@ async function maybeRefreshWeeklyTopics(today: string): Promise<{ ran: boolean; 
     const existing = await prisma.topicRecommendation.count({
       where: { weekStart, channel: 'blog' },
     });
-    if (existing >= 5) {
+    if (existing >= 7) {
       console.log(`[cron/content-generate] 토픽 이미 ${existing}건 존재 — 스킵`);
       return { ran: true, count: existing };
     }
@@ -161,7 +160,7 @@ async function autoCreateWeeklyPlan(today: string): Promise<{ ran: boolean; plan
     const topics = await prisma.topicRecommendation.findMany({
       where: { weekStart, channel: 'blog' },
       orderBy: { score: 'desc' },
-      take: 5,
+      take: 7,
     });
 
     if (topics.length === 0) {
@@ -225,12 +224,6 @@ export async function GET(request: NextRequest) {
 
   const today = getTodayKST();
   console.log(`[cron/content-generate] 실행 시작 — 날짜: ${today}`);
-
-  // 주말 스킵
-  if (!isWeekdayKST(today)) {
-    console.log(`[cron/content-generate] 주말 — 스킵`);
-    return NextResponse.json({ ok: true, date: today, skipped: 'weekend' });
-  }
 
   // 매주 월요일: 토픽 리프레시
   const topicsResult = await maybeRefreshWeeklyTopics(today);

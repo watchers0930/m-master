@@ -13,7 +13,7 @@ export interface TopicTag {
 }
 
 export interface RecommendedTopic {
-  rank: number; // 1~5
+  rank: number; // 1~7
   topic: string; // 80자 이내
   score: number; // 0~100
   tags: TopicTag[]; // 최대 3개
@@ -41,7 +41,7 @@ const TagSchema = z.object({
 });
 
 const ItemSchema = z.object({
-  rank: z.number().int().min(1).max(5),
+  rank: z.number().int().min(1).max(7),
   topic: z.string().min(1).max(80),
   score: z.number().min(0).max(100),
   tags: z.array(TagSchema).max(3),
@@ -60,7 +60,7 @@ function buildSystemPrompt(monthYmd: string): string {
   const month = parseInt(monthYmd.slice(5, 7), 10);
   return `당신은 VESTRA(AI 기반 부동산 권리분석·시세분석 서비스) 콘텐츠 전략가입니다.
 이번 주는 ${monthYmd} 주차 (${month}월)이며, 채널은 네이버 블로그입니다.
-월~금 5일간 매일 1건씩 발행할 토픽을 선정합니다.
+월~일 7일간 매일 1건씩 발행할 토픽을 선정합니다.
 
 [VESTRA 도메인]
 - 권리분석: AI 등기부등본 분석 / 근저당·가압류·소유권 확인 / 전세사기 예방
@@ -85,14 +85,14 @@ function buildSystemPrompt(monthYmd: string): string {
 - label은 8자 이내 한국어 권장, 항목당 최대 3개
 
 [도메인 다양성 — 반드시 준수]
-- 5개 토픽은 반드시 서로 다른 도메인에서 선정 (같은 도메인 2개 이상 금지)
+- 7개 토픽은 가능한 서로 다른 도메인에서 선정 (같은 도메인 3개 이상 금지)
 - 도메인 분류: 권리분석 / 시세·전망 / 전세·임대 / 세금·절세 / 동네정보·비교
 - 5개 도메인 중 최소 4개 이상 커버해야 함
 
 [제약]
 - topic은 후보 목록의 표현을 그대로 사용하거나 80자 이내로 다듬을 수 있음
 - reason은 60자 이내, 왜 이번 주 추천인지 1문장
-- 5개 정확히 선정 (rank 1~5, score 내림차순 정렬)`;
+- 7개 정확히 선정 (rank 1~7, score 내림차순 정렬)`;
 }
 
 // ----------------------------------------------------------------
@@ -107,7 +107,7 @@ function clamp(n: number, min: number, max: number): number {
 function sanitize(items: RecommendedTopic[]): RecommendedTopic[] {
   const sorted = [...items]
     .map(it => ({
-      rank: clamp(Math.floor(it.rank), 1, 5),
+      rank: clamp(Math.floor(it.rank), 1, 7),
       topic: it.topic.slice(0, 80),
       score: clamp(it.score, 0, 100),
       tags: (it.tags ?? []).slice(0, 3).map(t => ({
@@ -119,7 +119,7 @@ function sanitize(items: RecommendedTopic[]): RecommendedTopic[] {
     .sort((a, b) => b.score - a.score);
 
   // rank를 score 정렬 결과에 맞게 재부여
-  return sorted.slice(0, 5).map((it, idx) => ({ ...it, rank: idx + 1 }));
+  return sorted.slice(0, 7).map((it, idx) => ({ ...it, rank: idx + 1 }));
 }
 
 // 부족 시 후보 weight 상위에서 채움
@@ -127,12 +127,12 @@ function fillFromCandidates(
   items: RecommendedTopic[],
   candidates: Candidate[],
 ): RecommendedTopic[] {
-  if (items.length >= 5) return items.slice(0, 5);
+  if (items.length >= 7) return items.slice(0, 7);
   const used = new Set(items.map(i => i.topic));
   const sortedCands = [...candidates].sort((a, b) => b.weight - a.weight);
   const filled = [...items];
   for (const c of sortedCands) {
-    if (filled.length >= 5) break;
+    if (filled.length >= 7) break;
     if (used.has(c.topic)) continue;
     used.add(c.topic);
     filled.push({
@@ -143,7 +143,7 @@ function fillFromCandidates(
       reason: '후보 가중치 기반 자동 보정',
     });
   }
-  return filled.slice(0, 5).map((it, idx) => ({ ...it, rank: idx + 1 }));
+  return filled.slice(0, 7).map((it, idx) => ({ ...it, rank: idx + 1 }));
 }
 
 // ----------------------------------------------------------------
@@ -160,7 +160,7 @@ export async function recommendTopFive(input: RecommendInput): Promise<Recommend
       `${i + 1}. [${c.signal}/w${c.weight}] ${c.topic}`,
     ),
     '',
-    '위 후보에서 TOP 5를 선정하여 submit_recommendations를 호출하세요.',
+    '위 후보에서 TOP 7을 선정하여 submit_recommendations를 호출하세요.',
   ].join('\n');
 
   const response = await client.chat.completions.create({
@@ -183,7 +183,7 @@ export async function recommendTopFive(input: RecommendInput): Promise<Recommend
               items: {
                 type: 'object',
                 properties: {
-                  rank: { type: 'integer', minimum: 1, maximum: 5 },
+                  rank: { type: 'integer', minimum: 1, maximum: 7 },
                   topic: { type: 'string', maxLength: 80 },
                   score: { type: 'number', minimum: 0, maximum: 100 },
                   tags: {
