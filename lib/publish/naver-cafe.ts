@@ -371,7 +371,7 @@ const CAFE_FOOTER = [
   '<p></p>',
   '<p>https://vestra-plum.vercel.app</p>',
   '<p></p>',
-  '<p>#부동산 #권리분석 #등기부등본 #전세사기방지 #아파트시세 #실거래가 #전세보증보험 #부동산세금 #VESTRA #베스트라</p>',
+  // 태그는 tagList 필드로 전달 (본문 해시태그 제거)
 ].join('\n');
 
 // ---------------------------------------------------------------------------
@@ -393,7 +393,8 @@ export async function publishNaverCafePost(opts: {
 
   // 본문 HTML 생성 (이미지 없이 텍스트만 발행)
   const htmlBody = buildNaverCafeContent(opts.content, []) + '\n' + CAFE_FOOTER;
-  const fields = { subject: opts.subject, content: htmlBody };
+  const tags = '부동산,권리분석,등기부등본,전세사기방지,아파트시세,실거래가,전세보증보험,부동산세금,VESTRA,베스트라';
+  const fields = { subject: opts.subject, content: htmlBody, openArticle: 'true', tagList: tags };
 
   const { res, json } = await cafeApiPost(clubId, menuId, fields);
 
