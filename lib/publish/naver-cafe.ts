@@ -141,9 +141,10 @@ export function buildNaverCafeContent(text: string, imageUrls?: string[]): strin
     // 테이블 행이 아닌 줄 → 테이블 종료
     if (inTable) flushTable();
 
-    // 빈 줄 → 목록 종료
+    // 빈 줄 → 목록 종료 + 문단 간격
     if (line.trim() === '') {
       flushList();
+      htmlParts.push('<p></p>');
       continue;
     }
 
@@ -185,11 +186,12 @@ export function buildNaverCafeContent(text: string, imageUrls?: string[]): strin
       continue;
     }
 
-    // 인용
+    // 인용 (네이버 카페 blockquote 내부는 HTML 태그 미지원 — 텍스트만)
     const bqMatch = line.match(/^>\s+(.+)$/);
     if (bqMatch) {
       flushList();
-      htmlParts.push(`<blockquote>${inlineMd(bqMatch[1])}</blockquote>`);
+      const plain = bqMatch[1].replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1');
+      htmlParts.push(`<blockquote>${plain}</blockquote>`);
       continue;
     }
 
