@@ -141,10 +141,9 @@ export function buildNaverCafeContent(text: string, imageUrls?: string[]): strin
     // 테이블 행이 아닌 줄 → 테이블 종료
     if (inTable) flushTable();
 
-    // 빈 줄 → 목록 종료 + 문단 간격
+    // 빈 줄 → 목록 종료 (문단 간격은 헤딩 앞에서만 삽입)
     if (line.trim() === '') {
       flushList();
-      htmlParts.push('<br><br><br>');
       continue;
     }
 
@@ -158,22 +157,25 @@ export function buildNaverCafeContent(text: string, imageUrls?: string[]): strin
       continue;
     }
 
-    // 헤딩
-    const h2Match = line.match(/^##\s+(.+)$/);
-    if (h2Match) {
-      flushList();
-      htmlParts.push(`<h2>${inlineMd(h2Match[1])}</h2>`);
-      continue;
-    }
+    // 헤딩 (타이틀 위에만 <br><br> 삽입)
     const h3Match = line.match(/^###\s+(.+)$/);
     if (h3Match) {
       flushList();
+      if (htmlParts.length > 0) htmlParts.push('<br><br>');
       htmlParts.push(`<h3>${inlineMd(h3Match[1])}</h3>`);
+      continue;
+    }
+    const h2Match = line.match(/^##\s+(.+)$/);
+    if (h2Match) {
+      flushList();
+      if (htmlParts.length > 0) htmlParts.push('<br><br>');
+      htmlParts.push(`<h2>${inlineMd(h2Match[1])}</h2>`);
       continue;
     }
     const h1Match = line.match(/^#\s+(.+)$/);
     if (h1Match) {
       flushList();
+      if (htmlParts.length > 0) htmlParts.push('<br><br>');
       htmlParts.push(`<h1>${inlineMd(h1Match[1])}</h1>`);
       continue;
     }
