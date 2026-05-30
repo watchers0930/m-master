@@ -27,6 +27,7 @@ interface AutoPublishParams {
   topic: string;
   imageUrl: string | null;
   bodyImageUrls: string[];
+  blogScores: Record<string, number> | null;
   onProgress: (event: AutoPublishEvent) => void;
 }
 
@@ -65,7 +66,7 @@ async function publishToChannel(
       textBody: converted.text,
       imageUrl,
       bodyImageUrls: [],
-      scores: {},
+      scores: params.blogScores ?? {},
       costKrw: converted.krw,
       status: 'draft',
     },

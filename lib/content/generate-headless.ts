@@ -34,6 +34,7 @@ export interface HeadlessGenerateResult {
   text: string;
   imageUrl: string | null;
   bodyImageUrls: string[];
+  scores: Record<string, number> | null;
   costKrw: number;
 }
 
@@ -169,6 +170,7 @@ export async function generateContentHeadless(
     text,
     imageUrl,
     bodyImageUrls,
+    scores,
     costKrw: totalKrw,
   };
 }

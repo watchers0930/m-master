@@ -293,6 +293,7 @@ export async function GET(request: NextRequest) {
         topic: item.topic,
         imageUrl: result.imageUrl,
         bodyImageUrls: result.bodyImageUrls,
+        blogScores: result.scores ?? null,
         onProgress: () => {},
       });
 

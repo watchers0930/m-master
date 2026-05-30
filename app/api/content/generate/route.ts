@@ -226,6 +226,7 @@ export async function POST(request: NextRequest) {
             topic: req.topic,
             imageUrl,
             bodyImageUrls,
+            blogScores: scores,
             onProgress: (evt) => send(evt),
           });
         }
