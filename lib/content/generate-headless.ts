@@ -87,7 +87,7 @@ export async function generateContentHeadless(
   const client = getClient();
   const response = await client.chat.completions.create({
     model: CLAUDE_MODEL,
-    max_tokens: 5000,
+    max_tokens: 10000,
     messages: [
       { role: 'system', content: systemPrompt },
       { role: 'user', content: userPrompt },

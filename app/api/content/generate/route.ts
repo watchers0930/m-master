@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
         // 7) GPT-4o 스트리밍 생성
         const openaiStream = await client.chat.completions.create({
           model: CLAUDE_MODEL,
-          max_tokens: 5000,
+          max_tokens: 10000,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
