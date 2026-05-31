@@ -75,11 +75,12 @@ export async function generateContentHeadless(
 
   // 4) 프롬프트 조립
   const systemPrompt = buildSystemPrompt(channel, brandGuide, channelTemplate, tone);
+  const currentYear = new Date().getFullYear();
   const userPrompt = [
     `주제: ${topic}`,
     keywords.length ? `키워드: ${keywords.join(', ')}` : '',
     ragContext,
-    `${channel} 채널에 최적화된 마케팅 콘텐츠를 작성해주세요.`,
+    `${channel} 채널에 최적화된 마케팅 콘텐츠를 ${currentYear}년 기준으로 작성해주세요. 법령·세율·정책은 ${currentYear}년 최신 기준을 반영하고, 구체적 수치·사례·실무 인사이트를 포함하여 전문가 칼럼 수준의 깊이 있는 글을 작성하세요.`,
   ].filter(Boolean).join('\n\n');
 
   // 5) GPT-4o — 비스트리밍 생성

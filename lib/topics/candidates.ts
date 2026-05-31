@@ -148,7 +148,7 @@ export function buildCandidates(input: BuildCandidatesInput): Candidate[] {
 
   // 3) 코어 단독 키워드 (가중치 7)
   for (const core of [...RIGHTS_CORE.slice(0, 5), ...MARKET_CORE.slice(0, 4), ...LEASE_CORE.slice(0, 3)]) {
-    push(`2026년 ${core} 완벽 가이드`, 'core', 7);
+    push(`${new Date().getFullYear()}년 ${core} 완벽 가이드`, 'core', 7);
     if (candidates.length >= 18) break;
   }
 
