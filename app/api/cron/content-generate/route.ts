@@ -1,5 +1,6 @@
 // app/api/cron/content-generate/route.ts — 일일 자동 콘텐츠 생성 + 매주 월요일 토픽 리프레시
-// Vercel Cron: 0 23 * * * (UTC) = 오전 8시 KST
+// Vercel Cron: 0 22 * * * (UTC) = 오전 7시 KST
+// 50% 확률로 스킵 → schedule-publish(8시)에서 ?fallback=1로 폴백 호출 → 실질적으로 7시/8시 랜덤
 // 1) 매주 월요일: 추천 토픽 자동 생성 → ContentPlan + Items 자동 생성 (topics-refresh 통합)
 // 2) 매일(월~일): ContentPlanItem(scheduledDate=오늘, status=planned, plan.autoGenerate=true) 순차 생성·발행
 
@@ -223,6 +224,15 @@ export async function GET(request: NextRequest) {
   }
 
   const today = getTodayKST();
+
+  // 랜덤 실행: 50% 확률로 7시에 실행, 나머지는 8시(schedule-publish)에서 폴백
+  // ?fallback=1 파라미터가 있으면 무조건 실행 (schedule-publish에서 호출)
+  const isFallback = request.nextUrl.searchParams.get('fallback') === '1';
+  if (!isFallback && Math.random() < 0.5) {
+    console.log(`[cron/content-generate] 오늘은 8시에 실행 예정 (random delay) — ${today}`);
+    return NextResponse.json({ ok: true, delayed: true, date: today });
+  }
+
   console.log(`[cron/content-generate] 실행 시작 — 날짜: ${today}`);
 
   // 매주 월요일: 토픽 리프레시

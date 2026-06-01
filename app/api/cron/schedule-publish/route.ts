@@ -1,5 +1,6 @@
 // app/api/cron/schedule-publish/route.ts — 예약 발행 자동화 cron
 // Vercel Cron: 0 23 * * * (UTC) = 오전 8시 KST
+// 0) 폴백: 7시 content-generate가 랜덤 스킵했으면 ?fallback=1로 호출
 // 1) 소셜 슬롯(naver_cafe/facebook/instagram) 발행
 // 2) 블로그 슬롯 → 네이버 카페 자동 변환·발행
 
@@ -278,6 +279,53 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
 }
 
 // ---------------------------------------------------------------------------
+// 오늘 날짜 (KST) → 'YYYY-MM-DD'
+// ---------------------------------------------------------------------------
+function getTodayKST(): string {
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  return kst.toISOString().slice(0, 10);
+}
+
+// ---------------------------------------------------------------------------
+// 폴백: 7시 content-generate가 랜덤 스킵했으면 여기서 실행
+// ---------------------------------------------------------------------------
+async function maybeFallbackGenerate(): Promise<boolean> {
+  const today = getTodayKST();
+  const pendingCount = await prisma.contentPlanItem.count({
+    where: {
+      scheduledDate: today,
+      status: 'planned',
+      plan: { autoGenerate: true, status: 'active' },
+    },
+  });
+
+  if (pendingCount === 0) return false;
+
+  console.log(`[cron/schedule-publish] 폴백: ${pendingCount}건 미생성 → content-generate 호출`);
+
+  const secret = process.env.CRON_SECRET ?? '';
+  const host = process.env.VERCEL_PROJECT_PRODUCTION_URL ?? process.env.VERCEL_URL ?? 'localhost:3000';
+  const baseUrl = host.startsWith('http') ? host : `https://${host}`;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 240_000); // 4분 타임아웃
+    const res = await fetch(`${baseUrl}/api/cron/content-generate?fallback=1`, {
+      headers: { Authorization: `Bearer ${secret}` },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    const data = await res.json();
+    console.log(`[cron/schedule-publish] 폴백 완료:`, JSON.stringify(data));
+    return true;
+  } catch (err) {
+    console.error(`[cron/schedule-publish] 폴백 실패:`, err);
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // GET handler (Vercel Cron은 GET으로 호출)
 // ---------------------------------------------------------------------------
 export async function GET(request: NextRequest) {
@@ -286,6 +334,9 @@ export async function GET(request: NextRequest) {
   }
 
   console.log('[cron/schedule-publish] 실행 시작');
+
+  // 0) 폴백: 7시 content-generate가 스킵했으면 여기서 먼저 실행
+  const fallbackRan = await maybeFallbackGenerate();
 
   // 1) 소셜 슬롯 발행
   const socialResults = await publishSocialSlots();
@@ -297,12 +348,12 @@ export async function GET(request: NextRequest) {
 
   if (results.length === 0) {
     console.log('[cron/schedule-publish] 발행 대상 없음');
-    return NextResponse.json({ ok: true, processed: 0 });
+    return NextResponse.json({ ok: true, processed: 0, fallbackRan });
   }
 
   const published = results.filter((r) => r.status === 'published').length;
   const failed = results.filter((r) => r.status === 'failed').length;
   console.log(`[cron/schedule-publish] 완료 — 성공: ${published}, 실패: ${failed}`);
 
-  return NextResponse.json({ ok: true, processed: results.length, published, failed, results });
+  return NextResponse.json({ ok: true, processed: results.length, published, failed, results, fallbackRan });
 }
