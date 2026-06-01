@@ -20,6 +20,7 @@ import { generateThumbnail, calcImageKrw } from '@/lib/openai/image';
 import { trackCost } from '@/lib/cost/tracker';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
 import { autoPublishToSocial } from '@/lib/publish/auto-publish';
+import { buildExternalContext } from '@/lib/external/context-builder';
 import type { ContentGenerateRequest } from '@/types/api';
 
 const RequestSchema = z.object({
@@ -83,13 +84,22 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // 6) 프롬프트 조립
+  // 6) 외부 데이터 (뉴스 + MOLIT 시세)
+  let externalContext = '';
+  try {
+    externalContext = await buildExternalContext(req.topic, req.keywords ?? []);
+  } catch (err) {
+    console.warn('[generate] 외부 데이터 실패 (무시):', err);
+  }
+
+  // 7) 프롬프트 조립
   const systemPrompt = buildSystemPrompt(req.channel, brandGuide, channelTemplate, req.tone);
   const currentYear = new Date().getFullYear();
   const userPrompt = [
     `주제: ${req.topic}`,
     req.keywords?.length ? `키워드: ${req.keywords.join(', ')}` : '',
     ragContext,
+    externalContext,
     `${req.channel} 채널에 최적화된 마케팅 콘텐츠를 ${currentYear}년 기준으로 작성해주세요. 법령·세율·정책은 ${currentYear}년 최신 기준을 반영하고, 구체적 수치·사례·실무 인사이트를 포함하여 전문가 칼럼 수준의 깊이 있는 글을 작성하세요.`,
   ].filter(Boolean).join('\n\n');
 
@@ -102,7 +112,7 @@ export async function POST(request: NextRequest) {
         const client = getClient();
         let text = '';
 
-        // 7) GPT-4o 스트리밍 생성
+        // 8) GPT-4o 스트리밍 생성
         const openaiStream = await client.chat.completions.create({
           model: CLAUDE_MODEL,
           max_tokens: 10000,
@@ -133,7 +143,7 @@ export async function POST(request: NextRequest) {
         // 본문 마커 폴백을 먼저 적용 (이후 작업들이 갱신된 text를 참조)
         text = ensureMinimumMarkers(text, 5);
 
-        // 8~9) 검수 + 썸네일 + 본문 이미지 → 병렬 실행 (가장 큰 속도 개선)
+        // 9~10) 검수 + 썸네일 + 본문 이미지 → 병렬 실행 (가장 큰 속도 개선)
         const t0 = Date.now();
         const [reviewSettled, thumbSettled, bodyImgsSettled] = await Promise.allSettled([
           // 검수
@@ -180,11 +190,11 @@ export async function POST(request: NextRequest) {
           console.warn('[generate] 본문 이미지 처리 실패 (무시):', bodyImgsSettled.reason);
         }
 
-        // 10) 비용
+        // 11) 비용
         const embedKrw = calcEmbeddingKrw(embeddingTokens);
         const totalKrw = chatKrw + embedKrw + imageKrw + translateKrw;
 
-        // 11) DB insert
+        // 12) DB insert
         const contentData = await prisma.content.create({
           data: {
             ownerId,
@@ -202,12 +212,13 @@ export async function POST(request: NextRequest) {
           select: { id: true },
         });
 
-        // 12) cost_ledger
+        // 13) cost_ledger
         await trackCost({ kind: 'chat', tokensIn: usage.prompt_tokens, tokensOut: usage.completion_tokens, krw: chatKrw, contentId: contentData.id });
         if (embeddingTokens > 0) await trackCost({ kind: 'embedding', tokensIn: embeddingTokens, tokensOut: 0, krw: embedKrw, contentId: contentData.id });
         if (imageKrw > 0) await trackCost({ kind: 'image', tokensIn: 0, tokensOut: 0, krw: imageKrw, contentId: contentData.id });
+        if (externalContext) await trackCost({ kind: 'external', tokensIn: 0, tokensOut: 0, krw: 0, contentId: contentData.id });
 
-        // 13) audit_log
+        // 14) audit_log
         await logAudit({
           actor: ownerId,
           action: AUDIT_ACTIONS.CONTENT_GENERATE,

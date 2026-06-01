@@ -2,7 +2,7 @@
 
 import { prisma } from '@/lib/prisma';
 
-export type CostKind = 'chat' | 'embedding' | 'image';
+export type CostKind = 'chat' | 'embedding' | 'image' | 'external';
 
 export interface TrackCostOptions {
   kind: CostKind;

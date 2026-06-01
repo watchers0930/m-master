@@ -6,7 +6,7 @@ export type Channel = 'blog' | 'instagram' | 'facebook' | 'naver_cafe';
 export type ContentStatus = 'draft' | 'scheduled' | 'published' | 'failed';
 export type SlotStatus = 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled';
 export type SlotMode = 'manual' | 'ai_auto';
-export type CostKind = 'chat' | 'embedding' | 'image';
+export type CostKind = 'chat' | 'embedding' | 'image' | 'external';
 export type AnalyticsSource = 'ga4' | 'naver' | 'instagram' | 'facebook';
 
 // ----------------------------------------------------------------
