@@ -65,5 +65,9 @@ export default async function ChannelsPage() {
     }
   }
 
-  return <ChannelForm initial={initial} />;
+  const cafeTargets = await prisma.cafeTarget.findMany({ orderBy: { createdAt: 'asc' } });
+
+  return <ChannelForm initial={initial} cafeTargets={cafeTargets.map(t => ({
+    id: t.id, name: t.name, clubId: t.clubId, menuId: t.menuId, isDefault: t.isDefault,
+  }))} />;
 }

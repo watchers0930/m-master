@@ -7,7 +7,7 @@ import { publishFacebookPost } from './facebook';
 import { publishNaverCafePost } from './naver-cafe';
 import { trackCost } from '@/lib/cost/tracker';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
-import { getNaverCafeCreds, getInstagramCreds, getFacebookCreds } from '@/lib/channel-credentials';
+import { getNaverCafeCreds, getInstagramCreds, getFacebookCreds, getCafeTargets } from '@/lib/channel-credentials';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -87,6 +87,7 @@ async function publishToChannel(
 
   let externalId: string | undefined;
   let externalUrl: string | undefined;
+  let firstTargetName: string | undefined;
   if (channel === 'instagram') {
     // bodyImageUrls가 2장 이상이면 캐러셀 발행
     if (params.bodyImageUrls.length >= 2) {
@@ -114,13 +115,53 @@ async function publishToChannel(
     externalId = result.id;
     externalUrl = `https://facebook.com/${result.id}`;
   } else if (channel === 'naver_cafe') {
-    const result = await publishNaverCafePost({
-      subject: topic,
-      content: converted.text,
-      imageUrls: params.bodyImageUrls,
-    });
-    externalId = result.articleId;
-    externalUrl = result.cafeUrl;
+    // 다중 카페 타겟 지원: 모든 타겟에 순차 발행
+    const cafeTargets = await getCafeTargets();
+    if (cafeTargets.length > 0) {
+      for (let t = 0; t < cafeTargets.length; t++) {
+        const target = cafeTargets[t];
+        // 두 번째 카페부터 10초 대기 (스팸 필터 방지)
+        if (t > 0) await new Promise(r => setTimeout(r, 10_000));
+        try {
+          const result = await publishNaverCafePost({
+            subject: topic,
+            content: converted.text,
+            imageUrls: params.bodyImageUrls,
+            clubId: target.clubId,
+            menuId: target.menuId,
+          });
+          // 첫 번째 타겟 결과를 대표값으로 사용
+          if (t === 0) {
+            externalId = result.articleId;
+            externalUrl = result.cafeUrl;
+            firstTargetName = target.name;
+          }
+          // 추가 타겟은 별도 ScheduleSlot 생성
+          if (t > 0) {
+            await prisma.scheduleSlot.create({
+              data: {
+                contentId: content.id, channel: 'naver_cafe',
+                scheduledAt: new Date(), publishedAt: new Date(),
+                status: 'published', mode: 'ai_auto',
+                targetName: target.name,
+                externalId: result.articleId, externalUrl: result.cafeUrl,
+              },
+            });
+          }
+        } catch (err) {
+          console.error(`[auto-publish] naver_cafe ${target.name} 실패:`, err);
+        }
+      }
+    } else {
+      // CafeTarget 없으면 기존 방식 (credential의 clubId/menuId)
+      const result = await publishNaverCafePost({
+        subject: topic,
+        content: converted.text,
+        imageUrls: params.bodyImageUrls,
+      });
+      externalId = result.articleId;
+      externalUrl = result.cafeUrl;
+    }
   }
 
   // 5) Content status → published
@@ -138,6 +179,7 @@ async function publishToChannel(
       publishedAt: new Date(),
       status: 'published',
       mode: 'ai_auto',
+      targetName: firstTargetName ?? null,
       externalId: externalId ?? null,
       externalUrl: externalUrl ?? null,
     },

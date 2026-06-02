@@ -63,6 +63,16 @@ export async function getInstagramCreds(): Promise<InstagramCreds | null> {
   return { accessToken: at, businessId: bid };
 }
 
+/** 카페 타겟 목록 조회 */
+export async function getCafeTargets() {
+  return prisma.cafeTarget.findMany({ orderBy: { createdAt: 'asc' } });
+}
+
+/** 카페 타겟 단건 조회 */
+export async function getCafeTargetById(id: string) {
+  return prisma.cafeTarget.findUnique({ where: { id } });
+}
+
 /** 페이스북 자격증명: DB 우선 → 환경변수 fallback */
 export async function getFacebookCreds(): Promise<FacebookCreds | null> {
   const row = await prisma.channelCredential.findUnique({ where: { channel: 'facebook' } });

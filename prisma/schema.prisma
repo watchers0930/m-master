@@ -51,6 +51,7 @@ model ScheduleSlot {
   mode        String    @default("manual") // manual | ai_auto
   externalId  String?   @map("external_id")
   externalUrl String?   @map("external_url")
+  targetName  String?   @map("target_name")   // 카페 타겟 표시명 (추적용)
   retryCount  Int       @default(0) @map("retry_count")
   lastError   String?   @map("last_error") @db.Text
   createdAt   DateTime  @default(now()) @map("created_at")
@@ -271,4 +272,19 @@ model ChannelCredential {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("channel_credentials")
+}
+
+// ----------------------------------------------------------------
+// cafe_targets — 네이버 카페 발행 대상 목록
+// ----------------------------------------------------------------
+model CafeTarget {
+  id        String   @id @default(cuid())
+  name      String                        // 카페 표시명
+  clubId    String   @map("club_id")      // 네이버 카페 고유 ID
+  menuId    String   @map("menu_id")      // 게시판 메뉴 ID
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("cafe_targets")
 }

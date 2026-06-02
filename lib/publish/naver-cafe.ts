@@ -386,10 +386,12 @@ export async function publishNaverCafePost(opts: {
   subject: string;
   content: string;
   imageUrls?: string[];
+  clubId?: string;   // 지정 시 이 카페로 발행
+  menuId?: string;   // 지정 시 이 게시판으로 발행
 }): Promise<NaverCafePublishResult> {
   const resolved = await resolveCredentials();
-  const clubId = resolved.clubId;
-  const menuId = resolved.menuId;
+  const clubId = opts.clubId || resolved.clubId;
+  const menuId = opts.menuId || resolved.menuId;
   // DB 자격증명이 있으면 cachedAccessToken에 반영
   if (resolved.accessToken) cachedAccessToken = resolved.accessToken;
 

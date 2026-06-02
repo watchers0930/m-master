@@ -4,7 +4,8 @@ import { useState, useCallback } from 'react';
 
 // ── 타입 ─────────────────────────────────────────────────────────────
 interface ChannelStatus { connected: boolean; masked?: Record<string, string> }
-interface Props { initial: Record<string, ChannelStatus> }
+interface CafeTargetData { id: string; name: string; clubId: string; menuId: string; isDefault: boolean }
+interface Props { initial: Record<string, ChannelStatus>; cafeTargets?: CafeTargetData[] }
 
 interface FieldDef {
   key: string;
@@ -52,12 +53,18 @@ function Badge({ connected }: { connected: boolean }) {
 }
 
 // ── 메인 컴포넌트 ────────────────────────────────────────────────────
-export default function ChannelForm({ initial }: Props) {
+export default function ChannelForm({ initial, cafeTargets: initialTargets }: Props) {
   const [statuses, setStatuses] = useState(initial);
   const [forms, setForms] = useState<Record<string, Record<string, string>>>({});
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState<Record<string, string>>({});
+
+  // 카페 타겟 상태
+  const [targets, setTargets] = useState<CafeTargetData[]>(initialTargets ?? []);
+  const [targetForm, setTargetForm] = useState({ name: '', clubId: '', menuId: '' });
+  const [targetLoading, setTargetLoading] = useState(false);
+  const [targetError, setTargetError] = useState('');
 
   const setField = useCallback((channelId: string, key: string, value: string) => {
     setForms(prev => ({ ...prev, [channelId]: { ...prev[channelId], [key]: value } }));
@@ -115,6 +122,52 @@ export default function ChannelForm({ initial }: Props) {
     } finally {
       setLoading(prev => ({ ...prev, [channelId]: false }));
     }
+  }, []);
+
+  // ── 카페 타겟 핸들러 ──
+  const handleAddTarget = useCallback(async () => {
+    if (!targetForm.name || !targetForm.clubId || !targetForm.menuId) {
+      setTargetError('모든 필드를 입력하세요');
+      return;
+    }
+    setTargetLoading(true);
+    setTargetError('');
+    try {
+      const res = await fetch('/api/cafe-targets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(targetForm),
+      });
+      const json = await res.json();
+      if (!res.ok) { setTargetError(json.error?.message ?? '추가 실패'); return; }
+      setTargets(prev => [...prev, json.data]);
+      setTargetForm({ name: '', clubId: '', menuId: '' });
+    } catch { setTargetError('네트워크 오류'); }
+    finally { setTargetLoading(false); }
+  }, [targetForm]);
+
+  const handleDeleteTarget = useCallback(async (id: string) => {
+    if (!confirm('이 카페 타겟을 삭제하시겠습니까?')) return;
+    try {
+      await fetch('/api/cafe-targets', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      setTargets(prev => prev.filter(t => t.id !== id));
+    } catch { setTargetError('삭제 실패'); }
+  }, []);
+
+  const handleToggleDefault = useCallback(async (id: string, isDefault: boolean) => {
+    try {
+      const res = await fetch('/api/cafe-targets', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, isDefault }),
+      });
+      const json = await res.json();
+      if (res.ok) setTargets(json.data);
+    } catch { setTargetError('변경 실패'); }
   }, []);
 
   const inputStyle: React.CSSProperties = {
@@ -182,6 +235,81 @@ export default function ChannelForm({ initial }: Props) {
                 </button>
               )}
             </div>
+
+            {/* 카페 타겟 관리 (네이버 카페 연결 시만) */}
+            {ch.id === 'naver_cafe' && connected && (
+              <div style={{ padding: '0 18px 16px', borderTop: '1px solid var(--border2)' }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginTop: 14, marginBottom: 8 }}>카페 타겟 관리</p>
+                <p style={{ fontSize: 11, color: 'var(--sub)', marginBottom: 10 }}>같은 네이버 계정으로 가입된 여러 카페에 글을 발행할 수 있습니다.</p>
+
+                {/* 등록된 타겟 목록 */}
+                {targets.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                    {targets.map(t => (
+                      <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--n50)', borderRadius: 6, padding: '8px 10px', fontSize: 12 }}>
+                        <span style={{ flex: 1, fontWeight: 600, color: 'var(--text)' }}>{t.name}</span>
+                        <span style={{ fontSize: 10, color: 'var(--sub)', fontFamily: 'monospace' }}>club:{t.clubId} / menu:{t.menuId}</span>
+                        <button
+                          onClick={() => handleToggleDefault(t.id, !t.isDefault)}
+                          style={{
+                            fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                            background: t.isDefault ? '#E8F5E9' : 'var(--n100)',
+                            color: t.isDefault ? '#2E7D32' : 'var(--sub)',
+                          }}
+                        >
+                          {t.isDefault ? '기본' : '기본 설정'}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTarget(t.id)}
+                          style={{ fontSize: 10, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '2px 4px' }}
+                        >
+                          삭제
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* 카페 추가 폼 */}
+                <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 120px' }}>
+                    <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 이름</label>
+                    <input
+                      type="text" placeholder="예: 부동산 정보 카페"
+                      value={targetForm.name} onChange={e => setTargetForm(p => ({ ...p, name: e.target.value }))}
+                      style={{ ...inputStyle, fontSize: 11 }} autoComplete="off"
+                    />
+                  </div>
+                  <div style={{ flex: '0 0 100px' }}>
+                    <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 ID</label>
+                    <input
+                      type="text" placeholder="숫자"
+                      value={targetForm.clubId} onChange={e => setTargetForm(p => ({ ...p, clubId: e.target.value }))}
+                      style={{ ...inputStyle, fontSize: 11 }} autoComplete="off"
+                    />
+                  </div>
+                  <div style={{ flex: '0 0 100px' }}>
+                    <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>메뉴 ID</label>
+                    <input
+                      type="text" placeholder="숫자"
+                      value={targetForm.menuId} onChange={e => setTargetForm(p => ({ ...p, menuId: e.target.value }))}
+                      style={{ ...inputStyle, fontSize: 11 }} autoComplete="off"
+                    />
+                  </div>
+                  <button
+                    className="btn btn-primary"
+                    style={{ fontSize: 11, padding: '7px 12px', flexShrink: 0 }}
+                    onClick={handleAddTarget}
+                    disabled={targetLoading}
+                  >
+                    {targetLoading ? '추가 중...' : '카페 추가'}
+                  </button>
+                </div>
+                {targetError && (
+                  <div style={{ fontSize: 11, color: '#dc2626', marginTop: 6 }}>{targetError}</div>
+                )}
+              </div>
+            )}
 
             {/* 미연결 시 입력 폼 */}
             {!connected && (

@@ -122,6 +122,9 @@ export function PublishBtn({
   );
 }
 
+// ── 카페 타겟 타입 ────────────────────────────────────────────────
+interface CafeTarget { id: string; name: string; isDefault: boolean }
+
 // ── 모든 채널 일괄 발행 버튼 ─────────────────────────────────────
 type PublishAllChannel = 'naver_cafe' | 'facebook' | 'instagram';
 
@@ -136,6 +139,9 @@ export function PublishAllBtn({
 }) {
   const [publishing, setPublishing] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [cafeTargets, setCafeTargets] = useState<CafeTarget[]>([]);
+  const [selectedTargets, setSelectedTargets] = useState<Set<string>>(new Set());
+  const [showCafeSelect, setShowCafeSelect] = useState(false);
 
   const CHANNEL_ROUTES: Record<PublishAllChannel, string> = {
     naver_cafe: '/api/publish/naver-cafe',
@@ -143,8 +149,26 @@ export function PublishAllBtn({
     instagram: '/api/publish/instagram',
   };
 
+  // 카페 타겟 목록 로드
+  const loadCafeTargets = async () => {
+    try {
+      const res = await fetch('/api/cafe-targets');
+      const json = await res.json();
+      if (res.ok && json.data) {
+        const tgts: CafeTarget[] = json.data;
+        setCafeTargets(tgts);
+        setSelectedTargets(new Set(tgts.map((t: CafeTarget) => t.id)));
+      }
+    } catch { /* 실패 시 빈 목록 */ }
+  };
+
   const handlePublishAll = async () => {
-    if (!window.confirm('모든 활성 채널(네이버 카페, 페이스북, 인스타그램)에 순차 발행합니다.\n\n발행은 취소할 수 없습니다. 계속하시겠습니까?')) {
+    // 카페 타겟이 로드되지 않았으면 먼저 로드
+    if (cafeTargets.length === 0) {
+      await loadCafeTargets();
+    }
+
+    if (!window.confirm('모든 활성 채널에 순차 발행합니다.\n\n발행은 취소할 수 없습니다. 계속하시겠습니까?')) {
       return;
     }
 
@@ -152,31 +176,37 @@ export function PublishAllBtn({
     setResult(null);
 
     const channels: PublishAllChannel[] = ['naver_cafe', 'facebook', 'instagram'];
-    let success = 0;
-    let failed = 0;
+    let successCount = 0;
+    let failedCount = 0;
     const errors: string[] = [];
 
     for (const channel of channels) {
       try {
+        const bodyPayload: Record<string, unknown> = { content_id: contentId };
+        // 네이버 카페: 선택된 타겟 전달
+        if (channel === 'naver_cafe' && selectedTargets.size > 0) {
+          bodyPayload.cafe_target_ids = Array.from(selectedTargets);
+        }
+
         const res = await fetch(CHANNEL_ROUTES[channel], {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content_id: contentId }),
+          body: JSON.stringify(bodyPayload),
         });
         const json = await res.json();
         if (res.ok && !json.error) {
-          success++;
+          successCount++;
         } else {
-          failed++;
+          failedCount++;
           errors.push(`${channel}: ${json.error?.message ?? `HTTP ${res.status}`}`);
         }
       } catch (err) {
-        failed++;
+        failedCount++;
         errors.push(`${channel}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
-    const msg = `${channels.length}채널 발행 완료 (성공 ${success} / 실패 ${failed})`;
+    const msg = `${channels.length}채널 발행 완료 (성공 ${successCount} / 실패 ${failedCount})`;
     setResult(msg);
     setPublishing(false);
 
@@ -185,40 +215,98 @@ export function PublishAllBtn({
     }
   };
 
+  // 카페 선택 토글 열기 시 타겟 로드
+  const handleShowCafeSelect = async () => {
+    if (!showCafeSelect && cafeTargets.length === 0) {
+      await loadCafeTargets();
+    }
+    setShowCafeSelect(!showCafeSelect);
+  };
+
+  const toggleTarget = (id: string) => {
+    setSelectedTargets(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-      <button
-        onClick={handlePublishAll}
-        disabled={disabled || publishing}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '7px 13px', borderRadius: 7,
-          fontSize: 12, fontWeight: 700,
-          border: '2px solid #fff',
-          boxShadow: '0 0 0 1.5px rgba(0,0,0,0.15)',
-          cursor: disabled || publishing ? 'wait' : 'pointer',
-          fontFamily: 'inherit',
-          background: disabled || publishing ? 'var(--n200)' : 'linear-gradient(135deg, #03C75A 0%, #1877f2 50%, #e1306c 100%)',
-          color: '#fff',
-          opacity: disabled && !publishing ? 0.6 : 1,
-        }}
-      >
-        {publishing ? (
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
-            <path d="M21 12a9 9 0 11-6.219-8.56"/>
+    <div style={{ display: 'inline-flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <button
+          onClick={handlePublishAll}
+          disabled={disabled || publishing}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '7px 13px', borderRadius: 7,
+            fontSize: 12, fontWeight: 700,
+            border: '2px solid #fff',
+            boxShadow: '0 0 0 1.5px rgba(0,0,0,0.15)',
+            cursor: disabled || publishing ? 'wait' : 'pointer',
+            fontFamily: 'inherit',
+            background: disabled || publishing ? 'var(--n200)' : 'linear-gradient(135deg, #03C75A 0%, #1877f2 50%, #e1306c 100%)',
+            color: '#fff',
+            opacity: disabled && !publishing ? 0.6 : 1,
+          }}
+        >
+          {publishing ? (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
+              <path d="M21 12a9 9 0 11-6.219-8.56"/>
+            </svg>
+          ) : (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="22" y1="2" x2="11" y2="13"/>
+              <polygon points="22,2 15,22 11,13 2,9 22,2"/>
+            </svg>
+          )}
+          {publishing ? '일괄 발행 중...' : '전체 채널 발행'}
+        </button>
+        <button
+          onClick={handleShowCafeSelect}
+          disabled={disabled || publishing}
+          title="발행 대상 카페 선택"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '6px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
+            border: '1px solid var(--border)', background: 'var(--surface)',
+            color: 'var(--text)', cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <path d="M4 6h16M4 12h16M4 18h16"/>
           </svg>
-        ) : (
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="22" y1="2" x2="11" y2="13"/>
-            <polygon points="22,2 15,22 11,13 2,9 22,2"/>
-          </svg>
+          카페 선택
+        </button>
+        {result && (
+          <span style={{ fontSize: 10, color: result.includes('실패 0') ? '#22c55e' : 'var(--amber-600)', fontWeight: 600 }}>
+            {result}
+          </span>
         )}
-        {publishing ? '일괄 발행 중...' : '전체 채널 발행'}
-      </button>
-      {result && (
-        <span style={{ fontSize: 10, color: result.includes('실패 0') ? '#22c55e' : 'var(--amber-600)', fontWeight: 600 }}>
-          {result}
-        </span>
+      </div>
+
+      {/* 카페 타겟 선택 패널 */}
+      {showCafeSelect && cafeTargets.length > 0 && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 11 }}>
+          <p style={{ fontSize: 10, color: 'var(--sub)', marginBottom: 6 }}>발행 대상 카페를 선택하세요:</p>
+          {cafeTargets.map(t => (
+            <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={selectedTargets.has(t.id)}
+                onChange={() => toggleTarget(t.id)}
+                style={{ accentColor: '#03C75A' }}
+              />
+              <span style={{ fontWeight: 600, color: 'var(--text)' }}>{t.name}</span>
+              {t.isDefault && <span style={{ fontSize: 9, color: '#2E7D32', background: '#E8F5E9', padding: '1px 4px', borderRadius: 3 }}>기본</span>}
+            </label>
+          ))}
+        </div>
+      )}
+      {showCafeSelect && cafeTargets.length === 0 && (
+        <div style={{ fontSize: 11, color: 'var(--sub)', padding: '4px 0' }}>
+          등록된 카페 타겟이 없습니다. 채널 설정에서 카페를 추가하세요.
+        </div>
       )}
     </div>
   );

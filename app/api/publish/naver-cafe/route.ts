@@ -1,6 +1,6 @@
 // app/api/publish/naver-cafe/route.ts
-// POST { content_id } → 네이버 카페 API 발행 → schedule_slots 'published' 1건 적재
-// 인증 필수, audit_log 적재
+// POST { content_id, cafe_target_ids? } → 네이버 카페 발행 (다중 카페 지원)
+// cafe_target_ids 없으면 기본 카페 1건, 있으면 해당 카페들에 10초 간격 순차 발행
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -11,7 +11,20 @@ import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
 
 const RequestSchema = z.object({
   content_id: z.string().min(1, 'content_id는 필수입니다'),
+  cafe_target_ids: z.array(z.string()).optional(),
 });
+
+interface CafePublishResult {
+  targetId: string;
+  name: string;
+  articleId?: string;
+  url?: string;
+  error?: string;
+}
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 export async function POST(request: NextRequest) {
   const session = await requireSession();
@@ -29,7 +42,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { content_id } = parsed.data;
+  const { content_id, cafe_target_ids } = parsed.data;
 
   const content = await prisma.content.findFirst({
     where: { id: content_id, ownerId },
@@ -44,53 +57,101 @@ export async function POST(request: NextRequest) {
   const contentText = content.textBody || content.topic || '';
   const imageUrls = (content.bodyImageUrls ?? []).filter((u: string) => u && u.trim() !== '');
 
-  let publishResult;
-  try {
-    publishResult = await publishNaverCafePost({
-      subject,
-      content: contentText,
-      imageUrls,
+  // 발행 대상 카페 결정
+  let targets: { id: string; name: string; clubId: string; menuId: string }[];
+
+  if (cafe_target_ids && cafe_target_ids.length > 0) {
+    // 지정된 카페 타겟들
+    const found = await prisma.cafeTarget.findMany({
+      where: { id: { in: cafe_target_ids } },
+      orderBy: { createdAt: 'asc' },
     });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error('[publish/naver-cafe] 발행 실패:', msg);
-    return NextResponse.json(
-      { error: { code: 'publish_failed', message: msg } },
-      { status: 502 },
-    );
+    targets = found;
+  } else {
+    // 기본 카페 (isDefault=true) 또는 첫 번째 카페
+    const defaultTarget = await prisma.cafeTarget.findFirst({
+      where: { isDefault: true },
+    });
+    if (defaultTarget) {
+      targets = [defaultTarget];
+    } else {
+      // CafeTarget이 없으면 기존 방식 (credential에서 clubId/menuId)으로 단건 발행
+      try {
+        const publishResult = await publishNaverCafePost({ subject, content: contentText, imageUrls });
+        const now = new Date().toISOString();
+        try {
+          await prisma.scheduleSlot.create({
+            data: {
+              contentId: content_id, channel: 'naver_cafe',
+              scheduledAt: now, publishedAt: now,
+              status: 'published', mode: 'manual',
+              externalId: publishResult.articleId, externalUrl: publishResult.cafeUrl,
+            },
+          });
+        } catch (e) { console.error('[publish/naver-cafe] slot insert 실패:', e); }
+
+        await logAudit({
+          actor: ownerId, action: AUDIT_ACTIONS.PUBLISH_NAVER_CAFE,
+          targetType: 'content', targetId: content_id,
+          payload: { article_id: publishResult.articleId, cafe_url: publishResult.cafeUrl },
+        });
+
+        return NextResponse.json({ data: { id: publishResult.articleId, url: publishResult.cafeUrl }, error: null });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return NextResponse.json({ error: { code: 'publish_failed', message: msg } }, { status: 502 });
+      }
+    }
   }
 
-  const now = new Date().toISOString();
-  try {
-    await prisma.scheduleSlot.create({
-      data: {
-        contentId: content_id,
-        channel: 'naver_cafe',
-        scheduledAt: now,
-        publishedAt: now,
-        status: 'published',
-        mode: 'manual',
-        externalId: publishResult.articleId,
-        externalUrl: publishResult.cafeUrl,
-      },
-    });
-  } catch (slotError) {
-    console.error('[publish/naver-cafe] schedule_slots insert 실패:', slotError);
+  // 다중 카페 순차 발행 (10초 간격)
+  const results: CafePublishResult[] = [];
+
+  for (let i = 0; i < targets.length; i++) {
+    const target = targets[i];
+
+    // 두 번째 카페부터 10초 대기 (스팸 필터 방지)
+    if (i > 0) await sleep(10_000);
+
+    try {
+      const publishResult = await publishNaverCafePost({
+        subject, content: contentText, imageUrls,
+        clubId: target.clubId, menuId: target.menuId,
+      });
+
+      const now = new Date().toISOString();
+      try {
+        await prisma.scheduleSlot.create({
+          data: {
+            contentId: content_id, channel: 'naver_cafe',
+            scheduledAt: now, publishedAt: now,
+            status: 'published', mode: 'manual',
+            targetName: target.name,
+            externalId: publishResult.articleId, externalUrl: publishResult.cafeUrl,
+          },
+        });
+      } catch (e) { console.error(`[publish/naver-cafe] slot insert 실패 (${target.name}):`, e); }
+
+      await logAudit({
+        actor: ownerId, action: AUDIT_ACTIONS.PUBLISH_NAVER_CAFE,
+        targetType: 'content', targetId: content_id,
+        payload: { target_name: target.name, article_id: publishResult.articleId, cafe_url: publishResult.cafeUrl },
+      });
+
+      results.push({
+        targetId: target.id, name: target.name,
+        articleId: publishResult.articleId, url: publishResult.cafeUrl,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[publish/naver-cafe] ${target.name} 발행 실패:`, msg);
+      results.push({ targetId: target.id, name: target.name, error: msg });
+    }
   }
 
-  await logAudit({
-    actor: ownerId,
-    action: AUDIT_ACTIONS.PUBLISH_NAVER_CAFE,
-    targetType: 'content',
-    targetId: content_id,
-    payload: { article_id: publishResult.articleId, cafe_url: publishResult.cafeUrl },
-  });
-
+  const hasError = results.some(r => r.error);
   return NextResponse.json({
-    data: {
-      id: publishResult.articleId,
-      url: publishResult.cafeUrl,
-    },
-    error: null,
+    data: { results },
+    error: hasError ? { code: 'partial_failure', message: '일부 카페 발행 실패' } : null,
   });
 }
