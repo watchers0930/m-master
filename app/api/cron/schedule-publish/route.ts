@@ -12,6 +12,7 @@ import { publishInstagramImage, publishInstagramCarousel } from '@/lib/publish/i
 import { convertBlogToChannel } from '@/lib/claude/convert';
 import { trackCost } from '@/lib/cost/tracker';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
+import { getCafeTargets } from '@/lib/channel-credentials';
 
 export const maxDuration = 300; // 5분 (Vercel Pro)
 export const dynamic = 'force-dynamic';
@@ -212,13 +213,83 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
         contentId: content.id,
       });
 
-      // 네이버 카페 발행 (본문 이미지 첨부)
+      // 네이버 카페 발행 — 다중 카페 타겟 지원
       const blogImageUrls = (content.bodyImageUrls as string[]) ?? [];
-      const cafeResult = await publishNaverCafePost({
-        subject: content.topic,
-        content: converted.text,
-        imageUrls: blogImageUrls,
-      });
+      const cafeTargets = await getCafeTargets();
+      let anySuccess = false;
+
+      if (cafeTargets.length > 0) {
+        for (let ct = 0; ct < cafeTargets.length; ct++) {
+          const target = cafeTargets[ct];
+          if (ct > 0) await new Promise(r => setTimeout(r, 10_000));
+          try {
+            const cafeResult = await publishNaverCafePost({
+              subject: content.topic,
+              content: converted.text,
+              imageUrls: blogImageUrls,
+              clubId: target.clubId,
+              menuId: target.menuId,
+            });
+            anySuccess = true;
+            const cafeSlot = await prisma.scheduleSlot.create({
+              data: {
+                contentId: content.id, channel: 'naver_cafe',
+                scheduledAt: new Date(), publishedAt: new Date(),
+                status: 'published', mode: 'ai_auto',
+                targetName: target.name,
+                externalId: cafeResult.articleId, externalUrl: cafeResult.cafeUrl,
+              },
+            });
+            await logAudit({
+              actor: null,
+              action: AUDIT_ACTIONS.CRON_SCHEDULE_PUBLISH,
+              targetType: 'schedule_slot',
+              targetId: cafeSlot.id,
+              payload: {
+                source: 'blog_auto_cafe', blogSlotId: slot.id,
+                contentId: content.id, targetName: target.name,
+                externalId: cafeResult.articleId, cafeUrl: cafeResult.cafeUrl,
+                convertCostKrw: converted.krw,
+              },
+            });
+            console.log(`[cron/schedule-publish] ✓ 블로그→카페 ${target.name} — ${cafeResult.cafeUrl}`);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[cron/schedule-publish] ✗ 블로그→카페 ${target.name}:`, msg);
+          }
+        }
+      } else {
+        // CafeTarget 없으면 기존 방식
+        const cafeResult = await publishNaverCafePost({
+          subject: content.topic,
+          content: converted.text,
+          imageUrls: blogImageUrls,
+        });
+        anySuccess = true;
+        const cafeSlot = await prisma.scheduleSlot.create({
+          data: {
+            contentId: content.id, channel: 'naver_cafe',
+            scheduledAt: new Date(), publishedAt: new Date(),
+            status: 'published', mode: 'ai_auto',
+            externalId: cafeResult.articleId, externalUrl: cafeResult.cafeUrl,
+          },
+        });
+        await logAudit({
+          actor: null,
+          action: AUDIT_ACTIONS.CRON_SCHEDULE_PUBLISH,
+          targetType: 'schedule_slot',
+          targetId: cafeSlot.id,
+          payload: {
+            source: 'blog_auto_cafe', blogSlotId: slot.id,
+            contentId: content.id,
+            externalId: cafeResult.articleId, cafeUrl: cafeResult.cafeUrl,
+            convertCostKrw: converted.krw,
+          },
+        });
+        console.log(`[cron/schedule-publish] ✓ 블로그→카페 — ${cafeResult.cafeUrl}`);
+      }
+
+      if (!anySuccess) throw new Error('모든 카페 타겟 발행 실패');
 
       // 변환+발행 성공 후 블로그 슬롯 → published
       await prisma.scheduleSlot.update({
@@ -226,38 +297,8 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
         data: { status: 'published', publishedAt: new Date() },
       });
 
-      // 카페 슬롯 생성 (published)
-      const cafeSlot = await prisma.scheduleSlot.create({
-        data: {
-          contentId: content.id,
-          channel: 'naver_cafe',
-          scheduledAt: new Date(),
-          publishedAt: new Date(),
-          status: 'published',
-          mode: 'ai_auto',
-          externalId: cafeResult.articleId,
-          externalUrl: cafeResult.cafeUrl,
-        },
-      });
-
-      // audit log
-      await logAudit({
-        actor: null,
-        action: AUDIT_ACTIONS.CRON_SCHEDULE_PUBLISH,
-        targetType: 'schedule_slot',
-        targetId: cafeSlot.id,
-        payload: {
-          source: 'blog_auto_cafe',
-          blogSlotId: slot.id,
-          contentId: content.id,
-          externalId: cafeResult.articleId,
-          cafeUrl: cafeResult.cafeUrl,
-          convertCostKrw: converted.krw,
-        },
-      });
-
       results.push({ slotId: slot.id, channel: 'blog→naver_cafe', status: 'published' });
-      console.log(`[cron/schedule-publish] ✓ 블로그→카페 — ${content.topic} → ${cafeResult.cafeUrl}`);
+      console.log(`[cron/schedule-publish] ✓ 블로그→카페 완료 — ${content.topic}`);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       console.error(`[cron/schedule-publish] ✗ 블로그→카페 — slot ${slot.id}:`, errorMsg);

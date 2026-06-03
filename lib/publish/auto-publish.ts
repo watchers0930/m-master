@@ -118,6 +118,7 @@ async function publishToChannel(
     // 다중 카페 타겟 지원: 모든 타겟에 순차 발행
     const cafeTargets = await getCafeTargets();
     if (cafeTargets.length > 0) {
+      const errors: string[] = [];
       for (let t = 0; t < cafeTargets.length; t++) {
         const target = cafeTargets[t];
         // 두 번째 카페부터 10초 대기 (스팸 필터 방지)
@@ -130,14 +131,14 @@ async function publishToChannel(
             clubId: target.clubId,
             menuId: target.menuId,
           });
-          // 첫 번째 타겟 결과를 대표값으로 사용
-          if (t === 0) {
+          console.log(`[auto-publish] naver_cafe ${target.name} 성공: ${result.cafeUrl}`);
+          // 첫 번째 성공 타겟 결과를 대표값으로 사용
+          if (!externalId) {
             externalId = result.articleId;
             externalUrl = result.cafeUrl;
             firstTargetName = target.name;
-          }
-          // 추가 타겟은 별도 ScheduleSlot 생성
-          if (t > 0) {
+          } else {
+            // 추가 타겟은 별도 ScheduleSlot 생성
             await prisma.scheduleSlot.create({
               data: {
                 contentId: content.id, channel: 'naver_cafe',
@@ -149,8 +150,14 @@ async function publishToChannel(
             });
           }
         } catch (err) {
-          console.error(`[auto-publish] naver_cafe ${target.name} 실패:`, err);
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`[auto-publish] naver_cafe ${target.name} 실패:`, msg);
+          errors.push(`${target.name}: ${msg}`);
         }
+      }
+      // 모든 타겟이 실패하면 에러 throw
+      if (!externalId && errors.length > 0) {
+        throw new Error(`네이버 카페 전체 발행 실패 — ${errors.join(' | ')}`);
       }
     } else {
       // CafeTarget 없으면 기존 방식 (credential의 clubId/menuId)
