@@ -1,6 +1,7 @@
 // app/api/cafe-targets/route.ts — 카페 타겟 CRUD
 // GET  → 전체 목록
 // POST → 추가 { name, clubId, menuId }
+// PUT  → 수정 { id, name?, clubId?, menuId? }
 // PATCH → 기본 카페 변경 { id, isDefault }
 // DELETE → 삭제 { id }
 
@@ -19,6 +20,13 @@ const PatchSchema = z.object({
   id: z.string().min(1),
   isDefault: z.boolean(),
 });
+
+const UpdateSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1, '카페 이름은 필수입니다').optional(),
+  clubId: z.string().min(1, '카페 ID는 필수입니다').optional(),
+  menuId: z.string().min(1, '메뉴 ID는 필수입니다').optional(),
+}).refine(d => d.name || d.clubId || d.menuId, { message: '수정할 항목이 없습니다' });
 
 const DeleteSchema = z.object({
   id: z.string().min(1),
@@ -56,6 +64,33 @@ export async function POST(request: NextRequest) {
     data: { name, clubId, menuId, isDefault: count === 0 },
   });
 
+  return NextResponse.json({ data: target, error: null });
+}
+
+// ── PUT — 수정 ──
+export async function PUT(request: NextRequest) {
+  await requireSession();
+
+  let body: unknown;
+  try { body = await request.json(); } catch {
+    return NextResponse.json({ error: { code: 'bad_request', message: 'JSON 파싱 실패' } }, { status: 400 });
+  }
+
+  const parsed = UpdateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: { code: 'validation', message: parsed.error.issues[0]?.message ?? 'validation error' } },
+      { status: 400 },
+    );
+  }
+
+  const { id, ...fields } = parsed.data;
+  const data: Record<string, string> = {};
+  if (fields.name) data.name = fields.name;
+  if (fields.clubId) data.clubId = fields.clubId;
+  if (fields.menuId) data.menuId = fields.menuId;
+
+  const target = await prisma.cafeTarget.update({ where: { id }, data });
   return NextResponse.json({ data: target, error: null });
 }
 

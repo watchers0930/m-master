@@ -65,6 +65,8 @@ export default function ChannelForm({ initial, cafeTargets: initialTargets }: Pr
   const [targetForm, setTargetForm] = useState({ name: '', clubId: '', menuId: '' });
   const [targetLoading, setTargetLoading] = useState(false);
   const [targetError, setTargetError] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', clubId: '', menuId: '' });
 
   const setField = useCallback((channelId: string, key: string, value: string) => {
     setForms(prev => ({ ...prev, [channelId]: { ...prev[channelId], [key]: value } }));
@@ -158,6 +160,39 @@ export default function ChannelForm({ initial, cafeTargets: initialTargets }: Pr
     } catch { setTargetError('삭제 실패'); }
   }, []);
 
+  const handleStartEdit = useCallback((t: CafeTargetData) => {
+    setEditingId(t.id);
+    setEditForm({ name: t.name, clubId: t.clubId, menuId: t.menuId });
+    setTargetError('');
+  }, []);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingId(null);
+    setEditForm({ name: '', clubId: '', menuId: '' });
+  }, []);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!editingId || !editForm.name || !editForm.clubId || !editForm.menuId) {
+      setTargetError('모든 필드를 입력하세요');
+      return;
+    }
+    setTargetLoading(true);
+    setTargetError('');
+    try {
+      const res = await fetch('/api/cafe-targets', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: editingId, ...editForm }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setTargetError(json.error?.message ?? '수정 실패'); return; }
+      setTargets(prev => prev.map(t => t.id === editingId ? { ...t, ...json.data } : t));
+      setEditingId(null);
+      setEditForm({ name: '', clubId: '', menuId: '' });
+    } catch { setTargetError('네트워크 오류'); }
+    finally { setTargetLoading(false); }
+  }, [editingId, editForm]);
+
   const handleToggleDefault = useCallback(async (id: string, isDefault: boolean) => {
     try {
       const res = await fetch('/api/cafe-targets', {
@@ -245,7 +280,30 @@ export default function ChannelForm({ initial, cafeTargets: initialTargets }: Pr
                 {/* 등록된 타겟 목록 */}
                 {targets.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-                    {targets.map(t => (
+                    {targets.map(t => editingId === t.id ? (
+                      <div key={t.id} style={{ background: 'var(--n50)', borderRadius: 6, padding: '10px', fontSize: 12 }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                          <div style={{ flex: '1 1 120px' }}>
+                            <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 이름</label>
+                            <input type="text" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} style={{ ...inputStyle, fontSize: 11 }} autoComplete="off" />
+                          </div>
+                          <div style={{ flex: '0 0 100px' }}>
+                            <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 ID</label>
+                            <input type="text" value={editForm.clubId} onChange={e => setEditForm(p => ({ ...p, clubId: e.target.value }))} style={{ ...inputStyle, fontSize: 11 }} autoComplete="off" />
+                          </div>
+                          <div style={{ flex: '0 0 100px' }}>
+                            <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>메뉴 ID</label>
+                            <input type="text" value={editForm.menuId} onChange={e => setEditForm(p => ({ ...p, menuId: e.target.value }))} style={{ ...inputStyle, fontSize: 11 }} autoComplete="off" />
+                          </div>
+                          <button className="btn btn-primary" style={{ fontSize: 11, padding: '7px 12px', flexShrink: 0 }} onClick={handleSaveEdit} disabled={targetLoading}>
+                            {targetLoading ? '저장 중...' : '저장'}
+                          </button>
+                          <button className="btn btn-ghost" style={{ fontSize: 11, padding: '7px 8px', flexShrink: 0 }} onClick={handleCancelEdit}>
+                            취소
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
                       <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--n50)', borderRadius: 6, padding: '8px 10px', fontSize: 12 }}>
                         <span style={{ flex: 1, fontWeight: 600, color: 'var(--text)' }}>{t.name}</span>
                         <span style={{ fontSize: 10, color: 'var(--sub)', fontFamily: 'monospace' }}>club:{t.clubId} / menu:{t.menuId}</span>
@@ -258,6 +316,12 @@ export default function ChannelForm({ initial, cafeTargets: initialTargets }: Pr
                           }}
                         >
                           {t.isDefault ? '기본' : '기본 설정'}
+                        </button>
+                        <button
+                          onClick={() => handleStartEdit(t)}
+                          style={{ fontSize: 10, color: 'var(--blue-600)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '2px 4px' }}
+                        >
+                          수정
                         </button>
                         <button
                           onClick={() => handleDeleteTarget(t.id)}
