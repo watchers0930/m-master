@@ -7,6 +7,8 @@ export async function GET() {
   // 1) Unsplash 테스트
   const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
   results.unsplash_key_set = !!unsplashKey;
+  results.unsplash_key_type = typeof unsplashKey;
+  results.unsplash_key_len = unsplashKey?.length ?? 0;
   if (unsplashKey) {
     try {
       const res = await fetch(
@@ -28,9 +30,13 @@ export async function GET() {
     }
   }
 
+  // CREDENTIAL_ENCRYPTION_SECRET 체크 (다른 키 참고용)
+  results.credential_key_set = !!process.env.CREDENTIAL_ENCRYPTION_SECRET;
+
   // 2) OpenAI API 키 확인 (이미지 생성은 비용 발생하므로 키 유효성만 확인)
   const openaiKey = process.env.OPENAI_API_KEY;
   results.openai_key_set = !!openaiKey;
+  results.openai_image_model = process.env.OPENAI_IMAGE_MODEL ?? 'not_set';
   if (openaiKey) {
     try {
       const res = await fetch('https://api.openai.com/v1/models', {
