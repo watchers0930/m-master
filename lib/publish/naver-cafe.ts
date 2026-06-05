@@ -445,13 +445,18 @@ export async function publishNaverCafePost(opts: {
   // DB 자격증명이 있으면 cachedAccessToken에 반영
   if (resolved.accessToken) cachedAccessToken = resolved.accessToken;
 
-  // 이미지 URL을 HTML 본문에 인라인 배치 (multipart는 이미지를 상단에 몰아넣으므로 사용하지 않음)
-  const imgUrls = (opts.imageUrls ?? []).filter(u => u && u.trim() !== '');
-  const htmlBody = buildNaverCafeContent(opts.content, imgUrls) + '\n' + CAFE_FOOTER;
+  // 본문 HTML 생성 (인라인 <img>는 스팸 필터에 걸리므로 사용하지 않음)
+  const htmlBody = buildNaverCafeContent(opts.content, []) + '\n' + CAFE_FOOTER;
   const tags = generateDynamicTags(opts.subject, opts.keywords ?? [], opts.content);
   const fields = { subject: opts.subject, content: htmlBody, openArticle: 'true', tagList: tags };
 
-  const { res, json } = await cafeApiPost(clubId, menuId, fields);
+  // 이미지: multipart로 첨부 (네이버가 본문 상단에 배치 — API 제약)
+  const imgUrls = (opts.imageUrls ?? []).filter(u => u && u.trim() !== '');
+  const images = imgUrls.length > 0 ? await downloadImages(imgUrls) : [];
+
+  const { res, json } = images.length > 0
+    ? await cafeApiPostWithImages(clubId, menuId, fields, images)
+    : await cafeApiPost(clubId, menuId, fields);
 
   if (!res.ok) {
     const msg = (json?.message as { error?: { msg?: string } })?.error?.msg ?? `HTTP ${res.status}`;
