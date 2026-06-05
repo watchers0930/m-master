@@ -445,18 +445,13 @@ export async function publishNaverCafePost(opts: {
   // DB 자격증명이 있으면 cachedAccessToken에 반영
   if (resolved.accessToken) cachedAccessToken = resolved.accessToken;
 
-  // 본문 HTML 생성
-  const htmlBody = buildNaverCafeContent(opts.content, []) + '\n' + CAFE_FOOTER;
+  // 이미지 URL을 HTML 본문에 인라인 배치 (multipart는 이미지를 상단에 몰아넣으므로 사용하지 않음)
+  const imgUrls = (opts.imageUrls ?? []).filter(u => u && u.trim() !== '');
+  const htmlBody = buildNaverCafeContent(opts.content, imgUrls) + '\n' + CAFE_FOOTER;
   const tags = generateDynamicTags(opts.subject, opts.keywords ?? [], opts.content);
   const fields = { subject: opts.subject, content: htmlBody, openArticle: 'true', tagList: tags };
 
-  // 이미지가 있으면 다운로드 후 multipart로 첨부 발행
-  const imgUrls = (opts.imageUrls ?? []).filter(u => u && u.trim() !== '');
-  const images = imgUrls.length > 0 ? await downloadImages(imgUrls) : [];
-
-  const { res, json } = images.length > 0
-    ? await cafeApiPostWithImages(clubId, menuId, fields, images)
-    : await cafeApiPost(clubId, menuId, fields);
+  const { res, json } = await cafeApiPost(clubId, menuId, fields);
 
   if (!res.ok) {
     const msg = (json?.message as { error?: { msg?: string } })?.error?.msg ?? `HTTP ${res.status}`;
