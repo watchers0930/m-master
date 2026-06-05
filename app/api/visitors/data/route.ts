@@ -6,37 +6,46 @@ import {
   type Period,
 } from '@/lib/ga4/visitors';
 
-const VALID: Period[] = ['today', 'this_week', 'this_month', '7d', '30d', '90d', '365d'];
+const VALID: Period[] = ['today', 'yesterday', 'this_week', 'this_month', '7d', '30d', '90d', '365d'];
+
+async function fetchAll(period: Period) {
+  // GA4 API 동시 요청 제한(~10) 회피를 위해 3단계로 분산
+  const [kpi, daily] = await Promise.all([
+    fetchOverviewKpi(period),
+    fetchDailySeries(period),
+  ]);
+
+  const [traffic, pages, entry] = await Promise.all([
+    fetchTrafficSources(period),
+    fetchTopPages(period, 20),
+    fetchEntryExit(period),
+  ]);
+
+  const [refs, demo, devs] = await Promise.all([
+    fetchReferrals(period),
+    fetchDemographics(period),
+    fetchDevices(period),
+  ]);
+
+  return { kpi, traffic, daily, pages, refs, demo, devs, entry };
+}
 
 export async function GET(req: NextRequest) {
   await requireSession();
   const raw = req.nextUrl.searchParams.get('period') ?? '30d';
-  const period: Period = (VALID as string[]).includes(raw) ? (raw as Period) : '30d';
+  let period: Period = (VALID as string[]).includes(raw) ? (raw as Period) : '30d';
 
   try {
-    // GA4 API 동시 요청 제한(~10) 회피를 위해 3단계로 분산
-    // Phase 1: KPI(2) + daily(1) = 3 concurrent GA4 calls
-    const [kpi, daily] = await Promise.all([
-      fetchOverviewKpi(period),
-      fetchDailySeries(period),
-    ]);
+    let data = await fetchAll(period);
 
-    // Phase 2: traffic(1) + pages(1) + entry(2) = 4 concurrent
-    const [traffic, pages, entry] = await Promise.all([
-      fetchTrafficSources(period),
-      fetchTopPages(period, 20),
-      fetchEntryExit(period),
-    ]);
-
-    // Phase 3: refs(2) + demo(3) + devs(3) = 8 concurrent
-    const [refs, demo, devs] = await Promise.all([
-      fetchReferrals(period),
-      fetchDemographics(period),
-      fetchDevices(period),
-    ]);
+    // today 데이터가 비어있으면 yesterday로 폴백
+    if (period === 'today' && data.kpi.sessions === 0 && data.kpi.pageViews === 0) {
+      period = 'yesterday';
+      data = await fetchAll(period);
+    }
 
     return NextResponse.json({
-      data: { kpi, traffic, daily, pages, refs, demo, devs, entry },
+      data: { ...data, period },
       error: null,
     });
   } catch (e) {

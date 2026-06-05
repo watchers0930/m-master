@@ -6,12 +6,14 @@ import type { ContentPerformanceResponse } from '@/app/api/analytics/content-per
 
 const CH_LABEL: Record<string, string> = {
   blog: '블로그',
+  naver_cafe: '카페',
   instagram: '인스타',
   facebook: '페이스북',
 };
 
 const CH_COLOR: Record<string, string> = {
   blog: 'var(--blue-600)',
+  naver_cafe: '#03c75a',
   instagram: '#d946ef',
   facebook: '#1877f2',
 };
@@ -40,7 +42,7 @@ interface Props {
 }
 
 export function ContentPerformanceTable({ days }: Props) {
-  const [channelFilter, setChannelFilter] = useState<'all' | 'blog' | 'instagram' | 'facebook'>('all');
+  const [channelFilter, setChannelFilter] = useState<'all' | 'blog' | 'naver_cafe' | 'instagram' | 'facebook'>('all');
 
   const { data, isPending: loading, error: queryError } = useQuery({
     queryKey: ['analytics', 'content-performance', days],
@@ -76,7 +78,7 @@ export function ContentPerformanceTable({ days }: Props) {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
-          {(['all', 'blog', 'instagram', 'facebook'] as const).map((ch) => (
+          {(['all', 'naver_cafe', 'blog', 'instagram', 'facebook'] as const).map((ch) => (
             <button
               key={ch}
               onClick={() => setChannelFilter(ch)}
@@ -129,9 +131,13 @@ export function ContentPerformanceTable({ days }: Props) {
               {filtered.map((r) => (
                 <tr key={r.content_id} style={{ borderBottom: '1px solid var(--n100)' }}>
                   <td style={{ padding: '8px 6px', color: 'var(--text)', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <a href={r.external_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text)', textDecoration: 'none' }}>
-                      {r.title}
-                    </a>
+                    {r.external_url ? (
+                      <a href={r.external_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text)', textDecoration: 'none' }}>
+                        {r.title}
+                      </a>
+                    ) : (
+                      <span>{r.title}</span>
+                    )}
                   </td>
                   <td style={{ padding: '8px 6px' }}>
                     <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 3, background: `${CH_COLOR[r.channel]}15`, color: CH_COLOR[r.channel] }}>

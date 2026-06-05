@@ -14,8 +14,8 @@ export interface ContentPerformanceRow {
   title: string;
   channel: Channel;
   published_at: string | null;
-  external_url: string;
-  page_path: string;
+  external_url: string | null;
+  page_path: string | null;
   metrics: PathMetrics;
   naver_sessions: number;
 }
@@ -53,63 +53,80 @@ export async function GET(request: NextRequest) {
   const period = { from: ymd(from), to: ymd(now), days };
 
   try {
-    const slots = await prisma.scheduleSlot.findMany({
+    // content 테이블 기준으로 published 콘텐츠 조회 + schedule_slots JOIN
+    const contents = await prisma.content.findMany({
       where: {
         status: 'published',
-        externalUrl: { not: null },
-        publishedAt: { gte: new Date(`${period.from}T00:00:00Z`) },
+        createdAt: { gte: new Date(`${period.from}T00:00:00Z`) },
       },
-      include: {
-        content: { select: { topic: true } },
+      select: {
+        id: true,
+        topic: true,
+        channel: true,
+        createdAt: true,
+        scheduleSlots: {
+          where: { status: 'published', externalUrl: { not: null } },
+          select: { publishedAt: true, externalUrl: true, targetName: true },
+          orderBy: { publishedAt: 'desc' },
+          take: 1,
+        },
       },
-      orderBy: { publishedAt: 'desc' },
+      orderBy: { createdAt: 'desc' },
     });
 
     const rows: Array<Omit<ContentPerformanceRow, 'metrics' | 'naver_sessions'>> = [];
-    for (const slot of slots) {
-      if (!slot.externalUrl || !slot.contentId) continue;
-      let pagePath: string;
-      try {
-        pagePath = extractPath(slot.externalUrl);
-      } catch (error) {
-        if (error instanceof InvalidUrlError) continue;
-        throw error;
+    for (const content of contents) {
+      const slot = content.scheduleSlots[0];
+      const externalUrl = slot?.externalUrl ?? null;
+      let pagePath: string | null = null;
+
+      if (externalUrl) {
+        try {
+          pagePath = extractPath(externalUrl);
+        } catch (error) {
+          if (!(error instanceof InvalidUrlError)) throw error;
+        }
       }
+
       rows.push({
-        content_id: slot.contentId,
-        title: slot.content?.topic ?? '(untitled)',
-        channel: slot.channel as Channel,
-        published_at: slot.publishedAt?.toISOString() ?? null,
-        external_url: slot.externalUrl,
+        content_id: content.id,
+        title: content.topic ?? '(untitled)',
+        channel: content.channel as Channel,
+        published_at: slot?.publishedAt?.toISOString() ?? content.createdAt.toISOString(),
+        external_url: externalUrl,
         page_path: pagePath,
       });
     }
 
-    const uniquePaths = Array.from(new Set(rows.map((row) => row.page_path)));
+    // GA4 조회는 page_path가 있는 항목만
+    const pathRows = rows.filter((r) => r.page_path);
+    const uniquePaths = Array.from(new Set(pathRows.map((r) => r.page_path!)));
     let ga4Fallback = false;
     let ga4Error: string | null = null;
     let metricsByPath: Record<string, PathMetrics> = {};
     let naverByPath: Record<string, number> = {};
 
-    const [metricsResult, naverResult] = await Promise.all([
-      fetchMultiplePathMetrics(uniquePaths, from, now),
-      fetchMultiplePathSessionsByNaver(uniquePaths, from, now),
-    ]);
+    if (uniquePaths.length > 0) {
+      const [metricsResult, naverResult] = await Promise.all([
+        fetchMultiplePathMetrics(uniquePaths, from, now),
+        fetchMultiplePathSessionsByNaver(uniquePaths, from, now),
+      ]);
 
-    if (metricsResult === null || naverResult === null) {
-      ga4Fallback = true;
-      ga4Error = 'GA4 unavailable';
-      metricsByPath = Object.fromEntries(uniquePaths.map((entry) => [entry, { ...EMPTY_METRICS }]));
-      naverByPath = Object.fromEntries(uniquePaths.map((entry) => [entry, 0]));
-    } else {
-      metricsByPath = metricsResult;
-      naverByPath = naverResult;
+      if (metricsResult === null || naverResult === null) {
+        ga4Fallback = true;
+        ga4Error = 'GA4 unavailable';
+        metricsByPath = Object.fromEntries(uniquePaths.map((p) => [p, { ...EMPTY_METRICS }]));
+        naverByPath = Object.fromEntries(uniquePaths.map((p) => [p, 0]));
+      } else {
+        metricsByPath = metricsResult;
+        naverByPath = naverResult;
+      }
     }
 
     const data: ContentPerformanceRow[] = rows.map((row) => ({
       ...row,
-      metrics: metricsByPath[row.page_path] ?? { ...EMPTY_METRICS },
-      naver_sessions: naverByPath[row.page_path] ?? 0,
+      metrics: row.page_path ? (metricsByPath[row.page_path] ?? { ...EMPTY_METRICS }) : { ...EMPTY_METRICS },
+      naver_sessions: row.page_path ? (naverByPath[row.page_path] ?? 0) : 0,
     }));
 
     data.sort((a, b) => b.metrics.sessions - a.metrics.sessions);

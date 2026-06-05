@@ -20,7 +20,7 @@ export const TTL = {
   DETAIL: 15 * 60 * 1000,
 } as const;
 
-export type Period = '7d' | '30d' | '90d' | '365d' | 'today' | 'this_week' | 'this_month';
+export type Period = '7d' | '30d' | '90d' | '365d' | 'today' | 'yesterday' | 'this_week' | 'this_month';
 export interface DimensionValue {
   value?: string | null;
 }
@@ -153,6 +153,8 @@ export function periodToDates(period: Period) {
   switch (period) {
     case 'today':
       return { startDate: 'today', endDate: 'today' };
+    case 'yesterday':
+      return { startDate: 'yesterday', endDate: 'yesterday' };
     case 'this_week': {
       const now = kstNow();
       const diff = now.getDay() === 0 ? 6 : now.getDay() - 1;
@@ -179,6 +181,12 @@ export function prevPeriodDates(period: Period) {
   switch (period) {
     case 'today':
       return { startDate: 'yesterday', endDate: 'yesterday' };
+    case 'yesterday': {
+      const now = kstNow();
+      const twoDaysAgo = new Date(now);
+      twoDaysAgo.setDate(now.getDate() - 2);
+      return { startDate: toYMD(twoDaysAgo), endDate: toYMD(twoDaysAgo) };
+    }
     case 'this_week': {
       const now = kstNow();
       const diff = now.getDay() === 0 ? 6 : now.getDay() - 1;
