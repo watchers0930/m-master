@@ -450,9 +450,9 @@ export async function publishNaverCafePost(opts: {
   const tags = generateDynamicTags(opts.subject, opts.keywords ?? [], opts.content);
   const fields = { subject: opts.subject, content: htmlBody, openArticle: 'true', tagList: tags };
 
-  // 이미지: multipart로 첨부 (네이버가 본문 상단에 배치 — API 제약)
+  // 이미지: 대표 1장만 multipart 첨부 (네이버 API는 상단에 몰아넣으므로 1장만)
   const imgUrls = (opts.imageUrls ?? []).filter(u => u && u.trim() !== '');
-  const images = imgUrls.length > 0 ? await downloadImages(imgUrls) : [];
+  const images = imgUrls.length > 0 ? await downloadImages(imgUrls.slice(0, 1)) : [];
 
   const { res, json } = images.length > 0
     ? await cafeApiPostWithImages(clubId, menuId, fields, images)
