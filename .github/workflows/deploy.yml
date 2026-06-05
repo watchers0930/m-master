@@ -33,6 +33,16 @@ jobs:
         with:
           node-version: 22
 
+      - name: Sync environment variables to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          # UNSPLASH_ACCESS_KEY — GitHub Secret → Vercel env var
+          # 기존 값 삭제 후 재등록 (이미 존재할 수 있으므로 에러 무시)
+          npx vercel env rm UNSPLASH_ACCESS_KEY production --token="$VERCEL_TOKEN" --scope="$VERCEL_SCOPE" --yes 2>/dev/null || true
+          echo "${{ secrets.UNSPLASH_ACCESS_KEY }}" | npx vercel env add UNSPLASH_ACCESS_KEY production --token="$VERCEL_TOKEN" --scope="$VERCEL_SCOPE"
+
       - name: Deploy production to Vercel
         id: deploy_production
         env:

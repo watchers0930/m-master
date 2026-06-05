@@ -1,4 +1,4 @@
-// lib/openai/image.ts — DALL-E 3 썸네일 생성 (서버 전용)
+// lib/openai/image.ts — OpenAI 이미지 생성 (서버 전용)
 import OpenAI from 'openai';
 
 let _client: OpenAI | null = null;
@@ -10,7 +10,7 @@ function getClient(): OpenAI {
   return _client;
 }
 
-const IMAGE_COST_KRW = 100; // DALL-E 3 standard 기준 ~100원
+const IMAGE_COST_KRW = 100;
 
 export function calcImageKrw(): number {
   return IMAGE_COST_KRW;
@@ -21,11 +21,21 @@ export interface ImageGenResult {
   revised_prompt: string;
 }
 
+function getImageModel(): string {
+  return process.env.OPENAI_IMAGE_MODEL || 'dall-e-3';
+}
+
+function isGptImageModel(model: string): boolean {
+  return model.startsWith('gpt-image');
+}
+
 export async function generateThumbnail(
   topic: string,
   stylePrompt?: string,
 ): Promise<ImageGenResult> {
   const client = getClient();
+  const model = getImageModel();
+  const useGptImage = isGptImageModel(model);
 
   const prompt = [
     `VESTRA(AI 부동산 권리분석·시세분석 서비스) 마케팅 블로그 썸네일. 주제: "${topic}".`,
@@ -34,17 +44,19 @@ export async function generateThumbnail(
     '텍스트·글자 없음. 고해상도 상업용 이미지.',
   ].join(' ');
 
-  const res = await client.images.generate({
-    model: 'dall-e-3',
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const params: any = {
+    model,
     prompt,
     n: 1,
-    size: '1792x1024',
-    quality: 'standard',
+    size: useGptImage ? '1536x1024' : '1792x1024',
+    quality: useGptImage ? 'medium' : 'standard',
     response_format: 'url',
-  });
+  };
 
+  const res = await client.images.generate(params);
   const image = res.data?.[0];
-  if (!image?.url) throw new Error('DALL-E 3 이미지 URL 반환 없음');
+  if (!image?.url) throw new Error(`${model} 이미지 URL 반환 없음`);
 
   return {
     url: image.url,
