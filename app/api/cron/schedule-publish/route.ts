@@ -55,7 +55,7 @@ async function publishSocialSlots(): Promise<SlotResult[]> {
     },
     include: {
       content: {
-        select: { id: true, textBody: true, imageUrl: true, bodyImageUrls: true, topic: true },
+        select: { id: true, textBody: true, imageUrl: true, bodyImageUrls: true, topic: true, keywords: true },
       },
     },
     orderBy: [{ channel: 'asc' }, { scheduledAt: 'asc' }],
@@ -91,7 +91,7 @@ async function publishSocialSlots(): Promise<SlotResult[]> {
 
       if (slot.channel === 'naver_cafe') {
         const bodyUrls = (content.bodyImageUrls as string[]) ?? [];
-        const result = await publishNaverCafePost({ subject: content.topic, content: content.textBody, imageUrls: bodyUrls });
+        const result = await publishNaverCafePost({ subject: content.topic, content: content.textBody, keywords: content.keywords ?? [], imageUrls: bodyUrls });
         externalId = result.articleId;
         externalUrl = result.cafeUrl;
       } else if (slot.channel === 'facebook') {
@@ -177,7 +177,7 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
     },
     include: {
       content: {
-        select: { id: true, textBody: true, topic: true, ownerId: true, bodyImageUrls: true },
+        select: { id: true, textBody: true, topic: true, keywords: true, ownerId: true, bodyImageUrls: true },
       },
     },
     orderBy: { scheduledAt: 'asc' },
@@ -226,6 +226,7 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
             const cafeResult = await publishNaverCafePost({
               subject: content.topic,
               content: converted.text,
+              keywords: content.keywords ?? [],
               imageUrls: blogImageUrls,
               clubId: target.clubId,
               menuId: target.menuId,
@@ -263,6 +264,7 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
         const cafeResult = await publishNaverCafePost({
           subject: content.topic,
           content: converted.text,
+          keywords: content.keywords ?? [],
           imageUrls: blogImageUrls,
         });
         anySuccess = true;

@@ -377,6 +377,55 @@ const CAFE_FOOTER = [
 ].join('\n');
 
 // ---------------------------------------------------------------------------
+// 동적 태그 생성 — 콘텐츠 주제·키워드 기반
+// ---------------------------------------------------------------------------
+const BRAND_TAGS = ['VESTRA', '베스트라'];
+
+/** 콘텐츠에서 H2 소제목 키워드 추출 */
+function extractH2Keywords(text: string): string[] {
+  const matches = text.match(/^##\s+(.+)$/gm) ?? [];
+  return matches
+    .map(m => m.replace(/^##\s+/, '').replace(/[🔍📌✅💡🏠📊⚠️🔑📋💰🏢📈🔎✨🎯]/g, '').trim())
+    .filter(h => h.length >= 2 && h.length <= 20 && !h.includes('목차'));
+}
+
+/** 주제·키워드·본문에서 네이버 카페 태그 자동 생성 (최대 10개) */
+function generateDynamicTags(subject: string, keywords: string[], content: string): string {
+  const tagSet = new Set<string>();
+
+  // 1) DB 키워드 (가장 관련성 높음)
+  for (const kw of keywords) {
+    const clean = kw.trim().replace(/\s+/g, '');
+    if (clean.length >= 2 && clean.length <= 20) tagSet.add(clean);
+  }
+
+  // 2) 제목에서 핵심 단어 추출 (2글자 이상 명사 위주)
+  const stopWords = new Set(['방법', '완벽', '가이드', '정리', '핵심', '확인', '분석', '총정리']);
+  const subjectWords = subject
+    .replace(/[0-9]{4}년|[0-9]+가지|[0-9]+월/g, '') // 연도·숫자 제거
+    .split(/[\s,·|/]+/)
+    .map(w => w.trim())
+    .filter(w => w.length >= 2 && w.length <= 10 && !stopWords.has(w));
+  for (const w of subjectWords) tagSet.add(w);
+
+  // 3) H2 소제목에서 키워드 보충
+  const h2Keywords = extractH2Keywords(content);
+  for (const h2 of h2Keywords.slice(0, 3)) {
+    const words = h2.split(/[\s,·]+/).filter(w => w.length >= 2 && w.length <= 10);
+    for (const w of words) {
+      if (tagSet.size >= 8) break;
+      tagSet.add(w);
+    }
+  }
+
+  // 4) 브랜드 태그 항상 포함
+  for (const b of BRAND_TAGS) tagSet.add(b);
+
+  // 최대 10개, 쉼표 구분
+  return Array.from(tagSet).slice(0, 10).join(',');
+}
+
+// ---------------------------------------------------------------------------
 // 게시글 발행
 // ---------------------------------------------------------------------------
 /**
@@ -385,6 +434,7 @@ const CAFE_FOOTER = [
 export async function publishNaverCafePost(opts: {
   subject: string;
   content: string;
+  keywords?: string[];
   imageUrls?: string[];
   clubId?: string;   // 지정 시 이 카페로 발행
   menuId?: string;   // 지정 시 이 게시판으로 발행
@@ -395,12 +445,18 @@ export async function publishNaverCafePost(opts: {
   // DB 자격증명이 있으면 cachedAccessToken에 반영
   if (resolved.accessToken) cachedAccessToken = resolved.accessToken;
 
-  // 본문 HTML 생성 (이미지 없이 텍스트만 발행)
+  // 본문 HTML 생성
   const htmlBody = buildNaverCafeContent(opts.content, []) + '\n' + CAFE_FOOTER;
-  const tags = '부동산,권리분석,등기부등본,전세사기방지,아파트시세,실거래가,전세보증보험,부동산세금,VESTRA,베스트라';
+  const tags = generateDynamicTags(opts.subject, opts.keywords ?? [], opts.content);
   const fields = { subject: opts.subject, content: htmlBody, openArticle: 'true', tagList: tags };
 
-  const { res, json } = await cafeApiPost(clubId, menuId, fields);
+  // 이미지가 있으면 다운로드 후 multipart로 첨부 발행
+  const imgUrls = (opts.imageUrls ?? []).filter(u => u && u.trim() !== '');
+  const images = imgUrls.length > 0 ? await downloadImages(imgUrls) : [];
+
+  const { res, json } = images.length > 0
+    ? await cafeApiPostWithImages(clubId, menuId, fields, images)
+    : await cafeApiPost(clubId, menuId, fields);
 
   if (!res.ok) {
     const msg = (json?.message as { error?: { msg?: string } })?.error?.msg ?? `HTTP ${res.status}`;

@@ -25,6 +25,7 @@ interface AutoPublishParams {
   ownerId: string;
   blogText: string;
   topic: string;
+  keywords?: string[];
   imageUrl: string | null;
   bodyImageUrls: string[];
   blogScores: Record<string, number> | null;
@@ -127,6 +128,7 @@ async function publishToChannel(
           const result = await publishNaverCafePost({
             subject: topic,
             content: converted.text,
+            keywords: params.keywords,
             imageUrls: params.bodyImageUrls,
             clubId: target.clubId,
             menuId: target.menuId,
@@ -164,6 +166,7 @@ async function publishToChannel(
       const result = await publishNaverCafePost({
         subject: topic,
         content: converted.text,
+        keywords: params.keywords,
         imageUrls: params.bodyImageUrls,
       });
       externalId = result.articleId;

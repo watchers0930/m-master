@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
   const content = await prisma.content.findFirst({
     where: { id: content_id, ownerId },
-    select: { id: true, textBody: true, topic: true, bodyImageUrls: true },
+    select: { id: true, textBody: true, topic: true, keywords: true, bodyImageUrls: true },
   });
 
   if (!content) {
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
     } else {
       // CafeTarget이 없으면 기존 방식 (credential에서 clubId/menuId)으로 단건 발행
       try {
-        const publishResult = await publishNaverCafePost({ subject, content: contentText, imageUrls });
+        const publishResult = await publishNaverCafePost({ subject, content: contentText, keywords: content.keywords, imageUrls });
         const now = new Date().toISOString();
         try {
           await prisma.scheduleSlot.create({
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
 
     try {
       const publishResult = await publishNaverCafePost({
-        subject, content: contentText, imageUrls,
+        subject, content: contentText, keywords: content.keywords, imageUrls,
         clubId: target.clubId, menuId: target.menuId,
       });
 
