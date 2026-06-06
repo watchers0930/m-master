@@ -6,8 +6,8 @@ import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { getMonthlySpendKrw } from '@/lib/cost/tracker';
 import { fetchMonthlyVisitorsPair, fetchMultiplePathMetrics } from '@/lib/ga4/visitors';
-import { DashboardCalendar } from './DashboardCalendar';
-import { RefreshTopicsButton } from './components/RefreshTopicsButton';
+import { DashboardCalendar } from '../DashboardCalendar';
+import { RefreshTopicsButton } from '../components/RefreshTopicsButton';
 import {
   fetchAvgScorePair,
   fetchUpcomingMonthScheduleCount,

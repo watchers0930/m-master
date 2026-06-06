@@ -40,7 +40,7 @@ function LoginForm() {
       return;
     }
 
-    router.replace('/');
+    router.replace('/home');
   };
 
   const inputStyle = { width: '100%', borderRadius: 8, border: '1px solid #e2e8f0', padding: '9px 12px', fontSize: 13, color: '#1e293b', outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' as const };

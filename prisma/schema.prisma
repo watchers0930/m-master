@@ -17,6 +17,7 @@ model User {
   id           String   @id @default(cuid())
   email        String   @unique
   name         String?
+  phone        String?
   passwordHash String   @map("password_hash")
   plan         String   @default("free") // free | starter | pro
   stripeId     String?  @map("stripe_id")

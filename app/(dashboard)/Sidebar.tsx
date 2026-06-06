@@ -15,7 +15,7 @@ function Badge({ count }: { count: number }) {
 export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const active = (href: string) => href === '/' ? pathname === '/' : pathname.startsWith(href);
+  const active = (href: string) => href === '/home' ? pathname === '/home' : pathname.startsWith(href);
 
   const [draftCount, setDraftCount] = useState(0);
   const [todayCount, setTodayCount] = useState(0);
@@ -52,7 +52,7 @@ export function Sidebar() {
 
       <div className="sb-section">
         <div className="sb-label">메인</div>
-        <Link href="/" prefetch={false} className={`sb-item${active('/') ? ' active' : ''}`}>
+        <Link href="/home" prefetch={false} className={`sb-item${active('/home') ? ' active' : ''}`}>
           <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
             <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
             <rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
