@@ -69,7 +69,7 @@ function buildSystemPrompt(monthYmd: string): string {
 - 부동산 세금: 취득세·양도세·종부세 계산
 
 [작업]
-주어진 후보 토픽 중 이번 주 블로그 발행에 가장 적합한 TOP 5를 선정하고,
+주어진 후보 토픽 중 이번 주 블로그 발행에 가장 적합한 TOP 7을 선정하고,
 각 항목에 score(0~100), tags(최대 3개), reason(60자 이내)을 부여합니다.
 
 [score 기준]
@@ -174,7 +174,7 @@ export async function recommendTopFive(input: RecommendInput): Promise<Recommend
       type: 'function',
       function: {
         name: 'submit_recommendations',
-        description: '이번 주 블로그 추천 토픽 TOP 5를 제출합니다',
+        description: '이번 주 블로그 추천 토픽 TOP 7을 제출합니다',
         parameters: {
           type: 'object',
           properties: {

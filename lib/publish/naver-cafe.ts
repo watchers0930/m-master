@@ -436,6 +436,7 @@ export async function publishNaverCafePost(opts: {
   content: string;
   keywords?: string[];
   imageUrls?: string[];
+  imageUrl?: string;   // 썸네일 폴백 (bodyImageUrls가 비었을 때 사용)
   clubId?: string;   // 지정 시 이 카페로 발행
   menuId?: string;   // 지정 시 이 게시판으로 발행
 }): Promise<NaverCafePublishResult> {
@@ -450,9 +451,14 @@ export async function publishNaverCafePost(opts: {
   const tags = generateDynamicTags(opts.subject, opts.keywords ?? [], opts.content);
   const fields = { subject: opts.subject, content: htmlBody, openArticle: 'true', tagList: tags };
 
-  // 이미지: 대표 1장만 multipart 첨부 (네이버 API는 상단에 몰아넣으므로 1장만)
-  const imgUrls = (opts.imageUrls ?? []).filter(u => u && u.trim() !== '');
+  // 이미지: 대표 1장 (bodyImage 우선, 없으면 썸네일 폴백)
+  let imgUrls = (opts.imageUrls ?? []).filter(u => u && u.trim() !== '');
+  if (imgUrls.length === 0 && opts.imageUrl) {
+    imgUrls = [opts.imageUrl];
+  }
+  console.log(`[naver-cafe] 이미지 URL ${imgUrls.length}개 (원본 ${(opts.imageUrls ?? []).length}개)`);
   const images = imgUrls.length > 0 ? await downloadImages(imgUrls.slice(0, 1)) : [];
+  console.log(`[naver-cafe] 이미지 다운로드 결과: ${images.length}장`);
 
   const { res, json } = images.length > 0
     ? await cafeApiPostWithImages(clubId, menuId, fields, images)

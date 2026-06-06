@@ -66,7 +66,7 @@ async function publishToChannel(
       keywords: [],
       textBody: converted.text,
       imageUrl,
-      bodyImageUrls: [],
+      bodyImageUrls: params.bodyImageUrls ?? [],
       scores: params.blogScores ?? {},
       costKrw: converted.krw,
       status: 'draft',
@@ -130,6 +130,7 @@ async function publishToChannel(
             content: converted.text,
             keywords: params.keywords,
             imageUrls: params.bodyImageUrls,
+            imageUrl: imageUrl ?? undefined,
             clubId: target.clubId,
             menuId: target.menuId,
           });
@@ -168,6 +169,7 @@ async function publishToChannel(
         content: converted.text,
         keywords: params.keywords,
         imageUrls: params.bodyImageUrls,
+        imageUrl: imageUrl ?? undefined,
       });
       externalId = result.articleId;
       externalUrl = result.cafeUrl;

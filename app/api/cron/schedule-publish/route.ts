@@ -91,7 +91,7 @@ async function publishSocialSlots(): Promise<SlotResult[]> {
 
       if (slot.channel === 'naver_cafe') {
         const bodyUrls = (content.bodyImageUrls as string[]) ?? [];
-        const result = await publishNaverCafePost({ subject: content.topic, content: content.textBody, keywords: content.keywords ?? [], imageUrls: bodyUrls });
+        const result = await publishNaverCafePost({ subject: content.topic, content: content.textBody, keywords: content.keywords ?? [], imageUrls: bodyUrls, imageUrl: content.imageUrl ?? undefined });
         externalId = result.articleId;
         externalUrl = result.cafeUrl;
       } else if (slot.channel === 'facebook') {
@@ -177,7 +177,7 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
     },
     include: {
       content: {
-        select: { id: true, textBody: true, topic: true, keywords: true, ownerId: true, bodyImageUrls: true },
+        select: { id: true, textBody: true, imageUrl: true, topic: true, keywords: true, ownerId: true, bodyImageUrls: true },
       },
     },
     orderBy: { scheduledAt: 'asc' },
@@ -228,6 +228,7 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
               content: converted.text,
               keywords: content.keywords ?? [],
               imageUrls: blogImageUrls,
+              imageUrl: content.imageUrl ?? undefined,
               clubId: target.clubId,
               menuId: target.menuId,
             });
@@ -266,6 +267,7 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
           content: converted.text,
           keywords: content.keywords ?? [],
           imageUrls: blogImageUrls,
+          imageUrl: content.imageUrl ?? undefined,
         });
         anySuccess = true;
         const cafeSlot = await prisma.scheduleSlot.create({
