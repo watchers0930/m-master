@@ -458,8 +458,8 @@ export async function publishNaverCafePost(opts: {
   const tags = generateDynamicTags(opts.subject, opts.keywords ?? [], opts.content);
   const fields = { subject: opts.subject, content: htmlBody, openyn: 'true', tagList: tags };
 
-  // 이미지: multipart 첨부 (네이버 API가 본문 상단에 배치)
-  const images = imgUrls.length > 0 ? await downloadImages(imgUrls) : [];
+  // 이미지: 대표 1장만 multipart 첨부 (네이버 API가 본문 상단에 배치)
+  const images = imgUrls.length > 0 ? await downloadImages(imgUrls.slice(0, 1)) : [];
   console.log(`[naver-cafe] 이미지 다운로드 결과: ${images.length}장`);
 
   const { res, json } = images.length > 0
