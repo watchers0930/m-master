@@ -1,8 +1,4 @@
-'use client';
-
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
 
 const FEATURES = [
   { title: 'AI 콘텐츠 생성', desc: 'GPT 기반 블로그·SNS 글을 한 번에 생성하고, RAG로 브랜드 톤을 유지합니다.', icon: '✍️' },
@@ -18,30 +14,6 @@ const PLANS: readonly { key: string; name: string; price: string; unit: string; 
 ];
 
 export default function LandingPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState('');
-
-  const handlePlan = async (plan: string) => {
-    if (plan === 'free') {
-      router.push('/register?plan=free');
-      return;
-    }
-    setLoading(plan);
-    try {
-      const res = await fetch('/api/auth/signup-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan }),
-      });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
-    } catch { /* ignore */ }
-    setLoading('');
-  };
-
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: "'Noto Sans KR', sans-serif" }}>
       {/* 네비게이션 */}
@@ -63,13 +35,10 @@ export default function LandingPage() {
         <h1 style={{ fontSize: 36, fontWeight: 800, color: '#0f172a', lineHeight: 1.3, marginBottom: 16 }}>
           마케팅 콘텐츠,<br />AI가 만들고 자동으로 발행합니다
         </h1>
-        <p style={{ fontSize: 15, color: '#64748b', lineHeight: 1.7, marginBottom: 32 }}>
+        <p style={{ fontSize: 15, color: '#64748b', lineHeight: 1.7 }}>
           블로그, 카페, SNS 콘텐츠를 AI로 생성하고<br />
           예약 발행부터 성과 분석까지 한 곳에서 관리하세요.
         </p>
-        <Link href="#pricing" style={{ display: 'inline-block', background: '#2563EB', color: '#fff', padding: '14px 32px', borderRadius: 10, fontSize: 15, fontWeight: 700, textDecoration: 'none' }}>
-          요금제 보기
-        </Link>
       </section>
 
       {/* 기능 소개 */}
@@ -109,17 +78,17 @@ export default function LandingPage() {
                 <div>AI 비용 한도: <strong>{p.cost}</strong></div>
                 <div>채널: <strong>{p.channels}</strong></div>
               </div>
-              <button
-                onClick={() => handlePlan(p.key)}
-                disabled={loading === p.key}
+              <Link
+                href={`/register?plan=${p.key}`}
                 style={{
-                  marginTop: 20, width: '100%', padding: '12px 0', borderRadius: 9, border: 'none',
+                  display: 'block', marginTop: 20, width: '100%', padding: '12px 0', borderRadius: 9, border: 'none',
                   background: p.highlight ? '#2563EB' : '#f1f5f9', color: p.highlight ? '#fff' : '#1e293b',
-                  fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                  fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', textAlign: 'center',
+                  boxSizing: 'border-box',
                 }}
               >
-                {loading === p.key ? '처리 중...' : p.cta}
-              </button>
+                {p.cta}
+              </Link>
             </div>
           ))}
         </div>
