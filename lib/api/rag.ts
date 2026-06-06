@@ -28,3 +28,14 @@ export async function deleteRagDoc(docId: string): Promise<ApiResponse<null>> {
   if (!res.ok) return { data: null, error: json.error ?? { message: `HTTP ${res.status}` } };
   return { data: null, error: null };
 }
+
+export async function searchRagDocs(
+  query: string,
+  k = 5,
+): Promise<ApiResponse<{ chunks: import('@/lib/rag/retriever').RetrievedChunk[] }>> {
+  const qs = new URLSearchParams({ q: query, k: String(k) });
+  const res = await fetch(`/api/rag/search?${qs}`);
+  const json = await res.json();
+  if (!res.ok) return { data: null, error: json.error ?? { message: `HTTP ${res.status}` } };
+  return { data: json.data, error: null };
+}
