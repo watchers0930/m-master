@@ -449,7 +449,7 @@ export async function publishNaverCafePost(opts: {
   // 본문 HTML 생성 (인라인 <img>는 스팸 필터에 걸리므로 사용하지 않음)
   const htmlBody = buildNaverCafeContent(opts.content, []) + '\n' + CAFE_FOOTER;
   const tags = generateDynamicTags(opts.subject, opts.keywords ?? [], opts.content);
-  const fields = { subject: opts.subject, content: htmlBody, openArticle: 'true', tagList: tags };
+  const fields = { subject: opts.subject, content: htmlBody, openyn: 'true', tagList: tags };
 
   // 이미지: 대표 1장 (bodyImage 우선, 없으면 썸네일 폴백)
   let imgUrls = (opts.imageUrls ?? []).filter(u => u && u.trim() !== '');
