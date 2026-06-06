@@ -446,23 +446,20 @@ export async function publishNaverCafePost(opts: {
   // DB 자격증명이 있으면 cachedAccessToken에 반영
   if (resolved.accessToken) cachedAccessToken = resolved.accessToken;
 
-  // 본문 HTML 생성 (인라인 <img>는 스팸 필터에 걸리므로 사용하지 않음)
-  const htmlBody = buildNaverCafeContent(opts.content, []) + '\n' + CAFE_FOOTER;
-  const tags = generateDynamicTags(opts.subject, opts.keywords ?? [], opts.content);
-  const fields = { subject: opts.subject, content: htmlBody, openyn: 'true', tagList: tags };
-
-  // 이미지: 대표 1장 (bodyImage 우선, 없으면 썸네일 폴백)
+  // 이미지 URL 준비 (bodyImage 우선, 없으면 썸네일 폴백)
   let imgUrls = (opts.imageUrls ?? []).filter(u => u && u.trim() !== '');
   if (imgUrls.length === 0 && opts.imageUrl) {
     imgUrls = [opts.imageUrl];
   }
   console.log(`[naver-cafe] 이미지 URL ${imgUrls.length}개 (원본 ${(opts.imageUrls ?? []).length}개)`);
-  const images = imgUrls.length > 0 ? await downloadImages(imgUrls.slice(0, 1)) : [];
-  console.log(`[naver-cafe] 이미지 다운로드 결과: ${images.length}장`);
 
-  const { res, json } = images.length > 0
-    ? await cafeApiPostWithImages(clubId, menuId, fields, images)
-    : await cafeApiPost(clubId, menuId, fields);
+  // 본문 HTML 생성 — 인라인 <img> 태그로 이미지-글-이미지-글 배치
+  const htmlBody = buildNaverCafeContent(opts.content, imgUrls) + '\n' + CAFE_FOOTER;
+  const tags = generateDynamicTags(opts.subject, opts.keywords ?? [], opts.content);
+  const fields = { subject: opts.subject, content: htmlBody, openyn: 'true', tagList: tags };
+
+  // 인라인 <img> 방식 사용 — urlencoded POST (multipart 불필요)
+  const { res, json } = await cafeApiPost(clubId, menuId, fields);
 
   if (!res.ok) {
     const msg = (json?.message as { error?: { msg?: string } })?.error?.msg ?? `HTTP ${res.status}`;
