@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
   // 8) cost_ledger 적재
   const { trackCost } = await import('@/lib/cost/tracker');
   const krw = calcEmbeddingKrw(totalTokens);
-  await trackCost({ kind: 'embedding', tokensIn: totalTokens, tokensOut: 0, krw });
+  await trackCost({ ownerId, kind: 'embedding', tokensIn: totalTokens, tokensOut: 0, krw });
 
   // 9) audit_log
   await logAudit({

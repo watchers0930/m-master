@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { signIn } from 'next-auth/react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,11 +15,21 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    // TODO: 실제 인증 구현 시 교체 (현재 플레이스홀더)
-    setTimeout(() => {
-      setLoading(false);
-      router.replace('/');
-    }, 500);
+
+    const result = await signIn('credentials', {
+      email,
+      password,
+      redirect: false,
+    });
+
+    setLoading(false);
+
+    if (result?.error) {
+      setError('이메일 또는 비밀번호가 올바르지 않습니다.');
+      return;
+    }
+
+    router.replace('/');
   };
 
   return (
@@ -33,12 +44,12 @@ export default function LoginPage() {
           </div>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#1E3A6E' }}>MINTEQ</div>
-            <div style={{ fontSize: 11, color: '#64748b' }}>minteq.vercel.app</div>
+            <div style={{ fontSize: 11, color: '#64748b' }}>마케팅 자동화 플랫폼</div>
           </div>
         </div>
 
         <div style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', marginBottom: 6 }}>로그인</div>
-        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 24 }}>관리자 계정으로 로그인하세요</div>
+        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 24 }}>계정으로 로그인하세요</div>
 
         <form onSubmit={handleSubmit} autoComplete="off" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>

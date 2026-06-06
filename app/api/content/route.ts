@@ -5,7 +5,8 @@ import { prisma } from '@/lib/prisma';
 import { toSnakeCase } from '@/lib/utils/case';
 
 export async function GET(request: NextRequest) {
-  await requireSession();
+  const session = await requireSession();
+  const ownerId = session.user.id;
   const { searchParams } = request.nextUrl;
   const status    = searchParams.get('status') ?? undefined;
   const channel   = searchParams.get('channel') ?? undefined;
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
   const per_page  = parseInt(searchParams.get('per_page') ?? '50', 10);
 
   try {
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { ownerId };
     if (status) where.status = status;
     if (channel) where.channel = channel;
 

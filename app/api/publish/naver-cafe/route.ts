@@ -63,25 +63,26 @@ export async function POST(request: NextRequest) {
   if (cafe_target_ids && cafe_target_ids.length > 0) {
     // 지정된 카페 타겟들
     const found = await prisma.cafeTarget.findMany({
-      where: { id: { in: cafe_target_ids } },
+      where: { id: { in: cafe_target_ids }, ownerId },
       orderBy: { createdAt: 'asc' },
     });
     targets = found;
   } else {
     // 기본 카페 (isDefault=true) 또는 첫 번째 카페
     const defaultTarget = await prisma.cafeTarget.findFirst({
-      where: { isDefault: true },
+      where: { isDefault: true, ownerId },
     });
     if (defaultTarget) {
       targets = [defaultTarget];
     } else {
       // CafeTarget이 없으면 기존 방식 (credential에서 clubId/menuId)으로 단건 발행
       try {
-        const publishResult = await publishNaverCafePost({ subject, content: contentText, keywords: content.keywords, imageUrls });
+        const publishResult = await publishNaverCafePost({ subject, content: contentText, keywords: content.keywords, imageUrls, ownerId });
         const now = new Date().toISOString();
         try {
           await prisma.scheduleSlot.create({
             data: {
+              ownerId,
               contentId: content_id, channel: 'naver_cafe',
               scheduledAt: now, publishedAt: now,
               status: 'published', mode: 'manual',
@@ -116,13 +117,14 @@ export async function POST(request: NextRequest) {
     try {
       const publishResult = await publishNaverCafePost({
         subject, content: contentText, keywords: content.keywords, imageUrls,
-        clubId: target.clubId, menuId: target.menuId,
+        clubId: target.clubId, menuId: target.menuId, ownerId,
       });
 
       const now = new Date().toISOString();
       try {
         await prisma.scheduleSlot.create({
           data: {
+            ownerId,
             contentId: content_id, channel: 'naver_cafe',
             scheduledAt: now, publishedAt: now,
             status: 'published', mode: 'manual',

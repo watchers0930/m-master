@@ -124,6 +124,13 @@ export function Sidebar() {
           </svg>
           설정
         </Link>
+        <Link href="/billing" prefetch={false} className={`sb-item${active('/billing') ? ' active' : ''}`}>
+          <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+            <line x1="1" y1="10" x2="23" y2="10"/>
+          </svg>
+          과금/플랜
+        </Link>
       </div>
 
       <div className="sb-bottom">

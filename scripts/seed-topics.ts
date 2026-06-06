@@ -66,6 +66,7 @@ async function main() {
       signal: signalsByTopic.get(item.topic) ?? 'core',
     };
     return {
+      ownerId: 'seed-admin',
       month: monthYmd,
       topic: item.topic,
       score: item.score,

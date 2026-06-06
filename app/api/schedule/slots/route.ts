@@ -26,13 +26,14 @@ function toSnake(row: Record<string, unknown>) {
 }
 
 export async function GET(req: NextRequest) {
-  await requireSession();
+  const session = await requireSession();
+  const ownerId = session.user.id;
   const { searchParams } = new URL(req.url);
   const year  = searchParams.get('year');
   const month = searchParams.get('month');
 
   try {
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { ownerId };
 
     if (year && month) {
       const y = Number(year), m = Number(month);
@@ -58,7 +59,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  await requireSession();
+  const session = await requireSession();
+  const ownerId = session.user.id;
   try {
     const body = await req.json();
     const rows = Array.isArray(body) ? body : [body];
@@ -67,6 +69,7 @@ export async function POST(req: NextRequest) {
       rows.map((row: Record<string, unknown>) =>
         prisma.scheduleSlot.create({
           data: {
+            ownerId,
             contentId:   (row.content_id ?? row.contentId ?? null) as string | null,
             channel:     row.channel as string,
             scheduledAt: new Date((row.scheduled_at ?? row.scheduledAt) as string),
@@ -86,7 +89,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  await requireSession();
+  const session = await requireSession();
+  const ownerId = session.user.id;
   const { searchParams } = new URL(req.url);
   const year  = searchParams.get('year');
   const month = searchParams.get('month');
@@ -104,6 +108,7 @@ export async function DELETE(req: NextRequest) {
 
     await prisma.scheduleSlot.deleteMany({
       where: {
+        ownerId,
         scheduledAt: { gte: from, lt: to },
       },
     });

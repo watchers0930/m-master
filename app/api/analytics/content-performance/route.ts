@@ -43,7 +43,8 @@ function ymd(d: Date): string {
 }
 
 export async function GET(request: NextRequest) {
-  await requireSession();
+  const session = await requireSession();
+  const ownerId = session.user.id;
   const url = new URL(request.url);
   const daysRaw = parseInt(url.searchParams.get('days') ?? '30', 10);
   const days = Math.max(1, Math.min(Number.isFinite(daysRaw) ? daysRaw : 30, 90));
@@ -56,6 +57,7 @@ export async function GET(request: NextRequest) {
     // content 테이블 기준으로 published 콘텐츠 조회 + schedule_slots JOIN
     const contents = await prisma.content.findMany({
       where: {
+        ownerId,
         status: 'published',
         createdAt: { gte: new Date(`${period.from}T00:00:00Z`) },
       },

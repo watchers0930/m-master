@@ -60,6 +60,7 @@ export async function POST(request: NextRequest) {
     publishResult = await publishInstagramImage({
       imageUrl,
       caption: captionSource,
+      ownerId,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -75,6 +76,7 @@ export async function POST(request: NextRequest) {
   try {
     await prisma.scheduleSlot.create({
       data: {
+        ownerId,
         contentId: content_id,
         channel: 'instagram',
         scheduledAt: now,

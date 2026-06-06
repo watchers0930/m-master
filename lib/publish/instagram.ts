@@ -29,8 +29,8 @@ function getEnv(name: string): string {
 }
 
 /** DB 우선 → 환경변수 fallback으로 자격증명 해석 */
-async function resolveCredentials(): Promise<{ token: string; igUserId: string }> {
-  const creds = await getInstagramCreds();
+async function resolveCredentials(ownerId?: string): Promise<{ token: string; igUserId: string }> {
+  const creds = ownerId ? await getInstagramCreds(ownerId) : null;
   if (creds) return { token: creds.accessToken, igUserId: creds.businessId };
   return { token: getEnv('INSTAGRAM_ACCESS_TOKEN'), igUserId: getEnv('INSTAGRAM_BUSINESS_ID') };
 }
@@ -86,12 +86,13 @@ async function graphPost(path: string, body: Record<string, string>): Promise<un
 export async function publishInstagramCarousel(opts: {
   imageUrls: string[];
   caption: string;
+  ownerId?: string;
 }): Promise<InstagramPublishResult> {
   if (opts.imageUrls.length < 2) {
     throw new Error('캐러셀 발행에는 최소 2장의 이미지가 필요합니다');
   }
 
-  const { token, igUserId } = await resolveCredentials();
+  const { token, igUserId } = await resolveCredentials(opts.ownerId);
   const caption = buildInstagramCaption(opts.caption);
 
   // 1단계: 각 이미지로 child container 생성
@@ -141,8 +142,9 @@ export async function publishInstagramCarousel(opts: {
 export async function publishInstagramImage(opts: {
   imageUrl: string;
   caption: string;
+  ownerId?: string;
 }): Promise<InstagramPublishResult> {
-  const { token, igUserId } = await resolveCredentials();
+  const { token, igUserId } = await resolveCredentials(opts.ownerId);
   const caption = buildInstagramCaption(opts.caption);
 
   // 1단계: 컨테이너 생성

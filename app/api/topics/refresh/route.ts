@@ -97,6 +97,7 @@ export async function POST() {
       };
       if (ga4Unavailable) factors.ga4_unavailable = true;
       return {
+        ownerId,
         weekStart,
         topic: item.topic,
         score: item.score,
@@ -124,6 +125,7 @@ export async function POST() {
     // 8) cost_ledger
     const krw = calcChatKrw(recommended.usage);
     await trackCost({
+      ownerId,
       kind: 'chat',
       tokensIn: recommended.usage.prompt_tokens,
       tokensOut: recommended.usage.completion_tokens,

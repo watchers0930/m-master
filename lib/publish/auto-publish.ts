@@ -35,10 +35,10 @@ interface AutoPublishParams {
 // ---------------------------------------------------------------------------
 // DB 자격증명 + 환경변수 모두 확인하여 활성 채널 판별
 // ---------------------------------------------------------------------------
-async function getActiveChannels(): Promise<ConvertChannel[]> {
+async function getActiveChannels(ownerId: string): Promise<ConvertChannel[]> {
   const channels: ConvertChannel[] = [];
   // 현재 카페만 활성 (페이스북·인스타는 토큰 재발급 후 복원)
-  const naverCreds = await getNaverCafeCreds();
+  const naverCreds = await getNaverCafeCreds(ownerId);
   if (naverCreds) channels.push('naver_cafe');
   return channels;
 }
@@ -76,6 +76,7 @@ async function publishToChannel(
 
   // 3) 변환 비용 기록
   await trackCost({
+    ownerId: params.ownerId,
     kind: 'chat',
     tokensIn: converted.usage.prompt_tokens,
     tokensOut: converted.usage.completion_tokens,
@@ -97,6 +98,7 @@ async function publishToChannel(
       const result = await publishInstagramCarousel({
         imageUrls: absoluteUrls,
         caption: converted.text,
+        ownerId,
       });
       externalId = result.id;
     } else {
@@ -104,6 +106,7 @@ async function publishToChannel(
       const result = await publishInstagramImage({
         imageUrl,
         caption: converted.text,
+        ownerId,
       });
       externalId = result.id;
       externalUrl = result.permalink ?? undefined;
@@ -112,12 +115,13 @@ async function publishToChannel(
     const result = await publishFacebookPost({
       imageUrl,
       message: converted.text,
+      ownerId,
     });
     externalId = result.id;
     externalUrl = `https://facebook.com/${result.id}`;
   } else if (channel === 'naver_cafe') {
     // 다중 카페 타겟 지원: 모든 타겟에 순차 발행
-    const cafeTargets = await getCafeTargets();
+    const cafeTargets = await getCafeTargets(ownerId);
     if (cafeTargets.length > 0) {
       const errors: string[] = [];
       for (let t = 0; t < cafeTargets.length; t++) {
@@ -133,6 +137,7 @@ async function publishToChannel(
             imageUrl: imageUrl ?? undefined,
             clubId: target.clubId,
             menuId: target.menuId,
+            ownerId,
           });
           console.log(`[auto-publish] naver_cafe ${target.name} 성공: ${result.cafeUrl}`);
           // 첫 번째 성공 타겟 결과를 대표값으로 사용
@@ -144,6 +149,7 @@ async function publishToChannel(
             // 추가 타겟은 별도 ScheduleSlot 생성
             await prisma.scheduleSlot.create({
               data: {
+                ownerId,
                 contentId: content.id, channel: 'naver_cafe',
                 scheduledAt: new Date(), publishedAt: new Date(),
                 status: 'published', mode: 'ai_auto',
@@ -170,6 +176,7 @@ async function publishToChannel(
         keywords: params.keywords,
         imageUrls: params.bodyImageUrls,
         imageUrl: imageUrl ?? undefined,
+        ownerId,
       });
       externalId = result.articleId;
       externalUrl = result.cafeUrl;
@@ -185,6 +192,7 @@ async function publishToChannel(
   // 6) ScheduleSlot 생성 (mode: ai_auto)
   await prisma.scheduleSlot.create({
     data: {
+      ownerId,
       contentId: content.id,
       channel,
       scheduledAt: new Date(),
@@ -219,7 +227,7 @@ async function publishToChannel(
 // 메인 오케스트레이터
 // ---------------------------------------------------------------------------
 export async function autoPublishToSocial(params: AutoPublishParams): Promise<void> {
-  const channels = await getActiveChannels();
+  const channels = await getActiveChannels(params.ownerId);
   if (channels.length === 0) return; // 활성 채널 없으면 스킵
 
   // 3채널 병렬 실행 — Vercel Hobby 60초 제한 대응

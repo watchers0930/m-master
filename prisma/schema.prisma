@@ -11,6 +11,50 @@ datasource db {
 }
 
 // ----------------------------------------------------------------
+// users — 사용자 (멀티테넌시 핵심)
+// ----------------------------------------------------------------
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String   @map("password_hash")
+  plan         String   @default("free") // free | starter | pro
+  stripeId     String?  @map("stripe_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  settings           Setting[]
+  channelCredentials ChannelCredential[]
+  contents           Content[]
+  abTests            AbTest[]
+  contentPlans       ContentPlan[]
+  ragDocuments       RagDocument[]
+  costLedgers        CostLedger[]
+  cafeTargets        CafeTarget[]
+  subscriptions      Subscription[]
+
+  @@map("users")
+}
+
+// ----------------------------------------------------------------
+// subscriptions — Stripe 구독
+// ----------------------------------------------------------------
+model Subscription {
+  id               String    @id @default(cuid())
+  userId           String    @map("user_id")
+  stripeSubId      String?   @unique @map("stripe_sub_id")
+  plan             String    @default("free")
+  status           String    @default("active") // active | past_due | canceled
+  currentPeriodEnd DateTime? @map("current_period_end")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("subscriptions")
+}
+
+// ----------------------------------------------------------------
 // contents — 핵심 콘텐츠
 // ----------------------------------------------------------------
 model Content {
@@ -29,6 +73,7 @@ model Content {
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
+  owner         User           @relation(fields: [ownerId], references: [id])
   scheduleSlots ScheduleSlot[]
   abTestsAsA    AbTest[]       @relation("AbTestVariantA")
   abTestsAsB    AbTest[]       @relation("AbTestVariantB")
@@ -43,6 +88,7 @@ model Content {
 // ----------------------------------------------------------------
 model ScheduleSlot {
   id          String    @id @default(cuid())
+  ownerId     String    @map("owner_id")
   contentId   String?   @map("content_id")
   channel     String
   scheduledAt DateTime  @map("scheduled_at")
@@ -51,29 +97,34 @@ model ScheduleSlot {
   mode        String    @default("manual") // manual | ai_auto
   externalId  String?   @map("external_id")
   externalUrl String?   @map("external_url")
-  targetName  String?   @map("target_name")   // 카페 타겟 표시명 (추적용)
+  targetName  String?   @map("target_name")
   retryCount  Int       @default(0) @map("retry_count")
   lastError   String?   @map("last_error") @db.Text
   createdAt   DateTime  @default(now()) @map("created_at")
 
   content Content? @relation(fields: [contentId], references: [id], onDelete: Cascade)
 
+  @@index([ownerId])
   @@index([contentId])
   @@index([status, scheduledAt])
   @@map("schedule_slots")
 }
 
 // ----------------------------------------------------------------
-// settings — 싱글톤 (id=1)
+// settings — 유저별 설정
 // ----------------------------------------------------------------
 model Setting {
-  id              Int   @id @default(1)
-  brandGuide      Json  @default("{}") @map("brand_guide")
-  promptTemplates Json  @default("{}") @map("prompt_templates")
-  budgetMonthly   Int   @default(500000) @map("budget_monthly")
-  alertThreshold  Float @default(0.8) @map("alert_threshold")
-  notifications   Json  @default("{}") @map("notifications")
+  id              String @id @default(cuid())
+  ownerId         String @map("owner_id")
+  brandGuide      Json   @default("{}") @map("brand_guide")
+  promptTemplates Json   @default("{}") @map("prompt_templates")
+  budgetMonthly   Int    @default(500000) @map("budget_monthly")
+  alertThreshold  Float  @default(0.8) @map("alert_threshold")
+  notifications   Json   @default("{}") @map("notifications")
 
+  owner User @relation(fields: [ownerId], references: [id])
+
+  @@unique([ownerId])
   @@map("settings")
 }
 
@@ -82,6 +133,7 @@ model Setting {
 // ----------------------------------------------------------------
 model TopicRecommendation {
   id        String   @id @default(cuid())
+  ownerId   String   @map("owner_id")
   month     String?  // 'YYYY-MM' (레거시, nullable)
   weekStart String?  @map("week_start") // 'YYYY-MM-DD' (해당 주 월요일)
   topic     String
@@ -90,8 +142,8 @@ model TopicRecommendation {
   channel   String   @default("blog")
   createdAt DateTime @default(now()) @map("created_at")
 
-  @@index([weekStart, channel])
-  @@index([month, channel])
+  @@index([ownerId, weekStart, channel])
+  @@index([ownerId, month, channel])
   @@map("topic_recommendations")
 }
 
@@ -121,6 +173,7 @@ model AbTest {
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
+  owner    User    @relation(fields: [ownerId], references: [id])
   variantA Content @relation("AbTestVariantA", fields: [variantAId], references: [id], onDelete: Cascade)
   variantB Content @relation("AbTestVariantB", fields: [variantBId], references: [id], onDelete: Cascade)
 
@@ -143,6 +196,7 @@ model ContentPlan {
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
+  owner User              @relation(fields: [ownerId], references: [id])
   items ContentPlanItem[]
 
   @@unique([ownerId, weekKey])
@@ -184,6 +238,7 @@ model RagDocument {
   status      String   @default("uploaded") // uploaded | indexed | failed
   createdAt   DateTime @default(now()) @map("created_at")
 
+  owner  User       @relation(fields: [ownerId], references: [id])
   chunks RagChunk[]
 
   @@index([ownerId, status])
@@ -212,6 +267,7 @@ model RagChunk {
 // ----------------------------------------------------------------
 model CostLedger {
   id         String   @id @default(cuid())
+  ownerId    String   @map("owner_id")
   occurredAt DateTime @default(now()) @map("occurred_at")
   kind       String   // 'chat' | 'embedding' | 'image'
   tokensIn   Int      @default(0) @map("tokens_in")
@@ -219,7 +275,9 @@ model CostLedger {
   krw        Float    @default(0)
   contentId  String?  @map("content_id")
 
-  @@index([occurredAt])
+  owner User @relation(fields: [ownerId], references: [id])
+
+  @@index([ownerId, occurredAt])
   @@map("cost_ledger")
 }
 
@@ -244,6 +302,7 @@ model AuditLog {
 // ----------------------------------------------------------------
 model AnalyticsDaily {
   id        String   @id @default(cuid())
+  ownerId   String   @map("owner_id")
   date      String   // 'YYYY-MM-DD'
   channel   String
   contentId String?  @map("content_id")
@@ -254,8 +313,8 @@ model AnalyticsDaily {
   ctr       Float    @default(0)
   source    String   @default("ga4") // ga4 | naver | instagram | facebook
 
-  @@unique([date, channel, contentId, source])
-  @@index([date, channel])
+  @@unique([ownerId, date, channel, contentId, source])
+  @@index([ownerId, date, channel])
   @@map("analytics_daily")
 }
 
@@ -264,13 +323,17 @@ model AnalyticsDaily {
 // ----------------------------------------------------------------
 model ChannelCredential {
   id           String   @id @default(cuid())
-  channel      String   @unique // 'naver_cafe' | 'instagram' | 'facebook'
+  ownerId      String   @map("owner_id")
+  channel      String   // 'naver_cafe' | 'instagram' | 'facebook'
   accessToken  String?  @map("access_token") @db.Text
   refreshToken String?  @map("refresh_token") @db.Text
   expiresAt    String?  @map("expires_at")
   meta         Json?
   updatedAt    DateTime @updatedAt @map("updated_at")
 
+  owner User @relation(fields: [ownerId], references: [id])
+
+  @@unique([ownerId, channel])
   @@map("channel_credentials")
 }
 
@@ -279,12 +342,15 @@ model ChannelCredential {
 // ----------------------------------------------------------------
 model CafeTarget {
   id        String   @id @default(cuid())
-  name      String                        // 카페 표시명
-  clubId    String   @map("club_id")      // 네이버 카페 고유 ID
-  menuId    String   @map("menu_id")      // 게시판 메뉴 ID
+  ownerId   String   @map("owner_id")
+  name      String
+  clubId    String   @map("club_id")
+  menuId    String   @map("menu_id")
   isDefault Boolean  @default(false) @map("is_default")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+
+  owner User @relation(fields: [ownerId], references: [id])
 
   @@map("cafe_targets")
 }

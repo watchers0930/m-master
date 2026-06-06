@@ -52,9 +52,9 @@ interface SettingsLite {
   prompt_templates: Record<string, string>;
 }
 
-async function loadSettings(): Promise<SettingsLite> {
+async function loadSettings(ownerId: string): Promise<SettingsLite> {
   const settings = await prisma.setting.findUnique({
-    where: { id: 1 },
+    where: { ownerId },
     select: { brandGuide: true, promptTemplates: true },
   });
   return {
@@ -183,6 +183,7 @@ async function generateOneVariant(
 
   // 6) cost_ledger (변형별 chat/image)
   await trackCost({
+    ownerId: opts.ownerId,
     kind: 'chat',
     tokensIn: usage.prompt_tokens,
     tokensOut: usage.completion_tokens,
@@ -191,6 +192,7 @@ async function generateOneVariant(
   });
   if (imageKrw > 0) {
     await trackCost({
+      ownerId: opts.ownerId,
       kind: 'image',
       tokensIn: 0,
       tokensOut: 0,
@@ -203,6 +205,7 @@ async function generateOneVariant(
     const embedKrw = calcEmbeddingKrw(embeddingTokens);
     if (embedKrw > 0) {
       await trackCost({
+        ownerId: opts.ownerId,
         kind: 'embedding',
         tokensIn: embeddingTokens,
         tokensOut: 0,
@@ -242,7 +245,7 @@ export interface GenerateVariantBOptions {
 export async function generateVariantBFromSource(
   options: GenerateVariantBOptions,
 ): Promise<VariantGenerated> {
-  const settings = await loadSettings();
+  const settings = await loadSettings(options.ownerId);
   const { ragContext, embeddingTokens } = await buildRag(options);
   try {
     return await generateOneVariant('b', options, settings, ragContext, embeddingTokens);

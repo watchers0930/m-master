@@ -25,8 +25,8 @@ function getEnv(name: string): string {
 }
 
 /** DB 우선 → 환경변수 fallback으로 자격증명 해석 */
-async function resolveCredentials(): Promise<{ token: string; pageId: string }> {
-  const creds = await getFacebookCreds();
+async function resolveCredentials(ownerId?: string): Promise<{ token: string; pageId: string }> {
+  const creds = ownerId ? await getFacebookCreds(ownerId) : null;
   if (creds) return { token: creds.accessToken, pageId: creds.pageId };
   return { token: getEnv('FACEBOOK_ACCESS_TOKEN'), pageId: getEnv('FACEBOOK_PAGE_ID') };
 }
@@ -68,8 +68,9 @@ async function graphPost(path: string, body: Record<string, string>): Promise<un
 export async function publishFacebookPost(opts: {
   imageUrl: string | null;
   message: string;
+  ownerId?: string;
 }): Promise<FacebookPublishResult> {
-  const { token, pageId } = await resolveCredentials();
+  const { token, pageId } = await resolveCredentials(opts.ownerId);
   const message = buildFacebookMessage(opts.message);
 
   if (opts.imageUrl) {

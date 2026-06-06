@@ -93,6 +93,10 @@ async function maybeRefreshWeeklyTopics(today: string): Promise<{ ran: boolean; 
     });
 
     const signalsByTopic = new Map(candidates.map(c => [c.topic, c.signal]));
+    // ownerId 결정: 첫 번째 기존 유저 또는 'system'
+    const anyUser = await prisma.user.findFirst({ select: { id: true }, orderBy: { createdAt: 'asc' } });
+    const cronOwnerId = anyUser?.id ?? 'system';
+
     const rows = recommended.items.map(item => {
       const factors: Record<string, Prisma.InputJsonValue> = {
         tags: item.tags as unknown as Prisma.InputJsonValue,
@@ -101,6 +105,7 @@ async function maybeRefreshWeeklyTopics(today: string): Promise<{ ran: boolean; 
       };
       if (ga4Unavailable) factors.ga4_unavailable = true;
       return {
+        ownerId: cronOwnerId,
         weekStart,
         topic: item.topic,
         score: item.score,
@@ -115,6 +120,7 @@ async function maybeRefreshWeeklyTopics(today: string): Promise<{ ran: boolean; 
 
     const krw = calcChatKrw(recommended.usage);
     await trackCost({
+      ownerId: cronOwnerId,
       kind: 'chat',
       tokensIn: recommended.usage.prompt_tokens,
       tokensOut: recommended.usage.completion_tokens,

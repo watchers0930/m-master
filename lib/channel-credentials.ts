@@ -23,8 +23,10 @@ export interface FacebookCreds {
 }
 
 /** 네이버 카페 자격증명: DB 우선 → 환경변수 fallback */
-export async function getNaverCafeCreds(): Promise<NaverCafeCreds | null> {
-  const row = await prisma.channelCredential.findUnique({ where: { channel: 'naver_cafe' } });
+export async function getNaverCafeCreds(ownerId: string): Promise<NaverCafeCreds | null> {
+  const row = await prisma.channelCredential.findUnique({
+    where: { ownerId_channel: { ownerId, channel: 'naver_cafe' } },
+  });
   if (row?.accessToken) {
     const m = (row.meta ?? {}) as Record<string, string>;
     return {
@@ -51,8 +53,10 @@ export async function getNaverCafeCreds(): Promise<NaverCafeCreds | null> {
 }
 
 /** 인스타그램 자격증명: DB 우선 → 환경변수 fallback */
-export async function getInstagramCreds(): Promise<InstagramCreds | null> {
-  const row = await prisma.channelCredential.findUnique({ where: { channel: 'instagram' } });
+export async function getInstagramCreds(ownerId: string): Promise<InstagramCreds | null> {
+  const row = await prisma.channelCredential.findUnique({
+    where: { ownerId_channel: { ownerId, channel: 'instagram' } },
+  });
   if (row?.accessToken) {
     const m = (row.meta ?? {}) as Record<string, string>;
     return { accessToken: row.accessToken, businessId: m.businessId ?? '' };
@@ -64,8 +68,9 @@ export async function getInstagramCreds(): Promise<InstagramCreds | null> {
 }
 
 /** 카페 타겟 목록 조회 */
-export async function getCafeTargets() {
-  return prisma.cafeTarget.findMany({ orderBy: { createdAt: 'asc' } });
+export async function getCafeTargets(ownerId?: string) {
+  const where = ownerId ? { ownerId } : {};
+  return prisma.cafeTarget.findMany({ where, orderBy: { createdAt: 'asc' } });
 }
 
 /** 카페 타겟 단건 조회 */
@@ -74,8 +79,10 @@ export async function getCafeTargetById(id: string) {
 }
 
 /** 페이스북 자격증명: DB 우선 → 환경변수 fallback */
-export async function getFacebookCreds(): Promise<FacebookCreds | null> {
-  const row = await prisma.channelCredential.findUnique({ where: { channel: 'facebook' } });
+export async function getFacebookCreds(ownerId: string): Promise<FacebookCreds | null> {
+  const row = await prisma.channelCredential.findUnique({
+    where: { ownerId_channel: { ownerId, channel: 'facebook' } },
+  });
   if (row?.accessToken) {
     const m = (row.meta ?? {}) as Record<string, string>;
     return { accessToken: row.accessToken, pageId: m.pageId ?? '' };

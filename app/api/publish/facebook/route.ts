@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
     publishResult = await publishFacebookPost({
       imageUrl,
       message: messageSource,
+      ownerId,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest) {
   try {
     await prisma.scheduleSlot.create({
       data: {
+        ownerId,
         contentId: content_id,
         channel: 'facebook',
         scheduledAt: now,

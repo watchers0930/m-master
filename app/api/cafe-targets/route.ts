@@ -34,14 +34,16 @@ const DeleteSchema = z.object({
 
 // ── GET — 전체 목록 ──
 export async function GET() {
-  await requireSession();
-  const targets = await prisma.cafeTarget.findMany({ orderBy: { createdAt: 'asc' } });
+  const session = await requireSession();
+  const ownerId = session.user.id;
+  const targets = await prisma.cafeTarget.findMany({ where: { ownerId }, orderBy: { createdAt: 'asc' } });
   return NextResponse.json({ data: targets, error: null });
 }
 
 // ── POST — 추가 ──
 export async function POST(request: NextRequest) {
-  await requireSession();
+  const session = await requireSession();
+  const ownerId = session.user.id;
 
   let body: unknown;
   try { body = await request.json(); } catch {
@@ -59,9 +61,9 @@ export async function POST(request: NextRequest) {
   const { name, clubId, menuId } = parsed.data;
 
   // 첫 번째 타겟이면 자동으로 기본 설정
-  const count = await prisma.cafeTarget.count();
+  const count = await prisma.cafeTarget.count({ where: { ownerId } });
   const target = await prisma.cafeTarget.create({
-    data: { name, clubId, menuId, isDefault: count === 0 },
+    data: { ownerId, name, clubId, menuId, isDefault: count === 0 },
   });
 
   return NextResponse.json({ data: target, error: null });
@@ -69,7 +71,8 @@ export async function POST(request: NextRequest) {
 
 // ── PUT — 수정 ──
 export async function PUT(request: NextRequest) {
-  await requireSession();
+  const session = await requireSession();
+  const ownerId = session.user.id;
 
   let body: unknown;
   try { body = await request.json(); } catch {
@@ -85,6 +88,13 @@ export async function PUT(request: NextRequest) {
   }
 
   const { id, ...fields } = parsed.data;
+
+  // 소유권 확인
+  const existing = await prisma.cafeTarget.findUnique({ where: { id } });
+  if (!existing || existing.ownerId !== ownerId) {
+    return NextResponse.json({ error: { code: 'not_found', message: '대상을 찾을 수 없습니다' } }, { status: 404 });
+  }
+
   const data: Record<string, string> = {};
   if (fields.name) data.name = fields.name;
   if (fields.clubId) data.clubId = fields.clubId;
@@ -96,7 +106,8 @@ export async function PUT(request: NextRequest) {
 
 // ── PATCH — 기본 카페 변경 ──
 export async function PATCH(request: NextRequest) {
-  await requireSession();
+  const session = await requireSession();
+  const ownerId = session.user.id;
 
   let body: unknown;
   try { body = await request.json(); } catch {
@@ -113,23 +124,30 @@ export async function PATCH(request: NextRequest) {
 
   const { id, isDefault } = parsed.data;
 
+  // 소유권 확인
+  const existing = await prisma.cafeTarget.findUnique({ where: { id } });
+  if (!existing || existing.ownerId !== ownerId) {
+    return NextResponse.json({ error: { code: 'not_found', message: '대상을 찾을 수 없습니다' } }, { status: 404 });
+  }
+
   if (isDefault) {
-    // 기존 기본 해제 후 새 기본 설정
+    // 기존 기본 해제 후 새 기본 설정 (본인 소유만)
     await prisma.$transaction([
-      prisma.cafeTarget.updateMany({ where: { isDefault: true }, data: { isDefault: false } }),
+      prisma.cafeTarget.updateMany({ where: { ownerId, isDefault: true }, data: { isDefault: false } }),
       prisma.cafeTarget.update({ where: { id }, data: { isDefault: true } }),
     ]);
   } else {
     await prisma.cafeTarget.update({ where: { id }, data: { isDefault: false } });
   }
 
-  const targets = await prisma.cafeTarget.findMany({ orderBy: { createdAt: 'asc' } });
+  const targets = await prisma.cafeTarget.findMany({ where: { ownerId }, orderBy: { createdAt: 'asc' } });
   return NextResponse.json({ data: targets, error: null });
 }
 
 // ── DELETE — 삭제 ──
 export async function DELETE(request: NextRequest) {
-  await requireSession();
+  const session = await requireSession();
+  const ownerId = session.user.id;
 
   let body: unknown;
   try { body = await request.json(); } catch {
@@ -142,6 +160,12 @@ export async function DELETE(request: NextRequest) {
       { error: { code: 'validation', message: parsed.error.issues[0]?.message ?? 'validation error' } },
       { status: 400 },
     );
+  }
+
+  // 소유권 확인
+  const existing = await prisma.cafeTarget.findUnique({ where: { id: parsed.data.id } });
+  if (!existing || existing.ownerId !== ownerId) {
+    return NextResponse.json({ error: { code: 'not_found', message: '대상을 찾을 수 없습니다' } }, { status: 404 });
   }
 
   await prisma.cafeTarget.delete({ where: { id: parsed.data.id } });

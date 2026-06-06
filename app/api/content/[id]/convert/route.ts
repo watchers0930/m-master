@@ -64,7 +64,7 @@ export async function POST(
   if (!source.textBody) return jsonError('invalid_state', '본문이 비어있습니다', 422);
 
   // 2) 예산 체크
-  if (await isBudgetExceeded()) {
+  if (await isBudgetExceeded(ownerId)) {
     return jsonError('budget_exceeded', '월 예산 한도 초과', 429);
   }
 
@@ -144,6 +144,7 @@ export async function POST(
 
   // 5) cost_ledger
   await trackCost({
+    ownerId,
     kind: 'chat',
     tokensIn: convertResult.usage.prompt_tokens,
     tokensOut: convertResult.usage.completion_tokens,

@@ -21,6 +21,7 @@ import { trackCost } from '@/lib/cost/tracker';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
 import { autoPublishToSocial } from '@/lib/publish/auto-publish';
 import { buildExternalContext } from '@/lib/external/context-builder';
+import { checkContentLimit, checkCostLimit } from '@/lib/billing/limits';
 import type { ContentGenerateRequest } from '@/types/api';
 
 const RequestSchema = z.object({
@@ -59,12 +60,21 @@ export async function POST(request: NextRequest) {
 
   const req: ContentGenerateRequest = parsed.data;
 
-  // 3) 예산 체크
-  if (await isBudgetExceeded()) return jsonError('budget_exceeded', '월 예산 한도 초과. 설정에서 한도를 조정하세요.', 429);
+  // 3) 플랜 제한 체크
+  const user = await prisma.user.findUnique({ where: { id: ownerId }, select: { plan: true } });
+  try {
+    await checkContentLimit(ownerId, user?.plan ?? 'free');
+    await checkCostLimit(ownerId, user?.plan ?? 'free');
+  } catch (limitErr) {
+    return jsonError('plan_limit', limitErr instanceof Error ? limitErr.message : '플랜 한도 초과', 429);
+  }
 
-  // 4) settings
+  // 3b) 예산 체크
+  if (await isBudgetExceeded(ownerId)) return jsonError('budget_exceeded', '월 예산 한도 초과. 설정에서 한도를 조정하세요.', 429);
+
+  // 4) settings (유저별)
   const settingsData = await prisma.setting.findUnique({
-    where: { id: 1 },
+    where: { ownerId },
     select: { brandGuide: true, promptTemplates: true },
   });
   const brandGuide = (settingsData?.brandGuide ?? {}) as Record<string, unknown>;
@@ -213,10 +223,10 @@ export async function POST(request: NextRequest) {
         });
 
         // 13) cost_ledger
-        await trackCost({ kind: 'chat', tokensIn: usage.prompt_tokens, tokensOut: usage.completion_tokens, krw: chatKrw, contentId: contentData.id });
-        if (embeddingTokens > 0) await trackCost({ kind: 'embedding', tokensIn: embeddingTokens, tokensOut: 0, krw: embedKrw, contentId: contentData.id });
-        if (imageKrw > 0) await trackCost({ kind: 'image', tokensIn: 0, tokensOut: 0, krw: imageKrw, contentId: contentData.id });
-        if (externalContext) await trackCost({ kind: 'external', tokensIn: 0, tokensOut: 0, krw: 0, contentId: contentData.id });
+        await trackCost({ ownerId, kind: 'chat', tokensIn: usage.prompt_tokens, tokensOut: usage.completion_tokens, krw: chatKrw, contentId: contentData.id });
+        if (embeddingTokens > 0) await trackCost({ ownerId, kind: 'embedding', tokensIn: embeddingTokens, tokensOut: 0, krw: embedKrw, contentId: contentData.id });
+        if (imageKrw > 0) await trackCost({ ownerId, kind: 'image', tokensIn: 0, tokensOut: 0, krw: imageKrw, contentId: contentData.id });
+        if (externalContext) await trackCost({ ownerId, kind: 'external', tokensIn: 0, tokensOut: 0, krw: 0, contentId: contentData.id });
 
         // 14) audit_log
         await logAudit({

@@ -40,9 +40,10 @@ async function verifyNaverToken(accessToken: string): Promise<boolean> {
 
 // ── GET: 채널 목록 + 마스킹된 자격증명 ──────────────────────────────
 export async function GET() {
-  await requireSession();
+  const session = await requireSession();
+  const ownerId = session.user.id;
 
-  const creds = await prisma.channelCredential.findMany();
+  const creds = await prisma.channelCredential.findMany({ where: { ownerId } });
   const channels: Record<string, { connected: boolean; masked: Record<string, string> }> = {};
 
   for (const c of creds) {
@@ -83,6 +84,7 @@ const FacebookSchema = z.object({
 
 export async function POST(request: NextRequest) {
   const session = await requireSession();
+  const ownerId = session.user.id;
 
   let body: unknown;
   try { body = await request.json(); } catch {
@@ -103,8 +105,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: { code: 'verify_failed', message: '네이버 Access Token 검증 실패. 토큰 값을 확인하세요.' } }, { status: 400 });
     }
     await prisma.channelCredential.upsert({
-      where: { channel: 'naver_cafe' },
-      create: { channel: 'naver_cafe', accessToken: d.accessToken, refreshToken: d.refreshToken || null, meta: { clientId: d.clientId, clientSecret: d.clientSecret, clubId: d.clubId, menuId: d.menuId } },
+      where: { ownerId_channel: { ownerId, channel: 'naver_cafe' } },
+      create: { ownerId, channel: 'naver_cafe', accessToken: d.accessToken, refreshToken: d.refreshToken || null, meta: { clientId: d.clientId, clientSecret: d.clientSecret, clubId: d.clubId, menuId: d.menuId } },
       update: { accessToken: d.accessToken, refreshToken: d.refreshToken || null, meta: { clientId: d.clientId, clientSecret: d.clientSecret, clubId: d.clubId, menuId: d.menuId } },
     });
     await logAudit({ actor: session.user.id, action: 'channel.connect', targetType: 'channel', targetId: 'naver_cafe' });
@@ -123,8 +125,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: { code: 'verify_failed', message: 'Instagram Access Token 검증 실패. Meta Graph API Explorer에서 토큰을 확인하세요.' } }, { status: 400 });
     }
     await prisma.channelCredential.upsert({
-      where: { channel: 'instagram' },
-      create: { channel: 'instagram', accessToken: d.accessToken, meta: { businessId: d.businessId } },
+      where: { ownerId_channel: { ownerId, channel: 'instagram' } },
+      create: { ownerId, channel: 'instagram', accessToken: d.accessToken, meta: { businessId: d.businessId } },
       update: { accessToken: d.accessToken, meta: { businessId: d.businessId } },
     });
     await logAudit({ actor: session.user.id, action: 'channel.connect', targetType: 'channel', targetId: 'instagram' });
@@ -143,8 +145,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: { code: 'verify_failed', message: 'Facebook Access Token 검증 실패. 페이지 토큰을 확인하세요.' } }, { status: 400 });
     }
     await prisma.channelCredential.upsert({
-      where: { channel: 'facebook' },
-      create: { channel: 'facebook', accessToken: d.accessToken, meta: { pageId: d.pageId } },
+      where: { ownerId_channel: { ownerId, channel: 'facebook' } },
+      create: { ownerId, channel: 'facebook', accessToken: d.accessToken, meta: { pageId: d.pageId } },
       update: { accessToken: d.accessToken, meta: { pageId: d.pageId } },
     });
     await logAudit({ actor: session.user.id, action: 'channel.connect', targetType: 'channel', targetId: 'facebook' });
@@ -161,6 +163,7 @@ const DeleteSchema = z.object({
 
 export async function DELETE(request: NextRequest) {
   const session = await requireSession();
+  const ownerId = session.user.id;
 
   let body: unknown;
   try { body = await request.json(); } catch {
@@ -171,7 +174,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: { code: 'validation', message: '유효하지 않은 채널명입니다.' } }, { status: 400 });
   }
 
-  await prisma.channelCredential.deleteMany({ where: { channel: parsed.data.channel } });
+  await prisma.channelCredential.deleteMany({ where: { ownerId, channel: parsed.data.channel } });
   await logAudit({ actor: session.user.id, action: 'channel.disconnect', targetType: 'channel', targetId: parsed.data.channel });
 
   return NextResponse.json({ data: { ok: true }, error: null });

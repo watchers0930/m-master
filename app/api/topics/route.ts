@@ -21,13 +21,14 @@ function jsonOk<T>(body: T) {
 
 export async function GET() {
   const session = await requireSession();
-  const _ownerId = session.user.id;
+  const ownerId = session.user.id;
 
   try {
     const weekStart = getMondayOfWeekKST();
 
     const data = await prisma.topicRecommendation.findMany({
       where: {
+        ownerId,
         weekStart,
         channel: 'blog',
       },

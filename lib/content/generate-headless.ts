@@ -48,13 +48,13 @@ export async function generateContentHeadless(
   const { topic, channel, ownerId, tone, keywords = [] } = opts;
 
   // 1) 예산 체크
-  if (await isBudgetExceeded()) {
+  if (await isBudgetExceeded(ownerId)) {
     throw new Error('BUDGET_EXCEEDED: 월 예산 한도 초과');
   }
 
   // 2) settings
   const settingsData = await prisma.setting.findUnique({
-    where: { id: 1 },
+    where: { ownerId },
     select: { brandGuide: true, promptTemplates: true },
   });
   const brandGuide = (settingsData?.brandGuide ?? {}) as Record<string, unknown>;
@@ -172,10 +172,10 @@ export async function generateContentHeadless(
   });
 
   // 10) cost_ledger
-  await trackCost({ kind: 'chat', tokensIn: usage.prompt_tokens, tokensOut: usage.completion_tokens, krw: chatKrw, contentId: contentData.id });
-  if (embeddingTokens > 0) await trackCost({ kind: 'embedding', tokensIn: embeddingTokens, tokensOut: 0, krw: embedKrw, contentId: contentData.id });
-  if (imageKrw > 0) await trackCost({ kind: 'image', tokensIn: 0, tokensOut: 0, krw: imageKrw, contentId: contentData.id });
-  if (externalContext) await trackCost({ kind: 'external', tokensIn: 0, tokensOut: 0, krw: 0, contentId: contentData.id });
+  await trackCost({ ownerId, kind: 'chat', tokensIn: usage.prompt_tokens, tokensOut: usage.completion_tokens, krw: chatKrw, contentId: contentData.id });
+  if (embeddingTokens > 0) await trackCost({ ownerId, kind: 'embedding', tokensIn: embeddingTokens, tokensOut: 0, krw: embedKrw, contentId: contentData.id });
+  if (imageKrw > 0) await trackCost({ ownerId, kind: 'image', tokensIn: 0, tokensOut: 0, krw: imageKrw, contentId: contentData.id });
+  if (externalContext) await trackCost({ ownerId, kind: 'external', tokensIn: 0, tokensOut: 0, krw: 0, contentId: contentData.id });
 
   return {
     contentId: contentData.id,

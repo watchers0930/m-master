@@ -34,8 +34,8 @@ interface ResolvedNaverCreds {
 }
 
 /** DB 우선 → 환경변수 fallback으로 자격증명 해석 */
-async function resolveCredentials(): Promise<ResolvedNaverCreds> {
-  const creds = await getNaverCafeCreds();
+async function resolveCredentials(ownerId?: string): Promise<ResolvedNaverCreds> {
+  const creds = ownerId ? await getNaverCafeCreds(ownerId) : null;
   if (creds) return creds;
   return {
     accessToken: getEnv('NAVER_CAFE_ACCESS_TOKEN'),
@@ -52,9 +52,9 @@ async function resolveCredentials(): Promise<ResolvedNaverCreds> {
 // ---------------------------------------------------------------------------
 let cachedAccessToken: string | null = null;
 
-async function refreshAccessToken(): Promise<string> {
+async function refreshAccessToken(ownerId?: string): Promise<string> {
   // DB 자격증명 우선, 없으면 env fallback
-  const resolved = await resolveCredentials();
+  const resolved = await resolveCredentials(ownerId);
   const clientId = resolved.clientId || getEnv('NAVER_CLIENT_ID');
   const clientSecret = resolved.clientSecret || getEnv('NAVER_CLIENT_SECRET');
   const refreshToken = resolved.refreshToken || getEnv('NAVER_CAFE_REFRESH_TOKEN');
@@ -448,8 +448,9 @@ export async function publishNaverCafePost(opts: {
   imageUrl?: string;   // 썸네일 폴백 (bodyImageUrls가 비었을 때 사용)
   clubId?: string;   // 지정 시 이 카페로 발행
   menuId?: string;   // 지정 시 이 게시판으로 발행
+  ownerId?: string;  // 멀티테넌시: DB 자격증명 조회용
 }): Promise<NaverCafePublishResult> {
-  const resolved = await resolveCredentials();
+  const resolved = await resolveCredentials(opts.ownerId);
   const clubId = opts.clubId || resolved.clubId;
   const menuId = opts.menuId || resolved.menuId;
   // DB 자격증명이 있으면 cachedAccessToken에 반영

@@ -85,6 +85,10 @@ export async function GET(request: NextRequest) {
       where: { weekStart, channel: 'blog' },
     });
 
+    // ownerId 결정: 첫 번째 유저 또는 'system'
+    const anyUser = await prisma.user.findFirst({ select: { id: true }, orderBy: { createdAt: 'asc' } });
+    const cronOwnerId = anyUser?.id ?? 'system';
+
     const signalsByTopic = new Map(candidates.map(c => [c.topic, c.signal]));
     const rows = recommended.items.map(item => {
       const factors: Record<string, Prisma.InputJsonValue> = {
@@ -94,6 +98,7 @@ export async function GET(request: NextRequest) {
       };
       if (ga4Unavailable) factors.ga4_unavailable = true;
       return {
+        ownerId: cronOwnerId,
         weekStart,
         topic: item.topic,
         score: item.score,
@@ -109,6 +114,7 @@ export async function GET(request: NextRequest) {
     // cost 적재
     const krw = calcChatKrw(recommended.usage);
     await trackCost({
+      ownerId: cronOwnerId,
       kind: 'chat',
       tokensIn: recommended.usage.prompt_tokens,
       tokensOut: recommended.usage.completion_tokens,

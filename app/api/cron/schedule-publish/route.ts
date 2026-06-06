@@ -55,7 +55,7 @@ async function publishSocialSlots(): Promise<SlotResult[]> {
     },
     include: {
       content: {
-        select: { id: true, textBody: true, imageUrl: true, bodyImageUrls: true, topic: true, keywords: true },
+        select: { id: true, textBody: true, imageUrl: true, bodyImageUrls: true, topic: true, keywords: true, ownerId: true },
       },
     },
     orderBy: [{ channel: 'asc' }, { scheduledAt: 'asc' }],
@@ -91,11 +91,11 @@ async function publishSocialSlots(): Promise<SlotResult[]> {
 
       if (slot.channel === 'naver_cafe') {
         const bodyUrls = (content.bodyImageUrls as string[]) ?? [];
-        const result = await publishNaverCafePost({ subject: content.topic, content: content.textBody, keywords: content.keywords ?? [], imageUrls: bodyUrls, imageUrl: content.imageUrl ?? undefined });
+        const result = await publishNaverCafePost({ subject: content.topic, content: content.textBody, keywords: content.keywords ?? [], imageUrls: bodyUrls, imageUrl: content.imageUrl ?? undefined, ownerId: content.ownerId });
         externalId = result.articleId;
         externalUrl = result.cafeUrl;
       } else if (slot.channel === 'facebook') {
-        const result = await publishFacebookPost({ imageUrl: content.imageUrl, message: content.textBody });
+        const result = await publishFacebookPost({ imageUrl: content.imageUrl, message: content.textBody, ownerId: content.ownerId });
         externalId = result.id;
         externalUrl = `https://facebook.com/${result.id}`;
       } else if (slot.channel === 'instagram') {
@@ -103,11 +103,11 @@ async function publishSocialSlots(): Promise<SlotResult[]> {
         if (bodyUrls.length >= 2) {
           const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
           const absoluteUrls = bodyUrls.map(u => u.startsWith('http') ? u : `${appUrl}${u}`);
-          const result = await publishInstagramCarousel({ imageUrls: absoluteUrls, caption: content.textBody });
+          const result = await publishInstagramCarousel({ imageUrls: absoluteUrls, caption: content.textBody, ownerId: content.ownerId });
           externalId = result.id;
         } else {
           if (!content.imageUrl) throw new Error('인스타그램 발행에 이미지 URL 필수');
-          const result = await publishInstagramImage({ imageUrl: content.imageUrl, caption: content.textBody });
+          const result = await publishInstagramImage({ imageUrl: content.imageUrl, caption: content.textBody, ownerId: content.ownerId });
           externalId = result.id;
           externalUrl = result.permalink ?? null;
         }
@@ -206,6 +206,7 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
 
       // 변환 비용 기록
       await trackCost({
+        ownerId: content.ownerId,
         kind: 'chat',
         tokensIn: converted.usage.prompt_tokens,
         tokensOut: converted.usage.completion_tokens,
@@ -215,7 +216,7 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
 
       // 네이버 카페 발행 — 다중 카페 타겟 지원
       const blogImageUrls = (content.bodyImageUrls as string[]) ?? [];
-      const cafeTargets = await getCafeTargets();
+      const cafeTargets = await getCafeTargets(content.ownerId);
       let anySuccess = false;
 
       if (cafeTargets.length > 0) {
@@ -231,10 +232,12 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
               imageUrl: content.imageUrl ?? undefined,
               clubId: target.clubId,
               menuId: target.menuId,
+              ownerId: content.ownerId,
             });
             anySuccess = true;
             const cafeSlot = await prisma.scheduleSlot.create({
               data: {
+                ownerId: content.ownerId,
                 contentId: content.id, channel: 'naver_cafe',
                 scheduledAt: new Date(), publishedAt: new Date(),
                 status: 'published', mode: 'ai_auto',
@@ -268,10 +271,12 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
           keywords: content.keywords ?? [],
           imageUrls: blogImageUrls,
           imageUrl: content.imageUrl ?? undefined,
+          ownerId: content.ownerId,
         });
         anySuccess = true;
         const cafeSlot = await prisma.scheduleSlot.create({
           data: {
+            ownerId: content.ownerId,
             contentId: content.id, channel: 'naver_cafe',
             scheduledAt: new Date(), publishedAt: new Date(),
             status: 'published', mode: 'ai_auto',
