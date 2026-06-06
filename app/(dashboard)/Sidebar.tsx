@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { signOut, useSession } from 'next-auth/react';
 import { listContents } from '@/lib/api/content';
 import { listSlots } from '@/lib/api/schedule';
 
@@ -13,6 +14,7 @@ function Badge({ count }: { count: number }) {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
   const active = (href: string) => href === '/' ? pathname === '/' : pathname.startsWith(href);
 
   const [draftCount, setDraftCount] = useState(0);
@@ -134,11 +136,22 @@ export function Sidebar() {
       </div>
 
       <div className="sb-bottom">
-        <div className="sb-avatar">M</div>
-        <div>
-          <div className="sb-uname">MINTEQ</div>
-          <div className="sb-uemail">minteq.vercel.app</div>
+        <div className="sb-avatar">{session?.user?.name?.[0] ?? 'M'}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="sb-uname">{session?.user?.name ?? 'MINTEQ'}</div>
+          <div className="sb-uemail">{session?.user?.email ?? ''}</div>
         </div>
+        <button
+          onClick={() => signOut({ callbackUrl: '/login' })}
+          title="로그아웃"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#94a3b8', flexShrink: 0 }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+        </button>
       </div>
     </aside>
   );
