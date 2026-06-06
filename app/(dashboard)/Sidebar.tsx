@@ -142,7 +142,7 @@ export function Sidebar() {
           <div className="sb-uemail">{session?.user?.email ?? ''}</div>
         </div>
         <button
-          onClick={() => signOut({ callbackUrl: '/login' })}
+          onClick={() => signOut({ callbackUrl: '/' })}
           title="로그아웃"
           style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#94a3b8', flexShrink: 0 }}
         >
