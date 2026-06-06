@@ -216,7 +216,12 @@ export async function recommendTopFive(input: RecommendInput): Promise<Recommend
     throw new Error('추천 function call 응답 없음');
   }
 
-  const parsedRaw: unknown = JSON.parse(toolCall.function.arguments);
+  let parsedRaw: unknown = {};
+  try {
+    parsedRaw = JSON.parse(toolCall.function.arguments);
+  } catch {
+    console.warn('[recommend] function arguments JSON 파싱 실패');
+  }
 
   // zod 검증 — 실패 시 부분만 통과시키고 후처리에서 보정
   const safe = ResponseSchema.safeParse(parsedRaw);

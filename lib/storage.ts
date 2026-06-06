@@ -28,26 +28,6 @@ export async function upload(
   return { path: filePath };
 }
 
-export async function download(
-  bucket: string,
-  filePath: string,
-): Promise<Buffer> {
-  const fullPath = path.join(bucketPath(bucket), filePath);
-  return fs.readFileSync(fullPath);
-}
-
-export async function remove(
-  bucket: string,
-  filePaths: string[],
-): Promise<void> {
-  for (const fp of filePaths) {
-    const fullPath = path.join(bucketPath(bucket), fp);
-    if (fs.existsSync(fullPath)) {
-      fs.unlinkSync(fullPath);
-    }
-  }
-}
-
 export function getPublicUrl(bucket: string, filePath: string): string {
   return `/uploads/${bucket}/${filePath}`;
 }

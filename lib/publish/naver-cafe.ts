@@ -214,9 +214,18 @@ export function buildNaverCafeContent(text: string, imageUrls?: string[]): strin
   return htmlParts.join('\n');
 }
 
-/** 인라인 마크다운 변환 (볼드, 이탤릭) */
+/** HTML 특수문자 이스케이프 */
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/** 인라인 마크다운 변환 (볼드, 이탤릭) — XSS 방지를 위해 먼저 이스케이프 */
 function inlineMd(text: string): string {
-  return text
+  return escapeHtml(text)
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
     .replace(/\*([^*]+)\*/g, '<i>$1</i>');
 }

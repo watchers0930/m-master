@@ -4,7 +4,7 @@
 import { prisma } from '@/lib/prisma';
 import { getMonthlySpendKrw } from '@/lib/cost/tracker';
 
-export interface BudgetStatus {
+interface BudgetStatus {
   budgetMonthly: number;   // 설정된 월 한도 (KRW)
   spentKrw: number;        // 이번 달 누적 지출
   remainingKrw: number;    // 잔여
@@ -14,7 +14,7 @@ export interface BudgetStatus {
   exceeded: boolean;       // 100% 초과
 }
 
-export async function getBudgetStatus(): Promise<BudgetStatus> {
+async function getBudgetStatus(): Promise<BudgetStatus> {
   try {
     // settings 테이블에서 예산 한도 조회
     const settingsData = await prisma.setting.findUnique({

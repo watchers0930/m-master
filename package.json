@@ -1,6 +1,6 @@
 {
   "name": "m-master",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -11,14 +11,12 @@
     "db:status": "prisma migrate status"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.97.1",
     "@google-analytics/data": "^6.0.0",
     "@prisma/client": "^6.19.2",
     "@tanstack/react-query": "^5.100.9",
     "mammoth": "^1.12.0",
     "next": "16.1.6",
     "openai": "^6.38.0",
-    "pdf-parse": "^2.4.5",
     "prisma": "^6.19.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",

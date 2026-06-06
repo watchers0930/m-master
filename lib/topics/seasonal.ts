@@ -3,7 +3,7 @@
 // - 부동산 거래·이사 시즌 (봄/가을), 세금 신고 시기, 전세 만기 사이클
 // - VESTRA 핵심 서비스: AI 권리분석, 시세분석, 시세전망, 전세보증보험, 동네정보
 
-export const SEASONAL_KEYWORDS: Record<number, string[]> = {
+const SEASONAL_KEYWORDS: Record<number, string[]> = {
   1: ['신년 부동산 시장 전망', '연초 전세 만기 대비', '부동산 투자 계획'],
   2: ['봄 이사 시즌 준비', '전세 계약 갱신 체크', '신혼부부 내집마련'],
   3: ['봄 이사 시즌', '학군 탐색', '아파트 시세 동향', '전세사기 예방'],

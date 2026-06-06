@@ -43,7 +43,7 @@ const RATIO_DIMS: Record<AspectRatio, { w: number; h: number }> = {
   '1.91:1': { w: 1080, h: 566 },
 };
 
-export function applyAspectRatio(url: string, ratio: AspectRatio = '16:9'): string {
+function applyAspectRatio(url: string, ratio: AspectRatio = '16:9'): string {
   try {
     const u = new URL(url);
     const { w, h } = RATIO_DIMS[ratio];

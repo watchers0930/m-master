@@ -86,7 +86,12 @@ submit_translations 함수를 반드시 호출하여 결과를 제출하세요.`
     console.warn('[translate] function call 응답 없음 — 한국어 원본 사용');
     queries = koreanPrompts;
   } else {
-    const parsed = JSON.parse(toolCall.function.arguments) as { queries?: unknown };
+    let parsed: { queries?: unknown } = {};
+    try {
+      parsed = JSON.parse(toolCall.function.arguments) as { queries?: unknown };
+    } catch {
+      console.warn('[translate] JSON 파싱 실패 — 한국어 원본 사용');
+    }
     const arr = Array.isArray(parsed.queries) ? parsed.queries : [];
     // 길이 보정: 부족하면 원본으로 채우고, 초과하면 자름
     queries = koreanPrompts.map((orig, i) => {
@@ -98,5 +103,3 @@ submit_translations 함수를 반드시 호출하여 결과를 제출하세요.`
   return { queries, usage: toChatUsage(response.usage) };
 }
 
-// 비용 계산 export (호출부에서 사용)
-export { calcChatKrw as calcSonnetKrw } from './chat';

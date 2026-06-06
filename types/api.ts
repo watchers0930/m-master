@@ -42,19 +42,6 @@ export interface RagUploadResponse {
 }
 
 // ----------------------------------------------------------------
-// RAG - Search
-// ----------------------------------------------------------------
-export interface RagSearchChunk {
-  id: string;
-  text: string;
-  similarity: number;
-}
-
-export interface RagSearchResponse {
-  chunks: RagSearchChunk[];
-}
-
-// ----------------------------------------------------------------
 // Content - Generate
 // ----------------------------------------------------------------
 export interface ContentGenerateRequest {
@@ -94,19 +81,6 @@ export interface ScheduleManualResponse {
 export interface ScheduleSlotPatchRequest {
   scheduled_at?: string;
   status?: SlotStatus;
-}
-
-// ----------------------------------------------------------------
-// Publish - Blog
-// ----------------------------------------------------------------
-export interface PublishBlogRequest {
-  content_id: string;
-}
-
-export interface PublishBlogResponse {
-  html: string;
-  filename: string;
-  download_url: string;
 }
 
 // ----------------------------------------------------------------
