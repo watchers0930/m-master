@@ -453,13 +453,18 @@ export async function publishNaverCafePost(opts: {
   }
   console.log(`[naver-cafe] 이미지 URL ${imgUrls.length}개 (원본 ${(opts.imageUrls ?? []).length}개)`);
 
-  // 본문 HTML 생성 — 인라인 <img> 태그로 이미지-글-이미지-글 배치
-  const htmlBody = buildNaverCafeContent(opts.content, imgUrls) + '\n' + CAFE_FOOTER;
+  // 본문 HTML 생성 (인라인 <img>는 네이버 API가 거부 — multipart 첨부만 허용)
+  const htmlBody = buildNaverCafeContent(opts.content, []) + '\n' + CAFE_FOOTER;
   const tags = generateDynamicTags(opts.subject, opts.keywords ?? [], opts.content);
   const fields = { subject: opts.subject, content: htmlBody, openyn: 'true', tagList: tags };
 
-  // 인라인 <img> 방식 사용 — urlencoded POST (multipart 불필요)
-  const { res, json } = await cafeApiPost(clubId, menuId, fields);
+  // 이미지: multipart 첨부 (네이버 API가 본문 상단에 배치)
+  const images = imgUrls.length > 0 ? await downloadImages(imgUrls) : [];
+  console.log(`[naver-cafe] 이미지 다운로드 결과: ${images.length}장`);
+
+  const { res, json } = images.length > 0
+    ? await cafeApiPostWithImages(clubId, menuId, fields, images)
+    : await cafeApiPost(clubId, menuId, fields);
 
   if (!res.ok) {
     const msg = (json?.message as { error?: { msg?: string } })?.error?.msg ?? `HTTP ${res.status}`;
