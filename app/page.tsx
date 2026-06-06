@@ -24,10 +24,7 @@ export default function LandingPage() {
           </div>
           <span style={{ fontSize: 16, fontWeight: 700, color: '#1E3A6E' }}>MINTEQ</span>
         </div>
-        <div style={{ display: 'flex', gap: 12 }}>
-          <Link href="/login" style={{ fontSize: 13, color: '#475569', textDecoration: 'none', padding: '8px 16px' }}>로그인</Link>
-          <Link href="/register?plan=free" style={{ fontSize: 13, color: '#fff', background: '#2563EB', borderRadius: 7, padding: '8px 16px', textDecoration: 'none', fontWeight: 600 }}>무료 시작</Link>
-        </div>
+        <Link href="/login" style={{ fontSize: 13, color: '#475569', textDecoration: 'none', padding: '8px 16px' }}>로그인</Link>
       </nav>
 
       {/* Hero */}
