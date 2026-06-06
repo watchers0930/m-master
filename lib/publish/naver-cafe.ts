@@ -321,7 +321,7 @@ async function cafeApiPostWithImages(
       fd.append(k, encodeURIComponent(v));
     }
     for (let i = 0; i < images.length; i++) {
-      fd.append(`image[${i}]`, new Blob([new Uint8Array(images[i].buffer)], { type: images[i].type }), images[i].name);
+      fd.append('image', new Blob([new Uint8Array(images[i].buffer)], { type: images[i].type }), images[i].name);
     }
     return fd;
   }
