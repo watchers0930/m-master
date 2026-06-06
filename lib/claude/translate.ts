@@ -29,14 +29,19 @@ export async function translateImagePrompts(
 
   const client = getClient();
 
-  const systemPrompt = `당신은 한국어 이미지 설명을 영어 스톡 사진 검색 키워드로 변환하는 전문가입니다.
+  const systemPrompt = `당신은 한국어 이미지 설명을 영어 스톡 이미지 검색 키워드로 변환하는 전문가입니다.
 
 규칙:
 1. 각 설명을 Unsplash에서 잘 매칭될 영어 키워드 2~4개로 변환
-2. 추상적 개념(예: "인포그래픽", "흐름도")은 시각적 키워드로 치환 ("infographic" → "office desk meeting" 등 실제 사진 가능한 표현)
-3. 한국 특수 법률 용어는 보편적 시각 키워드로 변환 ("등기" → "document signing", "법인설립" → "business startup")
-4. 키워드는 공백으로 구분된 단어들로만 (문장 X)
-5. 입력 배열 순서대로 동일 개수의 결과 배열을 반환
+2. 이미지 스타일을 다양하게 섞어서 사용:
+   - 실사 사진: "Seoul apartment interior", "person reviewing contract"
+   - 일러스트: "real estate illustration flat design", "house investment vector"
+   - 인포그래픽: "data visualization infographic", "comparison chart graphic"
+   - 다이어그램: "flowchart diagram", "process workflow graphic"
+3. 입력 배열에서 최소 절반은 illustration, infographic, diagram, flat design, vector 중 하나를 포함
+4. 한국 특수 법률 용어는 보편적 시각 키워드로 변환 ("등기" → "document signing", "법인설립" → "business startup")
+5. 키워드는 공백으로 구분된 단어들로만 (문장 X)
+6. 입력 배열 순서대로 동일 개수의 결과 배열을 반환
 
 submit_translations 함수를 반드시 호출하여 결과를 제출하세요.`;
 
