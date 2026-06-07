@@ -108,34 +108,34 @@ export default function LandingPage() {
       </section>
 
       {/* 플랜 비교표 */}
-      <section style={{ maxWidth: 800, margin: '0 auto', padding: '0 24px 80px' }}>
-        <h3 style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', textAlign: 'center', marginBottom: 24 }}>플랜별 기능 비교</h3>
+      <section style={{ maxWidth: 960, margin: '0 auto', padding: '0 24px 80px' }}>
+        <h3 style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', textAlign: 'center', marginBottom: 28 }}>플랜별 기능 비교</h3>
         <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15.5 }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                <th style={{ padding: '14px 20px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>기능</th>
-                <th style={{ padding: '14px 16px', textAlign: 'center', fontWeight: 600, color: '#475569', width: 100 }}>Free</th>
-                <th style={{ padding: '14px 16px', textAlign: 'center', fontWeight: 700, color: '#2563EB', width: 100 }}>Starter</th>
-                <th style={{ padding: '14px 16px', textAlign: 'center', fontWeight: 600, color: '#475569', width: 100 }}>Pro</th>
+                <th style={{ padding: '17px 24px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>기능</th>
+                <th style={{ padding: '17px 20px', textAlign: 'center', fontWeight: 600, color: '#475569', width: 120 }}>Free</th>
+                <th style={{ padding: '17px 20px', textAlign: 'center', fontWeight: 700, color: '#2563EB', width: 120 }}>Starter</th>
+                <th style={{ padding: '17px 20px', textAlign: 'center', fontWeight: 600, color: '#475569', width: 120 }}>Pro</th>
               </tr>
             </thead>
             <tbody>
               {COMPARE_ROWS.map((row, i) => (
                 <tr key={row.label} style={{ borderBottom: i < COMPARE_ROWS.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                  <td style={{ padding: '12px 20px', color: '#334155' }}>{row.label}</td>
+                  <td style={{ padding: '14px 24px', color: '#334155' }}>{row.label}</td>
                   {(['free', 'starter', 'pro'] as const).map((plan) => {
                     const val = row[plan];
                     const isCheck = val === 'O';
                     const isDash = val === '-';
                     return (
-                      <td key={plan} style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      <td key={plan} style={{ padding: '14px 20px', textAlign: 'center' }}>
                         {isCheck ? (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                         ) : isDash ? (
-                          <span style={{ color: '#cbd5e1', fontSize: 16 }}>—</span>
+                          <span style={{ color: '#cbd5e1', fontSize: 19 }}>—</span>
                         ) : (
-                          <span style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>{val}</span>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}>{val}</span>
                         )}
                       </td>
                     );
