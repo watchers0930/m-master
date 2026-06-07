@@ -73,7 +73,6 @@ export function RagSearch() {
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--blue-400)" strokeWidth="2" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
             <path d="M21 12a9 9 0 11-6.219-8.56" />
           </svg>
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       )}
 

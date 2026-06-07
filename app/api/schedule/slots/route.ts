@@ -3,8 +3,31 @@
 // DELETE /api/schedule/slots?year=2026&month=5 → 월 전체 초기화
 
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+
+const VALID_CHANNELS = ['blog', 'naver_cafe', 'facebook', 'instagram'] as const;
+const VALID_STATUSES = ['scheduled', 'publishing', 'published', 'failed', 'cancelled'] as const;
+const VALID_MODES = ['manual', 'ai_auto'] as const;
+
+const SlotSchema = z.object({
+  content_id: z.string().nullish(),
+  contentId: z.string().nullish(),
+  channel: z.enum(VALID_CHANNELS),
+  scheduled_at: z.string().datetime({ offset: true }).optional(),
+  scheduledAt: z.string().datetime({ offset: true }).optional(),
+  status: z.enum(VALID_STATUSES).default('scheduled'),
+  mode: z.enum(VALID_MODES).default('manual'),
+}).refine(
+  (d) => d.scheduled_at || d.scheduledAt,
+  { message: 'scheduled_at 또는 scheduledAt 필수' },
+);
+
+const CreateSlotsSchema = z.union([
+  SlotSchema,
+  z.array(SlotSchema).min(1).max(100),
+]);
 
 /* Prisma returns camelCase; frontend expects snake_case */
 function toSnake(row: Record<string, unknown>) {
@@ -62,19 +85,28 @@ export async function POST(req: NextRequest) {
   const session = await requireSession();
   const ownerId = session.user.id;
   try {
-    const body = await req.json();
-    const rows = Array.isArray(body) ? body : [body];
+    let body: unknown;
+    try { body = await req.json(); } catch {
+      return NextResponse.json({ data: null, error: 'JSON 파싱 실패' }, { status: 400 });
+    }
+
+    const parsed = CreateSlotsSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ data: null, error: parsed.error.issues[0].message }, { status: 400 });
+    }
+
+    const rows = Array.isArray(parsed.data) ? parsed.data : [parsed.data];
 
     const created = await prisma.$transaction(
-      rows.map((row: Record<string, unknown>) =>
+      rows.map((row) =>
         prisma.scheduleSlot.create({
           data: {
             ownerId,
-            contentId:   (row.content_id ?? row.contentId ?? null) as string | null,
-            channel:     row.channel as string,
-            scheduledAt: new Date((row.scheduled_at ?? row.scheduledAt) as string),
-            status:      (row.status as string) ?? 'scheduled',
-            mode:        (row.mode as string) ?? 'manual',
+            contentId:   row.content_id ?? row.contentId ?? null,
+            channel:     row.channel,
+            scheduledAt: new Date((row.scheduled_at ?? row.scheduledAt)!),
+            status:      row.status,
+            mode:        row.mode,
           },
         }),
       ),

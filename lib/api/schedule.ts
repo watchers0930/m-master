@@ -1,6 +1,6 @@
 // lib/api/schedule.ts — 스케줄 API 래퍼 (Supabase 영구 저장)
 import type { ApiResponse, ScheduleManualRequest, ScheduleManualResponse } from '@/types/api';
-import type { ScheduleSlot, SlotStatus } from '@/types/db';
+import type { ScheduleSlot } from '@/types/db';
 
 // ── API 함수 ──────────────────────────────────────────────────────
 
@@ -33,18 +33,6 @@ export async function createSlot(
   if (json.error) return { data: null, error: json.error };
   const slot = Array.isArray(json.data) ? json.data[0] : json.data;
   return { data: { slot_id: slot.id }, error: null };
-}
-
-export async function patchSlot(
-  id: string,
-  updates: { scheduled_at?: string; status?: SlotStatus }
-): Promise<ApiResponse<ScheduleSlot>> {
-  const res = await fetch(`/api/schedule/slot/${id}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates),
-  });
-  return res.json();
 }
 
 export async function deleteSlot(id: string): Promise<ApiResponse<null>> {

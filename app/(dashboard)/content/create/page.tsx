@@ -209,7 +209,6 @@ function ContentCreatePageInner() {
       <style>{`
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
 
       <div style={{ display: 'grid', gridTemplateColumns: '360px minmax(0, 1fr) 400px', gap: 14, alignItems: 'start' }}>

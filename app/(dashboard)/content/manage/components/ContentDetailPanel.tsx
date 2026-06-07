@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { getContent } from '@/lib/api/content';
 import { createAbTest } from '@/lib/api/ab-test';
 import type { Content, AbTestMeasureDays } from '@/types/db';
-import { parseMarkdown, renderInline, ConvertBtn, PublishBtn } from '@/app/(dashboard)/content/create/components/ContentPreview';
+import { parseMarkdown, renderInline, ConvertBtn } from '@/app/(dashboard)/content/create/components/ContentPreview';
 
 const STATUS_LABEL: Record<string, string> = {
   draft: '초안', scheduled: '예약됨', published: '발행됨', failed: '실패',
@@ -224,7 +224,6 @@ export default function ContentDetailPanel({ contentId }: Props) {
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--blue-400)" strokeWidth="2" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
               <path d="M21 12a9 9 0 11-6.219-8.56"/>
             </svg>
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         ) : errorMsg ? (
           <p style={{ color: '#dc2626', fontSize: 12.5, padding: '24px 0', textAlign: 'center' }}>{errorMsg}</p>
@@ -416,7 +415,6 @@ export default function ContentDetailPanel({ contentId }: Props) {
           </div>
         </>
       )}
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

@@ -3,6 +3,7 @@
 // 이 엔드포인트는 수동 호출 용도로 유지
 
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyCronSecret } from '@/lib/cron/auth';
 import { prisma } from '@/lib/prisma';
 import { calcChatKrw } from '@/lib/claude/chat';
 import { trackCost } from '@/lib/cost/tracker';
@@ -16,12 +17,6 @@ import { Prisma } from '@prisma/client';
 export const maxDuration = 120;
 export const dynamic = 'force-dynamic';
 
-function verifyCronSecret(request: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const authHeader = request.headers.get('authorization');
-  return authHeader === `Bearer ${secret}`;
-}
 
 export async function GET(request: NextRequest) {
   if (!verifyCronSecret(request)) {

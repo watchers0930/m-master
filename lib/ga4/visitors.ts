@@ -441,6 +441,6 @@ export async function fetchRealtime(): Promise<{ activeUsers: number; timestamp:
 
 export { fetchPathMetrics, fetchMultiplePathMetrics, fetchMultiplePathSessionsByNaver } from './path-metrics';
 export type { PathMetrics } from './path-metrics';
-export { fetchDowChannelPattern, fetchPopularPages } from './popular';
-export type { DowChannelRow, PopularPage } from './popular';
-export { fetchMonthlyVisitors, fetchMonthlyVisitorsPair } from './monthly';
+export { fetchDowChannelPattern } from './popular';
+export type { DowChannelRow } from './popular';
+export { fetchMonthlyVisitorsPair } from './monthly';

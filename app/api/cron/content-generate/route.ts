@@ -5,6 +5,7 @@
 // 2) 매일(월~일): ContentPlanItem(scheduledDate=오늘, status=planned, plan.autoGenerate=true) 순차 생성·발행
 
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyCronSecret, getTodayKST } from '@/lib/cron/auth';
 import { prisma } from '@/lib/prisma';
 import { generateContentHeadless } from '@/lib/content/generate-headless';
 import { autoPublishToSocial } from '@/lib/publish/auto-publish';
@@ -48,24 +49,6 @@ function getRemainingMs(startTime: number, budgetMs = 270_000): number {
   return budgetMs - (Date.now() - startTime);
 }
 
-// ---------------------------------------------------------------------------
-// CRON_SECRET 인증
-// ---------------------------------------------------------------------------
-function verifyCronSecret(request: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const authHeader = request.headers.get('authorization');
-  return authHeader === `Bearer ${secret}`;
-}
-
-// ---------------------------------------------------------------------------
-// 오늘 날짜 (KST) → 'YYYY-MM-DD'
-// ---------------------------------------------------------------------------
-function getTodayKST(): string {
-  const now = new Date();
-  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  return kst.toISOString().slice(0, 10);
-}
 
 // ---------------------------------------------------------------------------
 // 매주 월요일: 추천 토픽 리프레시 (주간 전환)

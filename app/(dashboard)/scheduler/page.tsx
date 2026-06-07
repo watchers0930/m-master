@@ -134,7 +134,6 @@ export default function SchedulerPage() {
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--blue-400)" strokeWidth="2" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
               <path d="M21 12a9 9 0 11-6.219-8.56"/>
             </svg>
-            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         ) : (
           <CalendarView year={year} month={month} slots={slots} onSlotsChange={setSlots} />
@@ -177,7 +176,6 @@ export default function SchedulerPage() {
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" strokeWidth="2" strokeLinecap="round" style={{ animation: 'spin 1s linear infinite' }}>
                     <path d="M21 12a9 9 0 11-6.219-8.56"/>
                   </svg>
-                  <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
                   <p style={{ fontSize: 13, color: 'var(--sub)' }}>GA4 트렌드 + 시즌 데이터 분석 중...</p>
                 </div>
               )}

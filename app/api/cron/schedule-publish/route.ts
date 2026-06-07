@@ -5,6 +5,7 @@
 // 2) 블로그 슬롯 → 네이버 카페 자동 변환·발행
 
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyCronSecret, getTodayKST } from '@/lib/cron/auth';
 import { prisma } from '@/lib/prisma';
 import { publishNaverCafePost } from '@/lib/publish/naver-cafe';
 import { publishFacebookPost } from '@/lib/publish/facebook';
@@ -21,15 +22,6 @@ const MAX_RETRY = 3;
 
 type SlotResult = { slotId: string; channel: string; status: string; error?: string };
 
-// ---------------------------------------------------------------------------
-// CRON_SECRET 인증
-// ---------------------------------------------------------------------------
-function verifyCronSecret(request: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  const authHeader = request.headers.get('authorization');
-  return authHeader === `Bearer ${secret}`;
-}
 
 // (isNaverCafeEnabled 전역 체크 제거 — SaaS에서는 유저별 credential 확인 필요)
 
@@ -322,14 +314,6 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
   return results;
 }
 
-// ---------------------------------------------------------------------------
-// 오늘 날짜 (KST) → 'YYYY-MM-DD'
-// ---------------------------------------------------------------------------
-function getTodayKST(): string {
-  const now = new Date();
-  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  return kst.toISOString().slice(0, 10);
-}
 
 // ---------------------------------------------------------------------------
 // 폴백: 7시 content-generate가 랜덤 스킵했으면 여기서 실행

@@ -203,7 +203,6 @@ export default function WinnerPanel({ test, onUpdated }: Props) {
           <p style={{ fontSize: 11, color: '#dc2626', marginTop: 8 }}>{errorMsg}</p>
         )}
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
