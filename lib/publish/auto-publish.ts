@@ -52,6 +52,24 @@ async function publishToChannel(
 ): Promise<void> {
   const { blogContentId, ownerId, blogText, topic, imageUrl, onProgress } = params;
 
+  // 0) 중복 발행 방지: 같은 토픽이 오늘 이미 이 채널에 자동 발행되었으면 스킵
+  const cutoff = new Date(Date.now() - 20 * 60 * 60 * 1000); // 20시간 이내
+  const alreadyPublished = await prisma.scheduleSlot.findFirst({
+    where: {
+      ownerId,
+      channel,
+      status: 'published',
+      mode: 'ai_auto',
+      publishedAt: { gte: cutoff },
+      content: { topic },
+    },
+  });
+  if (alreadyPublished) {
+    console.log(`[auto-publish] ${channel} — 이미 발행됨 (${topic}), 스킵`);
+    onProgress({ type: 'auto_publish', channel, status: 'success' });
+    return;
+  }
+
   // 1) 변환
   onProgress({ type: 'auto_publish', channel, status: 'converting' });
   const converted = await convertBlogToChannel(blogText, topic, channel);

@@ -303,15 +303,20 @@ export async function GET(request: NextRequest) {
     const ownerId = item.plan.ownerId;
 
     try {
+      // 원자적 잠금: planned → generating (중복 실행 방지)
+      const claimed = await prisma.contentPlanItem.updateMany({
+        where: { id: item.id, status: 'planned' },
+        data: { status: 'generating' },
+      });
+      if (claimed.count === 0) {
+        console.log(`[cron/content-generate] [${ownerId}] ${item.topic} — 다른 인스턴스가 이미 처리 중, 스킵`);
+        continue;
+      }
+
       // 플랜 제한 체크 (콘텐츠 수 + 비용 한도)
       const userPlan = await getUserPlan(ownerId);
       await checkContentLimit(ownerId, userPlan);
       await checkCostLimit(ownerId, userPlan);
-
-      await prisma.contentPlanItem.update({
-        where: { id: item.id },
-        data: { status: 'generating' },
-      });
 
       const result = await generateContentHeadless({
         topic: item.topic,
