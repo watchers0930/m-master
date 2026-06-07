@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { listAbTests } from '@/lib/api/ab-test';
+import { PlanGate } from '@/components/PlanGate';
 import AbTestCard from './components/AbTestCard';
 
 export default function AbTestListPage() {
@@ -29,6 +30,8 @@ export default function AbTestListPage() {
           진행 중·완료된 두 변형 비교 결과를 모아 봅니다
         </p>
       </div>
+
+      <PlanGate feature="abTest">
 
       {/* 본문 */}
       {loading ? (
@@ -78,6 +81,7 @@ export default function AbTestListPage() {
           ))}
         </div>
       )}
+      </PlanGate>
     </div>
   );
 }

@@ -16,19 +16,13 @@ export interface FacebookPublishResult {
   postId?: string;     // photos 응답의 추가 post_id
 }
 
-function getEnv(name: string): string {
-  const v = process.env[name];
-  if (!v || v.trim().length === 0) {
-    throw new Error(`${name} 환경변수 미설정 — 페이스북 발행 불가`);
+/** SaaS: getFacebookCreds 단일 소스 — 자체 env fallback 제거 (credential 격리) */
+async function resolveCredentials(ownerId: string): Promise<{ token: string; pageId: string }> {
+  const creds = await getFacebookCreds(ownerId);
+  if (!creds) {
+    throw new Error(`페이스북 credential 없음 (ownerId=${ownerId})`);
   }
-  return v;
-}
-
-/** DB 우선 → 환경변수 fallback으로 자격증명 해석 */
-async function resolveCredentials(ownerId?: string): Promise<{ token: string; pageId: string }> {
-  const creds = ownerId ? await getFacebookCreds(ownerId) : null;
-  if (creds) return { token: creds.accessToken, pageId: creds.pageId };
-  return { token: getEnv('FACEBOOK_ACCESS_TOKEN'), pageId: getEnv('FACEBOOK_PAGE_ID') };
+  return { token: creds.accessToken, pageId: creds.pageId };
 }
 
 function getGraphVersion(): string {
@@ -68,7 +62,7 @@ async function graphPost(path: string, body: Record<string, string>): Promise<un
 export async function publishFacebookPost(opts: {
   imageUrl: string | null;
   message: string;
-  ownerId?: string;
+  ownerId: string;  // SaaS 필수
 }): Promise<FacebookPublishResult> {
   const { token, pageId } = await resolveCredentials(opts.ownerId);
   const message = buildFacebookMessage(opts.message);

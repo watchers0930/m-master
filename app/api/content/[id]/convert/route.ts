@@ -6,6 +6,7 @@ import { requireSession } from '@/lib/auth';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { isBudgetExceeded } from '@/lib/cost/budget';
+import { checkContentLimit, checkCostLimit, getUserPlan } from '@/lib/billing/limits';
 import { convertBlogToChannel } from '@/lib/claude/convert';
 import { trackCost } from '@/lib/cost/tracker';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
@@ -63,7 +64,14 @@ export async function POST(
   if (source.channel !== 'blog') return jsonError('invalid_state', '블로그 콘텐츠만 변환 가능합니다', 422);
   if (!source.textBody) return jsonError('invalid_state', '본문이 비어있습니다', 422);
 
-  // 2) 예산 체크
+  // 2) 플랜 제한 체크 (콘텐츠 수 + 비용 한도 + 유저 커스텀 예산)
+  const plan = await getUserPlan(ownerId);
+  try {
+    await checkContentLimit(ownerId, plan);
+    await checkCostLimit(ownerId, plan);
+  } catch (err) {
+    return jsonError('plan_limit', err instanceof Error ? err.message : '플랜 한도 초과', 429);
+  }
   if (await isBudgetExceeded(ownerId)) {
     return jsonError('budget_exceeded', '월 예산 한도 초과', 429);
   }

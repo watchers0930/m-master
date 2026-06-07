@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { checkChannelLimit, getUserPlan } from '@/lib/billing/limits';
 
 const CreateSchema = z.object({
   name: z.string().min(1, '카페 이름은 필수입니다'),
@@ -59,6 +60,17 @@ export async function POST(request: NextRequest) {
   }
 
   const { name, clubId, menuId } = parsed.data;
+
+  // 채널 수 제한 체크
+  const plan = await getUserPlan(ownerId);
+  try {
+    await checkChannelLimit(ownerId, plan);
+  } catch (err) {
+    return NextResponse.json(
+      { error: { code: 'plan_limit', message: err instanceof Error ? err.message : '채널 한도 초과' } },
+      { status: 429 },
+    );
+  }
 
   // 첫 번째 타겟이면 자동으로 기본 설정
   const count = await prisma.cafeTarget.count({ where: { ownerId } });

@@ -16,9 +16,37 @@ import { buildCandidates } from '@/lib/topics/candidates';
 import { recommendTopFive } from '@/lib/topics/recommend';
 import { getMondayOfWeekKST, getWeekdayDates, isMondayKST } from '@/lib/topics/week-utils';
 import { Prisma } from '@prisma/client';
+import { checkContentLimit, checkCostLimit, getUserPlan } from '@/lib/billing/limits';
 
 export const maxDuration = 300; // 5분 (Vercel Pro)
 export const dynamic = 'force-dynamic';
+
+// ---------------------------------------------------------------------------
+// 멀티테넌트: 대상 유저 조회 + 시간 예산
+// ---------------------------------------------------------------------------
+interface EligibleUser { id: string; email: string }
+
+async function getEligibleUsers(): Promise<EligibleUser[]> {
+  return prisma.user.findMany({
+    where: {
+      OR: [
+        // 유료 플랜 + 활성 구독
+        {
+          plan: { in: ['starter', 'pro'] },
+          subscriptions: { some: { status: 'active' } },
+        },
+        // 기존 autoGenerate 플랜 보유 유저 (하위 호환 — 마이그레이션 전 기존 유저 포함)
+        { contentPlans: { some: { autoGenerate: true, status: 'active' } } },
+      ],
+    },
+    select: { id: true, email: true },
+    orderBy: { createdAt: 'asc' },
+  });
+}
+
+function getRemainingMs(startTime: number, budgetMs = 270_000): number {
+  return budgetMs - (Date.now() - startTime);
+}
 
 // ---------------------------------------------------------------------------
 // CRON_SECRET 인증
@@ -42,60 +70,52 @@ function getTodayKST(): string {
 // ---------------------------------------------------------------------------
 // 매주 월요일: 추천 토픽 리프레시 (주간 전환)
 // ---------------------------------------------------------------------------
-async function maybeRefreshWeeklyTopics(today: string): Promise<{ ran: boolean; count?: number; error?: string }> {
-  if (!isMondayKST(today)) return { ran: false };
+interface Ga4Data { popular: PopularPage[] | null; unavailable: boolean }
 
-  const weekStart = getMondayOfWeekKST(today); // 오늘이 월요일이므로 today와 동일
-  const monthYmd = today.slice(0, 7) + '-01'; // candidates 생성용 (시즌 키워드)
-  console.log(`[cron/content-generate] 월요일 — 주간 토픽 리프레시 시작 (weekStart=${weekStart})`);
+async function refreshWeeklyTopicsForUser(
+  today: string,
+  ownerId: string,
+  ga4Data: Ga4Data,
+): Promise<{ count?: number; error?: string }> {
+  const weekStart = getMondayOfWeekKST(today);
+  const monthYmd = today.slice(0, 7) + '-01';
 
   try {
     // 이미 이번 주 토픽이 있으면 스킵 (idempotent)
     const existing = await prisma.topicRecommendation.count({
-      where: { weekStart, channel: 'blog' },
+      where: { weekStart, channel: 'blog', ownerId },
     });
     if (existing >= 7) {
-      console.log(`[cron/content-generate] 토픽 이미 ${existing}건 존재 — 스킵`);
-      return { ran: true, count: existing };
+      console.log(`[cron/content-generate] [${ownerId}] 토픽 이미 ${existing}건 — 스킵`);
+      return { count: existing };
     }
 
+    // 해당 유저의 발행 이력 기반 중복 제거
     const contents = await prisma.content.findMany({
+      where: { ownerId },
       select: { topic: true },
       orderBy: { createdAt: 'desc' },
       take: 200,
     });
     const publishedTopics = contents.map(c => c.topic).filter((t): t is string => !!t);
 
-    let ga4Popular: PopularPage[] | null = null;
-    let ga4Unavailable = false;
-    try {
-      ga4Popular = await fetchPopularPages(30);
-      if (ga4Popular === null) ga4Unavailable = true;
-    } catch {
-      ga4Unavailable = true;
-    }
-
     const candidates = buildCandidates({
       monthYmd,
       publishedTopics,
-      ga4PopularPaths: ga4Popular ?? undefined,
+      ga4PopularPaths: ga4Data.popular ?? undefined,
     });
     if (candidates.length === 0) {
-      console.error('[cron/content-generate] 토픽 후보 0건');
-      return { ran: true, error: 'no_candidates' };
+      return { error: 'no_candidates' };
     }
 
     const recommended = await recommendTopFive({ monthYmd, candidates, channel: 'blog' });
 
-    // 같은 주 기존 토픽 삭제 (재실행 대비)
+    // 같은 주·같은 유저 기존 토픽 삭제 (재실행 대비)
     await prisma.topicRecommendation.deleteMany({
-      where: { weekStart, channel: 'blog' },
+      where: { weekStart, channel: 'blog', ownerId },
     });
 
     const signalsByTopic = new Map(candidates.map(c => [c.topic, c.signal]));
-    // ownerId 결정: 첫 번째 기존 유저 또는 'system'
-    const anyUser = await prisma.user.findFirst({ select: { id: true }, orderBy: { createdAt: 'asc' } });
-    const cronOwnerId = anyUser?.id ?? 'system';
 
     const rows = recommended.items.map(item => {
       const factors: Record<string, Prisma.InputJsonValue> = {
@@ -103,9 +123,9 @@ async function maybeRefreshWeeklyTopics(today: string): Promise<{ ran: boolean; 
         reason: item.reason,
         signal: signalsByTopic.get(item.topic) ?? 'core',
       };
-      if (ga4Unavailable) factors.ga4_unavailable = true;
+      if (ga4Data.unavailable) factors.ga4_unavailable = true;
       return {
-        ownerId: cronOwnerId,
+        ownerId,
         weekStart,
         topic: item.topic,
         score: item.score,
@@ -120,7 +140,7 @@ async function maybeRefreshWeeklyTopics(today: string): Promise<{ ran: boolean; 
 
     const krw = calcChatKrw(recommended.usage);
     await trackCost({
-      ownerId: cronOwnerId,
+      ownerId,
       kind: 'chat',
       tokensIn: recommended.usage.prompt_tokens,
       tokensOut: recommended.usage.completion_tokens,
@@ -132,60 +152,50 @@ async function maybeRefreshWeeklyTopics(today: string): Promise<{ ran: boolean; 
       action: AUDIT_ACTIONS.CRON_TOPICS_REFRESH,
       targetType: 'topic_recommendations',
       targetId: weekStart,
-      payload: { weekStart, count: inserted.length, ga4_unavailable: ga4Unavailable, cost_krw: krw },
+      payload: { weekStart, ownerId, count: inserted.length, ga4_unavailable: ga4Data.unavailable, cost_krw: krw },
     });
 
-    console.log(`[cron/content-generate] 토픽 리프레시 완료 — ${inserted.length}건`);
-    return { ran: true, count: inserted.length };
+    console.log(`[cron/content-generate] [${ownerId}] 토픽 리프레시 완료 — ${inserted.length}건`);
+    return { count: inserted.length };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[cron/content-generate] 토픽 리프레시 실패:', msg);
-    return { ran: true, error: msg };
+    console.error(`[cron/content-generate] [${ownerId}] 토픽 리프레시 실패:`, msg);
+    return { error: msg };
   }
 }
 
 // ---------------------------------------------------------------------------
 // 매주 월요일: 토픽 5개 → ContentPlan + ContentPlanItem 자동 생성
 // ---------------------------------------------------------------------------
-async function autoCreateWeeklyPlan(today: string): Promise<{ ran: boolean; planId?: string; itemCount?: number; error?: string }> {
-  if (!isMondayKST(today)) return { ran: false };
-
+async function createWeeklyPlanForUser(
+  today: string,
+  ownerId: string,
+): Promise<{ planId?: string; itemCount?: number; error?: string }> {
   const weekStart = getMondayOfWeekKST(today);
-  console.log(`[cron/content-generate] 월요일 — 주간 플랜 자동 생성 (weekStart=${weekStart})`);
 
   try {
-    // 이미 이번 주 플랜이 있으면 스킵 (idempotent)
-    const existingPlan = await prisma.contentPlan.findFirst({
-      where: { weekKey: weekStart },
+    // 이미 이번 주 플랜이 있으면 스킵 (@@unique([ownerId, weekKey]))
+    const existingPlan = await prisma.contentPlan.findUnique({
+      where: { ownerId_weekKey: { ownerId, weekKey: weekStart } },
     });
     if (existingPlan) {
-      console.log(`[cron/content-generate] 주간 플랜 이미 존재 — 스킵 (${existingPlan.id})`);
-      return { ran: true, planId: existingPlan.id, itemCount: 0 };
+      console.log(`[cron/content-generate] [${ownerId}] 주간 플랜 이미 존재 — 스킵`);
+      return { planId: existingPlan.id, itemCount: 0 };
     }
 
-    // 이번 주 토픽 조회
+    // 해당 유저의 이번 주 토픽 조회
     const topics = await prisma.topicRecommendation.findMany({
-      where: { weekStart, channel: 'blog' },
+      where: { weekStart, channel: 'blog', ownerId },
       orderBy: { score: 'desc' },
       take: 7,
     });
 
     if (topics.length === 0) {
-      console.log('[cron/content-generate] 이번 주 토픽이 없어 플랜 생성 불가');
-      return { ran: true, error: 'no_topics' };
+      return { error: 'no_topics' };
     }
 
-    // ownerId 결정: 첫 번째 기존 플랜의 ownerId 또는 'system'
-    const anyPlan = await prisma.contentPlan.findFirst({
-      select: { ownerId: true },
-      orderBy: { createdAt: 'desc' },
-    });
-    const ownerId = anyPlan?.ownerId ?? 'system';
-
-    // 월~금 날짜 배열
     const weekdays = getWeekdayDates(weekStart);
 
-    // ContentPlan + Items 생성
     const plan = await prisma.contentPlan.create({
       data: {
         ownerId,
@@ -212,12 +222,12 @@ async function autoCreateWeeklyPlan(today: string): Promise<{ ran: boolean; plan
       payload: { weekStart, ownerId, itemCount: plan.items.length },
     });
 
-    console.log(`[cron/content-generate] 주간 플랜 생성 완료 — ${plan.items.length}건 (planId=${plan.id})`);
-    return { ran: true, planId: plan.id, itemCount: plan.items.length };
+    console.log(`[cron/content-generate] [${ownerId}] 주간 플랜 생성 — ${plan.items.length}건`);
+    return { planId: plan.id, itemCount: plan.items.length };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[cron/content-generate] 주간 플랜 생성 실패:', msg);
-    return { ran: true, error: msg };
+    console.error(`[cron/content-generate] [${ownerId}] 주간 플랜 실패:`, msg);
+    return { error: msg };
   }
 }
 
@@ -229,10 +239,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const startTime = Date.now();
   const today = getTodayKST();
 
   // 랜덤 실행: 50% 확률로 7시에 실행, 나머지는 8시(schedule-publish)에서 폴백
-  // ?fallback=1 파라미터가 있으면 무조건 실행 (schedule-publish에서 호출)
   const isFallback = request.nextUrl.searchParams.get('fallback') === '1';
   if (!isFallback && Math.random() < 0.5) {
     console.log(`[cron/content-generate] 오늘은 8시에 실행 예정 (random delay) — ${today}`);
@@ -241,67 +251,91 @@ export async function GET(request: NextRequest) {
 
   console.log(`[cron/content-generate] 실행 시작 — 날짜: ${today}`);
 
-  // 매주 월요일: 토픽 리프레시
-  const topicsResult = await maybeRefreshWeeklyTopics(today);
-  if (topicsResult.ran) {
-    console.log(`[cron/content-generate] 토픽 리프레시: ${topicsResult.error ? '실패 - ' + topicsResult.error : topicsResult.count + '건'}`);
+  // 1. 대상 유저 조회
+  const eligibleUsers = await getEligibleUsers();
+  if (eligibleUsers.length === 0) {
+    console.log('[cron/content-generate] 대상 유저 없음');
+    return NextResponse.json({ ok: true, date: today, users: 0, processed: 0 });
+  }
+  console.log(`[cron/content-generate] 대상 유저 ${eligibleUsers.length}명: ${eligibleUsers.map(u => u.email).join(', ')}`);
+
+  // 2. 월요일이면 GA4 데이터 1회 fetch (전역 — 유저별 반복 불필요)
+  const monday = isMondayKST(today);
+  const ga4Data: Ga4Data = { popular: null, unavailable: false };
+  if (monday) {
+    try {
+      ga4Data.popular = await fetchPopularPages(30);
+      if (ga4Data.popular === null) ga4Data.unavailable = true;
+    } catch {
+      ga4Data.unavailable = true;
+    }
   }
 
-  // 매주 월요일: 주간 플랜 자동 생성
-  const planResult = await autoCreateWeeklyPlan(today);
-  if (planResult.ran) {
-    console.log(`[cron/content-generate] 주간 플랜: ${planResult.error ? '실패 - ' + planResult.error : planResult.itemCount + '건'}`);
+  // 3. 유저별 토픽 리프레시 + 주간 플랜 생성
+  const perUser: Record<string, { topics?: object; plan?: object }> = {};
+
+  for (const user of eligibleUsers) {
+    if (getRemainingMs(startTime) < 30_000) {
+      console.log(`[cron/content-generate] 시간 부족 — 나머지 유저 스킵 (${user.email}~)`);
+      break;
+    }
+
+    if (monday) {
+      const topicsResult = await refreshWeeklyTopicsForUser(today, user.id, ga4Data);
+      const planResult = await createWeeklyPlanForUser(today, user.id);
+      perUser[user.id] = { topics: topicsResult, plan: planResult };
+    }
   }
 
-  // 오늘 예정된 planned 항목 조회 (autoGenerate=true인 플랜만)
+  // 4. 오늘 예정된 planned 항목 조회 (모든 유저 대상 — 이미 per-ownerId 스코프)
   const items = await prisma.contentPlanItem.findMany({
     where: {
       scheduledDate: today,
       status: 'planned',
-      plan: {
-        autoGenerate: true,
-        status: 'active',
-      },
+      plan: { autoGenerate: true, status: 'active' },
     },
-    include: {
-      plan: { select: { ownerId: true } },
-    },
+    include: { plan: { select: { ownerId: true } } },
     orderBy: { sortOrder: 'asc' },
   });
 
   if (items.length === 0) {
     console.log('[cron/content-generate] 오늘 예정 항목 없음');
     return NextResponse.json({
-      ok: true,
-      processed: 0,
-      date: today,
-      topicsRefresh: topicsResult.ran ? topicsResult : undefined,
-      weeklyPlan: planResult.ran ? planResult : undefined,
+      ok: true, date: today, users: eligibleUsers.length,
+      processed: 0, perUser: monday ? perUser : undefined,
     });
   }
 
   console.log(`[cron/content-generate] ${items.length}건 처리 시작`);
 
-  const results: Array<{ itemId: string; status: string; contentId?: string; error?: string }> = [];
+  // 5. 콘텐츠 순차 생성·발행
+  const results: Array<{ itemId: string; ownerId: string; status: string; contentId?: string; error?: string }> = [];
 
   for (const item of items) {
+    if (getRemainingMs(startTime) < 60_000) {
+      console.log('[cron/content-generate] 시간 부족 — 나머지 항목 스킵');
+      break;
+    }
+
     const ownerId = item.plan.ownerId;
 
     try {
-      // item.status → generating
+      // 플랜 제한 체크 (콘텐츠 수 + 비용 한도)
+      const userPlan = await getUserPlan(ownerId);
+      await checkContentLimit(ownerId, userPlan);
+      await checkCostLimit(ownerId, userPlan);
+
       await prisma.contentPlanItem.update({
         where: { id: item.id },
         data: { status: 'generating' },
       });
 
-      // 콘텐츠 생성
       const result = await generateContentHeadless({
         topic: item.topic,
         channel: 'blog',
         ownerId,
       });
 
-      // 소셜 자동 발행 (onProgress는 no-op)
       await autoPublishToSocial({
         blogContentId: result.contentId,
         ownerId,
@@ -313,43 +347,30 @@ export async function GET(request: NextRequest) {
         onProgress: () => {},
       });
 
-      // item.status → generated
       await prisma.contentPlanItem.update({
         where: { id: item.id },
-        data: {
-          status: 'generated',
-          contentJobId: result.contentId,
-          generatedAt: new Date(),
-        },
+        data: { status: 'generated', contentJobId: result.contentId, generatedAt: new Date() },
       });
 
-      // audit log
       await logAudit({
         actor: null,
         action: AUDIT_ACTIONS.CRON_CONTENT_GENERATE,
         targetType: 'content_plan_item',
         targetId: item.id,
-        payload: {
-          contentId: result.contentId,
-          topic: item.topic,
-          costKrw: result.costKrw,
-          date: today,
-        },
+        payload: { contentId: result.contentId, topic: item.topic, costKrw: result.costKrw, date: today },
       });
 
-      results.push({ itemId: item.id, status: 'generated', contentId: result.contentId });
-      console.log(`[cron/content-generate] ✓ ${item.topic} → ${result.contentId}`);
+      results.push({ itemId: item.id, ownerId, status: 'generated', contentId: result.contentId });
+      console.log(`[cron/content-generate] ✓ [${ownerId}] ${item.topic} → ${result.contentId}`);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      console.error(`[cron/content-generate] ✗ ${item.topic}:`, errorMsg);
+      console.error(`[cron/content-generate] ✗ [${ownerId}] ${item.topic}:`, errorMsg);
 
-      // item.status → failed
       await prisma.contentPlanItem.update({
         where: { id: item.id },
         data: { status: 'failed' },
       }).catch(() => {});
 
-      // audit log (실패)
       await logAudit({
         actor: null,
         action: AUDIT_ACTIONS.CRON_CONTENT_GENERATE,
@@ -358,23 +379,19 @@ export async function GET(request: NextRequest) {
         payload: { topic: item.topic, error: errorMsg, date: today },
       }).catch(() => {});
 
-      results.push({ itemId: item.id, status: 'failed', error: errorMsg });
-      // 다음 항목 계속 진행
+      results.push({ itemId: item.id, ownerId, status: 'failed', error: errorMsg });
     }
   }
 
-  const generated = results.filter((r) => r.status === 'generated').length;
-  const failed = results.filter((r) => r.status === 'failed').length;
-  console.log(`[cron/content-generate] 완료 — 성공: ${generated}, 실패: ${failed}`);
+  const generated = results.filter(r => r.status === 'generated').length;
+  const failed = results.filter(r => r.status === 'failed').length;
+  console.log(`[cron/content-generate] 완료 — 유저: ${eligibleUsers.length}, 성공: ${generated}, 실패: ${failed}`);
 
   return NextResponse.json({
-    ok: true,
-    date: today,
-    processed: items.length,
-    generated,
-    failed,
+    ok: true, date: today,
+    users: eligibleUsers.length,
+    processed: items.length, generated, failed,
     results,
-    topicsRefresh: topicsResult.ran ? topicsResult : undefined,
-    weeklyPlan: planResult.ran ? planResult : undefined,
+    perUser: monday ? perUser : undefined,
   });
 }

@@ -28,29 +28,45 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // SaaS: ownerId 필수 파라미터 (수동 호출 시 특정 유저 지정)
+  const ownerId = request.nextUrl.searchParams.get('ownerId');
+  if (!ownerId) {
+    return NextResponse.json(
+      { error: 'ownerId 파라미터 필수 — content-generate cron이 자동 처리합니다' },
+      { status: 400 },
+    );
+  }
+
+  // 유저 존재 확인
+  const user = await prisma.user.findUnique({ where: { id: ownerId }, select: { id: true } });
+  if (!user) {
+    return NextResponse.json({ error: '유저 없음' }, { status: 404 });
+  }
+
   const weekStart = getMondayOfWeekKST();
   const monthYmd = weekStart.slice(0, 7) + '-01';
-  console.log(`[cron/topics-refresh] 실행 시작 — weekStart=${weekStart}`);
+  console.log(`[cron/topics-refresh] [${ownerId}] 실행 시작 — weekStart=${weekStart}`);
 
   try {
-    // 이미 이번 주 토픽이 있으면 스킵
+    // 이미 이번 주 해당 유저 토픽이 있으면 스킵
     const existing = await prisma.topicRecommendation.count({
-      where: { weekStart, channel: 'blog' },
+      where: { weekStart, channel: 'blog', ownerId },
     });
     if (existing >= 5) {
-      console.log(`[cron/topics-refresh] 이미 ${existing}건 존재 — 스킵`);
+      console.log(`[cron/topics-refresh] [${ownerId}] 이미 ${existing}건 존재 — 스킵`);
       return NextResponse.json({ ok: true, skipped: true, existing, weekStart });
     }
 
-    // 발행된 토픽 (회피)
+    // 해당 유저의 발행 토픽 (중복 회피)
     const contents = await prisma.content.findMany({
+      where: { ownerId },
       select: { topic: true },
       orderBy: { createdAt: 'desc' },
       take: 200,
     });
     const publishedTopics = contents.map(c => c.topic).filter((t): t is string => !!t);
 
-    // GA4 인기 page (실패해도 진행)
+    // GA4 인기 page (전역 데이터, 실패해도 진행)
     let ga4Popular: PopularPage[] | null = null;
     let ga4Unavailable = false;
     try {
@@ -61,7 +77,6 @@ export async function GET(request: NextRequest) {
       ga4Unavailable = true;
     }
 
-    // 후보 생성
     const candidates = buildCandidates({
       monthYmd,
       publishedTopics,
@@ -69,25 +84,20 @@ export async function GET(request: NextRequest) {
     });
 
     if (candidates.length === 0) {
-      console.error('[cron/topics-refresh] 후보 0건');
+      console.error(`[cron/topics-refresh] [${ownerId}] 후보 0건`);
       return NextResponse.json({ ok: false, error: 'no_candidates', weekStart }, { status: 500 });
     }
 
-    // GPT-4o TOP5 추천
     const recommended = await recommendTopFive({
       monthYmd,
       candidates,
       channel: 'blog',
     });
 
-    // 같은 주 DELETE → INSERT
+    // 같은 주·같은 유저 DELETE → INSERT (재실행 대비)
     await prisma.topicRecommendation.deleteMany({
-      where: { weekStart, channel: 'blog' },
+      where: { weekStart, channel: 'blog', ownerId },
     });
-
-    // ownerId 결정: 첫 번째 유저 또는 'system'
-    const anyUser = await prisma.user.findFirst({ select: { id: true }, orderBy: { createdAt: 'asc' } });
-    const cronOwnerId = anyUser?.id ?? 'system';
 
     const signalsByTopic = new Map(candidates.map(c => [c.topic, c.signal]));
     const rows = recommended.items.map(item => {
@@ -98,7 +108,7 @@ export async function GET(request: NextRequest) {
       };
       if (ga4Unavailable) factors.ga4_unavailable = true;
       return {
-        ownerId: cronOwnerId,
+        ownerId,
         weekStart,
         topic: item.topic,
         score: item.score,
@@ -111,35 +121,28 @@ export async function GET(request: NextRequest) {
       rows.map(row => prisma.topicRecommendation.create({ data: row })),
     );
 
-    // cost 적재
     const krw = calcChatKrw(recommended.usage);
     await trackCost({
-      ownerId: cronOwnerId,
+      ownerId,
       kind: 'chat',
       tokensIn: recommended.usage.prompt_tokens,
       tokensOut: recommended.usage.completion_tokens,
       krw,
     });
 
-    // audit
     await logAudit({
       actor: null,
       action: AUDIT_ACTIONS.CRON_TOPICS_REFRESH,
       targetType: 'topic_recommendations',
       targetId: weekStart,
-      payload: {
-        weekStart,
-        count: inserted.length,
-        ga4_unavailable: ga4Unavailable,
-        cost_krw: krw,
-      },
+      payload: { weekStart, ownerId, count: inserted.length, ga4_unavailable: ga4Unavailable, cost_krw: krw },
     });
 
-    console.log(`[cron/topics-refresh] 완료 — ${inserted.length}건 생성`);
-    return NextResponse.json({ ok: true, weekStart, count: inserted.length });
+    console.log(`[cron/topics-refresh] [${ownerId}] 완료 — ${inserted.length}건 생성`);
+    return NextResponse.json({ ok: true, weekStart, ownerId, count: inserted.length });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[cron/topics-refresh] 실패:', msg);
+    console.error(`[cron/topics-refresh] [${ownerId}] 실패:`, msg);
     return NextResponse.json({ ok: false, error: msg, weekStart }, { status: 500 });
   }
 }

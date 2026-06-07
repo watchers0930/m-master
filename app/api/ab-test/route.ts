@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { isBudgetExceeded } from '@/lib/cost/budget';
+import { checkCostLimit, checkFeatureAccess, getUserPlan } from '@/lib/billing/limits';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
 import { generateVariantBFromSource, GenerateFailedError } from '@/lib/ab-test/generate-pair';
 import type {
@@ -66,7 +67,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 2) 예산 체크 (변형 1개 신규 생성)
+  // 2) 플랜 기능 + 비용 체크
+  const plan = await getUserPlan(ownerId);
+  try {
+    checkFeatureAccess(plan, 'abTest');
+    await checkCostLimit(ownerId, plan);
+  } catch (err) {
+    return jsonError('plan_limit', err instanceof Error ? err.message : '플랜 제한', 429);
+  }
   if (await isBudgetExceeded(ownerId)) {
     return jsonError('budget_exceeded', '월 예산 한도 초과. 설정에서 한도를 조정하세요.', 429);
   }

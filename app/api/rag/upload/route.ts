@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
+import { checkFeatureAccess, getUserPlan } from '@/lib/billing/limits';
 import type { SourceType } from '@/types/db';
 
 const ALLOWED_MIME: Record<string, SourceType> = {
@@ -23,6 +24,17 @@ export async function POST(request: NextRequest) {
   // 1) 세션 검증
   const session = await requireSession();
   const ownerId = session.user.id;
+
+  // 1.5) 플랜 기능 체크 (RAG는 starter 이상)
+  const plan = await getUserPlan(ownerId);
+  try {
+    checkFeatureAccess(plan, 'rag');
+  } catch (err) {
+    return NextResponse.json(
+      { error: { code: 'plan_limit', message: err instanceof Error ? err.message : '플랜 제한' } },
+      { status: 403 },
+    );
+  }
 
   // 2) multipart 파싱
   let formData: FormData;

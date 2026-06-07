@@ -20,19 +20,13 @@ export interface InstagramPublishResult {
   permalink?: string;
 }
 
-function getEnv(name: string): string {
-  const v = process.env[name];
-  if (!v || v.trim().length === 0) {
-    throw new Error(`${name} 환경변수 미설정 — 인스타 발행 불가`);
+/** SaaS: getInstagramCreds 단일 소스 — 자체 env fallback 제거 (credential 격리) */
+async function resolveCredentials(ownerId: string): Promise<{ token: string; igUserId: string }> {
+  const creds = await getInstagramCreds(ownerId);
+  if (!creds) {
+    throw new Error(`인스타그램 credential 없음 (ownerId=${ownerId})`);
   }
-  return v;
-}
-
-/** DB 우선 → 환경변수 fallback으로 자격증명 해석 */
-async function resolveCredentials(ownerId?: string): Promise<{ token: string; igUserId: string }> {
-  const creds = ownerId ? await getInstagramCreds(ownerId) : null;
-  if (creds) return { token: creds.accessToken, igUserId: creds.businessId };
-  return { token: getEnv('INSTAGRAM_ACCESS_TOKEN'), igUserId: getEnv('INSTAGRAM_BUSINESS_ID') };
+  return { token: creds.accessToken, igUserId: creds.businessId };
 }
 
 function getGraphVersion(): string {
@@ -86,7 +80,7 @@ async function graphPost(path: string, body: Record<string, string>): Promise<un
 export async function publishInstagramCarousel(opts: {
   imageUrls: string[];
   caption: string;
-  ownerId?: string;
+  ownerId: string;  // SaaS 필수
 }): Promise<InstagramPublishResult> {
   if (opts.imageUrls.length < 2) {
     throw new Error('캐러셀 발행에는 최소 2장의 이미지가 필요합니다');
@@ -142,7 +136,7 @@ export async function publishInstagramCarousel(opts: {
 export async function publishInstagramImage(opts: {
   imageUrl: string;
   caption: string;
-  ownerId?: string;
+  ownerId: string;  // SaaS 필수
 }): Promise<InstagramPublishResult> {
   const { token, igUserId } = await resolveCredentials(opts.ownerId);
   const caption = buildInstagramCaption(opts.caption);

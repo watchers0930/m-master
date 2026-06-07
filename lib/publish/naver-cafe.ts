@@ -18,14 +18,6 @@ export interface NaverCafePublishResult {
   cafeUrl: string;
 }
 
-function getEnv(name: string): string {
-  const v = process.env[name];
-  if (!v || v.trim().length === 0) {
-    throw new Error(`${name} 환경변수 미설정 — 네이버 카페 발행 불가`);
-  }
-  return v;
-}
-
 /** DB 자격증명 resolve 결과 */
 interface ResolvedNaverCreds {
   accessToken: string; refreshToken: string;
@@ -33,38 +25,30 @@ interface ResolvedNaverCreds {
   clubId: string; menuId: string;
 }
 
-/** DB 우선 → 환경변수 fallback으로 자격증명 해석 */
-async function resolveCredentials(ownerId?: string): Promise<ResolvedNaverCreds> {
-  const creds = ownerId ? await getNaverCafeCreds(ownerId) : null;
-  if (creds) return creds;
-  return {
-    accessToken: getEnv('NAVER_CAFE_ACCESS_TOKEN'),
-    refreshToken: process.env.NAVER_CAFE_REFRESH_TOKEN ?? '',
-    clientId: process.env.NAVER_CLIENT_ID ?? '',
-    clientSecret: process.env.NAVER_CLIENT_SECRET ?? '',
-    clubId: getEnv('NAVER_CAFE_CLUB_ID'),
-    menuId: getEnv('NAVER_CAFE_MENU_ID'),
-  };
+/** SaaS: getNaverCafeCreds 단일 소스 — 자체 env fallback 제거 (credential 격리) */
+async function resolveCredentials(ownerId: string): Promise<ResolvedNaverCreds> {
+  const creds = await getNaverCafeCreds(ownerId);
+  if (!creds) {
+    throw new Error(`네이버 카페 credential 없음 (ownerId=${ownerId})`);
+  }
+  return creds;
 }
 
 // ---------------------------------------------------------------------------
 // 토큰 자동 갱신 (access_token 만료 시 refresh_token으로 재발급)
+// SaaS: 모듈 레벨 캐시 제거 — 유저별 토큰 격리
 // ---------------------------------------------------------------------------
-let cachedAccessToken: string | null = null;
-
-async function refreshAccessToken(ownerId?: string): Promise<string> {
-  // DB 자격증명 우선, 없으면 env fallback
-  const resolved = await resolveCredentials(ownerId);
-  const clientId = resolved.clientId || getEnv('NAVER_CLIENT_ID');
-  const clientSecret = resolved.clientSecret || getEnv('NAVER_CLIENT_SECRET');
-  const refreshToken = resolved.refreshToken || getEnv('NAVER_CAFE_REFRESH_TOKEN');
+async function refreshAccessToken(creds: ResolvedNaverCreds): Promise<string> {
+  if (!creds.clientId || !creds.clientSecret || !creds.refreshToken) {
+    throw new Error('네이버 토큰 갱신 불가 — clientId/clientSecret/refreshToken 필요');
+  }
 
   const res = await fetch(
     `https://nid.naver.com/oauth2.0/token?${new URLSearchParams({
       grant_type: 'refresh_token',
-      client_id: clientId,
-      client_secret: clientSecret,
-      refresh_token: refreshToken,
+      client_id: creds.clientId,
+      client_secret: creds.clientSecret,
+      refresh_token: creds.refreshToken,
     })}`,
   );
 
@@ -78,13 +62,8 @@ async function refreshAccessToken(ownerId?: string): Promise<string> {
     throw new Error(`네이버 토큰 갱신 실패: ${json.error_description ?? json.error ?? 'unknown'}`);
   }
 
-  cachedAccessToken = json.access_token;
   console.log('[naver-cafe] 토큰 자동 갱신 완료');
   return json.access_token;
-}
-
-async function getAccessToken(): Promise<string> {
-  return cachedAccessToken ?? process.env.NAVER_CAFE_ACCESS_TOKEN ?? '';
 }
 
 // ---------------------------------------------------------------------------
@@ -282,11 +261,12 @@ async function cafeApiPost(
   clubId: string,
   menuId: string,
   fields: Record<string, string>,
+  creds: ResolvedNaverCreds,
 ): Promise<{ res: Response; json: Record<string, unknown> }> {
   const url = `https://openapi.naver.com/v1/cafe/${clubId}/menu/${menuId}/articles`;
   const body = buildFormBody(fields);
 
-  let token = await getAccessToken();
+  let token = creds.accessToken;
   let res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -296,9 +276,9 @@ async function cafeApiPost(
     body,
   });
 
-  // 401 → 토큰 만료 → 자동 갱신 후 재시도
+  // 401 → 토큰 만료 → 해당 유저의 credential로 갱신 후 재시도
   if (res.status === 401) {
-    token = await refreshAccessToken();
+    token = await refreshAccessToken(creds);
     res = await fetch(url, {
       method: 'POST',
       headers: {
@@ -320,13 +300,13 @@ async function cafeApiPostWithImages(
   menuId: string,
   fields: Record<string, string>,
   images: DownloadedImage[],
+  creds: ResolvedNaverCreds,
 ): Promise<{ res: Response; json: Record<string, unknown> }> {
   const url = `https://openapi.naver.com/v1/cafe/${clubId}/menu/${menuId}/articles`;
 
   function buildFormData(): FormData {
     const fd = new FormData();
     for (const [k, v] of Object.entries(fields)) {
-      // 네이버 서버가 추가 URL 디코딩을 수행하므로 1중 인코딩 필요
       fd.append(k, encodeURIComponent(v));
     }
     for (let i = 0; i < images.length; i++) {
@@ -335,7 +315,7 @@ async function cafeApiPostWithImages(
     return fd;
   }
 
-  let token = await getAccessToken();
+  let token = creds.accessToken;
   let res = await fetch(url, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
@@ -343,7 +323,7 @@ async function cafeApiPostWithImages(
   });
 
   if (res.status === 401) {
-    token = await refreshAccessToken();
+    token = await refreshAccessToken(creds);
     res = await fetch(url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
@@ -448,13 +428,11 @@ export async function publishNaverCafePost(opts: {
   imageUrl?: string;   // 썸네일 폴백 (bodyImageUrls가 비었을 때 사용)
   clubId?: string;   // 지정 시 이 카페로 발행
   menuId?: string;   // 지정 시 이 게시판으로 발행
-  ownerId?: string;  // 멀티테넌시: DB 자격증명 조회용
+  ownerId: string;   // SaaS 필수: DB 자격증명 조회용
 }): Promise<NaverCafePublishResult> {
   const resolved = await resolveCredentials(opts.ownerId);
   const clubId = opts.clubId || resolved.clubId;
   const menuId = opts.menuId || resolved.menuId;
-  // DB 자격증명이 있으면 cachedAccessToken에 반영
-  if (resolved.accessToken) cachedAccessToken = resolved.accessToken;
 
   // 이미지 URL 준비 (bodyImage 우선, 없으면 썸네일 폴백)
   let imgUrls = (opts.imageUrls ?? []).filter(u => u && u.trim() !== '');
@@ -473,8 +451,8 @@ export async function publishNaverCafePost(opts: {
   console.log(`[naver-cafe] 이미지 다운로드 결과: ${images.length}장`);
 
   const { res, json } = images.length > 0
-    ? await cafeApiPostWithImages(clubId, menuId, fields, images)
-    : await cafeApiPost(clubId, menuId, fields);
+    ? await cafeApiPostWithImages(clubId, menuId, fields, images, resolved)
+    : await cafeApiPost(clubId, menuId, fields, resolved);
 
   if (!res.ok) {
     const msg = (json?.message as { error?: { msg?: string } })?.error?.msg ?? `HTTP ${res.status}`;

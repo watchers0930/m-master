@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { UploadDropzone } from './UploadDropzone';
 import { DocList } from './DocList';
 import { RagSearch } from './RagSearch';
+import { PlanGate } from '@/components/PlanGate';
 import { listRagDocs } from '@/lib/api/rag';
 import type { RagDocument } from '@/types/db';
 
@@ -37,6 +38,8 @@ export default function RagPage() {
         <h1 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>RAG 문서 관리</h1>
         <p style={{ fontSize: 12, color: 'var(--sub)', marginTop: 2 }}>업로드한 문서를 벡터 인덱싱하여 콘텐츠 생성에 활용합니다</p>
       </div>
+
+      <PlanGate feature="rag">
 
       {/* 요약 배지 */}
       <div style={{ display: 'flex', gap: 8 }}>
@@ -108,6 +111,7 @@ export default function RagPage() {
         <span>파일을 업로드하면 자동으로 텍스트 추출 → 청킹 → 임베딩이 수행됩니다. 인덱싱 완료된 문서는 콘텐츠 생성 시 자동 참조됩니다.</span>
       </div>
 
+      </PlanGate>
     </div>
   );
 }

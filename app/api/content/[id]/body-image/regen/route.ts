@@ -6,6 +6,7 @@ import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { searchOne } from '@/lib/unsplash/search';
 import { translateImagePrompts } from '@/lib/claude/translate';
+import { checkCostLimit, getUserPlan } from '@/lib/billing/limits';
 
 const RequestSchema = z.object({
   index: z.number().int().min(0).max(50),
@@ -44,6 +45,14 @@ export async function POST(
 
   if (!row) return jsonError('not_found', '콘텐츠를 찾을 수 없습니다', 404);
   if (row.ownerId !== ownerId) return jsonError('forbidden', '권한 없음', 403);
+
+  // 비용 한도 체크
+  const plan = await getUserPlan(ownerId);
+  try {
+    await checkCostLimit(ownerId, plan);
+  } catch (err) {
+    return jsonError('plan_limit', err instanceof Error ? err.message : '플랜 한도 초과', 429);
+  }
 
   const currentUrls = Array.isArray(row.bodyImageUrls) ? [...(row.bodyImageUrls as string[])] : [];
   if (index >= currentUrls.length) {

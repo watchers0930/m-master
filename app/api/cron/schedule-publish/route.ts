@@ -12,7 +12,7 @@ import { publishInstagramImage, publishInstagramCarousel } from '@/lib/publish/i
 import { convertBlogToChannel } from '@/lib/claude/convert';
 import { trackCost } from '@/lib/cost/tracker';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
-import { getCafeTargets } from '@/lib/channel-credentials';
+import { getCafeTargets, getNaverCafeCreds } from '@/lib/channel-credentials';
 
 export const maxDuration = 300; // 5분 (Vercel Pro)
 export const dynamic = 'force-dynamic';
@@ -31,16 +31,7 @@ function verifyCronSecret(request: NextRequest): boolean {
   return authHeader === `Bearer ${secret}`;
 }
 
-// ---------------------------------------------------------------------------
-// 네이버 카페 환경변수 확인
-// ---------------------------------------------------------------------------
-function isNaverCafeEnabled(): boolean {
-  return !!(
-    process.env.NAVER_CAFE_ACCESS_TOKEN &&
-    process.env.NAVER_CAFE_CLUB_ID &&
-    process.env.NAVER_CAFE_MENU_ID
-  );
-}
+// (isNaverCafeEnabled 전역 체크 제거 — SaaS에서는 유저별 credential 확인 필요)
 
 // ---------------------------------------------------------------------------
 // 1) 소셜 슬롯 발행 (기존 로직)
@@ -163,11 +154,6 @@ async function publishSocialSlots(): Promise<SlotResult[]> {
 // 2) 블로그 슬롯 → 네이버 카페 자동 변환·발행
 // ---------------------------------------------------------------------------
 async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
-  if (!isNaverCafeEnabled()) {
-    console.log('[cron/schedule-publish] 네이버 카페 환경변수 미설정 — 스킵');
-    return [];
-  }
-
   // 예약 시간 경과 + scheduled 상태인 blog 슬롯 (콘텐츠 있는 것만)
   const blogSlots = await prisma.scheduleSlot.findMany({
     where: {
@@ -199,9 +185,17 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
       continue;
     }
 
+    // SaaS: 해당 유저의 네이버 카페 credential 확인
+    const cafeCreds = await getNaverCafeCreds(content.ownerId);
+    if (!cafeCreds) {
+      console.log(`[cron/schedule-publish] [${content.ownerId}] 카페 credential 없음 — 스킵`);
+      results.push({ slotId: slot.id, channel: 'blog→naver_cafe', status: 'failed', error: 'no_credentials' });
+      continue;
+    }
+
     try {
       // Claude로 블로그 → 네이버 카페 변환 (변환 먼저 — 실패 시 슬롯 상태 보존)
-      console.log(`[cron/schedule-publish] 카페 변환 중: ${content.topic}`);
+      console.log(`[cron/schedule-publish] [${content.ownerId}] 카페 변환 중: ${content.topic}`);
       const converted = await convertBlogToChannel(content.textBody, content.topic, 'naver_cafe');
 
       // 변환 비용 기록
