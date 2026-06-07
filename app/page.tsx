@@ -31,7 +31,7 @@ const COMPARE_ROWS: readonly { label: string; free: string; starter: string; pro
 
 export default function LandingPage() {
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: "'Noto Sans KR', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: "'Paperozi', 'Noto Sans KR', sans-serif" }}>
       {/* 네비게이션 */}
       <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 32px', maxWidth: 1100, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
