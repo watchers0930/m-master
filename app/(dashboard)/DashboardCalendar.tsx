@@ -31,11 +31,17 @@ function chipClass(slot: CalendarSlot) {
   return                                   { chip: 'ch-fb',      dot: 'dot-fb',      label };
 }
 
+/** UTC ISO 문자열 → KST 날짜 문자열 (YYYY-MM-DD) */
+function toKSTDate(iso: string): string {
+  const d = new Date(iso);
+  return new Date(d.getTime() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
 function buildCells(year: number, month: number, slots: CalendarSlot[]) {
   const firstDay = new Date(year, month - 1, 1).getDay();
   const lastDate = new Date(year, month, 0).getDate();
   const prevLast = new Date(year, month - 1, 0).getDate();
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = toKSTDate(new Date().toISOString());
   const cells: { date: number; current: boolean; col: number; slots: CalendarSlot[]; isToday: boolean }[] = [];
 
   const push = (date: number, current: boolean, daySlots: CalendarSlot[], isToday: boolean) =>
@@ -44,7 +50,7 @@ function buildCells(year: number, month: number, slots: CalendarSlot[]) {
   for (let i = firstDay - 1; i >= 0; i--) push(prevLast - i, false, [], false);
   for (let d = 1; d <= lastDate; d++) {
     const ds = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    push(d, true, slots.filter(s => s.scheduled_at.startsWith(ds)), ds === todayStr);
+    push(d, true, slots.filter(s => toKSTDate(s.scheduled_at) === ds), ds === todayStr);
   }
   let n = 1;
   while (cells.length % 7 !== 0 || cells.length < 35) push(n++, false, [], false);
