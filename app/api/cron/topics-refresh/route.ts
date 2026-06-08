@@ -62,14 +62,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ ok: true, skipped: true, existing, weekStart });
     }
 
-    // 해당 유저의 발행 토픽 (중복 회피)
-    const contents = await prisma.content.findMany({
-      where: { ownerId },
-      select: { topic: true },
-      orderBy: { createdAt: 'desc' },
-      take: 200,
-    });
+    // 해당 유저의 발행 토픽 (중복 회피) + 설정 조회
+    const [contents, userSettings] = await Promise.all([
+      prisma.content.findMany({
+        where: { ownerId },
+        select: { topic: true },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      }),
+      prisma.setting.findUnique({
+        where: { ownerId },
+        select: { brandGuide: true },
+      }),
+    ]);
     const publishedTopics = contents.map(c => c.topic).filter((t): t is string => !!t);
+
+    const bg = (userSettings?.brandGuide ?? {}) as Record<string, unknown>;
+    const businessContext = {
+      industry: bg.industry as string | undefined,
+      coreKeywords: bg.core_keywords as string[] | undefined,
+      services: bg.services as string[] | undefined,
+      companyName: bg.company_name as string | undefined,
+    };
 
     // GA4 인기 page (전역 데이터, 실패해도 진행)
     let ga4Popular: PopularPage[] | null = null;
@@ -86,6 +100,7 @@ export async function GET(request: NextRequest) {
       monthYmd,
       publishedTopics,
       ga4PopularPaths: ga4Popular ?? undefined,
+      businessContext,
     });
 
     if (candidates.length === 0) {
@@ -97,6 +112,7 @@ export async function GET(request: NextRequest) {
       monthYmd,
       candidates,
       channel: 'blog',
+      businessContext,
     });
 
     // 같은 주·같은 유저 DELETE → INSERT (재실행 대비)

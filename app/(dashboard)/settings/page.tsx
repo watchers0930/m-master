@@ -4,13 +4,28 @@ import { useState, useEffect } from 'react';
 import { getSettings, updateSettings } from '@/lib/api/analytics';
 
 interface SettingsState {
-  brand_guide: { tone: string; forbidden_words: string[] };
+  brand_guide: {
+    tone: string;
+    forbidden_words: string[];
+    company_name: string;
+    industry: string;
+    core_keywords: string[];
+    services: string[];
+    target_audience: string;
+    cta_message: string;
+    website_url: string;
+  };
   prompt_templates: Record<string, string>;
   budget_monthly: number;
   alert_threshold: number;
   notifications: Record<string, boolean>;
   analytics_keys: { ga4_property_id: string };
 }
+
+const INDUSTRY_OPTIONS = [
+  '부동산', '건설/시공', 'IT/소프트웨어', '교육', '의료/건강',
+  '뷰티/패션', 'F&B', '금융/보험', '제조업', '기타',
+];
 
 const NOTIF_LABELS: Record<string, string> = {
   publish_success:      '발행 성공',
@@ -33,12 +48,25 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [settings, setSettings] = useState<SettingsState | null>(null);
   const [forbiddenInput, setForbiddenInput] = useState('');
+  const [keywordInput, setKeywordInput] = useState('');
+  const [serviceInput, setServiceInput] = useState('');
 
   useEffect(() => {
     getSettings().then((res) => {
       if (res.data) {
+        const bg = res.data.brand_guide;
         setSettings({
-          brand_guide: { tone: res.data.brand_guide.tone ?? '', forbidden_words: res.data.brand_guide.forbidden_words ?? [] },
+          brand_guide: {
+            tone: bg.tone ?? '',
+            forbidden_words: bg.forbidden_words ?? [],
+            company_name: bg.company_name ?? '',
+            industry: bg.industry ?? '',
+            core_keywords: bg.core_keywords ?? [],
+            services: bg.services ?? [],
+            target_audience: bg.target_audience ?? '',
+            cta_message: bg.cta_message ?? '',
+            website_url: bg.website_url ?? '',
+          },
           prompt_templates: res.data.prompt_templates as Record<string, string>,
           budget_monthly: res.data.budget_monthly,
           alert_threshold: res.data.alert_threshold,
@@ -70,6 +98,19 @@ export default function SettingsPage() {
 
   const removeForbiddenWord = (word: string) => {
     setSettings((prev) => prev ? { ...prev, brand_guide: { ...prev.brand_guide, forbidden_words: prev.brand_guide.forbidden_words.filter((w) => w !== word) } } : prev);
+  };
+
+  const addTag = (field: 'core_keywords' | 'services', value: string, setter: (v: string) => void) => {
+    const v = value.trim();
+    if (!v || !settings) return;
+    setSettings((prev) => prev ? { ...prev, brand_guide: { ...prev.brand_guide, [field]: [...prev.brand_guide[field], v] } } : prev);
+    setter('');
+  };
+  const removeTag = (field: 'core_keywords' | 'services', value: string) => {
+    setSettings((prev) => prev ? { ...prev, brand_guide: { ...prev.brand_guide, [field]: prev.brand_guide[field].filter((w) => w !== value) } } : prev);
+  };
+  const setBg = (key: string, value: string) => {
+    setSettings((prev) => prev ? { ...prev, brand_guide: { ...prev.brand_guide, [key]: value } } : prev);
   };
 
   if (loading) {
@@ -163,6 +204,81 @@ export default function SettingsPage() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      {/* 비즈니스 프로필 */}
+      <div className="card">
+        <div className="card-head">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c400)" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/>
+          </svg>
+          <span className="card-title">비즈니스 프로필</span>
+          <span style={{ fontSize: 10, color: 'var(--sub)' }}>토픽 추천과 콘텐츠 생성에 반영됩니다</span>
+        </div>
+        <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div>
+              <label style={labelStyle}>회사명</label>
+              <input style={fieldStyle} placeholder="예: 한양건설" value={settings.brand_guide.company_name} onChange={(e) => setBg('company_name', e.target.value)} />
+            </div>
+            <div>
+              <label style={labelStyle}>업종</label>
+              <select style={fieldStyle} value={settings.brand_guide.industry} onChange={(e) => setBg('industry', e.target.value)}>
+                <option value="">선택하세요</option>
+                {INDUSTRY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>핵심 키워드</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input style={{ ...fieldStyle, flex: 1 }} placeholder="키워드 입력 후 추가 (예: 아파트 시공)" value={keywordInput} onChange={(e) => setKeywordInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag('core_keywords', keywordInput, setKeywordInput); } }} />
+              <button onClick={() => addTag('core_keywords', keywordInput, setKeywordInput)} className="btn btn-ghost" style={{ fontSize: 11.5, flexShrink: 0 }}>추가</button>
+            </div>
+            {settings.brand_guide.core_keywords.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                {settings.brand_guide.core_keywords.map((w) => (
+                  <span key={w} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#eff6ff', border: '1px solid #bfdbfe', color: '#2563eb', fontSize: 11, padding: '2px 8px', borderRadius: 20 }}>
+                    {w}
+                    <button type="button" onClick={() => removeTag('core_keywords', w)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontSize: 14, lineHeight: 1, padding: 0 }}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <p style={{ fontSize: 10.5, color: 'var(--sub)', marginTop: 4 }}>토픽 추천 후보 생성에 활용됩니다</p>
+          </div>
+          <div>
+            <label style={labelStyle}>주요 서비스</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input style={{ ...fieldStyle, flex: 1 }} placeholder="서비스 입력 후 추가 (예: 신축 아파트 시공)" value={serviceInput} onChange={(e) => setServiceInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag('services', serviceInput, setServiceInput); } }} />
+              <button onClick={() => addTag('services', serviceInput, setServiceInput)} className="btn btn-ghost" style={{ fontSize: 11.5, flexShrink: 0 }}>추가</button>
+            </div>
+            {settings.brand_guide.services.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                {settings.brand_guide.services.map((w) => (
+                  <span key={w} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', fontSize: 11, padding: '2px 8px', borderRadius: 20 }}>
+                    {w}
+                    <button type="button" onClick={() => removeTag('services', w)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontSize: 14, lineHeight: 1, padding: 0 }}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <label style={labelStyle}>타겟 고객</label>
+            <input style={fieldStyle} placeholder="예: 30~50대 내집마련 예비 고객" value={settings.brand_guide.target_audience} onChange={(e) => setBg('target_audience', e.target.value)} />
+          </div>
+          <div>
+            <label style={labelStyle}>CTA 메시지</label>
+            <input style={fieldStyle} placeholder="예: 무료 시공 상담 신청하세요" value={settings.brand_guide.cta_message} onChange={(e) => setBg('cta_message', e.target.value)} />
+          </div>
+          <div>
+            <label style={labelStyle}>웹사이트 URL</label>
+            <input style={fieldStyle} placeholder="예: https://hanyang.co.kr" value={settings.brand_guide.website_url} onChange={(e) => setBg('website_url', e.target.value)} />
           </div>
         </div>
       </div>

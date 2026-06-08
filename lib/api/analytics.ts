@@ -78,57 +78,74 @@ export async function getAnalyticsSummary(params?: {
   };
 }
 
-export async function getSettings(): Promise<
-  ApiResponse<{
-    brand_guide: { tone?: string; forbidden_words?: string[] };
-    prompt_templates: Record<string, string>;
-    budget_monthly: number;
-    alert_threshold: number;
-    notifications: Record<string, boolean>;
-    analytics_keys: { ga4_property_id?: string };
-  }>
-> {
-  // TODO: BE 연동 (현재 BE 미구현 — env 우선)
-  let analytics_keys = { ga4_property_id: '' };
-  try {
-    const res = await fetch('/api/settings/ga4', { cache: 'no-store' });
-    if (res.ok) {
-      const j = await res.json();
-      analytics_keys = {
-        ga4_property_id: j.ga4_property_id ?? '',
-      };
+export interface SettingsData {
+  brand_guide: {
+    tone?: string;
+    forbidden_words?: string[];
+    company_name?: string;
+    industry?: string;
+    core_keywords?: string[];
+    services?: string[];
+    target_audience?: string;
+    cta_message?: string;
+    website_url?: string;
+  };
+  prompt_templates: Record<string, string>;
+  budget_monthly: number;
+  alert_threshold: number;
+  notifications: Record<string, boolean>;
+  analytics_keys: { ga4_property_id?: string };
+}
+
+export async function getSettings(): Promise<ApiResponse<SettingsData>> {
+  const [settingsRes, ga4Res] = await Promise.all([
+    fetch('/api/settings', { cache: 'no-store' }).catch(() => null),
+    fetch('/api/settings/ga4', { cache: 'no-store' }).catch(() => null),
+  ]);
+
+  const defaults: SettingsData = {
+    brand_guide: {},
+    prompt_templates: {},
+    budget_monthly: 500000,
+    alert_threshold: 0.8,
+    notifications: {
+      publish_success: true,
+      low_score: true,
+      ai_schedule_complete: true,
+      performance_spike: false,
+      budget_80pct: true,
+    },
+    analytics_keys: { ga4_property_id: '' },
+  };
+
+  if (settingsRes?.ok) {
+    const j = await settingsRes.json();
+    if (j.data) {
+      defaults.brand_guide = j.data.brand_guide ?? {};
+      defaults.prompt_templates = j.data.prompt_templates ?? {};
+      defaults.budget_monthly = j.data.budget_monthly ?? 500000;
+      defaults.alert_threshold = j.data.alert_threshold ?? 0.8;
+      defaults.notifications = j.data.notifications ?? defaults.notifications;
     }
-  } catch {
-    /* fetch 실패 시 빈 값 유지 */
   }
 
-  return {
-    data: {
-      brand_guide: {
-        tone: '전문적이고 신뢰감 있는',
-        forbidden_words: ['싸다', '최저가', '무료'],
-      },
-      prompt_templates: {
-        blog: 'VESTRA 부동산 AI 전문가 관점에서 {topic}에 대해 {tone} 톤으로 블로그 포스트를 작성하세요.',
-      },
-      budget_monthly: 500000,
-      alert_threshold: 0.8,
-      notifications: {
-        publish_success: true,
-        low_score: true,
-        ai_schedule_complete: true,
-        performance_spike: false,
-        budget_80pct: true,
-      },
-      analytics_keys,
-    },
-    error: null,
-  };
+  if (ga4Res?.ok) {
+    const g = await ga4Res.json();
+    defaults.analytics_keys = { ga4_property_id: g.ga4_property_id ?? '' };
+  }
+
+  return { data: defaults, error: null };
 }
 
 export async function updateSettings(updates: Record<string, unknown>): Promise<ApiResponse<null>> {
-  // TODO: BE 연동
-  void updates;
-  await new Promise((r) => setTimeout(r, 500));
+  const res = await fetch('/api/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) {
+    const j = await res.json().catch(() => ({}));
+    return { data: null, error: { code: 'save_failed', message: j.error ?? '설정 저장 실패' } };
+  }
   return { data: null, error: null };
 }

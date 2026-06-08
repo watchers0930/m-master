@@ -107,6 +107,12 @@ export interface BrandGuide {
   forbidden_words: string[];
   company_name: string;
   tagline?: string;
+  industry?: string;
+  core_keywords?: string[];
+  services?: string[];
+  target_audience?: string;
+  cta_message?: string;
+  website_url?: string;
 }
 
 export interface Settings {

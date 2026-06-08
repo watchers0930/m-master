@@ -2,7 +2,7 @@
 // 기존 buildSystemPrompt() 템플릿 그대로 보존
 
 import type { ChannelPromptParams } from './channel-prompts';
-import { TONE_GUIDE } from './channel-prompts';
+import { TONE_GUIDE, extractBusiness } from './channel-prompts';
 
 function resolvedTone(params: ChannelPromptParams) {
   const toneKey = params.userTone ?? (params.brandGuide.tone as string) ?? '전문적';
@@ -17,12 +17,15 @@ function forbidden(params: ChannelPromptParams) {
 export function blogPrompt(params: ChannelPromptParams): string {
   const { toneKey, toneGuide } = resolvedTone(params);
   const forbiddenWords = forbidden(params);
+  const biz = extractBusiness(params.brandGuide);
+  const brand = biz.companyName || '브랜드';
+  const svcSummary = biz.services.length > 0 ? biz.services.slice(0, 3).join(', ') : biz.industry ?? '전문 서비스';
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
   const day = now.getDate();
 
-  return `당신은 VESTRA(AI 기반 부동산 권리분석·시세분석 서비스) 전문 마케팅 작가입니다.
+  return `당신은 ${brand}(${svcSummary}) 전문 마케팅 작가입니다.
 네이버 블로그 상위 노출을 목표로, 아래 모든 기준을 반드시 준수하여 콘텐츠를 작성하세요.
 
 **오늘 날짜: ${year}년 ${month}월 ${day}일**
@@ -66,9 +69,9 @@ ${toneGuide}
 모든 섹션에서 아래 깊이 기준을 반드시 충족하세요:
 
 ### 깊이 확보 필수 요소 (매 H2마다 최소 2가지 이상)
-1. **구체적 수치·통계**: "${year}년 국토교통부 발표 기준 전세사기 신고 건수 X건", "취득세율 1~3% 구간별 세부 기준" 등 정확한 숫자 제시
-2. **실무 경험 기반 인사이트**: "실제 등기부등본을 분석하다 보면 가장 많이 놓치는 부분은…", "현장에서 자주 발생하는 실수는…" 같은 실무자 관점
-3. **구체적 사례·시나리오**: 실제 있을 법한 상황을 구체적으로 묘사 (인물·금액·지역·결과 포함). "A씨는 서울 강남구 30평대 아파트를 전세 4억에 계약했는데…" 수준
+1. **구체적 수치·통계**: "${year}년 기준 관련 통계·조사 결과" 등 정확한 숫자 제시
+2. **실무 경험 기반 인사이트**: "현장에서 자주 발생하는 실수는…", "실무자 관점에서 가장 중요한 것은…" 같은 전문가 관점
+3. **구체적 사례·시나리오**: 실제 있을 법한 상황을 구체적으로 묘사 (인물·금액·결과 포함)
 4. **왜(Why)·어떻게(How) 설명**: 단순 정보 나열이 아닌, 왜 그런 절차가 필요한지, 어떤 원리로 작동하는지 근본 이유를 설명
 5. **비교·대조 분석**: 단순 소개가 아닌 "A 방식 vs B 방식" 또는 "~한 경우 vs ~하지 않은 경우"의 차이점과 장단점 분석
 6. **주의사항·함정**: 일반인이 모르는 맹점, 흔한 실수, 법적 리스크 등 경고성 정보
@@ -82,7 +85,7 @@ ${toneGuide}
 
 ### 차별화 기준
 독자가 이 글을 읽은 후 "이건 다른 블로그에서 못 본 정보인데?" 라고 느껴야 합니다.
-- 법령 조항 번호까지 명시 (예: 부동산등기법 제23조)
+- 관련 법령·규정 조항 번호까지 명시
 - 비용 계산 예시를 실제 금액으로 시뮬레이션
 - 시기별·상황별 달라지는 포인트를 구분하여 설명
 - ${year}년 최신 개정사항·정책 변화 반영
@@ -176,12 +179,7 @@ ${toneGuide}
 - 핵심 수치·법적 근거: blockquote(\`> \`) 또는 **bold** 처리
 - bold 강조: 문단당 1~2개 제한
 - 표(마크다운 테이블): 비교·정리가 필요한 내용에 적극 활용
-- 법령·판례·공공기관 수치 인용으로 전문성 입증 — **공식 URL 명시 권장**:
-  - 인터넷등기소: https://www.iros.go.kr
-  - 정부24: https://www.gov.kr
-  - 국토교통부 실거래가: https://rt.molit.go.kr
-  - 위택스(취득세): https://www.wetax.go.kr
-  - 국세청 홈택스: https://www.hometax.go.kr
+- 법령·판례·공공기관 수치 인용으로 전문성 입증 — **공식 URL 명시 권장** (정부24, 관련 부처 사이트 등)
 - 이모지: 한 H2 섹션당 **최대 2~3개**까지만 사용
 
 ---
@@ -196,14 +194,14 @@ ${toneGuide}
 ---
 
 ## 9. 브랜드·법적 기준
-- 마지막 H2: 반드시 **VESTRA CTA 섹션** (자연스러운 서비스 소개 + 행동 유도)
-- VESTRA 핵심 메시지: AI 권리분석으로 5분 안에 위험 요소 확인 / 실시간 시세·전망 분석 / 100% 비대면 / 전세사기 예방 진단
-- 부동산 관련 법령(부동산등기법·주택임대차보호법·민법) 근거 반영, 과장·허위 표현 절대 금지
+- 마지막 H2: 반드시 **${brand} CTA 섹션** (자연스러운 서비스 소개 + 행동 유도)
+- ${brand} 핵심 메시지: ${biz.ctaMessage || '전문 서비스로 고객님의 성공을 돕겠습니다'}
+- 관련 법령·규정 근거 반영, 과장·허위 표현 절대 금지
 - 금지어(${forbiddenWords || '없음'}) 본문 전체에서 사용 금지
 
 ### 외부 링크 정책 (네이버 어뷰징 회피)
 - 외부 도메인 링크: **본문 전체에서 최대 2개**까지 (공식 공공기관 URL만 권장)
-- 자사 도메인(vestra-plum.vercel.app) 링크: 마지막 CTA 섹션에 1개만
+${biz.websiteUrl ? `- 자사 도메인(${biz.websiteUrl}) 링크: 마지막 CTA 섹션에 1개만` : '- 자사 링크: 마지막 CTA 섹션에 1개만 (있는 경우)'}
 - 어필리에이트 링크·트래픽 교환 링크 절대 금지
 
 ---
@@ -212,9 +210,9 @@ ${toneGuide}
 글 본문 맨 아래에 다음 형식으로 태그 **5~10개** 작성:
 \`\`\`
 ---
-**태그:** #부동산권리분석 #아파트시세 #VESTRA #전세사기예방 #부동산AI ...
+**태그:** #핵심키워드1 #핵심키워드2 #${brand.replace(/\s/g, '')} #업종키워드 ...
 \`\`\`
-- 핵심 키워드 + 롱테일 키워드 + 카테고리명 조합
+- 핵심 키워드 + 롱테일 키워드 + 브랜드명 + 업종 카테고리 조합
 - 한글 위주, 띄어쓰기 X
 - 본문에 등장한 단어 위주로 선정 (네이버 매칭률 ↑)
 
@@ -262,7 +260,7 @@ JSON, 코드블록(\`\`\`), 설명 텍스트 없이 콘텐츠만 출력합니다
 - 결론부에 참여 유도 한 문장 있는가?
 
 ### C. E-E-A-T
-- 공식 URL(인터넷등기소·정부24 등) 최소 1개 인용했는가?
+- 공식 URL(정부·공공기관 등) 최소 1개 인용했는가?
 - 이모지를 H2 섹션당 2~3개 이하로 자제했는가?
 - 외부 도메인 링크 본문 전체 2개 이하인가?
 

@@ -156,6 +156,13 @@ export type CostLedgerInsert = Omit<CostLedger, 'id' | 'occurred_at'> & {
 export interface BrandGuide {
   tone?: string;
   forbidden_words?: string[];
+  company_name?: string;
+  industry?: string;
+  core_keywords?: string[];
+  services?: string[];
+  target_audience?: string;
+  cta_message?: string;
+  website_url?: string;
   [key: string]: unknown;
 }
 

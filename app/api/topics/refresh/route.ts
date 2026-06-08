@@ -45,13 +45,28 @@ export async function POST() {
   const monthYmd = weekStart.slice(0, 7) + '-01'; // candidates 생성용
 
   try {
-    // 2) 이미 발행된 토픽 (회피)
-    const contents = await prisma.content.findMany({
-      select: { topic: true },
-      orderBy: { createdAt: 'desc' },
-      take: 200,
-    });
+    // 2) 이미 발행된 토픽 (회피) + 유저 설정 조회
+    const [contents, userSettings] = await Promise.all([
+      prisma.content.findMany({
+        where: { ownerId },
+        select: { topic: true },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      }),
+      prisma.setting.findUnique({
+        where: { ownerId },
+        select: { brandGuide: true },
+      }),
+    ]);
     const publishedTopics = contents.map(c => c.topic).filter((t): t is string => !!t);
+
+    const bg = (userSettings?.brandGuide ?? {}) as Record<string, unknown>;
+    const businessContext = {
+      industry: bg.industry as string | undefined,
+      coreKeywords: bg.core_keywords as string[] | undefined,
+      services: bg.services as string[] | undefined,
+      companyName: bg.company_name as string | undefined,
+    };
 
     // 3) GA4 인기 page (실패해도 진행)
     let ga4Popular: PopularPage[] | null = null;
@@ -69,6 +84,7 @@ export async function POST() {
       monthYmd,
       publishedTopics,
       ga4PopularPaths: ga4Popular ?? undefined,
+      businessContext,
     });
 
     if (candidates.length === 0) {
@@ -82,17 +98,19 @@ export async function POST() {
         monthYmd,
         candidates,
         channel: 'blog',
+        businessContext,
       });
     } catch (err) {
       console.error('[topics/refresh] recommendTopFive 실패:', err);
       return jsonError('recommend_failed', '추천 생성에 실패했습니다', 500);
     }
 
-    // 6) 같은 주 DELETE
+    // 6) 같은 주·같은 유저 DELETE
     await prisma.topicRecommendation.deleteMany({
       where: {
         weekStart,
         channel: 'blog',
+        ownerId,
       },
     });
 

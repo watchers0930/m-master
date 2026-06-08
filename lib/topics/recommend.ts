@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 import { CLAUDE_MODEL, getClient, toChatUsage, type ChatUsage } from '@/lib/claude/chat';
-import type { Candidate } from './candidates';
+import type { Candidate, BusinessContext } from './candidates';
 
 export type TagType = 's' | 'e' | 't'; // s=시즌, e=SEO/경쟁도, t=트렌드
 
@@ -24,6 +24,7 @@ export interface RecommendInput {
   monthYmd: string;
   candidates: Candidate[];
   channel: 'blog';
+  businessContext?: BusinessContext;
 }
 
 export interface RecommendResult {
@@ -56,17 +57,26 @@ const ResponseSchema = z.object({
 // 시스템 프롬프트
 // ----------------------------------------------------------------
 
-function buildSystemPrompt(monthYmd: string): string {
+function buildSystemPrompt(monthYmd: string, biz?: BusinessContext): string {
   const month = parseInt(monthYmd.slice(5, 7), 10);
-  return `당신은 VESTRA(AI 기반 부동산 권리분석·시세분석 서비스) 콘텐츠 전략가입니다.
+  const companyName = biz?.companyName || '전문 기업';
+  const industry = biz?.industry || '마케팅';
+  const servicesList = biz?.services?.length
+    ? biz.services.map(s => `- ${s}`).join('\n')
+    : '- 전문 서비스 제공';
+  const keywordsList = biz?.coreKeywords?.length
+    ? biz.coreKeywords.join(', ')
+    : '콘텐츠 마케팅, 고객 유치';
+
+  return `당신은 ${companyName}(${industry}) 콘텐츠 전략가입니다.
 이번 주는 ${monthYmd} 주차 (${month}월)이며, 채널은 네이버 블로그입니다.
 월~일 7일간 매일 1건씩 발행할 토픽을 선정합니다.
 
-[VESTRA 도메인]
-- 권리분석: AI 등기부등본 분석 / 근저당·가압류·소유권 확인 / 전세사기 예방
-- 시세분석: 실거래가 조회 / 시세 전망 / 학군·역세권 분석 / 동네 비교
-- 전세 안전: 전세보증보험 / 임대차 3법 / 보증금 안전 진단
-- 부동산 세금: 취득세·양도세·종부세 계산
+[도메인]
+${servicesList}
+
+[핵심 키워드]
+${keywordsList}
 
 [작업]
 주어진 후보 토픽 중 이번 주 블로그 발행에 가장 적합한 TOP 7을 선정하고,
@@ -85,9 +95,8 @@ function buildSystemPrompt(monthYmd: string): string {
 - label은 8자 이내 한국어 권장, 항목당 최대 3개
 
 [도메인 다양성 — 반드시 준수]
-- 7개 토픽은 가능한 서로 다른 도메인에서 선정 (같은 도메인 3개 이상 금지)
-- 도메인 분류: 권리분석 / 시세·전망 / 전세·임대 / 세금·절세 / 동네정보·비교
-- 5개 도메인 중 최소 4개 이상 커버해야 함
+- 7개 토픽은 가능한 서로 다른 주제에서 선정 (같은 주제 3개 이상 금지)
+- 다양한 키워드와 서비스 영역을 골고루 커버
 
 [제약]
 - topic은 후보 목록의 표현을 그대로 사용하거나 80자 이내로 다듬을 수 있음
@@ -152,7 +161,7 @@ function fillFromCandidates(
 
 export async function recommendTopFive(input: RecommendInput): Promise<RecommendResult> {
   const client = getClient();
-  const systemPrompt = buildSystemPrompt(input.monthYmd);
+  const systemPrompt = buildSystemPrompt(input.monthYmd, input.businessContext);
 
   const userPrompt = [
     `후보 목록 (${input.candidates.length}개):`,

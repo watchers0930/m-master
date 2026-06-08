@@ -74,24 +74,39 @@ async function refreshWeeklyTopicsForUser(
     }
 
     // 해당 유저의 발행 이력 기반 중복 제거
-    const contents = await prisma.content.findMany({
-      where: { ownerId },
-      select: { topic: true },
-      orderBy: { createdAt: 'desc' },
-      take: 200,
-    });
+    const [contents, userSettings] = await Promise.all([
+      prisma.content.findMany({
+        where: { ownerId },
+        select: { topic: true },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      }),
+      prisma.setting.findUnique({
+        where: { ownerId },
+        select: { brandGuide: true },
+      }),
+    ]);
     const publishedTopics = contents.map(c => c.topic).filter((t): t is string => !!t);
+
+    const bg = (userSettings?.brandGuide ?? {}) as Record<string, unknown>;
+    const businessContext = {
+      industry: bg.industry as string | undefined,
+      coreKeywords: bg.core_keywords as string[] | undefined,
+      services: bg.services as string[] | undefined,
+      companyName: bg.company_name as string | undefined,
+    };
 
     const candidates = buildCandidates({
       monthYmd,
       publishedTopics,
       ga4PopularPaths: ga4Data.popular ?? undefined,
+      businessContext,
     });
     if (candidates.length === 0) {
       return { error: 'no_candidates' };
     }
 
-    const recommended = await recommendTopFive({ monthYmd, candidates, channel: 'blog' });
+    const recommended = await recommendTopFive({ monthYmd, candidates, channel: 'blog', businessContext });
 
     // 같은 주·같은 유저 기존 토픽 삭제 (재실행 대비)
     await prisma.topicRecommendation.deleteMany({
