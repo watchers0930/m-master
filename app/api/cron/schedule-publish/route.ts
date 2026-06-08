@@ -14,6 +14,7 @@ import { convertBlogToChannel } from '@/lib/claude/convert';
 import { trackCost } from '@/lib/cost/tracker';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
 import { getCafeTargets, getNaverCafeCreds } from '@/lib/channel-credentials';
+import { checkCostLimit, getUserPlan } from '@/lib/billing/limits';
 
 export const maxDuration = 300; // 5분 (Vercel Pro)
 export const dynamic = 'force-dynamic';
@@ -182,6 +183,16 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
     if (!cafeCreds) {
       console.log(`[cron/schedule-publish] [${content.ownerId}] 카페 credential 없음 — 스킵`);
       results.push({ slotId: slot.id, channel: 'blog→naver_cafe', status: 'failed', error: 'no_credentials' });
+      continue;
+    }
+
+    // 비용 한도 체크 — 초과 시 변환 스킵 (슬롯 상태 유지)
+    const userPlan = await getUserPlan(content.ownerId);
+    try {
+      await checkCostLimit(content.ownerId, userPlan);
+    } catch {
+      console.log(`[cron/schedule-publish] [${content.ownerId}] 비용 한도 초과 — 카페 변환 스킵`);
+      results.push({ slotId: slot.id, channel: 'blog→naver_cafe', status: 'failed', error: 'cost_limit' });
       continue;
     }
 

@@ -11,6 +11,7 @@ import { fetchPopularPages, type PopularPage } from '@/lib/ga4/popular-pages';
 import { buildCandidates } from '@/lib/topics/candidates';
 import { recommendTopFive } from '@/lib/topics/recommend';
 import { getMondayOfWeekKST } from '@/lib/topics/week-utils';
+import { checkCostLimit, getUserPlan } from '@/lib/billing/limits';
 import type { TopicRecommendation } from '@/types/db';
 
 function jsonError(code: string, message: string, status: number) {
@@ -31,6 +32,14 @@ export async function POST() {
   // 1) 세션
   const session = await requireSession();
   const ownerId = session.user.id;
+
+  // 비용 한도 체크
+  const plan = await getUserPlan(ownerId);
+  try {
+    await checkCostLimit(ownerId, plan);
+  } catch (err) {
+    return jsonError('plan_limit', err instanceof Error ? err.message : '비용 한도 초과', 403);
+  }
 
   const weekStart = getMondayOfWeekKST();
   const monthYmd = weekStart.slice(0, 7) + '-01'; // candidates 생성용

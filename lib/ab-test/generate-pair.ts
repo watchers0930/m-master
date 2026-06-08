@@ -67,10 +67,10 @@ async function buildRag(opts: GeneratePairOptions): Promise<{ ragContext: string
   if (!(await hasIndexedDocs(opts.ownerId))) return { ragContext: '', embeddingTokens: 0 };
   const ragQuery = [opts.topic, ...(opts.keywords ?? [])].join(' ');
   try {
-    const chunks = await retrieveTopK({ query: ragQuery, ownerId: opts.ownerId, k: 5 });
+    const { chunks, queryTokens } = await retrieveTopK({ query: ragQuery, ownerId: opts.ownerId, k: 5 });
     return {
       ragContext: buildRagContext(chunks),
-      embeddingTokens: Math.ceil(ragQuery.length / 3),
+      embeddingTokens: queryTokens,
     };
   } catch (err) {
     console.warn('[ab-test/generate-pair] RAG 실패 (무시):', err);

@@ -12,6 +12,7 @@ import { fetchPopularPages, type PopularPage } from '@/lib/ga4/popular-pages';
 import { buildCandidates } from '@/lib/topics/candidates';
 import { recommendTopFive } from '@/lib/topics/recommend';
 import { getMondayOfWeekKST } from '@/lib/topics/week-utils';
+import { checkCostLimit, getUserPlan } from '@/lib/billing/limits';
 import { Prisma } from '@prisma/client';
 
 export const maxDuration = 120;
@@ -41,6 +42,15 @@ export async function GET(request: NextRequest) {
   const weekStart = getMondayOfWeekKST();
   const monthYmd = weekStart.slice(0, 7) + '-01';
   console.log(`[cron/topics-refresh] [${ownerId}] 실행 시작 — weekStart=${weekStart}`);
+
+  // 비용 한도 체크
+  const plan = await getUserPlan(ownerId);
+  try {
+    await checkCostLimit(ownerId, plan);
+  } catch {
+    console.log(`[cron/topics-refresh] [${ownerId}] 비용 한도 초과 — 스킵`);
+    return NextResponse.json({ ok: true, skipped: true, reason: 'cost_limit', weekStart });
+  }
 
   try {
     // 이미 이번 주 해당 유저 토픽이 있으면 스킵

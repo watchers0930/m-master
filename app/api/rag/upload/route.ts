@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
-import { checkFeatureAccess, getUserPlan } from '@/lib/billing/limits';
+import { checkFeatureAccess, checkCostLimit, getUserPlan } from '@/lib/billing/limits';
 import type { SourceType } from '@/types/db';
 
 const ALLOWED_MIME: Record<string, SourceType> = {
@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
   const plan = await getUserPlan(ownerId);
   try {
     checkFeatureAccess(plan, 'rag');
+    await checkCostLimit(ownerId, plan);
   } catch (err) {
     return NextResponse.json(
       { error: { code: 'plan_limit', message: err instanceof Error ? err.message : '플랜 제한' } },

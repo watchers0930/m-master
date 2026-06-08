@@ -66,9 +66,9 @@ export async function generateContentHeadless(
   if (await hasIndexedDocs(ownerId)) {
     const ragQuery = [topic, ...keywords].join(' ');
     try {
-      const chunks = await retrieveTopK({ query: ragQuery, ownerId, k: 5 });
+      const { chunks, queryTokens } = await retrieveTopK({ query: ragQuery, ownerId, k: 5 });
       ragContext = buildRagContext(chunks);
-      embeddingTokens = Math.ceil(ragQuery.length / 3);
+      embeddingTokens = queryTokens;
     } catch (err) {
       console.warn('[generate-headless] RAG 실패 (무시):', err);
     }
