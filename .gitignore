@@ -14,3 +14,4 @@ dist
 *.jpeg
 !public/**
 .env.test
+tmp-blog-test.js
