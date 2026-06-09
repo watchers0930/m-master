@@ -1,0 +1,62 @@
+name: Publish Naver Blog
+
+on:
+  schedule:
+    # 매일 00:00 UTC = 09:00 KST
+    - cron: '0 0 * * *'
+  workflow_dispatch: # 수동 트리거
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-naver-blog
+  cancel-in-progress: false
+
+env:
+  NAVER_COOKIES: ${{ secrets.NAVER_COOKIES }}
+  NAVER_ID: ${{ secrets.NAVER_ID }}
+  NAVER_PW: ${{ secrets.NAVER_PW }}
+  BLOG_PUBLISH_API_KEY: ${{ secrets.BLOG_PUBLISH_API_KEY }}
+  APP_URL: https://m-master.vercel.app
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install playwright tsx
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Run blog publish script
+        run: npx tsx scripts/publish-naver-blog.ts
+
+      - name: Upload cookies artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: naver-cookies
+          path: naver-cookies.json
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots/
+          retention-days: 3
+          if-no-files-found: ignore
