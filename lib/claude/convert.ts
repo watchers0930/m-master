@@ -58,6 +58,14 @@ const CHANNEL_PROMPTS: Record<ConvertChannel, string> = {
 - 소제목, 목차, 단계별 설명 등 블로그 구조를 그대로 보존
 - 원본 분량의 90% 이상 유지 (축약 금지)
 
+## 네이버 검색 최적화 (필수)
+- 제목: 핵심 키워드를 앞에 배치, 30~45자, 검색 의도에 맞는 구조 (예: "근저당 확인 방법 | 2026 하반기 부동산 시세 전망")
+- 첫 문단(2~3문장): 핵심 키워드 2~3개를 자연스럽게 포함 — 네이버 검색 결과 스니펫으로 노출됨
+- 소제목(##): 사람들이 실제 네이버에서 검색할 만한 질문·키워드 형태로 작성 (예: "전세보증보험 가입 조건은?", "근저당 설정이란 무엇인가")
+- 본문: 최소 2000자 이상 유지 — 긴 글이 네이버 검색에서 유리
+- 문단마다 핵심 키워드 자연스럽게 반복 (키워드 스터핑 금지, 읽기 자연스러워야 함)
+- 태그: 사람들이 실제로 네이버에 입력하는 검색어 스타일 (단어가 아닌 구문, 예: "전세보증보험 가입방법", "근저당이란")
+
 ## 형식 규칙
 - 마크다운 형식 사용: ## 소제목, **강조**, - 목록 항목
 - [이미지: 설명] 플레이스홀더를 원본 위치 그대로 유지
@@ -70,14 +78,51 @@ const CHANNEL_PROMPTS: Record<ConvertChannel, string> = {
 - 외부 링크 삽입 금지
 - 광고성 CTA는 자연스러운 마무리로 완화
 
-## 출력
-마크다운 형식의 본문 전체를 출력하세요. 설명·JSON·코드블록 없이 본문만 출력.`,
+## 출력 형식 (반드시 준수)
+첫 줄: [제목] 검색 최적화된 카페 글 제목 (30~45자)
+그 다음: 마크다운 형식의 본문 전체
+마지막 줄: [태그] 실제검색어1, 실제검색어2, ... (10개, 네이버 검색어 스타일 롱테일 키워드)
+
+설명·JSON·코드블록 없이 위 형식만 출력하세요.`,
 };
 
 export interface ConvertResult {
   text: string;
+  seoTitle?: string;
+  seoTags?: string[];
   usage: ChatUsage;
   krw: number;
+}
+
+/** naver_cafe 변환 출력에서 [제목], [태그], 본문을 분리 */
+function parseCafeOutput(raw: string): { seoTitle?: string; seoTags?: string[]; body: string } {
+  const lines = raw.split('\n');
+  let seoTitle: string | undefined;
+  let seoTags: string[] | undefined;
+  let bodyStart = 0;
+  let bodyEnd = lines.length;
+
+  // 첫 줄: [제목] ...
+  if (lines[0]?.trim().startsWith('[제목]')) {
+    seoTitle = lines[0].trim().replace(/^\[제목\]\s*/, '').trim();
+    bodyStart = 1;
+    // 제목 다음 빈 줄 스킵
+    while (bodyStart < lines.length && lines[bodyStart].trim() === '') bodyStart++;
+  }
+
+  // 마지막 비공백 줄: [태그] ...
+  let lastIdx = lines.length - 1;
+  while (lastIdx >= 0 && lines[lastIdx].trim() === '') lastIdx--;
+  if (lastIdx >= 0 && lines[lastIdx].trim().startsWith('[태그]')) {
+    const tagLine = lines[lastIdx].trim().replace(/^\[태그\]\s*/, '');
+    seoTags = tagLine.split(',').map(t => t.trim()).filter(t => t.length >= 2);
+    bodyEnd = lastIdx;
+    // 태그 직전 빈 줄 스킵
+    while (bodyEnd > bodyStart && lines[bodyEnd - 1].trim() === '') bodyEnd--;
+  }
+
+  const body = lines.slice(bodyStart, bodyEnd).join('\n').trim();
+  return { seoTitle: seoTitle || undefined, seoTags: seoTags?.length ? seoTags : undefined, body };
 }
 
 export async function convertBlogToChannel(
@@ -108,9 +153,17 @@ export async function convertBlogToChannel(
     ],
   });
 
-  const text = response.choices[0]?.message?.content ?? '';
-  if (!text) throw new Error(`${channel} 변환 텍스트 빈 응답`);
+  const rawText = response.choices[0]?.message?.content ?? '';
+  if (!rawText) throw new Error(`${channel} 변환 텍스트 빈 응답`);
 
   const usage = toChatUsage(response.usage);
-  return { text, usage, krw: calcChatKrw(usage) };
+  const krw = calcChatKrw(usage);
+
+  // naver_cafe: [제목]/[태그] 파싱
+  if (channel === 'naver_cafe') {
+    const parsed = parseCafeOutput(rawText);
+    return { text: parsed.body || rawText, seoTitle: parsed.seoTitle, seoTags: parsed.seoTags, usage, krw };
+  }
+
+  return { text: rawText, usage, krw };
 }

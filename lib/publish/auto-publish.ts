@@ -140,6 +140,9 @@ async function publishToChannel(
   } else if (channel === 'naver_cafe') {
     // 다중 카페 타겟 지원: 모든 타겟에 순차 발행
     const cafeTargets = await getCafeTargets(ownerId);
+    const cafeSubject = converted.seoTitle ?? topic;
+    const cafeKeywords = converted.seoTags ?? params.keywords;
+
     if (cafeTargets.length > 0) {
       const errors: string[] = [];
       for (let t = 0; t < cafeTargets.length; t++) {
@@ -148,9 +151,9 @@ async function publishToChannel(
         if (t > 0) await new Promise(r => setTimeout(r, 10_000));
         try {
           const result = await publishNaverCafePost({
-            subject: topic,
+            subject: cafeSubject,
             content: converted.text,
-            keywords: params.keywords,
+            keywords: cafeKeywords,
             imageUrls: params.bodyImageUrls,
             imageUrl: imageUrl ?? undefined,
             clubId: target.clubId,
@@ -189,9 +192,9 @@ async function publishToChannel(
     } else {
       // CafeTarget 없으면 기존 방식 (credential의 clubId/menuId)
       const result = await publishNaverCafePost({
-        subject: topic,
+        subject: cafeSubject,
         content: converted.text,
-        keywords: params.keywords,
+        keywords: cafeKeywords,
         imageUrls: params.bodyImageUrls,
         imageUrl: imageUrl ?? undefined,
         ownerId,

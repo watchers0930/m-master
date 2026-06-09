@@ -211,6 +211,10 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
         contentId: content.id,
       });
 
+      // SEO 최적화 제목/태그 사용 (AI 변환 결과 우선, 없으면 원본 폴백)
+      const cafeSubject = converted.seoTitle ?? content.topic;
+      const cafeKeywords = converted.seoTags ?? content.keywords ?? [];
+
       // 네이버 카페 발행 — 다중 카페 타겟 지원
       const blogImageUrls = (content.bodyImageUrls as string[]) ?? [];
       const cafeTargets = await getCafeTargets(content.ownerId);
@@ -222,9 +226,9 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
           if (ct > 0) await new Promise(r => setTimeout(r, 10_000));
           try {
             const cafeResult = await publishNaverCafePost({
-              subject: content.topic,
+              subject: cafeSubject,
               content: converted.text,
-              keywords: content.keywords ?? [],
+              keywords: cafeKeywords,
               imageUrls: blogImageUrls,
               imageUrl: content.imageUrl ?? undefined,
               clubId: target.clubId,
@@ -263,9 +267,9 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
       } else {
         // CafeTarget 없으면 기존 방식
         const cafeResult = await publishNaverCafePost({
-          subject: content.topic,
+          subject: cafeSubject,
           content: converted.text,
-          keywords: content.keywords ?? [],
+          keywords: cafeKeywords,
           imageUrls: blogImageUrls,
           imageUrl: content.imageUrl ?? undefined,
           ownerId: content.ownerId,
