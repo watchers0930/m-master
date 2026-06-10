@@ -499,24 +499,28 @@ async function insertVestraFooter(page: Page, topic: string): Promise<void> {
   await fl.locator('.se-section-text').last().click();
   await page.waitForTimeout(300);
 
-  // 베스트라 소개 문구 (볼드 + 일반 혼합)
+  // 베스트라 소개 문구
   await page.keyboard.press('Enter');
   await page.keyboard.press(`${MOD_KEY}+b`);
-  await page.keyboard.type('VESTRA | AI 부동산 분석 플랫폼', { delay: 10 });
+  await page.keyboard.type('VESTRA | AI 부동산 권리분석·시세분석 서비스', { delay: 10 });
   await page.keyboard.press(`${MOD_KEY}+b`);
+  await page.keyboard.press('Enter');
   await page.keyboard.press('Enter');
 
   await page.keyboard.type(
-    '등기부등본 권리분석, 실거래가 시세 조회, 전세보증보험 가입 확인까지',
+    '등기부등본 변동 감시부터 계약서 위험 조항 분석까지, AI가 알아서 챙겨드립니다.',
     { delay: 5 },
   );
   await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+
   await page.keyboard.type(
-    '부동산 거래에 필요한 모든 분석을 AI가 한번에 해결해 드립니다.',
+    '근저당·가압류·소유권 변경 — 모르는 사이 생기는 위험을 실시간으로 알려드립니다.',
     { delay: 5 },
   );
   await page.keyboard.press('Enter');
   await page.keyboard.press('Enter');
+
   await page.keyboard.type('https://vestra-plum.vercel.app', { delay: 5 });
 
   await page.waitForTimeout(300);
