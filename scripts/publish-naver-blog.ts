@@ -146,8 +146,8 @@ async function loginToNaver(page: Page): Promise<boolean> {
 
   await page.waitForTimeout(500);
 
-  // 로그인 버튼 클릭
-  await page.locator('.btn_login, #log\\.login').click();
+  // 로그인 버튼 클릭 (패스키 버튼 제외 — type="submit"인 것만)
+  await page.locator('button#log\\.login[type="submit"]').click();
   await page.waitForTimeout(3000);
 
   // 2FA/CAPTCHA 체크
