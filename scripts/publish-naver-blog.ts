@@ -457,6 +457,73 @@ async function fillBody(
 }
 
 // ---------------------------------------------------------------------------
+// SE 에디터: 구분선 삽입
+// ---------------------------------------------------------------------------
+async function insertDivider(page: Page): Promise<void> {
+  const fl = page.frameLocator('iframe[name="mainFrame"]');
+  try {
+    // SE 에디터 구분선 버튼 클릭
+    await fl.locator('button.se-toolbar-button-line, button[data-name="horizontalLine"]').click();
+    await page.waitForTimeout(500);
+    // 구분선 스타일 팝업에서 첫 번째(기본) 스타일 선택
+    const lineOption = fl.locator('.se-line-toolbar-button, .se-popup-button-line').first();
+    if (await lineOption.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await lineOption.click();
+      await page.waitForTimeout(300);
+    }
+  } catch {
+    // 구분선 삽입 실패 시 텍스트로 대체
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('━━━━━━━━━━━━━━━━━━━━━━━━━━━━', { delay: 2 });
+    await page.keyboard.press('Enter');
+  }
+  console.log('[구분선] 삽입 완료');
+}
+
+// ---------------------------------------------------------------------------
+// 베스트라 홍보 푸터 삽입 (구분선 + 역할 설명 + 도메인)
+// ---------------------------------------------------------------------------
+async function insertVestraFooter(page: Page, topic: string): Promise<void> {
+  const fl = page.frameLocator('iframe[name="mainFrame"]');
+
+  // 본문 마지막 텍스트 영역에 커서 이동
+  await fl.locator('.se-section-text').last().click();
+  await page.waitForTimeout(300);
+
+  // 빈 줄 + 구분선
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await insertDivider(page);
+
+  // 구분선 아래 텍스트 영역 클릭
+  await fl.locator('.se-section-text').last().click();
+  await page.waitForTimeout(300);
+
+  // 베스트라 소개 문구 (볼드 + 일반 혼합)
+  await page.keyboard.press('Enter');
+  await page.keyboard.press(`${MOD_KEY}+b`);
+  await page.keyboard.type('VESTRA | AI 부동산 분석 플랫폼', { delay: 10 });
+  await page.keyboard.press(`${MOD_KEY}+b`);
+  await page.keyboard.press('Enter');
+
+  await page.keyboard.type(
+    '등기부등본 권리분석, 실거래가 시세 조회, 전세보증보험 가입 확인까지',
+    { delay: 5 },
+  );
+  await page.keyboard.press('Enter');
+  await page.keyboard.type(
+    '부동산 거래에 필요한 모든 분석을 AI가 한번에 해결해 드립니다.',
+    { delay: 5 },
+  );
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('https://vestra-plum.vercel.app', { delay: 5 });
+
+  await page.waitForTimeout(300);
+  console.log('[베스트라] 홍보 푸터 삽입 완료');
+}
+
+// ---------------------------------------------------------------------------
 // 발행 버튼 클릭 + 설정 다이얼로그 처리
 // ---------------------------------------------------------------------------
 async function clickPublish(page: Page): Promise<string | null> {
@@ -502,6 +569,7 @@ async function publishOne(
 
     await fillTitle(page, item.topic);
     await fillBody(page, item.textBody, item.bodyImageUrls ?? []);
+    await insertVestraFooter(page, item.topic);
     const url = await clickPublish(page);
 
     if (DRY_RUN) return { success: true, url: 'dry-run' };
