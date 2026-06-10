@@ -15,6 +15,11 @@ import * as os from 'os';
 import * as path from 'path';
 
 // ---------------------------------------------------------------------------
+// Persistent browser profile (self-hosted runner 전용)
+// ---------------------------------------------------------------------------
+const USER_DATA_DIR = path.join(os.homedir(), '.naver-blog-browser');
+
+// ---------------------------------------------------------------------------
 // 설정
 // ---------------------------------------------------------------------------
 const APP_URL = process.env.APP_URL ?? 'https://m-master.vercel.app';
@@ -403,31 +408,51 @@ async function main(): Promise<void> {
   }
   console.log(`미발행 콘텐츠 ${items.length}건 조회됨`);
 
-  // 2) 브라우저 시작
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({
+  // 2) 브라우저 시작 — persistent context + anti-detection
+  //    self-hosted runner(맥)에서 실행되므로 headed 모드 사용 가능
+  //    persistent context는 브라우저 프로필을 유지하여 재로그인 빈도를 줄임
+  if (!fs.existsSync(USER_DATA_DIR)) fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+
+  const context = await chromium.launchPersistentContext(USER_DATA_DIR, {
+    headless: false,
+    args: [
+      '--disable-blink-features=AutomationControlled',
+      '--no-sandbox',
+      '--disable-dev-shm-usage',
+      '--window-position=0,0',
+    ],
+    ignoreDefaultArgs: ['--enable-automation'],
     viewport: { width: 1280, height: 900 },
     locale: 'ko-KR',
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
   });
 
-  // 3) 쿠키 복원
-  const cookies = loadCookiesFromEnv() ?? loadCookiesFromFile();
-  if (cookies) {
-    await context.addCookies(cookies);
-    console.log(`[쿠키] ${cookies.length}개 복원됨`);
+  // navigator.webdriver 숨김
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => false });
+  });
+
+  // 3) 쿠키 복원 — persistent context에 세션이 없는 경우에만 주입
+  const page = context.pages()[0] ?? await context.newPage();
+
+  let loggedIn = await checkLoginStatus(page);
+  if (!loggedIn) {
+    // persistent context에 세션 없음 → env/file 쿠키 주입 시도
+    const cookies = loadCookiesFromEnv() ?? loadCookiesFromFile();
+    if (cookies) {
+      await context.addCookies(cookies);
+      console.log(`[쿠키] ${cookies.length}개 주입됨`);
+      loggedIn = await checkLoginStatus(page);
+    }
   }
 
-  const page = await context.newPage();
-
-  // 4) 로그인 확인
-  let loggedIn = await checkLoginStatus(page);
+  // 4) 그래도 로그인 안 됨 → ID/PW 폴백
   if (!loggedIn) {
     console.log('[로그인] 쿠키 만료 — ID/PW 로그인 시도');
     loggedIn = await loginToNaver(page);
     if (!loggedIn) {
-      console.error('[로그인] 실패. 쿠키 갱신 후 재시도 필요.');
-      await browser.close();
+      console.error('[로그인] 실패. 수동 로그인 후 재시도 필요.');
+      await context.close();
       process.exit(1);
     }
   }
@@ -455,11 +480,11 @@ async function main(): Promise<void> {
     }
   }
 
-  // 6) 쿠키 저장 (다음 실행용)
+  // 6) 쿠키 저장 (다음 실행용 — 파일 백업)
   const updatedCookies = await context.cookies();
   saveCookiesToFile(updatedCookies);
 
-  await browser.close();
+  await context.close();
 
   console.log(`\n=== 완료: ${successCount}/${items.length}건 발행 성공 ===`);
   if (successCount < items.length) process.exit(1);
