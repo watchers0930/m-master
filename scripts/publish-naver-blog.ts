@@ -334,22 +334,58 @@ async function insertImage(
 // ---------------------------------------------------------------------------
 const IMAGE_MARKER = /^\[이미지:.*?\]\s*$/;
 const HEADING_RE = /^(#{2,3})\s+(.+)$/;
+const TABLE_HEADER_RE = /^\|.+\|$/;
+const TABLE_SEPARATOR_RE = /^\|[\s:-]+\|$/;
+const TAG_LINE_RE = /^\*{0,2}태그:\*{0,2}\s*#/;
+const HR_RE = /^---+$/;
+
+/** 마크다운 테이블을 SE 에디터에서 볼드 헤더 + 줄바꿈 텍스트로 렌더링 */
+async function typeTableBlock(page: Page, tableLines: string[]): Promise<void> {
+  // 첫 줄: 헤더, 두번째: 구분선, 나머지: 데이터
+  const headers = tableLines[0].split('|').filter(c => c.trim()).map(c => c.trim());
+  const dataRows = tableLines.slice(2).map(row =>
+    row.split('|').filter(c => c.trim()).map(c => c.trim()),
+  );
+
+  // 헤더 볼드 출력
+  await page.keyboard.press(`${MOD_KEY}+b`);
+  await page.keyboard.type(headers.join(' | '), { delay: 5 });
+  await page.keyboard.press(`${MOD_KEY}+b`);
+  await page.keyboard.press('Enter');
+
+  // 구분선
+  await page.keyboard.type('─'.repeat(Math.min(headers.join(' | ').length, 40)), { delay: 2 });
+  await page.keyboard.press('Enter');
+
+  // 데이터 행
+  for (const row of dataRows) {
+    await page.keyboard.type(row.join(' | '), { delay: 5 });
+    await page.keyboard.press('Enter');
+  }
+}
+
+/** 태그 줄에서 해시태그 추출 */
+function extractTags(tagLine: string): string[] {
+  const cleaned = tagLine.replace(/^\*{0,2}태그:\*{0,2}\s*/, '');
+  return cleaned.match(/#[^\s#]+/g) ?? [];
+}
 
 async function fillBody(
   page: Page,
   text: string,
   bodyImageUrls: string[],
-): Promise<void> {
+): Promise<{ tags: string[] }> {
   const fl = page.frameLocator('iframe[name="mainFrame"]');
   await fl.locator('.se-section-text').click();
   await page.waitForTimeout(500);
 
   const lines = text.split('\n');
-  let imageIndex = 0;          // bodyImageUrls 인덱스
-  let textLineCount = 0;       // 입력된 텍스트 줄 수
-  let lastWasImage = false;    // 직전 콘텐츠가 이미지인지
+  let imageIndex = 0;
+  let textLineCount = 0;
+  let lastWasImage = false;
   let needsClickAfterImage = false;
   const deferredImages: { url: string; idx: number }[] = [];
+  const collectedTags: string[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
@@ -360,8 +396,46 @@ async function fillBody(
       continue;
     }
 
-    // H1 제목 (#) — 스킵 (SE 에디터에 별도 제목 필드 있음)
+    // H1 제목 (#) — 스킵
     if (/^#\s+/.test(line) && !line.startsWith('##')) {
+      continue;
+    }
+
+    // --- 구분선 — 태그 직전의 HR은 스킵
+    if (HR_RE.test(line)) {
+      // 다음 비공백 줄이 태그줄이면 HR + 태그 모두 스킵 (본문에 넣지 않음)
+      let nextIdx = i + 1;
+      while (nextIdx < lines.length && !lines[nextIdx].trim()) nextIdx++;
+      if (nextIdx < lines.length && TAG_LINE_RE.test(lines[nextIdx].trim())) {
+        continue; // HR 스킵, 태그는 아래에서 처리
+      }
+      await page.keyboard.press('Enter');
+      continue;
+    }
+
+    // 태그 줄 — 본문에 넣지 않고 수집
+    if (TAG_LINE_RE.test(line)) {
+      collectedTags.push(...extractTags(line));
+      continue;
+    }
+
+    // 마크다운 테이블 감지 (| 헤더 | ... | + |---|---| 패턴)
+    if (TABLE_HEADER_RE.test(line) && i + 1 < lines.length && TABLE_SEPARATOR_RE.test(lines[i + 1].trim())) {
+      const tableLines: string[] = [line];
+      let j = i + 1;
+      while (j < lines.length && TABLE_HEADER_RE.test(lines[j].trim())) {
+        tableLines.push(lines[j].trim());
+        j++;
+      }
+      if (needsClickAfterImage) {
+        await fl.locator('.se-section-text').last().click();
+        await page.waitForTimeout(300);
+        needsClickAfterImage = false;
+      }
+      await typeTableBlock(page, tableLines);
+      textLineCount += tableLines.length;
+      lastWasImage = false;
+      i = j - 1; // 테이블 줄 건너뛰기
       continue;
     }
 
@@ -372,7 +446,6 @@ async function fillBody(
       imageIndex++;
       if (!imgUrl) continue;
 
-      // 규칙: 텍스트 3줄 미만이면 지연, 이미지 연속이면 지연
       if (textLineCount < 3 || lastWasImage) {
         deferredImages.push({ url: imgUrl, idx });
         continue;
@@ -391,13 +464,13 @@ async function fillBody(
       needsClickAfterImage = false;
     }
 
-    // 지연된 이미지 flush (텍스트 3줄 이상 쌓였고, 직전이 이미지 아님)
+    // 지연된 이미지 flush (텍스트 3줄 이상, 직전 이미지 아님)
     if (deferredImages.length > 0 && textLineCount >= 3 && !lastWasImage) {
       const img = deferredImages.shift()!;
       await insertImage(page, img.url, img.idx);
       await fl.locator('.se-section-text').last().click();
       await page.waitForTimeout(300);
-      lastWasImage = false; // 바로 텍스트 이어가므로
+      lastWasImage = false;
     }
 
     // H2/H3 헤딩
@@ -406,7 +479,6 @@ async function fillBody(
       const level = headingMatch[1].length as 2 | 3;
       const headingText = headingMatch[2].replace(/[#*]/g, '').trim();
 
-      // SE 에디터 헤딩 스타일 시도, 실패 시 볼드로 대체
       const styled = await applyHeadingStyle(page, level);
       if (!styled) await page.keyboard.press(`${MOD_KEY}+b`);
       await page.keyboard.type(headingText, { delay: 10 });
@@ -429,8 +501,8 @@ async function fillBody(
     lastWasImage = false;
     await page.waitForTimeout(50);
 
-    // 루프 중 누적된 지연 이미지 flush (텍스트 사이사이에 배치)
-    if (deferredImages.length > 0 && textLineCount >= 3 && (textLineCount % 4 === 0)) {
+    // 지연 이미지 flush (3줄마다)
+    if (deferredImages.length > 0 && textLineCount >= 3 && (textLineCount % 3 === 0)) {
       const img = deferredImages.shift()!;
       await page.keyboard.press('Enter');
       await insertImage(page, img.url, img.idx);
@@ -451,9 +523,8 @@ async function fillBody(
   }
 
   await page.waitForTimeout(500);
-  const totalImages = imageIndex;
-  const deferredCount = deferredImages.length;
-  console.log(`[본문] 타이핑 완료 (이미지 ${totalImages}개, 서식 적용)`);
+  console.log(`[본문] 타이핑 완료 (이미지 ${imageIndex}개, 태그 ${collectedTags.length}개, 서식 적용)`);
+  return { tags: collectedTags };
 }
 
 // ---------------------------------------------------------------------------
@@ -528,6 +599,48 @@ async function insertVestraFooter(page: Page, topic: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// SE 에디터: 태그 입력 (발행 설정 다이얼로그의 태그 필드에 삽입)
+// ---------------------------------------------------------------------------
+async function insertTags(page: Page, tags: string[], keywords: string[]): Promise<void> {
+  // 본문에서 추출한 태그 + content keywords 합치고 중복 제거
+  const allTags = [...new Set([
+    ...tags.map(t => t.replace(/^#/, '').trim()),
+    ...keywords.map(k => k.trim()),
+  ])].filter(t => t.length >= 2).slice(0, 10);
+
+  if (allTags.length === 0) return;
+
+  const fl = page.frameLocator('iframe[name="mainFrame"]');
+  try {
+    // SE 에디터 태그 입력 필드 찾기
+    const tagInput = fl.locator('input.se-tag-input__input, input[placeholder*="태그"], input[placeholder*="tag"]').first();
+    if (await tagInput.isVisible({ timeout: 3000 }).catch(() => false)) {
+      for (const tag of allTags) {
+        await tagInput.click();
+        await page.keyboard.type(tag, { delay: 10 });
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(200);
+      }
+      console.log(`[태그] SE 에디터 태그 입력 완료 (${allTags.length}개)`);
+      return;
+    }
+  } catch { /* 태그 입력 필드 없으면 아래 fallback */ }
+
+  // Fallback: 본문 하단에 태그 텍스트로 입력
+  try {
+    await fl.locator('.se-section-text').last().click();
+    await page.waitForTimeout(300);
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter');
+    const tagText = allTags.map(t => `#${t}`).join(' ');
+    await page.keyboard.type(tagText, { delay: 5 });
+    console.log(`[태그] 본문 하단 태그 입력 완료 (${allTags.length}개)`);
+  } catch (err) {
+    console.warn(`[태그] 입력 실패: ${err instanceof Error ? err.message : err}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 발행 버튼 클릭 + 설정 다이얼로그 처리
 // ---------------------------------------------------------------------------
 async function clickPublish(page: Page): Promise<string | null> {
@@ -572,8 +685,9 @@ async function publishOne(
     await page.waitForTimeout(1000);
 
     await fillTitle(page, item.topic);
-    await fillBody(page, item.textBody, item.bodyImageUrls ?? []);
+    const { tags } = await fillBody(page, item.textBody, item.bodyImageUrls ?? []);
     await insertVestraFooter(page, item.topic);
+    await insertTags(page, tags, item.keywords ?? []);
     const url = await clickPublish(page);
 
     if (DRY_RUN) return { success: true, url: 'dry-run' };
@@ -608,7 +722,7 @@ async function main(): Promise<void> {
   console.log(`[세션] storageState 파일: ${hasStateFile ? STATE_PATH : '없음'}`);
 
   const browser = await chromium.launch({
-    headless: false,
+    headless: true,
     args: BROWSER_ARGS,
     ignoreDefaultArgs: ['--enable-automation'],
   });

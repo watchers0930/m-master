@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
         const chatKrw = calcChatKrw(usage);
 
         // 본문 마커 폴백을 먼저 적용 (이후 작업들이 갱신된 text를 참조)
-        text = ensureMinimumMarkers(text, 5);
+        text = ensureMinimumMarkers(text, req.channel === 'blog' ? 10 : 5);
 
         // 9~10) 검수 + 썸네일 + 본문 이미지 → 병렬 실행 (가장 큰 속도 개선)
         const t0 = Date.now();

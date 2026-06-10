@@ -110,7 +110,7 @@ export async function generateContentHeadless(
   const chatKrw = calcChatKrw(usage);
 
   // 본문 마커 폴백
-  text = ensureMinimumMarkers(text, 5);
+  text = ensureMinimumMarkers(text, channel === 'blog' ? 10 : 5);
 
   // 7) 검수 + 썸네일 + 본문 이미지 → 병렬
   const [reviewSettled, thumbSettled, bodyImgsSettled] = await Promise.allSettled([
