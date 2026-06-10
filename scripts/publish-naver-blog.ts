@@ -97,31 +97,43 @@ function saveCookiesToFile(cookies: unknown[]): void {
 // ---------------------------------------------------------------------------
 async function checkLoginStatus(page: Page): Promise<boolean> {
   try {
-    await page.goto('https://blog.naver.com/GoBlogWrite.naver', {
-      waitUntil: 'domcontentloaded',
-      timeout: 15000,
-    });
-    // 로그인 안 되어 있으면 로그인 페이지로 리다이렉트됨
-    const url = page.url();
-    if (url.includes('nidlogin') || url.includes('nid.naver.com/nidlogin')) {
+    // 네이버 세션 쿠키 존재 확인 (NID_AUT 또는 NID_SES)
+    const cookies = await page.context().cookies('https://naver.com');
+    const hasSession = cookies.some((c) => c.name === 'NID_AUT' || c.name === 'NID_SES');
+    if (!hasSession) {
+      console.log('[로그인] 세션 쿠키 없음');
       return false;
     }
 
-    // Redirect=Write 패턴 → 한번 더 이동 필요
+    // 실제 블로그 글쓰기 접근 테스트
+    await page.goto('https://blog.naver.com/GoBlogWrite.naver', {
+      waitUntil: 'load',
+      timeout: 20000,
+    });
+
+    const url = page.url();
+    if (url.includes('nidlogin')) return false;
+
+    // Redirect 완료 대기
     if (url.includes('Redirect=Write')) {
-      await page.waitForTimeout(2000);
+      await page.waitForTimeout(3000);
       await page.goto('https://blog.naver.com/GoBlogWrite.naver', {
-        waitUntil: 'domcontentloaded',
-        timeout: 15000,
+        waitUntil: 'load',
+        timeout: 20000,
       });
     }
 
-    // 에디터 로드 대기 (제목 placeholder)
+    // 에디터 프레임 로드 확인
     const mainFrame = page.frame('mainFrame');
-    if (!mainFrame) return false;
-    await mainFrame.waitForSelector('.se-title-text', { timeout: 10000 });
+    if (!mainFrame) {
+      console.log(`[로그인] mainFrame 없음 (URL: ${page.url()})`);
+      return false;
+    }
+    await mainFrame.waitForSelector('.se-title-text', { timeout: 15000 });
+    console.log('[로그인] 블로그 에디터 접근 확인 완료');
     return true;
-  } catch {
+  } catch (err) {
+    console.log(`[로그인] 체크 실패: ${err instanceof Error ? err.message : err}`);
     return false;
   }
 }

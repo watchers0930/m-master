@@ -61,25 +61,13 @@ async function main(): Promise<void> {
         continue;
       }
 
-      // 로그인 페이지를 벗어남 → 블로그 글쓰기 접근 테스트
+      // 로그인 페이지를 벗어남 → 세션 쿠키로 확인
       if (url.includes('naver.com')) {
-        await page.goto('https://blog.naver.com/GoBlogWrite.naver', {
-          waitUntil: 'domcontentloaded',
-          timeout: 15000,
-        });
-
-        const writeUrl = page.url();
-        if (!writeUrl.includes('nidlogin') && !writeUrl.includes('login')) {
-          const mainFrame = page.frame('mainFrame');
-          if (mainFrame) {
-            try {
-              await mainFrame.waitForSelector('.se-title-text', { timeout: 10000 });
-              loggedIn = true;
-              break;
-            } catch {
-              // 에디터 로드 실패 — 계속 대기
-            }
-          }
+        const cookies = await context.cookies('https://naver.com');
+        const hasSession = cookies.some((c) => c.name === 'NID_AUT' || c.name === 'NID_SES');
+        if (hasSession) {
+          loggedIn = true;
+          break;
         }
       }
     } catch {
