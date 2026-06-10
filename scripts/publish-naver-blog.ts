@@ -297,19 +297,33 @@ async function typeWithFormatting(page: Page, text: string): Promise<void> {
     if (!part) continue;
 
     if (part.startsWith('**') && part.endsWith('**')) {
+      // 강조 텍스트 — 볼드 + 딥블루 색상
       const inner = part.slice(2, -2);
+      await setTextColor(page, COLOR_ACCENT);
       await page.keyboard.press(`${MOD_KEY}+b`);
       await page.keyboard.type(inner, { delay: 5 });
       await page.keyboard.press(`${MOD_KEY}+b`);
+      await setTextColor(page, COLOR_NORMAL);
     } else if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+      // 이탤릭 텍스트
       const inner = part.slice(1, -1);
       await page.keyboard.press(`${MOD_KEY}+i`);
       await page.keyboard.type(inner, { delay: 5 });
       await page.keyboard.press(`${MOD_KEY}+i`);
     } else {
+      // 일반 텍스트 — 소프트 블랙
       await page.keyboard.type(part, { delay: 5 });
     }
   }
+}
+
+/** 인용문(blockquote) 한 줄 타이핑 — 이탤릭 + 회색 + 좌측 바 느낌 */
+async function typeBlockquote(page: Page, text: string): Promise<void> {
+  await setTextColor(page, COLOR_QUOTE);
+  await page.keyboard.press(`${MOD_KEY}+i`);
+  await page.keyboard.type(`❝ ${text}`, { delay: 5 });
+  await page.keyboard.press(`${MOD_KEY}+i`);
+  await setTextColor(page, COLOR_NORMAL);
 }
 
 // ---------------------------------------------------------------------------
@@ -338,6 +352,28 @@ const TABLE_HEADER_RE = /^\|.+\|$/;
 const TABLE_SEPARATOR_RE = /^\|[\s:-]+\|$/;
 const TAG_LINE_RE = /^\*{0,2}태그:\*{0,2}\s*#/;
 const HR_RE = /^---+$/;
+const BLOCKQUOTE_RE = /^>\s*(.+)/;
+
+// ---------------------------------------------------------------------------
+// 폰트 색상 (AI 작성 느낌 탈피 — 강조·일반·인용 시각 분리)
+// ---------------------------------------------------------------------------
+const COLOR_NORMAL = '#333333';     // 일반 텍스트 (순흑 대신 소프트 블랙)
+const COLOR_ACCENT = '#1a5276';     // 강조(볼드) — 딥블루
+const COLOR_HEADING = '#1b2631';    // 소제목(H2/H3) — 진한 남색
+const COLOR_QUOTE = '#555555';      // 인용문(blockquote) — 회색
+const COLOR_TABLE_HEAD = '#2c3e50'; // 테이블 헤더 — 다크 블루그레이
+
+/** SE 에디터 iframe 내 execCommand로 폰트 색상 변경 */
+async function setTextColor(page: Page, color: string): Promise<void> {
+  try {
+    const frame = page.frame('mainFrame');
+    if (frame) {
+      await frame.evaluate((c) => {
+        document.execCommand('foreColor', false, c);
+      }, color);
+    }
+  } catch { /* 색상 변경 실패 시 기본색 유지 — 무시 */ }
+}
 
 /** 마크다운 테이블을 SE 에디터에서 볼드 헤더 + 줄바꿈 텍스트로 렌더링 */
 async function typeTableBlock(page: Page, tableLines: string[]): Promise<void> {
@@ -347,19 +383,21 @@ async function typeTableBlock(page: Page, tableLines: string[]): Promise<void> {
     row.split('|').filter(c => c.trim()).map(c => c.trim()),
   );
 
-  // 헤더 볼드 출력
+  // 헤더 볼드 + 다크 블루그레이
+  await setTextColor(page, COLOR_TABLE_HEAD);
   await page.keyboard.press(`${MOD_KEY}+b`);
-  await page.keyboard.type(headers.join(' | '), { delay: 5 });
+  await page.keyboard.type(headers.join('  │  '), { delay: 5 });
   await page.keyboard.press(`${MOD_KEY}+b`);
+  await setTextColor(page, COLOR_NORMAL);
   await page.keyboard.press('Enter');
 
   // 구분선
-  await page.keyboard.type('─'.repeat(Math.min(headers.join(' | ').length, 40)), { delay: 2 });
+  await page.keyboard.type('─'.repeat(Math.min(headers.join('  │  ').length, 50)), { delay: 2 });
   await page.keyboard.press('Enter');
 
-  // 데이터 행
+  // 데이터 행 — 일반 색상
   for (const row of dataRows) {
-    await page.keyboard.type(row.join(' | '), { delay: 5 });
+    await page.keyboard.type(row.join('  │  '), { delay: 5 });
     await page.keyboard.press('Enter');
   }
 }
@@ -473,18 +511,32 @@ async function fillBody(
       lastWasImage = false;
     }
 
-    // H2/H3 헤딩
+    // H2/H3 헤딩 — 진한 남색 + SE 헤딩 스타일
     const headingMatch = line.match(HEADING_RE);
     if (headingMatch) {
       const level = headingMatch[1].length as 2 | 3;
       const headingText = headingMatch[2].replace(/[#*]/g, '').trim();
 
       const styled = await applyHeadingStyle(page, level);
+      await setTextColor(page, COLOR_HEADING);
       if (!styled) await page.keyboard.press(`${MOD_KEY}+b`);
       await page.keyboard.type(headingText, { delay: 10 });
       if (!styled) await page.keyboard.press(`${MOD_KEY}+b`);
+      await setTextColor(page, COLOR_NORMAL);
 
       await page.keyboard.press('Enter');
+      textLineCount++;
+      lastWasImage = false;
+      await page.waitForTimeout(50);
+      continue;
+    }
+
+    // 인용문(blockquote) — 이탤릭 + 회색 + 인용부호
+    const quoteMatch = line.match(BLOCKQUOTE_RE);
+    if (quoteMatch) {
+      const quoteText = quoteMatch[1].replace(/\*\*/g, '').trim();
+      await typeBlockquote(page, quoteText);
+      if (i < lines.length - 1) await page.keyboard.press('Enter');
       textLineCount++;
       lastWasImage = false;
       await page.waitForTimeout(50);
@@ -494,7 +546,8 @@ async function fillBody(
     // 불릿 리스트
     const bulletLine = line.replace(/^[-*]\s+/, '• ');
 
-    // 인라인 서식 적용하며 타이핑
+    // 일반 텍스트 색상 설정 후 인라인 서식 적용
+    await setTextColor(page, COLOR_NORMAL);
     await typeWithFormatting(page, bulletLine);
     if (i < lines.length - 1) await page.keyboard.press('Enter');
     textLineCount++;
