@@ -103,9 +103,19 @@ async function checkLoginStatus(page: Page): Promise<boolean> {
     });
     // 로그인 안 되어 있으면 로그인 페이지로 리다이렉트됨
     const url = page.url();
-    if (url.includes('nidlogin') || url.includes('login')) {
+    if (url.includes('nidlogin') || url.includes('nid.naver.com/nidlogin')) {
       return false;
     }
+
+    // Redirect=Write 패턴 → 한번 더 이동 필요
+    if (url.includes('Redirect=Write')) {
+      await page.waitForTimeout(2000);
+      await page.goto('https://blog.naver.com/GoBlogWrite.naver', {
+        waitUntil: 'domcontentloaded',
+        timeout: 15000,
+      });
+    }
+
     // 에디터 로드 대기 (제목 placeholder)
     const mainFrame = page.frame('mainFrame');
     if (!mainFrame) return false;
