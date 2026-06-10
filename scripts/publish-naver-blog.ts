@@ -263,19 +263,78 @@ async function uploadImage(page: Page, filePath: string): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------
-// 마크다운 줄 → 플레인텍스트 변환
+// SE 에디터: 헤딩 스타일 적용 (문단 드롭다운 → 제목N 선택)
 // ---------------------------------------------------------------------------
-function stripMarkdown(line: string): string {
-  return line
-    .replace(/^#{1,3}\s+/, '')
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/\*(.+?)\*/g, '$1')
-    .replace(/^[-*]\s+/, '• ');
+async function applyHeadingStyle(page: Page, level: 2 | 3): Promise<boolean> {
+  const fl = page.frameLocator('iframe[name="mainFrame"]');
+  try {
+    // SE 에디터 문단 스타일 드롭다운 열기
+    await fl.locator('button.se-text-paragraph-button').click();
+    await page.waitForTimeout(400);
+    // 제목 레벨 선택
+    const selector = level === 2
+      ? '[data-style="heading2"], [data-value="heading2"]'
+      : '[data-style="heading3"], [data-value="heading3"]';
+    await fl.locator(selector).click();
+    await page.waitForTimeout(200);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ---------------------------------------------------------------------------
-// 에디터: 본문 입력 — 글-이미지 교차 배치
+// SE 에디터: 인라인 서식 적용하며 텍스트 타이핑
+// **bold** → Ctrl+B 토글, *italic* → Ctrl+I 토글
 // ---------------------------------------------------------------------------
+const MOD_KEY = process.platform === 'darwin' ? 'Meta' : 'Control';
+
+async function typeWithFormatting(page: Page, text: string): Promise<void> {
+  // **bold**와 *italic* 구간 분리
+  const parts = text.split(/(\*\*[^*]+?\*\*|\*[^*]+?\*)/g);
+
+  for (const part of parts) {
+    if (!part) continue;
+
+    if (part.startsWith('**') && part.endsWith('**')) {
+      const inner = part.slice(2, -2);
+      await page.keyboard.press(`${MOD_KEY}+b`);
+      await page.keyboard.type(inner, { delay: 5 });
+      await page.keyboard.press(`${MOD_KEY}+b`);
+    } else if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
+      const inner = part.slice(1, -1);
+      await page.keyboard.press(`${MOD_KEY}+i`);
+      await page.keyboard.type(inner, { delay: 5 });
+      await page.keyboard.press(`${MOD_KEY}+i`);
+    } else {
+      await page.keyboard.type(part, { delay: 5 });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 이미지 삽입 (다운로드 → 업로드 → 임시파일 삭제)
+// ---------------------------------------------------------------------------
+async function insertImage(
+  page: Page,
+  imgUrl: string,
+  imgIndex: number,
+): Promise<boolean> {
+  await page.keyboard.press('Enter');
+  const tmpPath = await downloadImage(imgUrl, imgIndex);
+  if (!tmpPath) return false;
+  const ok = await uploadImage(page, tmpPath);
+  fs.unlinkSync(tmpPath);
+  return ok;
+}
+
+// ---------------------------------------------------------------------------
+// 에디터: 본문 입력 — 서식 적용 + 이미지 교차 배치
+// 규칙: (1) 텍스트 3줄 이상 후 첫 이미지 (2) 이미지 연속 배치 금지
+// ---------------------------------------------------------------------------
+const IMAGE_MARKER = /^\[이미지:.*?\]\s*$/;
+const HEADING_RE = /^(#{2,3})\s+(.+)$/;
+
 async function fillBody(
   page: Page,
   text: string,
@@ -285,51 +344,116 @@ async function fillBody(
   await fl.locator('.se-section-text').click();
   await page.waitForTimeout(500);
 
-  const IMAGE_MARKER = /^\[이미지:.*?\]\s*$/;
   const lines = text.split('\n');
-  let imageIndex = 0;
-  let needsEnterBeforeText = false;
+  let imageIndex = 0;          // bodyImageUrls 인덱스
+  let textLineCount = 0;       // 입력된 텍스트 줄 수
+  let lastWasImage = false;    // 직전 콘텐츠가 이미지인지
+  let needsClickAfterImage = false;
+  const deferredImages: { url: string; idx: number }[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
 
+    // 빈 줄
     if (!line) {
       await page.keyboard.press('Enter');
-      needsEnterBeforeText = false;
       continue;
     }
 
+    // H1 제목 (#) — 스킵 (SE 에디터에 별도 제목 필드 있음)
+    if (/^#\s+/.test(line) && !line.startsWith('##')) {
+      continue;
+    }
+
+    // 이미지 마커
     if (IMAGE_MARKER.test(line)) {
       const imgUrl = bodyImageUrls[imageIndex];
-      if (imgUrl) {
-        await page.keyboard.press('Enter');
-        const tmpPath = await downloadImage(imgUrl, imageIndex);
-        if (tmpPath) {
-          await uploadImage(page, tmpPath);
-          fs.unlinkSync(tmpPath);
-          needsEnterBeforeText = true;
-        }
-      }
+      const idx = imageIndex;
       imageIndex++;
+      if (!imgUrl) continue;
+
+      // 규칙: 텍스트 3줄 미만이면 지연, 이미지 연속이면 지연
+      if (textLineCount < 3 || lastWasImage) {
+        deferredImages.push({ url: imgUrl, idx });
+        continue;
+      }
+
+      await insertImage(page, imgUrl, idx);
+      lastWasImage = true;
+      needsClickAfterImage = true;
       continue;
     }
 
-    if (needsEnterBeforeText) {
+    // 이미지 직후 텍스트 → 새 텍스트 영역 클릭
+    if (needsClickAfterImage) {
       await fl.locator('.se-section-text').last().click();
       await page.waitForTimeout(300);
-      needsEnterBeforeText = false;
+      needsClickAfterImage = false;
     }
 
-    const plain = stripMarkdown(line);
-    if (plain) {
-      await page.keyboard.type(plain, { delay: 5 });
+    // 지연된 이미지 flush (텍스트 3줄 이상 쌓였고, 직전이 이미지 아님)
+    if (deferredImages.length > 0 && textLineCount >= 3 && !lastWasImage) {
+      const img = deferredImages.shift()!;
+      await insertImage(page, img.url, img.idx);
+      await fl.locator('.se-section-text').last().click();
+      await page.waitForTimeout(300);
+      lastWasImage = false; // 바로 텍스트 이어가므로
     }
+
+    // H2/H3 헤딩
+    const headingMatch = line.match(HEADING_RE);
+    if (headingMatch) {
+      const level = headingMatch[1].length as 2 | 3;
+      const headingText = headingMatch[2].replace(/[#*]/g, '').trim();
+
+      // SE 에디터 헤딩 스타일 시도, 실패 시 볼드로 대체
+      const styled = await applyHeadingStyle(page, level);
+      if (!styled) await page.keyboard.press(`${MOD_KEY}+b`);
+      await page.keyboard.type(headingText, { delay: 10 });
+      if (!styled) await page.keyboard.press(`${MOD_KEY}+b`);
+
+      await page.keyboard.press('Enter');
+      textLineCount++;
+      lastWasImage = false;
+      await page.waitForTimeout(50);
+      continue;
+    }
+
+    // 불릿 리스트
+    const bulletLine = line.replace(/^[-*]\s+/, '• ');
+
+    // 인라인 서식 적용하며 타이핑
+    await typeWithFormatting(page, bulletLine);
     if (i < lines.length - 1) await page.keyboard.press('Enter');
+    textLineCount++;
+    lastWasImage = false;
     await page.waitForTimeout(50);
+
+    // 루프 중 누적된 지연 이미지 flush (텍스트 사이사이에 배치)
+    if (deferredImages.length > 0 && textLineCount >= 3 && (textLineCount % 4 === 0)) {
+      const img = deferredImages.shift()!;
+      await page.keyboard.press('Enter');
+      await insertImage(page, img.url, img.idx);
+      await fl.locator('.se-section-text').last().click();
+      await page.waitForTimeout(300);
+      lastWasImage = false;
+    }
+  }
+
+  // 남은 지연 이미지 모두 삽입
+  for (const img of deferredImages) {
+    if (needsClickAfterImage) {
+      await fl.locator('.se-section-text').last().click();
+      await page.waitForTimeout(300);
+    }
+    await insertImage(page, img.url, img.idx);
+    needsClickAfterImage = true;
   }
 
   await page.waitForTimeout(500);
-  console.log(`[본문] 타이핑 완료 (이미지 ${imageIndex}개 포함)`);
+  const totalImages = imageIndex;
+  const deferredCount = deferredImages.length;
+  console.log(`[본문] 타이핑 완료 (이미지 ${totalImages}개, 서식 적용)`);
 }
 
 // ---------------------------------------------------------------------------
