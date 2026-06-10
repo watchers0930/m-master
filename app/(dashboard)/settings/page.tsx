@@ -50,8 +50,23 @@ export default function SettingsPage() {
   const [forbiddenInput, setForbiddenInput] = useState('');
   const [keywordInput, setKeywordInput] = useState('');
   const [serviceInput, setServiceInput] = useState('');
+  const [ga4Connected, setGa4Connected] = useState(false);
+  const [ga4UpdatedAt, setGa4UpdatedAt] = useState<string | null>(null);
+  const [ga4Disconnecting, setGa4Disconnecting] = useState(false);
 
   useEffect(() => {
+    // GA4 연결 상태 조회
+    fetch('/api/settings/ga4').then(r => r.json()).then((d) => {
+      setGa4Connected(!!d.connected);
+      setGa4UpdatedAt(d.updated_at ?? null);
+    }).catch(() => {});
+    // URL 파라미터로 연결 성공 확인
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('ga4') === 'connected') {
+      setGa4Connected(true);
+      setGa4UpdatedAt(new Date().toISOString());
+      window.history.replaceState({}, '', '/settings');
+    }
     getSettings().then((res) => {
       if (res.data) {
         const bg = res.data.brand_guide;
@@ -141,16 +156,22 @@ export default function SettingsPage() {
         </button>
       </div>
 
-      {/* GA4 분석 키 */}
+      {/* GA4 분석 연동 */}
       <div className="card">
         <div className="card-head">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--c400)" strokeWidth="1.8" strokeLinecap="round">
             <path d="M18 20V10M12 20V4M6 20v-6"/>
           </svg>
-          <span className="card-title">GA4 분석 키</span>
+          <span className="card-title">GA4 분석 연동</span>
           <span style={{ fontSize: 10, color: 'var(--sub)' }}>Google Analytics 4 연동 정보</span>
         </div>
         <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: ga4Connected ? '#22c55e' : '#9ca3af', flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: 'var(--text)' }}>
+              {ga4Connected ? `연결됨${ga4UpdatedAt ? ` (${new Date(ga4UpdatedAt).toLocaleDateString('ko-KR')})` : ''}` : '연결 안됨'}
+            </span>
+          </div>
           <div>
             <label style={labelStyle}>GA4 Property ID</label>
             <input
@@ -161,8 +182,30 @@ export default function SettingsPage() {
             />
             <p style={{ fontSize: 10.5, color: 'var(--sub)', marginTop: 4 }}>GA4 관리 → 속성 설정 → 속성 ID</p>
           </div>
-          <div>
-            <p style={{ fontSize: 11, color: 'var(--sub)' }}>서비스 계정 키는 보안을 위해 서버 환경변수(GA4_SERVICE_ACCOUNT_JSON)로 관리됩니다.</p>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              className="btn btn-primary"
+              style={{ fontSize: 12 }}
+              onClick={() => { window.location.href = '/api/auth/ga4'; }}
+            >
+              {ga4Connected ? 'Google 계정 재연결' : 'Google 계정 연결'}
+            </button>
+            {ga4Connected && (
+              <button
+                className="btn btn-ghost"
+                style={{ fontSize: 12, color: '#dc2626' }}
+                disabled={ga4Disconnecting}
+                onClick={async () => {
+                  setGa4Disconnecting(true);
+                  await fetch('/api/settings/ga4', { method: 'DELETE' });
+                  setGa4Connected(false);
+                  setGa4UpdatedAt(null);
+                  setGa4Disconnecting(false);
+                }}
+              >
+                {ga4Disconnecting ? '해제 중...' : '연결 해제'}
+              </button>
+            )}
           </div>
         </div>
       </div>

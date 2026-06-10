@@ -15,3 +15,4 @@ dist
 !public/**
 .env.test
 tmp-blog-test.js
+naver-cookies.json

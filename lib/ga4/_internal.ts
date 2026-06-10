@@ -6,6 +6,45 @@ let client: BetaAnalyticsDataClient | null = null;
 let clientExp = 0;
 const CLIENT_TTL = 5 * 60 * 1000;
 
+// DB 우선 credential 캐시 (ChannelCredential 테이블)
+let dbCredentialsCache: object | null = null;
+let dbCredentialsLoaded = false;
+
+/** DB에서 GA4 OAuth 정보를 로드하여 모듈 캐시에 저장 */
+export async function ensureDbCredentials(): Promise<void> {
+  if (dbCredentialsLoaded) return;
+  dbCredentialsLoaded = true;
+  try {
+    const { prisma } = await import('@/lib/prisma');
+    const cred = await prisma.channelCredential.findFirst({
+      where: { channel: 'ga4' },
+      select: { refreshToken: true, meta: true },
+    });
+    if (cred?.refreshToken) {
+      const meta = (cred.meta ?? {}) as Record<string, string>;
+      dbCredentialsCache = {
+        type: 'authorized_user',
+        client_id: meta.client_id || process.env.GA4_OAUTH_CLIENT_ID,
+        client_secret: meta.client_secret || process.env.GA4_OAUTH_CLIENT_SECRET,
+        refresh_token: cred.refreshToken,
+      };
+      // 새 credential 반영을 위해 클라이언트 캐시 초기화
+      client = null;
+      clientExp = 0;
+    }
+  } catch (e) {
+    console.warn('[ga4] DB credential load failed:', e);
+  }
+}
+
+/** DB credential 캐시 무효화 (토큰 변경 시 호출) */
+export function invalidateDbCredentials(): void {
+  dbCredentialsLoaded = false;
+  dbCredentialsCache = null;
+  client = null;
+  clientExp = 0;
+}
+
 // GA4 접근 실패 시 빠르게 skip 하기 위한 플래그
 let ga4Disabled = false;
 let ga4DisabledUntil = 0;
@@ -35,6 +74,9 @@ export interface ReportRow {
 }
 
 function loadCredentials(): object | undefined {
+  // 0) DB 캐시 (ensureDbCredentials로 사전 로드됨)
+  if (dbCredentialsCache) return dbCredentialsCache;
+
   // 1) OAuth refresh token → authorized_user 형식 (우선)
   const clientId = process.env.GA4_OAUTH_CLIENT_ID;
   const clientSecret = process.env.GA4_OAUTH_CLIENT_SECRET;
@@ -221,6 +263,9 @@ export function calcDelta(cur: number, prev: number): number {
 }
 
 export async function safe<T>(fn: () => Promise<T>, label: string, fallback: T): Promise<T> {
+  // DB에서 credential 사전 로드
+  await ensureDbCredentials();
+
   // GA4가 비활성 상태면 즉시 fallback 반환
   if (!isGa4Available()) return fallback;
 
