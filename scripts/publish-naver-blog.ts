@@ -202,6 +202,34 @@ async function takeScreenshot(page: Page, name: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// SE 에디터: 자동 저장 복구 팝업 처리
+// ---------------------------------------------------------------------------
+async function dismissDraftRecoveryPopup(page: Page): Promise<void> {
+  const fl = page.frameLocator('iframe[name="mainFrame"]');
+  const popup = fl.locator('.se-popup-alert-confirm.blog-se-alert, [data-name*="se-popup-alert"]').first();
+
+  if (!await popup.isVisible({ timeout: 3000 }).catch(() => false)) return;
+
+  const popupText = await popup.innerText().catch(() => '');
+  console.log(`[팝업] 에디터 알림 감지: ${popupText.replace(/\s+/g, ' ').trim()}`);
+
+  const cancelButton = popup.locator('button:has-text("취소"), a:has-text("취소")').first();
+  if (await cancelButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await cancelButton.click();
+    await page.waitForTimeout(800);
+    console.log('[팝업] 자동 저장 복구 취소 — 새 글 작성 계속');
+    return;
+  }
+
+  const closeButton = popup.locator('button:has-text("닫기"), button:has-text("확인"), a:has-text("확인")').first();
+  if (await closeButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await closeButton.click();
+    await page.waitForTimeout(800);
+    console.log('[팝업] 에디터 알림 닫음');
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 에디터: 제목 입력
 // ---------------------------------------------------------------------------
 async function fillTitle(page: Page, title: string): Promise<void> {
@@ -736,6 +764,7 @@ async function publishOne(
     const fl = page.frameLocator('iframe[name="mainFrame"]');
     await fl.locator('.se-title-text').waitFor({ timeout: 10000 });
     await page.waitForTimeout(1000);
+    await dismissDraftRecoveryPopup(page);
 
     await fillTitle(page, item.topic);
     const { tags } = await fillBody(page, item.textBody, item.bodyImageUrls ?? []);
@@ -763,12 +792,12 @@ async function main(): Promise<void> {
   console.log(`APP_URL: ${APP_URL}`);
 
   // 1) 미발행 콘텐츠 조회
-  const items = await fetchPendingContent();
+  const items = (await fetchPendingContent()).slice(0, 1);
   if (items.length === 0) {
     console.log('발행할 블로그 콘텐츠 없음. 종료.');
     return;
   }
-  console.log(`미발행 콘텐츠 ${items.length}건 조회됨`);
+  console.log(`미발행 콘텐츠 ${items.length}건 조회됨 (실행당 1건 제한)`);
 
   // 2) 브라우저 시작 — storageState 기반 세션 복원
   const hasStateFile = fs.existsSync(STATE_PATH);
