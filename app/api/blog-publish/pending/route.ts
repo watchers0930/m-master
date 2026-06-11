@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
       ownerId: true,
     },
     orderBy: { createdAt: 'asc' },
-    take: 5, // 한 번에 최대 5건
+    take: 1, // 자동 발행은 실행당 1건만 처리
   });
 
   return NextResponse.json({ items });

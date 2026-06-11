@@ -792,12 +792,12 @@ async function main(): Promise<void> {
   console.log(`APP_URL: ${APP_URL}`);
 
   // 1) 미발행 콘텐츠 조회
-  const items = await fetchPendingContent();
+  const items = (await fetchPendingContent()).slice(0, 1);
   if (items.length === 0) {
     console.log('발행할 블로그 콘텐츠 없음. 종료.');
     return;
   }
-  console.log(`미발행 콘텐츠 ${items.length}건 조회됨`);
+  console.log(`미발행 콘텐츠 ${items.length}건 조회됨 (실행당 1건 제한)`);
 
   // 2) 브라우저 시작 — storageState 기반 세션 복원
   const hasStateFile = fs.existsSync(STATE_PATH);
