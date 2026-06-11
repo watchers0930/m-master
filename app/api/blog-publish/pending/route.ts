@@ -7,6 +7,14 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
+function getKstDayBounds(date = new Date()): { start: Date; end: Date; ymd: string } {
+  const kst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  const ymd = kst.toISOString().slice(0, 10);
+  const start = new Date(`${ymd}T00:00:00.000+09:00`);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { start, end, ymd };
+}
+
 function verifyApiKey(req: NextRequest): boolean {
   const key = process.env.BLOG_PUBLISH_API_KEY;
   if (!key) return false;
@@ -16,6 +24,25 @@ function verifyApiKey(req: NextRequest): boolean {
 export async function GET(req: NextRequest) {
   if (!verifyApiKey(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const today = getKstDayBounds();
+  const publishedToday = await prisma.scheduleSlot.findFirst({
+    where: {
+      channel: 'blog',
+      status: 'published',
+      publishedAt: { gte: today.start, lt: today.end },
+    },
+    select: { id: true },
+  });
+
+  if (publishedToday) {
+    return NextResponse.json({
+      items: [],
+      skipped: true,
+      reason: 'daily_blog_publish_limit_reached',
+      date: today.ymd,
+    });
   }
 
   // channel='blog', status='draft' 중 아직 블로그에 발행 안 된 건
