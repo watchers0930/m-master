@@ -313,7 +313,7 @@ async function applyHeadingStyle(page: Page, level: 2 | 3): Promise<boolean> {
 
 // ---------------------------------------------------------------------------
 // SE 에디터: 인라인 서식 적용하며 텍스트 타이핑
-// **bold** → Ctrl+B 토글, *italic* → Ctrl+I 토글
+// **bold** → Ctrl+B + 형광펜, *italic* → Ctrl+I 토글
 // ---------------------------------------------------------------------------
 const MOD_KEY = process.platform === 'darwin' ? 'Meta' : 'Control';
 
@@ -325,12 +325,14 @@ async function typeWithFormatting(page: Page, text: string): Promise<void> {
     if (!part) continue;
 
     if (part.startsWith('**') && part.endsWith('**')) {
-      // 강조 텍스트 — 볼드 + 딥블루 색상
+      // 강조 텍스트 — 볼드 + 딥블루 + 형광펜 배경
       const inner = part.slice(2, -2);
+      await setHighlightColor(page, COLOR_HIGHLIGHT);
       await setTextColor(page, COLOR_ACCENT);
       await page.keyboard.press(`${MOD_KEY}+b`);
       await page.keyboard.type(inner, { delay: 5 });
       await page.keyboard.press(`${MOD_KEY}+b`);
+      await clearHighlightColor(page);
       await setTextColor(page, COLOR_NORMAL);
     } else if (part.startsWith('*') && part.endsWith('*') && part.length > 2) {
       // 이탤릭 텍스트
@@ -390,6 +392,7 @@ const COLOR_ACCENT = '#1a5276';     // 강조(볼드) — 딥블루
 const COLOR_HEADING = '#1b2631';    // 소제목(H2/H3) — 진한 남색
 const COLOR_QUOTE = '#555555';      // 인용문(blockquote) — 회색
 const COLOR_TABLE_HEAD = '#2c3e50'; // 테이블 헤더 — 다크 블루그레이
+const COLOR_HIGHLIGHT = '#fff59d';  // 핵심 포인트 — 옅은 노란 형광펜
 
 /** SE 에디터 iframe 내 execCommand로 폰트 색상 변경 */
 async function setTextColor(page: Page, color: string): Promise<void> {
@@ -401,6 +404,31 @@ async function setTextColor(page: Page, color: string): Promise<void> {
       }, color);
     }
   } catch { /* 색상 변경 실패 시 기본색 유지 — 무시 */ }
+}
+
+/** SE 에디터 iframe 내 execCommand로 형광펜 배경 변경 */
+async function setHighlightColor(page: Page, color: string): Promise<void> {
+  try {
+    const frame = page.frame('mainFrame');
+    if (frame) {
+      await frame.evaluate((c) => {
+        document.execCommand('hiliteColor', false, c);
+        document.execCommand('backColor', false, c);
+      }, color);
+    }
+  } catch { /* 배경색 변경 실패 시 볼드/색상만 유지 */ }
+}
+
+async function clearHighlightColor(page: Page): Promise<void> {
+  try {
+    const frame = page.frame('mainFrame');
+    if (frame) {
+      await frame.evaluate(() => {
+        document.execCommand('hiliteColor', false, 'transparent');
+        document.execCommand('backColor', false, 'transparent');
+      });
+    }
+  } catch { /* 배경색 초기화 실패 시 이후 색상 설정으로 보정 */ }
 }
 
 /** 마크다운 테이블을 SE 에디터에서 볼드 헤더 + 줄바꿈 텍스트로 렌더링 */
