@@ -45,12 +45,13 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // channel='blog', status='draft' 중 아직 블로그에 발행 안 된 건
+  // channel='blog', status='draft' 중 오늘 KST 생성됐고 아직 블로그에 발행 안 된 건
   // (ScheduleSlot에 channel='blog', status='published'가 없는 것)
   const items = await prisma.content.findMany({
     where: {
       channel: 'blog',
       status: 'draft',
+      createdAt: { gte: today.start, lt: today.end },
       scheduleSlots: { none: { channel: 'blog', status: 'published' } },
     },
     select: {
@@ -63,9 +64,9 @@ export async function GET(req: NextRequest) {
       createdAt: true,
       ownerId: true,
     },
-    orderBy: { createdAt: 'asc' },
+    orderBy: { createdAt: 'desc' },
     take: 1, // 자동 발행은 실행당 1건만 처리
   });
 
-  return NextResponse.json({ items });
+  return NextResponse.json({ items, date: today.ymd });
 }
