@@ -205,28 +205,65 @@ async function takeScreenshot(page: Page, name: string): Promise<void> {
 // SE 에디터: 자동 저장 복구 팝업 처리
 // ---------------------------------------------------------------------------
 async function dismissDraftRecoveryPopup(page: Page): Promise<void> {
-  const fl = page.frameLocator('iframe[name="mainFrame"]');
-  const popup = fl.locator('.se-popup-alert-confirm.blog-se-alert, [data-name*="se-popup-alert"]').first();
+  const frame = page.frame('mainFrame');
+  if (!frame) return;
 
-  if (!await popup.isVisible({ timeout: 3000 }).catch(() => false)) return;
+  const hasPopup = await frame
+    .locator('.se-popup-alert-confirm.blog-se-alert, [data-name*="se-popup-alert"], .se-popup-dim')
+    .first()
+    .isVisible({ timeout: 3000 })
+    .catch(() => false);
+  if (!hasPopup) return;
 
-  const popupText = await popup.innerText().catch(() => '');
-  console.log(`[팝업] 에디터 알림 감지: ${popupText.replace(/\s+/g, ' ').trim()}`);
+  const popupText = await frame
+    .locator('.se-popup-alert-confirm.blog-se-alert, [data-name*="se-popup-alert"]')
+    .first()
+    .innerText({ timeout: 1000 })
+    .catch(() => '');
+  console.log(`[팝업] 에디터 알림 감지: ${popupText.replace(/\s+/g, ' ').trim() || '내용 없음'}`);
 
-  const cancelButton = popup.locator('button:has-text("취소"), a:has-text("취소")').first();
-  if (await cancelButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await cancelButton.click();
-    await page.waitForTimeout(800);
-    console.log('[팝업] 자동 저장 복구 취소 — 새 글 작성 계속');
+  const clicked = await frame.evaluate(() => {
+    const popup = document.querySelector(
+      '.se-popup-alert-confirm.blog-se-alert, [data-name*="se-popup-alert"]',
+    );
+    if (!popup) return false;
+
+    const candidates = Array.from(
+      popup.querySelectorAll<HTMLElement>('button, a, [role="button"]'),
+    );
+    const preferred = candidates.find((el) => {
+      const text = (el.textContent ?? '').replace(/\s+/g, '');
+      return text.includes('취소') || text.includes('닫기') || text.includes('확인') || text.includes('새글');
+    });
+    const target = preferred ?? candidates[0];
+    target?.click();
+    return Boolean(target);
+  }).catch(() => false);
+
+  if (!clicked) {
+    await page.keyboard.press('Escape').catch(() => {});
+  }
+
+  await page.waitForTimeout(1000);
+
+  const stillVisible = await frame
+    .locator('.se-popup-dim, .se-popup-alert-confirm.blog-se-alert, [data-name*="se-popup-alert"]')
+    .first()
+    .isVisible({ timeout: 1000 })
+    .catch(() => false);
+
+  if (stillVisible) {
+    await frame.evaluate(() => {
+      document
+        .querySelectorAll('.se-popup-dim, .se-popup-alert-confirm.blog-se-alert, [data-name*="se-popup-alert"]')
+        .forEach((el) => el.remove());
+    }).catch(() => {});
+    await page.waitForTimeout(300);
+    console.log('[팝업] 닫기 실패 레이어 강제 제거');
     return;
   }
 
-  const closeButton = popup.locator('button:has-text("닫기"), button:has-text("확인"), a:has-text("확인")').first();
-  if (await closeButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await closeButton.click();
-    await page.waitForTimeout(800);
-    console.log('[팝업] 에디터 알림 닫음');
-  }
+  console.log('[팝업] 에디터 알림 닫음');
 }
 
 // ---------------------------------------------------------------------------
@@ -234,6 +271,7 @@ async function dismissDraftRecoveryPopup(page: Page): Promise<void> {
 // ---------------------------------------------------------------------------
 async function fillTitle(page: Page, title: string): Promise<void> {
   const fl = page.frameLocator('iframe[name="mainFrame"]');
+  await dismissDraftRecoveryPopup(page);
   await fl.locator('.se-section-documentTitle').click();
   await page.waitForTimeout(500);
   await page.keyboard.type(title, { delay: 30 });
