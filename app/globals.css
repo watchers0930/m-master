@@ -672,3 +672,22 @@ a {
     font-size: 24px;
   }
 }
+
+.landing-footer {
+  padding: 32px 28px;
+  text-align: center;
+  border-top: 1px solid #e5e8ed;
+  color: #8a929e;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.landing-footer .footer-brand {
+  font-weight: 700;
+  color: #4a5568;
+  margin: 0 0 4px;
+}
+
+.landing-footer p {
+  margin: 0;
+}

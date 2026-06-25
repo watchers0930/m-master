@@ -220,6 +220,12 @@ export default function LandingPage() {
           ))}
         </div>
       </section>
+
+      <footer className="landing-footer">
+        <p className="footer-brand">BMI C&amp;S</p>
+        <p>대표이사 김동의 · 사업자등록번호 263-87-03481 · 통신판매신고번호 2025-경기광명-0189</p>
+        <p>서울시 강남구 강남대로 354(역삼동, 혜천빌딩) 1126-5호 · 고객센터 010-8490-9271</p>
+      </footer>
     </main>
   );
 }
