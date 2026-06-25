@@ -280,9 +280,13 @@ export async function GET(request: NextRequest) {
 
     if (monday) {
       const topicsResult = await refreshWeeklyTopicsForUser(today, user.id, ga4Data);
-      const planResult = await createWeeklyPlanForUser(today, user.id);
-      perUser[user.id] = { topics: topicsResult, plan: planResult };
+      perUser[user.id] = { topics: topicsResult };
     }
+
+    // 요일 무관: 이번 주 플랜이 없으면 자동 생성 (월요일 실패 시 복구 보장)
+    const planResult = await createWeeklyPlanForUser(today, user.id);
+    if (!perUser[user.id]) perUser[user.id] = {};
+    perUser[user.id].plan = planResult;
   }
 
   // 4. 오늘 예정된 planned 항목 조회 (모든 유저 대상 — 이미 per-ownerId 스코프)
