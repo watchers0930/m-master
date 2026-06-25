@@ -171,7 +171,6 @@ export default function LandingPage() {
 
       <section className="feature-band">
         <div className="section-head">
-          <p>운영 기능</p>
           <h2>마케터가 매일 반복하는 일을 앱 안에 묶었습니다</h2>
         </div>
         <div className="feature-grid">
@@ -187,7 +186,6 @@ export default function LandingPage() {
 
       <section id="pricing" className="pricing-band">
         <div className="section-head">
-          <p>요금제</p>
           <h2>작게 시작하고, 채널이 늘면 확장하세요</h2>
         </div>
         <div className="pricing-grid">
