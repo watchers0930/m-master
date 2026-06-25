@@ -172,6 +172,7 @@ export default function LandingPage() {
       <section className="feature-band">
         <div className="section-head">
           <h2>마케터가 매일 반복하는 일을 앱 안에 묶었습니다</h2>
+          <p className="section-desc">콘텐츠 기획부터 발행, 성과 분석까지 하나의 흐름으로 연결합니다.<br />채널이 늘어도 운영 방식은 그대로 유지됩니다.</p>
         </div>
         <div className="feature-grid">
           {FEATURES.map((feature) => (
@@ -187,6 +188,7 @@ export default function LandingPage() {
       <section id="pricing" className="pricing-band">
         <div className="section-head">
           <h2>작게 시작하고, 채널이 늘면 확장하세요</h2>
+          <p className="section-desc">무료로 시작해 콘텐츠 효과를 확인하고, 필요한 만큼 확장하세요.<br />언제든지 플랜을 변경할 수 있습니다.</p>
         </div>
         <div className="pricing-grid">
           {PLANS.map((plan) => (

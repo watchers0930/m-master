@@ -430,7 +430,8 @@ a {
 
 .section-head {
   max-width: 640px;
-  margin-bottom: 26px;
+  margin: 0 auto 36px;
+  text-align: center;
 }
 
 .section-head p {
@@ -445,6 +446,13 @@ a {
   line-height: 1.28;
   font-weight: 800;
   word-break: keep-all;
+}
+
+.section-desc {
+  margin: 12px 0 0;
+  font-size: 14px;
+  color: #6b7a8d;
+  line-height: 1.75;
 }
 
 .feature-grid,
