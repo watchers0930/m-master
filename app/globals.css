@@ -452,7 +452,7 @@ a {
   margin: 12px 0 0;
   font-size: 14px;
   font-weight: 400 !important;
-  color: #111;
+  color: #111 !important;
   line-height: 1.5;
 }
 
