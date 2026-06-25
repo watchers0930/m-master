@@ -3,8 +3,8 @@ import './globals.css';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: 'MINTEQ - 마케팅 자동화',
-  description: 'MINTEQ 마케팅 콘텐츠 자동 생성·편성·발행 관리 시스템',
+  title: 'M-MASTER - 마케팅 자동화 앱',
+  description: 'M-MASTER 마케팅 콘텐츠 생성, 예약 발행, 성과 분석 자동화 앱',
 };
 
 export default function RootLayout({

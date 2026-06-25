@@ -1,156 +1,217 @@
 import Link from 'next/link';
 
 const FEATURES = [
-  { title: 'AI 콘텐츠 생성', desc: 'GPT 기반 블로그·SNS 글을 한 번에 생성하고, RAG로 브랜드 톤을 유지합니다.', icon: '✍️' },
-  { title: '멀티채널 자동 발행', desc: '네이버 블로그·카페, 인스타그램, 페이스북에 예약 발행합니다.', icon: '📡' },
-  { title: 'A/B 테스트', desc: '제목·본문 변형을 자동 생성하고 GA4 데이터로 성과를 비교합니다.', icon: '🧪' },
-  { title: '성과 분석', desc: 'GA4 연동으로 조회수·클릭률을 실시간 추적하고 토픽을 추천합니다.', icon: '📊' },
-];
+  {
+    title: '콘텐츠 생성',
+    desc: '브랜드 문서, 최근 성과, 채널별 문체를 반영해 블로그와 SNS 초안을 만듭니다.',
+    icon: 'edit',
+  },
+  {
+    title: '예약 발행',
+    desc: '네이버 블로그와 카페, 인스타그램, 페이스북 발행 일정을 한 화면에서 관리합니다.',
+    icon: 'calendar',
+  },
+  {
+    title: '성과 분석',
+    desc: 'GA4 방문자, 콘텐츠 점수, 전월 대비 변화를 대시보드에서 바로 확인합니다.',
+    icon: 'chart',
+  },
+  {
+    title: '토픽 추천',
+    desc: '시즌 이슈와 검색 흐름을 반영해 다음 콘텐츠 주제를 자동으로 제안합니다.',
+    icon: 'spark',
+  },
+] as const;
 
-const PLANS: readonly { key: string; name: string; price: string; unit: string; content: string; cost: string; channels: string; cta: string; highlight?: boolean }[] = [
-  { key: 'free', name: 'Free', price: '0', unit: '원/월', content: '5건/월', cost: '10,000원', channels: '1개', cta: '무료로 시작' },
-  { key: 'starter', name: 'Starter', price: '29,000', unit: '원/월', content: '30건/월', cost: '100,000원', channels: '3개', cta: '시작하기', highlight: true },
-  { key: 'pro', name: 'Pro', price: '79,000', unit: '원/월', content: '무제한', cost: '500,000원', channels: '무제한', cta: '시작하기' },
-];
+const PIPELINE = [
+  { label: '자료 수집', value: 'RAG 문서 18개' },
+  { label: '초안 생성', value: '블로그 3건 대기' },
+  { label: '예약 편성', value: '6월 14건' },
+  { label: '성과 회수', value: 'GA4 연결됨' },
+] as const;
 
-// 플랜별 기능 비교표 데이터
-const COMPARE_ROWS: readonly { label: string; free: string; starter: string; pro: string }[] = [
-  { label: 'AI 콘텐츠 생성',       free: '5건/월',   starter: '30건/월',   pro: '무제한' },
-  { label: 'AI 비용 한도',         free: '10,000원',  starter: '100,000원', pro: '500,000원' },
-  { label: '발행 채널 수',         free: '1개',       starter: '3개',       pro: '무제한' },
-  { label: '블로그 자동 발행',      free: 'O',        starter: 'O',         pro: 'O' },
-  { label: '네이버 카페 발행',      free: 'O',        starter: 'O',         pro: 'O' },
-  { label: 'GA4 성과 분석',       free: 'O',         starter: 'O',         pro: 'O' },
-  { label: '인스타그램 발행',       free: '-',        starter: 'O',         pro: 'O' },
-  { label: '페이스북 발행',        free: '-',         starter: 'O',         pro: 'O' },
-  { label: '자동 스케줄링 (Cron)',  free: '-',        starter: 'O',         pro: 'O' },
-  { label: 'RAG 문서 기반 생성',   free: '-',         starter: 'O',         pro: 'O' },
-  { label: 'AI 토픽 추천',        free: '-',         starter: 'O',         pro: 'O' },
-  { label: 'A/B 테스트',          free: '-',         starter: '-',         pro: 'O' },
-];
+const PLANS: {
+  name: string;
+  price: string;
+  note: string;
+  cta: string;
+  href: string;
+  featured?: boolean;
+}[] = [
+  { name: 'Free', price: '0', note: '월 5건 생성', cta: '무료 시작', href: '/register?plan=free' },
+  { name: 'Starter', price: '29,000', note: '월 30건 생성, 채널 3개', cta: 'Starter 시작', href: '/register?plan=starter', featured: true },
+  { name: 'Pro', price: '79,000', note: '무제한 생성, A/B 테스트', cta: 'Pro 시작', href: '/register?plan=pro' },
+] as const;
+
+function Icon({ name }: { name: (typeof FEATURES)[number]['icon'] }) {
+  if (name === 'edit') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
+      </svg>
+    );
+  }
+
+  if (name === 'calendar') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="17" rx="2" />
+        <path d="M8 2v4M16 2v4M3 10h18" />
+      </svg>
+    );
+  }
+
+  if (name === 'chart') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 19V5" />
+        <path d="M4 19h17" />
+        <path d="m8 15 3-4 3 2 4-7" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3l1.6 5.2L19 10l-5.4 1.8L12 17l-1.6-5.2L5 10l5.4-1.8Z" />
+      <path d="M19 16l.7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7Z" />
+    </svg>
+  );
+}
 
 export default function LandingPage() {
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: "'Paperozi', 'Noto Sans KR', sans-serif" }}>
-      {/* 네비게이션 */}
-      <nav style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 32px', maxWidth: 1100, margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg,#1E3A6E,#2563EB)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="14" height="14" viewBox="0 0 90 90" fill="none"><path d="M16 66L32 22L45 46L58 22L74 66" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          </div>
-          <span style={{ fontSize: 16, fontWeight: 700, color: '#1E3A6E' }}>MINTEQ</span>
+    <main className="landing">
+      <nav className="landing-nav" aria-label="주요 메뉴">
+        <Link href="/" className="brand">
+          <span className="brand-mark">
+            <svg viewBox="0 0 90 90" aria-hidden="true">
+              <path d="M16 66 32 22l13 24 13-24 16 44" />
+            </svg>
+          </span>
+          <span>M-MASTER</span>
+        </Link>
+        <div className="nav-actions">
+          <Link href="#pricing">요금</Link>
+          <Link href="/login" className="nav-login">로그인</Link>
         </div>
-        <Link href="/login" style={{ fontSize: 13, color: '#475569', textDecoration: 'none', padding: '8px 16px' }}>로그인</Link>
       </nav>
 
-      {/* Hero */}
-      <section style={{ textAlign: 'center', padding: '80px 24px 60px', maxWidth: 700, margin: '0 auto' }}>
-        <h1 style={{ fontSize: 36, fontWeight: 800, color: '#0f172a', lineHeight: 1.3, marginBottom: 16 }}>
-          마케팅 콘텐츠,<br />AI가 만들고 자동으로 발행합니다
-        </h1>
-        <p style={{ fontSize: 15, color: '#64748b', lineHeight: 1.7 }}>
-          블로그, 카페, SNS 콘텐츠를 AI로 생성하고<br />
-          예약 발행부터 성과 분석까지 한 곳에서 관리하세요.
-        </p>
+      <section className="hero">
+        <div className="hero-copy">
+          <p className="eyebrow">Context-aware marketing platform</p>
+          <h1>M-MASTER</h1>
+          <p className="hero-sub">
+            콘텐츠 기획, AI 초안 생성, 예약 발행, 성과 분석을 한 번에 운영하는 마케팅 자동화 앱입니다.
+          </p>
+          <div className="hero-actions">
+            <Link href="/register?plan=starter" className="primary-cta">시작하기</Link>
+            <Link href="/login" className="secondary-cta">데모 보기</Link>
+          </div>
+          <div className="trust-row" aria-label="핵심 지표">
+            <span>블로그</span>
+            <span>네이버 카페</span>
+            <span>Instagram</span>
+            <span>GA4</span>
+          </div>
+        </div>
+
+        <div className="product-shot" aria-label="M-MASTER 대시보드 미리보기">
+          <div className="shot-sidebar">
+            <div className="shot-logo">M</div>
+            <span className="shot-active" />
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="shot-main">
+            <div className="shot-top">
+              <div>
+                <strong>마케팅 운영 대시보드</strong>
+                <span>2026년 6월 캠페인</span>
+              </div>
+              <Link href="/home">열기</Link>
+            </div>
+            <div className="metric-grid">
+              <div>
+                <span>이번달 방문자</span>
+                <strong>24,812</strong>
+              </div>
+              <div>
+                <span>발행 완료</span>
+                <strong>36건</strong>
+              </div>
+              <div>
+                <span>평균 점수</span>
+                <strong>91점</strong>
+              </div>
+            </div>
+            <div className="preview-grid">
+              <div className="calendar-preview">
+                {Array.from({ length: 28 }, (_, index) => (
+                  <span
+                    key={index}
+                    className={index === 9 || index === 15 || index === 22 ? 'has-post' : ''}
+                  />
+                ))}
+              </div>
+              <div className="topic-preview">
+                <p>추천 토픽</p>
+                <strong>여름 성수기 전환 캠페인</strong>
+                <span>검색 상승 + 시즌성 + 기존 성과</span>
+                <div className="score-bar"><i /></div>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
-      {/* 기능 소개 */}
-      <section style={{ maxWidth: 1000, margin: '0 auto', padding: '0 24px 60px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-          {FEATURES.map((f) => (
-            <div key={f.title} style={{ background: '#fff', borderRadius: 12, padding: '28px 24px', border: '1px solid #e2e8f0' }}>
-              <div style={{ fontSize: 28, marginBottom: 12 }}>{f.icon}</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>{f.title}</div>
-              <div style={{ fontSize: 12.5, color: '#64748b', lineHeight: 1.6 }}>{f.desc}</div>
-            </div>
+      <section className="pipeline" aria-label="마케팅 자동화 흐름">
+        {PIPELINE.map((item) => (
+          <div key={item.label}>
+            <span>{item.label}</span>
+            <strong>{item.value}</strong>
+          </div>
+        ))}
+      </section>
+
+      <section className="feature-band">
+        <div className="section-head">
+          <p>운영 기능</p>
+          <h2>마케터가 매일 반복하는 일을 앱 안에 묶었습니다</h2>
+        </div>
+        <div className="feature-grid">
+          {FEATURES.map((feature) => (
+            <article key={feature.title} className="feature-item">
+              <span className="feature-icon"><Icon name={feature.icon} /></span>
+              <h3>{feature.title}</h3>
+              <p>{feature.desc}</p>
+            </article>
           ))}
         </div>
       </section>
 
-      {/* 요금제 */}
-      <section id="pricing" style={{ maxWidth: 1000, margin: '0 auto', padding: '0 24px 80px' }}>
-        <h2 style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', textAlign: 'center', marginBottom: 8 }}>요금제</h2>
-        <p style={{ fontSize: 13, color: '#64748b', textAlign: 'center', marginBottom: 36 }}>필요에 맞는 플랜을 선택하세요</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
-          {PLANS.map((p) => (
-            <div key={p.key} style={{
-              background: '#fff', borderRadius: 14, padding: '32px 28px',
-              border: p.highlight ? '2px solid #2563EB' : '1px solid #e2e8f0',
-              position: 'relative',
-            }}>
-              {p.highlight && (
-                <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: '#2563EB', color: '#fff', fontSize: 11, fontWeight: 600, padding: '3px 14px', borderRadius: 20 }}>추천</div>
-              )}
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>{p.name}</div>
-              <div style={{ margin: '12px 0 20px' }}>
-                <span style={{ fontSize: 32, fontWeight: 800, color: '#2563EB' }}>{p.price}</span>
-                <span style={{ fontSize: 13, color: '#64748b' }}>{p.unit}</span>
+      <section id="pricing" className="pricing-band">
+        <div className="section-head">
+          <p>요금제</p>
+          <h2>작게 시작하고, 채널이 늘면 확장하세요</h2>
+        </div>
+        <div className="pricing-grid">
+          {PLANS.map((plan) => (
+            <article key={plan.name} className={`price-item${plan.featured ? ' featured' : ''}`}>
+              {plan.featured && <span className="plan-badge">추천</span>}
+              <h3>{plan.name}</h3>
+              <div className="price">
+                <strong>{plan.price}</strong>
+                <span>원/월</span>
               </div>
-              <div style={{ fontSize: 12.5, color: '#475569', lineHeight: 2 }}>
-                <div>콘텐츠: <strong>{p.content}</strong></div>
-                <div>AI 비용 한도: <strong>{p.cost}</strong></div>
-                <div>채널: <strong>{p.channels}</strong></div>
-              </div>
-              <Link
-                href={`/register?plan=${p.key}`}
-                style={{
-                  display: 'block', marginTop: 20, width: '100%', padding: '12px 0', borderRadius: 9, border: 'none',
-                  background: p.highlight ? '#2563EB' : '#f1f5f9', color: p.highlight ? '#fff' : '#1e293b',
-                  fontSize: 13, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', textAlign: 'center',
-                  boxSizing: 'border-box',
-                }}
-              >
-                {p.cta}
-              </Link>
-            </div>
+              <p>{plan.note}</p>
+              <Link href={plan.href}>{plan.cta}</Link>
+            </article>
           ))}
         </div>
       </section>
-
-      {/* 플랜 비교표 */}
-      <section style={{ maxWidth: 960, margin: '0 auto', padding: '0 24px 80px' }}>
-        <h3 style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', textAlign: 'center', marginBottom: 28 }}>플랜별 기능 비교</h3>
-        <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 15.5 }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
-                <th style={{ padding: '17px 24px', textAlign: 'left', fontWeight: 600, color: '#475569' }}>기능</th>
-                <th style={{ padding: '17px 20px', textAlign: 'center', fontWeight: 600, color: '#475569', width: 120 }}>Free</th>
-                <th style={{ padding: '17px 20px', textAlign: 'center', fontWeight: 700, color: '#2563EB', width: 120 }}>Starter</th>
-                <th style={{ padding: '17px 20px', textAlign: 'center', fontWeight: 600, color: '#475569', width: 120 }}>Pro</th>
-              </tr>
-            </thead>
-            <tbody>
-              {COMPARE_ROWS.map((row, i) => (
-                <tr key={row.label} style={{ borderBottom: i < COMPARE_ROWS.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                  <td style={{ padding: '14px 24px', color: '#334155' }}>{row.label}</td>
-                  {(['free', 'starter', 'pro'] as const).map((plan) => {
-                    const val = row[plan];
-                    const isCheck = val === 'O';
-                    const isDash = val === '-';
-                    return (
-                      <td key={plan} style={{ padding: '14px 20px', textAlign: 'center' }}>
-                        {isCheck ? (
-                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                        ) : isDash ? (
-                          <span style={{ color: '#cbd5e1', fontSize: 19 }}>—</span>
-                        ) : (
-                          <span style={{ fontSize: 14, fontWeight: 600, color: '#334155' }}>{val}</span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* 푸터 */}
-      <footer style={{ textAlign: 'center', padding: '24px', borderTop: '1px solid #e2e8f0', fontSize: 12, color: '#94a3b8' }}>
-        &copy; 2026 MINTEQ. All rights reserved.
-      </footer>
-    </div>
+    </main>
   );
 }
