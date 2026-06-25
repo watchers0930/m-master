@@ -45,37 +45,45 @@ const PLANS: {
 
 function Icon({ name }: { name: (typeof FEATURES)[number]['icon'] }) {
   if (name === 'edit') {
+    // PenLine — 콘텐츠 생성
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M12 20h9" />
-        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
+        <path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 19.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z" />
       </svg>
     );
   }
 
   if (name === 'calendar') {
+    // CalendarCheck — 예약 발행
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <rect x="3" y="4" width="18" height="17" rx="2" />
-        <path d="M8 2v4M16 2v4M3 10h18" />
+        <path d="M8 2v4M16 2v4" />
+        <rect x="3" y="4" width="18" height="18" rx="2" />
+        <path d="M3 10h18" />
+        <path d="m9 16 2 2 4-4" />
       </svg>
     );
   }
 
   if (name === 'chart') {
+    // BarChart2 — 성과 분석
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M4 19V5" />
-        <path d="M4 19h17" />
-        <path d="m8 15 3-4 3 2 4-7" />
+        <line x1="18" y1="20" x2="18" y2="10" />
+        <line x1="12" y1="20" x2="12" y2="4" />
+        <line x1="6" y1="20" x2="6" y2="14" />
+        <line x1="2" y1="20" x2="22" y2="20" />
       </svg>
     );
   }
 
+  // Lightbulb — 토픽 추천
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 3l1.6 5.2L19 10l-5.4 1.8L12 17l-1.6-5.2L5 10l5.4-1.8Z" />
-      <path d="M19 16l.7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7Z" />
+      <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
+      <path d="M9 18h6" />
+      <path d="M10 22h4" />
     </svg>
   );
 }
