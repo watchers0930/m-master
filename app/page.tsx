@@ -23,12 +23,6 @@ const FEATURES = [
   },
 ] as const;
 
-const PIPELINE = [
-  { label: '자료 수집', value: 'RAG 문서 18개' },
-  { label: '초안 생성', value: '블로그 3건 대기' },
-  { label: '예약 편성', value: '6월 14건' },
-  { label: '성과 회수', value: 'GA4 연결됨' },
-] as const;
 
 const PLANS: {
   name: string;
@@ -173,15 +167,6 @@ export default function LandingPage() {
             </div>
           </div>
         </div>
-      </section>
-
-      <section className="pipeline" aria-label="마케팅 자동화 흐름">
-        {PIPELINE.map((item) => (
-          <div key={item.label}>
-            <span>{item.label}</span>
-            <strong>{item.value}</strong>
-          </div>
-        ))}
       </section>
 
       <section className="feature-band">
