@@ -88,15 +88,15 @@ a {
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: #526173;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 400;
 }
 
 .nav-actions a {
-  padding: 9px 12px;
-  border-radius: 7px;
+  padding: 6px 10px;
+  border-radius: 6px;
 }
 
 .nav-actions a:hover {
