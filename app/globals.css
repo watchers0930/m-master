@@ -451,8 +451,8 @@ a {
 .section-desc {
   margin: 12px 0 0;
   font-size: 14px;
-  font-weight: 400;
-  color: #6b7a8d;
+  font-weight: 400 !important;
+  color: #111;
   line-height: 1.5;
 }
 
