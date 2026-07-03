@@ -38,7 +38,7 @@ function EmojiImg({ emoji, size = 18 }: { emoji: string; size?: number }) {
       src={twemojiUrl(emoji)}
       alt={emoji}
       width={size} height={size}
-      style={{ display: 'block', imageRendering: 'auto' }}
+      style={{ display: 'block', flexShrink: 0, width: size, height: size }}
       onError={(e) => {
         const t = e.currentTarget;
         const fb = twemojiUrlNoVS(emoji);
@@ -244,7 +244,7 @@ export function EditorToolbar({ onExecCommand, onInsertImage, onInsertHtml }: Pr
         <button
           title="이모지"
           onMouseDown={(e) => { e.preventDefault(); setShowEmoji(v => !v); setShowColors(false); setShowBg(false); setShowSizes(false); setShowTable(false); }}
-          style={{ width: 30, height: 30, border: '1px solid #e2e8f0', borderRadius: 6, background: '#fff', cursor: 'pointer' }}
+          style={{ width: 30, height: 30, border: '1px solid #e2e8f0', borderRadius: 6, background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
         ><EmojiImg emoji="😊" /></button>
         {showEmoji && (
           <div style={{ position: 'absolute', top: 34, right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 10, zIndex: 20, boxShadow: '0 4px 16px rgba(0,0,0,.12)', width: 240 }}>
