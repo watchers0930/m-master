@@ -127,49 +127,56 @@ export function EditorWorkspace({ doc }: Props) {
           </div>
         </div>
 
-        {/* 발행 예약 */}
+        {/* 발행 예정일 */}
         <div style={{ background: '#fff', border: '1px solid #e4ebf5', borderRadius: 14, overflow: 'hidden' }}>
-          <div style={{ padding: '13px 16px', borderBottom: '1px solid #e4ebf5', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>발행 예약</div>
+          <div style={{ padding: '13px 16px', borderBottom: '1px solid #e4ebf5', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>발행 예정일</div>
           <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
             {!doc?.id && (
-              <p style={{ fontSize: 12, color: '#64748b' }}>문서를 먼저 저장하면 예약할 수 있습니다.</p>
+              <p style={{ fontSize: 12, color: '#94a3b8' }}>문서를 저장하면 예정일을 등록할 수 있습니다.</p>
             )}
             {doc?.id && (
               <>
                 {job ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: jobStatusColor, display: 'inline-block' }} />
-                      <span style={{ fontSize: 12, fontWeight: 700, color: jobStatusColor }}>{STATUS_LABELS[job.status]}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: jobStatusColor, display: 'inline-block' }} />
+                        <span style={{ fontSize: 12, fontWeight: 700, color: jobStatusColor }}>{STATUS_LABELS[job.status]}</span>
+                      </div>
+                      {job.status === 'pending' && (
+                        <button onClick={handleCancelSchedule}
+                          style={{ fontSize: 11, color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+                          취소
+                        </button>
+                      )}
                     </div>
-                    <div style={{ fontSize: 12, color: '#64748b' }}>
-                      {job.scheduledAt ? new Date(job.scheduledAt).toLocaleString('ko-KR') : '-'}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 10px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                      <span style={{ fontSize: 14 }}>📅</span>
+                      <span style={{ fontSize: 12, color: '#334155', fontWeight: 600 }}>
+                        {job.scheduledAt ? new Date(job.scheduledAt).toLocaleString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                      </span>
                     </div>
                     {job.status === 'done' && job.externalUrl && (
                       <a href={job.externalUrl} target="_blank" rel="noopener noreferrer"
-                        style={{ fontSize: 12, color: '#2563eb', textDecoration: 'underline' }}>발행된 글 보기</a>
+                        style={{ fontSize: 12, color: '#2563eb', textDecoration: 'underline' }}>발행된 글 보기 →</a>
                     )}
                     {job.status === 'failed' && job.error && (
-                      <div style={{ fontSize: 11, color: '#ef4444' }}>{job.error}</div>
-                    )}
-                    {(job.status === 'pending') && (
-                      <button onClick={handleCancelSchedule} style={{ padding: '6px 12px', background: '#fff', border: '1px solid #fecaca', borderRadius: 8, fontSize: 12, color: '#b91c1c', cursor: 'pointer' }}>
-                        예약 취소
-                      </button>
+                      <div style={{ fontSize: 11, color: '#ef4444', padding: '6px 10px', background: '#fef2f2', borderRadius: 6 }}>{job.error}</div>
                     )}
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>날짜 · 시간 선택</label>
                     <input
                       type="datetime-local"
                       value={scheduledAt}
                       min={new Date().toISOString().slice(0, 16)}
                       onChange={e => setScheduledAt(e.target.value)}
-                      style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: '7px 10px', fontSize: 12 }}
+                      style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: '7px 10px', fontSize: 12, outline: 'none' }}
                     />
                     <button onClick={handleSchedule} disabled={!scheduledAt}
-                      style={{ padding: '8px', background: scheduledAt ? '#2563eb' : '#e2e8f0', color: scheduledAt ? '#fff' : '#94a3b8', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: scheduledAt ? 'pointer' : 'not-allowed' }}>
-                      예약 등록 → 월간일정 반영
+                      style={{ padding: '9px', background: scheduledAt ? '#2563eb' : '#e2e8f0', color: scheduledAt ? '#fff' : '#94a3b8', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: scheduledAt ? 'pointer' : 'not-allowed' }}>
+                      📅 월간일정에 등록
                     </button>
                   </div>
                 )}
