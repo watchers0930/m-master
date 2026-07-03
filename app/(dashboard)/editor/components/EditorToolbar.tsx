@@ -15,6 +15,10 @@ const EMOJI_GROUPS = [
 
 const TABLE_MAX = 6;
 
+// Mac에서 이모지가 흑백 텍스트로 렌더링되는 것을 방지 (VS16 = emoji presentation selector)
+const fe0f = '️';
+const em = (s: string) => (s.endsWith(fe0f) ? s : s + fe0f);
+
 interface Props {
   onExecCommand: (cmd: string, value?: string) => void;
   onInsertImage: () => void;
@@ -212,7 +216,7 @@ export function EditorToolbar({ onExecCommand, onInsertImage, onInsertHtml }: Pr
           title="이모지"
           onMouseDown={(e) => { e.preventDefault(); setShowEmoji(v => !v); setShowColors(false); setShowBg(false); setShowSizes(false); setShowTable(false); }}
           style={{ width: 30, height: 30, border: '1px solid #e2e8f0', borderRadius: 6, background: '#fff', cursor: 'pointer' }}
-        ><span className="editor-emoji">😊</span></button>
+        ><span className="editor-emoji">{em('😊')}</span></button>
         {showEmoji && (
           <div style={{ position: 'absolute', top: 34, right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 10, zIndex: 20, boxShadow: '0 4px 16px rgba(0,0,0,.12)', width: 240 }}>
             {/* 탭 */}
@@ -235,7 +239,7 @@ export function EditorToolbar({ onExecCommand, onInsertImage, onInsertHtml }: Pr
                   onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <span className="editor-emoji">{emoji}</span>
+                  <span className="editor-emoji">{em(emoji)}</span>
                 </button>
               ))}
             </div>
