@@ -218,18 +218,38 @@ export function RichEditor({ value, onChange, placeholder = '내용을 입력하
       return;
     }
 
-    // 일반 클릭: 이미 단독 선택된 셀이면 편집 모드(선택 해제), 아니면 선택
-    if (selectedRef.current.length === 1 && td.hasAttribute('data-sel')) {
+    // 이미 선택된 셀을 다시 클릭 → 편집 모드(선택 해제)
+    if (td.hasAttribute('data-sel')) {
       clearSelection();
-    } else {
-      applySelection([td]);
-      anchorRef.current = td;
+      return;
     }
+
+    // 선택이 있는 상태에서 다른 셀 클릭 → 범위 선택 확장
+    if (selectedRef.current.length > 0 && anchorRef.current) {
+      const table = td.closest('table') as HTMLTableElement | null;
+      const anchorTable = anchorRef.current.closest('table') as HTMLTableElement | null;
+      if (table && table === anchorTable) {
+        applySelection(getCellsInRange(table, anchorRef.current, td));
+      } else {
+        applySelection([td]);
+        anchorRef.current = td;
+      }
+      return;
+    }
+
+    // 처음 선택
+    applySelection([td]);
+    anchorRef.current = td;
   };
 
   const doMerge = () => {
     const ok = mergeCells(selectedRef.current);
-    if (ok) { clearSelection(); notifyChange(); }
+    if (ok) {
+      clearSelection();
+      notifyChange();
+    } else {
+      alert('직사각형 범위의 셀만 병합할 수 있습니다.\n예: 2×2, 2×3 등 직사각형 형태로 선택해 주세요.');
+    }
   };
 
   const doSplit = () => {
