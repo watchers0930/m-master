@@ -35,10 +35,16 @@ export function RichEditor({ value, onChange, placeholder = '내용을 입력하
   const imageInputRef = useRef<HTMLInputElement>(null);
   const isComposing = useRef(false);
   const resizeRef = useRef<ResizeState | null>(null);
+  const imgDragRef = useRef<{
+    img: HTMLImageElement; handle: string;
+    startX: number; startY: number; startW: number; startH: number;
+  } | null>(null);
   const selectedRef = useRef<HTMLTableCellElement[]>([]);
   const anchorRef = useRef<HTMLTableCellElement | null>(null);
 
   const [toolbar, setToolbar] = useState<CellToolbar | null>(null);
+  const [selectedImg, setSelectedImg] = useState<HTMLImageElement | null>(null);
+  const [imgRect, setImgRect] = useState<DOMRect | null>(null);
 
   useEffect(() => {
     const el = editorRef.current;
@@ -52,27 +58,44 @@ export function RichEditor({ value, onChange, placeholder = '내용을 입력하
     onChange(raw.replace(/ data-sel="true"/g, ''));
   }, [onChange]);
 
-  // document-level 리사이즈 이벤트
+  // document-level 리사이즈 이벤트 (테이블 셀 + 이미지)
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       const r = resizeRef.current;
-      if (!r) return;
-      if (r.kind === 'table') {
-        const w = Math.max(100, r.startW + e.clientX - r.startX);
-        r.el.style.width = `${w}px`;
-      } else {
-        if (r.dir === 'col') {
-          const w = Math.max(40, r.startW + e.clientX - r.startX);
+      if (r) {
+        if (r.kind === 'table') {
+          const w = Math.max(100, r.startW + e.clientX - r.startX);
           r.el.style.width = `${w}px`;
-          r.el.style.minWidth = `${w}px`;
         } else {
-          const h = Math.max(24, r.startH + e.clientY - r.startY);
-          r.el.style.height = `${h}px`;
+          if (r.dir === 'col') {
+            const w = Math.max(40, r.startW + e.clientX - r.startX);
+            r.el.style.width = `${w}px`;
+            r.el.style.minWidth = `${w}px`;
+          } else {
+            const h = Math.max(24, r.startH + e.clientY - r.startY);
+            r.el.style.height = `${h}px`;
+          }
         }
+      }
+      const d = imgDragRef.current;
+      if (d) {
+        const dx = e.clientX - d.startX;
+        const dy = e.clientY - d.startY;
+        const h = d.handle;
+        let newW = d.startW, newH = d.startH;
+        if (h === 'e' || h === 'ne' || h === 'se') newW = Math.max(50, d.startW + dx);
+        if (h === 'w' || h === 'nw' || h === 'sw') newW = Math.max(50, d.startW - dx);
+        if (h === 's' || h === 'se' || h === 'sw') newH = Math.max(50, d.startH + dy);
+        if (h === 'n' || h === 'ne' || h === 'nw') newH = Math.max(50, d.startH - dy);
+        d.img.style.width = `${newW}px`;
+        d.img.style.height = `${newH}px`;
+        d.img.style.maxWidth = 'none';
+        setImgRect(d.img.getBoundingClientRect());
       }
     };
     const onUp = () => {
       if (resizeRef.current) { resizeRef.current = null; notifyChange(); }
+      if (imgDragRef.current) { imgDragRef.current = null; notifyChange(); }
     };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
@@ -81,6 +104,14 @@ export function RichEditor({ value, onChange, placeholder = '내용을 입력하
       document.removeEventListener('mouseup', onUp);
     };
   }, [notifyChange]);
+
+  // 스크롤 시 이미지 선택 오버레이 위치 갱신
+  useEffect(() => {
+    if (!selectedImg) return;
+    const update = () => setImgRect(selectedImg.getBoundingClientRect());
+    window.addEventListener('scroll', update, true);
+    return () => window.removeEventListener('scroll', update, true);
+  }, [selectedImg]);
 
   const handleInput = () => {
     if (isComposing.current) return;
@@ -196,6 +227,17 @@ export function RichEditor({ value, onChange, placeholder = '내용을 입력하
   };
 
   const handleClick = (e: React.MouseEvent) => {
+    // 이미지 클릭 → 리사이즈 선택
+    const img = (e.target as Element).closest('img') as HTMLImageElement | null;
+    if (img) {
+      e.preventDefault();
+      setSelectedImg(img);
+      setImgRect(img.getBoundingClientRect());
+      clearSelection();
+      return;
+    }
+    if (selectedImg) { setSelectedImg(null); setImgRect(null); }
+
     const td = (e.target as Element).closest('td,th') as HTMLTableCellElement | null;
     if (!td) { clearSelection(); return; }
 
@@ -275,6 +317,41 @@ export function RichEditor({ value, onChange, placeholder = '내용을 입력하
         style={{ minHeight: 440, padding: 20, fontSize: 15, lineHeight: 1.7, outline: 'none', color: '#1e293b', borderRadius: '0 0 12px 12px', overflow: 'hidden' }}
       />
       <input ref={imageInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageFile} />
+
+      {/* 이미지 리사이즈 오버레이 */}
+      {selectedImg && imgRect && (
+        <div style={{ position: 'fixed', top: imgRect.top - 1, left: imgRect.left - 1, width: imgRect.width + 2, height: imgRect.height + 2, border: '2px solid #2563eb', pointerEvents: 'none', zIndex: 9997, boxSizing: 'border-box' }}>
+          {([
+            { id: 'nw', s: { top: -5,  left: -5,  cursor: 'nw-resize' } as React.CSSProperties },
+            { id: 'n',  s: { top: -5,  left: '50%', transform: 'translateX(-50%)', cursor: 'n-resize' } as React.CSSProperties },
+            { id: 'ne', s: { top: -5,  right: -5, cursor: 'ne-resize' } as React.CSSProperties },
+            { id: 'e',  s: { top: '50%', right: -5, transform: 'translateY(-50%)', cursor: 'e-resize' } as React.CSSProperties },
+            { id: 'se', s: { bottom: -5, right: -5, cursor: 'se-resize' } as React.CSSProperties },
+            { id: 's',  s: { bottom: -5, left: '50%', transform: 'translateX(-50%)', cursor: 's-resize' } as React.CSSProperties },
+            { id: 'sw', s: { bottom: -5, left: -5,  cursor: 'sw-resize' } as React.CSSProperties },
+            { id: 'w',  s: { top: '50%', left: -5,  transform: 'translateY(-50%)', cursor: 'w-resize' } as React.CSSProperties },
+          ] as { id: string; s: React.CSSProperties }[]).map(({ id, s }) => (
+            <div
+              key={id}
+              onMouseDown={e => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!selectedImg) return;
+                imgDragRef.current = {
+                  img: selectedImg, handle: id,
+                  startX: e.clientX, startY: e.clientY,
+                  startW: selectedImg.offsetWidth, startH: selectedImg.offsetHeight,
+                };
+              }}
+              style={{ position: 'absolute', width: 8, height: 8, background: '#fff', border: '1.5px solid #2563eb', borderRadius: 2, pointerEvents: 'auto', ...s }}
+            />
+          ))}
+          {/* 크기 표시 */}
+          <div style={{ position: 'absolute', bottom: -22, left: '50%', transform: 'translateX(-50%)', background: '#1e293b', color: '#fff', fontSize: 10, padding: '2px 6px', borderRadius: 4, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
+            {Math.round(imgRect.width)} × {Math.round(imgRect.height)}
+          </div>
+        </div>
+      )}
 
       {/* 셀 조작 툴바 */}
       {toolbar && (
