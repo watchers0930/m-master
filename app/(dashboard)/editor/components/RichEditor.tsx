@@ -10,14 +10,9 @@ interface Props {
   placeholder?: string;
 }
 
-interface ResizeState {
-  td: HTMLTableCellElement;
-  startX: number;
-  startY: number;
-  startW: number;
-  startH: number;
-  dir: 'col' | 'row';
-}
+type ResizeState =
+  | { kind: 'cell'; el: HTMLTableCellElement; startX: number; startY: number; startW: number; startH: number; dir: 'col' | 'row' }
+  | { kind: 'table'; el: HTMLTableElement; startX: number; startW: number };
 
 interface CellToolbar {
   fx: number; // fixed viewport X
@@ -62,13 +57,18 @@ export function RichEditor({ value, onChange, placeholder = '내용을 입력하
     const onMove = (e: MouseEvent) => {
       const r = resizeRef.current;
       if (!r) return;
-      if (r.dir === 'col') {
-        const w = Math.max(40, r.startW + e.clientX - r.startX);
-        r.td.style.width = `${w}px`;
-        r.td.style.minWidth = `${w}px`;
+      if (r.kind === 'table') {
+        const w = Math.max(100, r.startW + e.clientX - r.startX);
+        r.el.style.width = `${w}px`;
       } else {
-        const h = Math.max(24, r.startH + e.clientY - r.startY);
-        r.td.style.height = `${h}px`;
+        if (r.dir === 'col') {
+          const w = Math.max(40, r.startW + e.clientX - r.startX);
+          r.el.style.width = `${w}px`;
+          r.el.style.minWidth = `${w}px`;
+        } else {
+          const h = Math.max(24, r.startH + e.clientY - r.startY);
+          r.el.style.height = `${h}px`;
+        }
       }
     };
     const onUp = () => {
@@ -155,18 +155,43 @@ export function RichEditor({ value, onChange, placeholder = '내용을 입력하
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (resizeRef.current) return;
+    // 테이블 오른쪽 border 우선 감지
+    const table = (e.target as Element).closest('table') as HTMLTableElement | null;
+    if (table) {
+      const rect = table.getBoundingClientRect();
+      if (Math.abs(e.clientX - rect.right) < BORDER_HIT) {
+        if (editorRef.current) editorRef.current.style.cursor = 'ew-resize';
+        return;
+      }
+    }
+    // 셀 border 감지
     const td = (e.target as Element).closest('td,th') as HTMLTableCellElement | null;
-    const cursor = td ? (getResizeDir(e.clientX, e.clientY, td) === 'col' ? 'col-resize' : getResizeDir(e.clientX, e.clientY, td) === 'row' ? 'row-resize' : '') : '';
-    if (editorRef.current) editorRef.current.style.cursor = cursor;
+    if (td) {
+      const dir = getResizeDir(e.clientX, e.clientY, td);
+      if (editorRef.current) editorRef.current.style.cursor = dir === 'col' ? 'col-resize' : dir === 'row' ? 'row-resize' : '';
+      return;
+    }
+    if (editorRef.current) editorRef.current.style.cursor = '';
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    // 테이블 오른쪽 border 우선
+    const table = (e.target as Element).closest('table') as HTMLTableElement | null;
+    if (table) {
+      const rect = table.getBoundingClientRect();
+      if (Math.abs(e.clientX - rect.right) < BORDER_HIT) {
+        e.preventDefault();
+        resizeRef.current = { kind: 'table', el: table, startX: e.clientX, startW: table.offsetWidth };
+        return;
+      }
+    }
+    // 셀 border
     const td = (e.target as Element).closest('td,th') as HTMLTableCellElement | null;
     if (!td) return;
     const dir = getResizeDir(e.clientX, e.clientY, td);
     if (dir) {
       e.preventDefault();
-      resizeRef.current = { td, startX: e.clientX, startY: e.clientY, startW: td.offsetWidth, startH: td.offsetHeight, dir };
+      resizeRef.current = { kind: 'cell', el: td, startX: e.clientX, startY: e.clientY, startW: td.offsetWidth, startH: td.offsetHeight, dir };
     }
   };
 
@@ -256,7 +281,7 @@ export function RichEditor({ value, onChange, placeholder = '내용을 입력하
         [contenteditable]:empty:before{content:attr(data-placeholder);color:#94a3b8;pointer-events:none}
         [contenteditable] img{max-width:100%;height:auto}
         [contenteditable] a{color:#2563eb;text-decoration:underline}
-        [contenteditable] table{border-collapse:collapse;width:100%;margin:8px 0}
+        [contenteditable] table{border-collapse:collapse;margin:8px 0}
         [contenteditable] td,[contenteditable] th{border:1px solid #cbd5e1;padding:6px 10px;min-width:40px;vertical-align:top;position:relative}
         [contenteditable] th{background:#f8fafc;font-weight:700}
         [contenteditable] td[data-sel],[contenteditable] th[data-sel]{outline:2px solid #2563eb;outline-offset:-2px;background:#dbeafe !important}

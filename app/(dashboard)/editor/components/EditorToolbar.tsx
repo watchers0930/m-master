@@ -231,10 +231,12 @@ export function EditorToolbar({ onExecCommand, onInsertImage, onInsertHtml }: Pr
               {EMOJI_GROUPS[emojiTab].items.map(emoji => (
                 <button key={emoji}
                   onMouseDown={(e) => { e.preventDefault(); onInsertHtml(emoji); setShowEmoji(false); }}
-                  style={{ width: 30, height: 30, border: '1px solid transparent', borderRadius: 6, background: 'transparent', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                  style={{ width: 30, height: 30, border: '1px solid transparent', borderRadius: 6, background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                >{emoji}</button>
+                >
+                  <span style={{ fontSize: 18, lineHeight: 1, fontFamily: 'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif', color: 'initial' }}>{emoji}</span>
+                </button>
               ))}
             </div>
           </div>
