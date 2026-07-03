@@ -15,9 +15,38 @@ const EMOJI_GROUPS = [
 
 const TABLE_MAX = 6;
 
-// Mac에서 이모지가 흑백 텍스트로 렌더링되는 것을 방지 (VS16 = emoji presentation selector)
-const fe0f = '️';
-const em = (s: string) => (s.endsWith(fe0f) ? s : s + fe0f);
+// Twemoji CDN 이미지 URL — 폰트 의존 없이 이모지를 이미지로 표시
+function twemojiUrl(emoji: string): string {
+  const cps: string[] = [];
+  for (const char of emoji) {
+    const cp = char.codePointAt(0);
+    if (cp !== undefined) cps.push(cp.toString(16));
+  }
+  return `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${cps.join('-')}.svg`;
+}
+function twemojiUrlNoVS(emoji: string): string {
+  const cps: string[] = [];
+  for (const char of emoji) {
+    const cp = char.codePointAt(0);
+    if (cp !== undefined && cp !== 0xfe0f) cps.push(cp.toString(16));
+  }
+  return `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/${cps.join('-')}.svg`;
+}
+function EmojiImg({ emoji, size = 18 }: { emoji: string; size?: number }) {
+  return (
+    <img
+      src={twemojiUrl(emoji)}
+      alt={emoji}
+      width={size} height={size}
+      style={{ display: 'block', imageRendering: 'auto' }}
+      onError={(e) => {
+        const t = e.currentTarget;
+        const fb = twemojiUrlNoVS(emoji);
+        if (t.src !== fb) t.src = fb;
+      }}
+    />
+  );
+}
 
 interface Props {
   onExecCommand: (cmd: string, value?: string) => void;
@@ -216,7 +245,7 @@ export function EditorToolbar({ onExecCommand, onInsertImage, onInsertHtml }: Pr
           title="이모지"
           onMouseDown={(e) => { e.preventDefault(); setShowEmoji(v => !v); setShowColors(false); setShowBg(false); setShowSizes(false); setShowTable(false); }}
           style={{ width: 30, height: 30, border: '1px solid #e2e8f0', borderRadius: 6, background: '#fff', cursor: 'pointer' }}
-        ><span className="editor-emoji">{em('😊')}</span></button>
+        ><EmojiImg emoji="😊" /></button>
         {showEmoji && (
           <div style={{ position: 'absolute', top: 34, right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 10, zIndex: 20, boxShadow: '0 4px 16px rgba(0,0,0,.12)', width: 240 }}>
             {/* 탭 */}
@@ -239,7 +268,7 @@ export function EditorToolbar({ onExecCommand, onInsertImage, onInsertHtml }: Pr
                   onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <span className="editor-emoji">{em(emoji)}</span>
+                  <EmojiImg emoji={emoji} />
                 </button>
               ))}
             </div>
