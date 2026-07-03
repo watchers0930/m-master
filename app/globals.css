@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* 이모지 전용 — Paperozi 웹폰트 override */
+.editor-emoji {
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Noto Emoji', serif !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+  font-style: normal !important;
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }

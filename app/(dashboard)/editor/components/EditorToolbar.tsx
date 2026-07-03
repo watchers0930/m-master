@@ -211,8 +211,8 @@ export function EditorToolbar({ onExecCommand, onInsertImage, onInsertHtml }: Pr
         <button
           title="이모지"
           onMouseDown={(e) => { e.preventDefault(); setShowEmoji(v => !v); setShowColors(false); setShowBg(false); setShowSizes(false); setShowTable(false); }}
-          style={{ width: 30, height: 30, border: '1px solid #e2e8f0', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 16 }}
-        >😊</button>
+          style={{ width: 30, height: 30, border: '1px solid #e2e8f0', borderRadius: 6, background: '#fff', cursor: 'pointer' }}
+        ><span className="editor-emoji">😊</span></button>
         {showEmoji && (
           <div style={{ position: 'absolute', top: 34, right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 10, zIndex: 20, boxShadow: '0 4px 16px rgba(0,0,0,.12)', width: 240 }}>
             {/* 탭 */}
@@ -235,7 +235,7 @@ export function EditorToolbar({ onExecCommand, onInsertImage, onInsertHtml }: Pr
                   onMouseEnter={e => (e.currentTarget.style.background = '#f1f5f9')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <span style={{ fontSize: 18, lineHeight: 1, fontFamily: 'Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif', color: 'initial' }}>{emoji}</span>
+                  <span className="editor-emoji">{emoji}</span>
                 </button>
               ))}
             </div>
