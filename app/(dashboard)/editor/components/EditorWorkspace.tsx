@@ -79,38 +79,35 @@ export function EditorWorkspace({ doc }: Props) {
   const jobStatusColor = job ? ({ pending: '#2563eb', processing: '#f97316', done: '#16a34a', failed: '#ef4444' }[job.status] ?? '#64748b') : '';
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 300px', gap: 20, alignItems: 'stretch' }}>
-      {/* 에디터 메인 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <input
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder="문서 제목"
-            style={{ flex: 1, fontSize: 20, fontWeight: 400, border: 'none', borderBottom: '2px solid #e2e8f0', padding: '8px 0', outline: 'none', background: 'transparent', color: '#0f172a' }}
-          />
-        </div>
-
-        <RichEditor value={body} onChange={handleBody} />
-
-        {error && (
-          <div style={{ padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, fontSize: 13, color: '#b91c1c' }}>
-            {error}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          {doc?.id && (
-            <button onClick={handleDelete} style={{ padding: '9px 16px', background: '#fff', border: '1px solid #fecaca', borderRadius: 10, fontSize: 13, color: '#b91c1c', cursor: 'pointer', fontWeight: 600 }}>
-              삭제
-            </button>
-          )}
-          <button onClick={handleSave} disabled={saving}
-            style={{ padding: '9px 20px', background: saving ? '#93c5fd' : '#2563eb', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer' }}>
-            {saving ? '저장 중...' : doc?.id ? '저장' : '문서 생성'}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* 제목 + 저장 버튼 행 */}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <input
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="문서 제목"
+          style={{ flex: 1, fontSize: 20, fontWeight: 400, border: 'none', borderBottom: '2px solid #e2e8f0', padding: '8px 0', outline: 'none', background: 'transparent', color: '#0f172a' }}
+        />
+        {doc?.id && (
+          <button onClick={handleDelete} style={{ padding: '9px 16px', background: '#fff', border: '1px solid #fecaca', borderRadius: 10, fontSize: 13, color: '#b91c1c', cursor: 'pointer', fontWeight: 600 }}>
+            삭제
           </button>
-        </div>
+        )}
+        <button onClick={handleSave} disabled={saving}
+          style={{ padding: '9px 20px', background: saving ? '#93c5fd' : '#2563eb', color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer' }}>
+          {saving ? '저장 중...' : doc?.id ? '저장' : '문서 생성'}
+        </button>
       </div>
+
+      {error && (
+        <div style={{ padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, fontSize: 13, color: '#b91c1c' }}>
+          {error}
+        </div>
+      )}
+
+      {/* RichEditor + 우측 레일 — 동일 행으로 높이 맞춤 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 300px', gap: 20, alignItems: 'stretch' }}>
+        <RichEditor value={body} onChange={handleBody} />
 
       {/* 우측 레일 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, position: 'sticky', top: 16, height: '100%' }}>
@@ -195,13 +192,7 @@ export function EditorWorkspace({ doc }: Props) {
           </div>
         </div>
       </div>
-
-      {/* 반응형 */}
-      <style>{`
-        @media(max-width:1100px){
-          .editor-grid{grid-template-columns:1fr !important}
-        }
-      `}</style>
+      </div>
     </div>
   );
 }
