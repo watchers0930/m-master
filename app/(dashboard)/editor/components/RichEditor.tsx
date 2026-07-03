@@ -41,6 +41,12 @@ export function RichEditor({ value, onChange, placeholder = '내용을 입력하
 
   const insertImage = () => imageInputRef.current?.click();
 
+  const insertHtml = (html: string) => {
+    editorRef.current?.focus();
+    document.execCommand('insertHTML', false, html);
+    onChange(editorRef.current?.innerHTML ?? '');
+  };
+
   const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -57,7 +63,7 @@ export function RichEditor({ value, onChange, placeholder = '내용을 입력하
 
   return (
     <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
-      <EditorToolbar onExecCommand={execCommand} onInsertImage={insertImage} />
+      <EditorToolbar onExecCommand={execCommand} onInsertImage={insertImage} onInsertHtml={insertHtml} />
       <div
         ref={editorRef}
         contentEditable
