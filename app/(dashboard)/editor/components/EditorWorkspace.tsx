@@ -79,7 +79,7 @@ export function EditorWorkspace({ doc }: Props) {
   const jobStatusColor = job ? ({ pending: '#2563eb', processing: '#f97316', done: '#16a34a', failed: '#ef4444' }[job.status] ?? '#64748b') : '';
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 300px', gap: 20, alignItems: 'start' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 300px', gap: 20, alignItems: 'stretch' }}>
       {/* 에디터 메인 */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -87,7 +87,7 @@ export function EditorWorkspace({ doc }: Props) {
             value={title}
             onChange={e => setTitle(e.target.value)}
             placeholder="문서 제목"
-            style={{ flex: 1, fontSize: 20, fontWeight: 700, border: 'none', borderBottom: '2px solid #e2e8f0', padding: '8px 0', outline: 'none', background: 'transparent', color: '#0f172a' }}
+            style={{ flex: 1, fontSize: 20, fontWeight: 400, border: 'none', borderBottom: '2px solid #e2e8f0', padding: '8px 0', outline: 'none', background: 'transparent', color: '#0f172a' }}
           />
         </div>
 
@@ -113,7 +113,7 @@ export function EditorWorkspace({ doc }: Props) {
       </div>
 
       {/* 우측 레일 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, position: 'sticky', top: 16 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14, position: 'sticky', top: 16, height: '100%' }}>
         {/* 채널 */}
         <div style={{ background: '#fff', border: '1px solid #e4ebf5', borderRadius: 14, overflow: 'hidden' }}>
           <div style={{ padding: '13px 16px', borderBottom: '1px solid #e4ebf5', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>채널</div>
