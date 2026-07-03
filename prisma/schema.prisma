@@ -33,6 +33,9 @@ model User {
   costLedgers        CostLedger[]
   cafeTargets        CafeTarget[]
   subscriptions      Subscription[]
+  ideaDocuments      IdeaDocument[]
+  ideaPublishJobs    IdeaPublishJob[]    @relation("IdeaPublishJobOwner")
+  ideaSchedules      IdeaSchedule[]     @relation("IdeaScheduleOwner")
 
   @@map("users")
 }
@@ -336,6 +339,74 @@ model ChannelCredential {
 
   @@unique([ownerId, channel])
   @@map("channel_credentials")
+}
+
+// ----------------------------------------------------------------
+// idea_documents — 리치 에디터 문서
+// ----------------------------------------------------------------
+model IdeaDocument {
+  id          String   @id @default(cuid())
+  ownerId     String   @map("owner_id")
+  title       String   @default("")
+  body        String   @default("<p><br></p>") @db.Text
+  channel     String   @default("blog") // blog | instagram | facebook | naver_cafe
+  status      String   @default("draft") // draft | completed
+  notes       String?  @db.Text
+  bodyImageUrls String[] @default([]) @map("body_image_urls")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  owner       User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  publishJob  IdeaPublishJob?
+
+  @@index([ownerId, createdAt])
+  @@map("idea_documents")
+}
+
+// ----------------------------------------------------------------
+// idea_publish_jobs — 발행 예약 잡
+// ----------------------------------------------------------------
+model IdeaPublishJob {
+  id          String    @id @default(cuid())
+  ownerId     String    @map("owner_id")
+  docId       String?   @unique @map("doc_id")
+  title       String
+  bodyHtml    String    @db.Text @map("body_html")
+  channel     String    // blog | instagram | facebook | naver_cafe
+  status      String    @default("pending") // pending | processing | done | failed
+  scheduledAt DateTime? @map("scheduled_at")
+  externalUrl String?   @map("external_url")
+  error       String?   @db.Text
+  startedAt   DateTime? @map("started_at")
+  finishedAt  DateTime? @map("finished_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  owner User          @relation("IdeaPublishJobOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  doc   IdeaDocument? @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, status])
+  @@index([status, scheduledAt])
+  @@map("idea_publish_jobs")
+}
+
+// ----------------------------------------------------------------
+// idea_schedules — 달력 계획 일정
+// ----------------------------------------------------------------
+model IdeaSchedule {
+  id            String   @id @default(cuid())
+  ownerId       String   @map("owner_id")
+  title         String
+  scheduledDate String   @map("scheduled_date") // YYYY-MM-DD
+  category      String   @default("general") // general | blog | youtube
+  status        String   @default("planned") // planned | in_progress | completed
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  owner User @relation("IdeaScheduleOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, scheduledDate])
+  @@map("idea_schedules")
 }
 
 // ----------------------------------------------------------------

@@ -331,6 +331,76 @@ async function publishBlogToNaverCafe(): Promise<SlotResult[]> {
 
 
 // ---------------------------------------------------------------------------
+// 3) IdeaPublishJob 처리 (문서 편집기에서 예약된 발행)
+// ---------------------------------------------------------------------------
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').trim();
+}
+
+async function publishIdeaJobs(): Promise<{ id: string; status: string; error?: string }[]> {
+  const jobs = await prisma.ideaPublishJob.findMany({
+    where: {
+      status: 'pending',
+      scheduledAt: { lte: new Date() },
+    },
+    orderBy: { scheduledAt: 'asc' },
+  });
+
+  if (jobs.length === 0) return [];
+
+  console.log(`[cron/schedule-publish] IdeaPublishJob ${jobs.length}건 처리`);
+  const results: { id: string; status: string; error?: string }[] = [];
+
+  for (const job of jobs) {
+    await prisma.ideaPublishJob.update({ where: { id: job.id }, data: { status: 'processing', startedAt: new Date() } });
+
+    try {
+      let externalUrl: string | null = null;
+      const textBody = stripHtml(job.bodyHtml);
+
+      if (job.channel === 'naver_cafe') {
+        const result = await publishNaverCafePost({
+          subject: job.title,
+          content: textBody,
+          keywords: [],
+          imageUrls: [],
+          ownerId: job.ownerId,
+        });
+        externalUrl = result.cafeUrl;
+      } else if (job.channel === 'facebook') {
+        const result = await publishFacebookPost({ imageUrl: null, message: textBody, ownerId: job.ownerId });
+        externalUrl = `https://facebook.com/${result.id}`;
+      } else if (job.channel === 'instagram') {
+        const result = await publishInstagramImage({ imageUrl: '', caption: textBody, ownerId: job.ownerId });
+        externalUrl = result.permalink ?? null;
+      } else {
+        // blog 등 직접 발행 API 미구현 채널 → done 처리
+        externalUrl = null;
+      }
+
+      await prisma.ideaPublishJob.update({
+        where: { id: job.id },
+        data: { status: 'done', finishedAt: new Date(), externalUrl },
+      });
+
+      console.log(`[cron/schedule-publish] ✓ IdeaJob ${job.id} (${job.channel})`);
+      results.push({ id: job.id, status: 'done' });
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.error(`[cron/schedule-publish] ✗ IdeaJob ${job.id}:`, errorMsg);
+
+      await prisma.ideaPublishJob
+        .update({ where: { id: job.id }, data: { status: 'failed', finishedAt: new Date(), error: errorMsg } })
+        .catch(() => {});
+
+      results.push({ id: job.id, status: 'failed', error: errorMsg });
+    }
+  }
+
+  return results;
+}
+
+// ---------------------------------------------------------------------------
 // 폴백: 7시 content-generate가 랜덤 스킵했으면 여기서 실행
 // ---------------------------------------------------------------------------
 async function maybeFallbackGenerate(): Promise<boolean> {
@@ -387,16 +457,21 @@ export async function GET(request: NextRequest) {
   // 2) 블로그 → 네이버 카페 자동 발행
   const blogCafeResults = await publishBlogToNaverCafe();
 
+  // 3) IdeaPublishJob 처리
+  const ideaJobResults = await publishIdeaJobs();
+
   const results = [...socialResults, ...blogCafeResults];
 
-  if (results.length === 0) {
+  if (results.length === 0 && ideaJobResults.length === 0) {
     console.log('[cron/schedule-publish] 발행 대상 없음');
     return NextResponse.json({ ok: true, processed: 0, fallbackRan });
   }
 
   const published = results.filter((r) => r.status === 'published').length;
   const failed = results.filter((r) => r.status === 'failed').length;
-  console.log(`[cron/schedule-publish] 완료 — 성공: ${published}, 실패: ${failed}`);
+  const ideaDone = ideaJobResults.filter(r => r.status === 'done').length;
+  const ideaFailed = ideaJobResults.filter(r => r.status === 'failed').length;
+  console.log(`[cron/schedule-publish] 완료 — 성공: ${published}, 실패: ${failed}, 아이디어잡: ${ideaDone}건 완료/${ideaFailed}건 실패`);
 
-  return NextResponse.json({ ok: true, processed: results.length, published, failed, results, fallbackRan });
+  return NextResponse.json({ ok: true, processed: results.length, published, failed, results, ideaJobs: ideaJobResults, fallbackRan });
 }

@@ -103,6 +103,24 @@ export function Sidebar() {
       {/* 운영 섹션: 스케줄러는 자동 크론으로 운영 — 메뉴 숨김 */}
 
       <div className="sb-section">
+        <div className="sb-label">아이디어 운영</div>
+        <Link href="/editor" prefetch={false} className={`sb-item${active('/editor') ? ' active' : ''}`}>
+          <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/>
+          </svg>
+          문서 편집기
+        </Link>
+        <Link href="/planner" prefetch={false} className={`sb-item${active('/planner') ? ' active' : ''}`}>
+          <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          월간 일정
+        </Link>
+      </div>
+
+      <div className="sb-section">
         <div className="sb-label">설정</div>
         <Link href="/rag" prefetch={false} className={`sb-item${active('/rag') ? ' active' : ''}`}>
           <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
