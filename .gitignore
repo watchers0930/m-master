@@ -16,3 +16,4 @@ dist
 .env.test
 tmp-blog-test.js
 naver-cookies.json
+docs/
