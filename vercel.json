@@ -1,13 +1,4 @@
 {
   "framework": "nextjs",
-  "crons": [
-    {
-      "path": "/api/cron/content-generate",
-      "schedule": "0 22 * * *"
-    },
-    {
-      "path": "/api/cron/schedule-publish",
-      "schedule": "0 23 * * *"
-    }
-  ]
+  "crons": []
 }
