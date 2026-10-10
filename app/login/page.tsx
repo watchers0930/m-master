@@ -69,7 +69,7 @@ function LoginForm() {
       <button
         type="submit"
         disabled={loading}
-        style={{ marginTop: 4, background: loading ? '#9db4f5' : 'linear-gradient(110deg,#3b6ef5,#2f5bea,#1e3a8a)', color: '#fff', border: 'none', borderRadius: 11, padding: '12px 0', fontSize: 14, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', boxShadow: loading ? 'none' : '0 10px 24px rgba(47,91,234,0.35)', transition: 'opacity 0.15s' }}
+        style={{ marginTop: 4, background: loading ? '#93a7d4' : 'linear-gradient(110deg,#2a4a93,#1f3a7a,#112452)', color: '#fff', border: 'none', borderRadius: 11, padding: '12px 0', fontSize: 14, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'inherit', boxShadow: loading ? 'none' : '0 10px 24px rgba(27,53,111,0.35)', transition: 'opacity 0.15s' }}
       >
         {loading ? '로그인 중...' : '로그인'}
       </button>
@@ -79,10 +79,10 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'radial-gradient(44% 40% at 18% 0%, rgba(47,91,234,0.12), transparent 60%), radial-gradient(42% 38% at 82% 4%, rgba(59,110,245,0.12), transparent 62%), linear-gradient(180deg,#f7f8fd 0%,#ffffff 70%)' }}>
-      <div style={{ width: 360, maxWidth: '100%', background: '#fff', borderRadius: 18, padding: '40px 36px', border: '1px solid #ebedf5', boxShadow: '0 1px 3px rgba(21,23,43,0.06), 0 24px 50px -24px rgba(47,91,234,0.35)' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'radial-gradient(44% 40% at 18% 0%, rgba(27,53,111,0.12), transparent 60%), radial-gradient(42% 38% at 82% 4%, rgba(38,69,154,0.12), transparent 62%), linear-gradient(180deg,#f7f8fd 0%,#ffffff 70%)' }}>
+      <div style={{ width: 360, maxWidth: '100%', background: '#fff', borderRadius: 18, padding: '40px 36px', border: '1px solid #ebedf5', boxShadow: '0 1px 3px rgba(21,23,43,0.06), 0 24px 50px -24px rgba(27,53,111,0.35)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(110deg,#3b6ef5,#2f5bea,#1e3a8a)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 16px rgba(47,91,234,0.4)' }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(110deg,#2a4a93,#1f3a7a,#112452)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 16px rgba(27,53,111,0.4)' }}>
             <svg width="16" height="16" viewBox="0 0 90 90" fill="none">
               <path d="M16 66L32 22L45 46L58 22L74 66" stroke="#fff" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
@@ -100,7 +100,7 @@ export default function LoginPage() {
 
         <div style={{ marginTop: 18, textAlign: 'center', fontSize: 12.5, color: '#5c6178' }}>
           계정이 없으신가요?{' '}
-          <Link href="/register" style={{ color: '#2f5bea', fontWeight: 700, textDecoration: 'none' }}>회원가입</Link>
+          <Link href="/register" style={{ color: '#1f3a7a', fontWeight: 700, textDecoration: 'none' }}>회원가입</Link>
         </div>
       </div>
     </div>

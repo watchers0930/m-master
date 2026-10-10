@@ -18,21 +18,21 @@
 @font-face { font-family: 'Paperlogy'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2408-3@1.0/Paperlogy-9Black.woff2') format('woff2'); font-weight: 900; font-display: swap; }
 
 :root {
-  /* 포인트 색: 딥 블루/인디고 (밝기 단계 유지, 사이드바 배경은 하드코딩 다크라 별도) */
-  --blue-900: #0a1230;
-  --blue-800: #13224d;
-  --blue-700: #1e3a8a;
-  --blue-600: #1e40af;
-  --blue-500: #2449c4;
-  --blue-400: #2f5bea;
-  --blue-300: #7ea2f7;
-  --blue-200: #c3d4fb;
-  --blue-100: #dde8fd;
-  --blue-50:  #eff4fe;
+  /* 포인트 색: 묵직한 남색(네이비) (밝기 단계 유지, 사이드바 배경은 하드코딩 다크라 별도) */
+  --blue-900: #070d20;
+  --blue-800: #0c1838;
+  --blue-700: #112452;
+  --blue-600: #16285c;
+  --blue-500: #1b356f;
+  --blue-400: #1f3a7a;
+  --blue-300: #6f8fd0;
+  --blue-200: #b9c6e6;
+  --blue-100: #dbe4f4;
+  --blue-50:  #eef2fa;
 
-  --c900: #0a1230; --c800: #13224d; --c700: #1e3a8a;
-  --c600: #1e40af; --c500: #2449c4; --c400: #2f5bea;
-  --c300: #7ea2f7; --c200: #c3d4fb; --c100: #dde8fd; --c50: #eff4fe;
+  --c900: #070d20; --c800: #0c1838; --c700: #112452;
+  --c600: #16285c; --c500: #1b356f; --c400: #1f3a7a;
+  --c300: #6f8fd0; --c200: #b9c6e6; --c100: #dbe4f4; --c50: #eef2fa;
 
   --n900: #0C1837; --n700: #2D3D5A; --n500: #4A5978;
   --n400: #6B7FA0; --n200: #C8D5E8; --n100: #E4EBF5; --n50: #F3F6FB;
@@ -64,7 +64,7 @@ a { text-decoration: none; color: inherit; }
 .sb-label { font-size: 10px; color: rgba(255,255,255,0.42); padding: 2px 18px 8px; letter-spacing: 0.6px; text-transform: uppercase; font-weight: 600; }
 .sb-item { display: flex; align-items: center; gap: 10px; padding: 9px 18px; color: rgba(255,255,255,0.65); font-size: 13px; font-weight: 500; border-left: 2px solid transparent; transition: all 0.12s; cursor: pointer; text-decoration: none; }
 .sb-item:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.95); }
-.sb-item.active { background: rgba(47,91,234,0.26); color: #fff; border-left-color: var(--blue-400); font-weight: 600; }
+.sb-item.active { background: rgba(27,53,111,0.26); color: #fff; border-left-color: var(--blue-400); font-weight: 600; }
 .sb-badge { margin-left: auto; background: var(--blue-400); color: #fff; font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 8px; }
 .sb-bottom { margin-top: auto; padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 9px; }
 .sb-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--blue-500); border: 2px solid var(--blue-300); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; }
