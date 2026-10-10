@@ -106,7 +106,7 @@ export default function RegisterPage() {
             </svg>
           </div>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: '#15172b', letterSpacing: '0.01em' }}>M-MASTER</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: '#15172b', letterSpacing: '0.01em' }}>MINTEQ</div>
             <div style={{ fontSize: 11, color: '#8e93a7' }}>마케팅 자동화 플랫폼</div>
           </div>
         </div>
