@@ -104,7 +104,7 @@ export default async function DashboardPage() {
 
   const scoreDelta = calcScoreDelta(avgScorePair.thisAvg, avgScorePair.lastAvg);
 
-  const barColors = ['#2563EB', '#7C3AED', '#4338CA'];
+  const barColors = ['#7c5cf0', '#9b5df0', '#c15cf0'];
 
   return (
     <>
@@ -352,7 +352,7 @@ export default async function DashboardPage() {
 
               return (
                 <div key={c.id} className="perf-item">
-                  <div className="p-bar" style={{background: barColors[i] ?? '#2563EB'}}></div>
+                  <div className="p-bar" style={{background: barColors[i] ?? '#7c5cf0'}}></div>
                   <div className={`p-grade ${gc}`}>{gl}</div>
                   <div style={{flex:1,minWidth:0}}>
                     <div className="p-title">{c.topic}</div>

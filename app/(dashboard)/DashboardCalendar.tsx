@@ -158,9 +158,9 @@ export function DashboardCalendar() {
       </div>
 
       <div className="cal-foot">
-        <div className="legend"><span className="leg-dot" style={{background:'#2563EB'}}></span>블로그</div>
-        <div className="legend"><span className="leg-dot" style={{background:'#60A5FA'}}></span>인스타</div>
-        <div className="legend"><span className="leg-dot" style={{background:'#122556'}}></span>페이스북</div>
+        <div className="legend"><span className="leg-dot" style={{background:'#7c5cf0'}}></span>블로그</div>
+        <div className="legend"><span className="leg-dot" style={{background:'#a78bfa'}}></span>인스타</div>
+        <div className="legend"><span className="leg-dot" style={{background:'#35216b'}}></span>페이스북</div>
         <div className="legend"><span className="leg-dot" style={{background:'#B45309'}}></span>AI 편성</div>
         <div className="legend"><span className="leg-dot" style={{background:'#C8D5E8'}}></span>완료</div>
         <div className="cal-stats">

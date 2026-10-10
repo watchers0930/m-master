@@ -18,20 +18,21 @@
 @font-face { font-family: 'Paperlogy'; src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/2408-3@1.0/Paperlogy-9Black.woff2') format('woff2'); font-weight: 900; font-display: swap; }
 
 :root {
-  --blue-900: #060E24;
-  --blue-800: #0C1A3D;
-  --blue-700: #122556;
-  --blue-600: #1A3470;
-  --blue-500: #1E40AF;
-  --blue-400: #2563EB;
-  --blue-300: #60A5FA;
-  --blue-200: #BFDBFE;
-  --blue-100: #DBEAFE;
-  --blue-50:  #EFF6FF;
+  /* 포인트 색: 파랑 → 바이올렛 리맵 (밝기 단계 유지, 사이드바 배경은 하드코딩 다크라 별도) */
+  --blue-900: #0e0a24;
+  --blue-800: #241452;
+  --blue-700: #35216b;
+  --blue-600: #4d2da0;
+  --blue-500: #6238d6;
+  --blue-400: #7c5cf0;
+  --blue-300: #a78bfa;
+  --blue-200: #ddd6fe;
+  --blue-100: #ede9fe;
+  --blue-50:  #f5f3ff;
 
-  --c900: #060E24; --c800: #0C1A3D; --c700: #122556;
-  --c600: #1A3470; --c500: #1E40AF; --c400: #2563EB;
-  --c300: #60A5FA; --c200: #BFDBFE; --c100: #DBEAFE; --c50: #EFF6FF;
+  --c900: #0e0a24; --c800: #241452; --c700: #35216b;
+  --c600: #4d2da0; --c500: #6238d6; --c400: #7c5cf0;
+  --c300: #a78bfa; --c200: #ddd6fe; --c100: #ede9fe; --c50: #f5f3ff;
 
   --n900: #0C1837; --n700: #2D3D5A; --n500: #4A5978;
   --n400: #6B7FA0; --n200: #C8D5E8; --n100: #E4EBF5; --n50: #F3F6FB;
@@ -63,7 +64,7 @@ a { text-decoration: none; color: inherit; }
 .sb-label { font-size: 10px; color: rgba(255,255,255,0.42); padding: 2px 18px 8px; letter-spacing: 0.6px; text-transform: uppercase; font-weight: 600; }
 .sb-item { display: flex; align-items: center; gap: 10px; padding: 9px 18px; color: rgba(255,255,255,0.65); font-size: 13px; font-weight: 500; border-left: 2px solid transparent; transition: all 0.12s; cursor: pointer; text-decoration: none; }
 .sb-item:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.95); }
-.sb-item.active { background: rgba(37,99,235,0.22); color: #fff; border-left-color: var(--blue-400); font-weight: 600; }
+.sb-item.active { background: rgba(124,92,240,0.26); color: #fff; border-left-color: var(--blue-400); font-weight: 600; }
 .sb-badge { margin-left: auto; background: var(--blue-400); color: #fff; font-size: 9.5px; font-weight: 700; padding: 2px 6px; border-radius: 8px; }
 .sb-bottom { margin-top: auto; padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; gap: 9px; }
 .sb-avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--blue-500); border: 2px solid var(--blue-300); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; }
