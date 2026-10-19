@@ -1,3 +1,4 @@
+import { visibilityGapCandidates } from '@/lib/topics/visibility-gap';
 // app/api/cron/content-generate/route.ts — 일일 자동 콘텐츠 생성 + 매주 월요일 토픽 리프레시
 // Vercel Cron: 0 22 * * * (UTC) = 오전 7시 KST
 // 50% 확률로 스킵 → schedule-publish(8시)에서 ?fallback=1로 폴백 호출 → 실질적으로 7시/8시 랜덤
@@ -96,7 +97,9 @@ async function refreshWeeklyTopicsForUser(
       companyName: bg.company_name as string | undefined,
     };
 
+    const visibilityGaps = await visibilityGapCandidates(ownerId);
     const candidates = buildCandidates({
+      visibilityGaps,
       monthYmd,
       publishedTopics,
       ga4PopularPaths: ga4Data.popular ?? undefined,
@@ -116,10 +119,11 @@ async function refreshWeeklyTopicsForUser(
     const signalsByTopic = new Map(candidates.map(c => [c.topic, c.signal]));
 
     const rows = recommended.items.map(item => {
-      const factors: Record<string, Prisma.InputJsonValue> = {
+      const factors: Record<string, Prisma.InputJsonValue | null> = {
         tags: item.tags as unknown as Prisma.InputJsonValue,
         reason: item.reason,
-        signal: signalsByTopic.get(item.topic) ?? 'core',
+        signal: item.factors ? 'ai_visibility_gap' : signalsByTopic.get(item.topic) ?? 'core',
+        ...(item.factors ? { ...item.factors } : {}),
       };
       if (ga4Data.unavailable) factors.ga4_unavailable = true;
       return {

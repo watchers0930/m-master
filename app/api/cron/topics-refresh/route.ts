@@ -1,3 +1,4 @@
+import { visibilityGapCandidates } from '@/lib/topics/visibility-gap';
 // app/api/cron/topics-refresh/route.ts — 주간 추천 토픽 자동 생성 cron (독립 엔드포인트)
 // 참고: content-generate cron에도 동일 로직이 통합되어 있음 (매주 월요일 자동 실행)
 // 이 엔드포인트는 수동 호출 용도로 유지
@@ -96,7 +97,9 @@ export async function GET(request: NextRequest) {
       ga4Unavailable = true;
     }
 
+    const visibilityGaps = await visibilityGapCandidates(ownerId);
     const candidates = buildCandidates({
+      visibilityGaps,
       monthYmd,
       publishedTopics,
       ga4PopularPaths: ga4Popular ?? undefined,
@@ -122,10 +125,11 @@ export async function GET(request: NextRequest) {
 
     const signalsByTopic = new Map(candidates.map(c => [c.topic, c.signal]));
     const rows = recommended.items.map(item => {
-      const factors: Record<string, Prisma.InputJsonValue> = {
+      const factors: Record<string, Prisma.InputJsonValue | null> = {
         tags: item.tags as unknown as Prisma.InputJsonValue,
         reason: item.reason,
-        signal: signalsByTopic.get(item.topic) ?? 'core',
+        signal: item.factors ? 'ai_visibility_gap' : signalsByTopic.get(item.topic) ?? 'core',
+        ...(item.factors ? { ...item.factors } : {}),
       };
       if (ga4Unavailable) factors.ga4_unavailable = true;
       return {

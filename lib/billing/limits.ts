@@ -2,13 +2,13 @@
 import { prisma } from '@/lib/prisma';
 
 export const PLAN_LIMITS = {
-  free:    { contentPerMonth: 5,  costLimitKrw: 10_000,  channels: 1,  rag: false, abTest: false },
-  starter: { contentPerMonth: 30, costLimitKrw: 100_000, channels: 3,  rag: true,  abTest: false },
-  pro:     { contentPerMonth: -1, costLimitKrw: 500_000, channels: -1, rag: true,  abTest: true }, // -1 = 무제한
+  free:    { contentPerMonth: 5,  costLimitKrw: 10_000,  channels: 1,  rag: false, abTest: false, visibility: false, visibilityQueries: 0, domains: 1 },
+  starter: { contentPerMonth: 30, costLimitKrw: 100_000, channels: 3,  rag: true,  abTest: false, visibility: true, visibilityQueries: 10, domains: 5 },
+  pro:     { contentPerMonth: -1, costLimitKrw: 500_000, channels: -1, rag: true,  abTest: true, visibility: true, visibilityQueries: -1, domains: -1 }, // -1 = 무제한
 } as const;
 
 export type PlanKey = keyof typeof PLAN_LIMITS;
-export type FeatureKey = 'rag' | 'abTest';
+export type FeatureKey = 'rag' | 'abTest' | 'visibility';
 
 /** DB에서 유저 플랜 조회 (API route에서 간편 사용) */
 export async function getUserPlan(userId: string): Promise<PlanKey> {
@@ -86,7 +86,17 @@ export function checkFeatureAccess(plan: string, feature: FeatureKey): void {
     const featureNames: Record<FeatureKey, string> = {
       rag: 'RAG (자료 기반 생성)',
       abTest: 'A/B 테스트',
+      visibility: 'AI 가시성',
     };
     throw new Error(`${featureNames[feature]}은(는) ${plan === 'free' ? 'Starter' : 'Pro'} 플랜부터 사용 가능합니다.`);
+  }
+}
+
+export const FEATURE_MIN_PLAN: Record<FeatureKey, PlanKey> = { rag: 'starter', abTest: 'pro', visibility: 'starter' };
+
+export async function checkVisibilityQueryLimit(userId: string, plan: string, db: Pick<typeof prisma, 'visibilityQuery'> = prisma): Promise<void> {
+  const limit = (PLAN_LIMITS[plan as PlanKey] ?? PLAN_LIMITS.free).visibilityQueries;
+  if (limit >= 0 && await db.visibilityQuery.count({ where: { ownerId: userId } }) >= limit) {
+    throw new Error('visibility_query_limit');
   }
 }

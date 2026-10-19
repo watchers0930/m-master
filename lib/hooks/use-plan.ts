@@ -1,29 +1,51 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 export type PlanKey = 'free' | 'starter' | 'pro';
 
 interface PlanState {
   plan: PlanKey;
   loading: boolean;
+  /** 플랜 조회 실패 여부. 실패를 'free'로 오인하지 않도록 호출부에서 분기한다. */
+  error: boolean;
+}
+
+export interface UsePlanResult extends PlanState {
+  /** 플랜 재조회 (조회 실패 시 재시도용) */
+  refetch: () => void;
 }
 
 /** 현재 유저의 플랜을 /api/billing/usage에서 가져옴 */
-export function usePlan(): PlanState {
-  const [state, setState] = useState<PlanState>({ plan: 'free', loading: true });
+export function usePlan(): UsePlanResult {
+  const [state, setState] = useState<PlanState>({ plan: 'free', loading: true, error: false });
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    let alive = true;
+    setState((s) => ({ ...s, loading: true, error: false }));
     fetch('/api/billing/usage')
-      .then((r) => r.json())
-      .then((res) => {
-        const plan = (res.data?.plan ?? 'free') as PlanKey;
-        setState({ plan, loading: false });
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
       })
-      .catch(() => setState((s) => ({ ...s, loading: false })));
+      .then((res) => {
+        if (!alive) return;
+        const plan = (res.data?.plan ?? 'free') as PlanKey;
+        setState({ plan, loading: false, error: false });
+      })
+      .catch(() => {
+        if (!alive) return;
+        // 조회 실패: 기본값 free 로 두되 error=true 로 표시해 호출부가 구분할 수 있게 한다.
+        setState({ plan: 'free', loading: false, error: true });
+      });
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  return state;
+  useEffect(() => load(), [load]);
+
+  return { ...state, refetch: load };
 }
 
 /** 기능별 최소 요구 플랜 */

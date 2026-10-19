@@ -1,14 +1,16 @@
 // lib/topics/candidates.ts — 룰 기반 토픽 후보 생성기 (15~20개)
 // businessContext로 유저 업종/키워드 기반 동적 후보 생성
 
+import type { VisibilityGapEvidence } from './visibility-gap';
 import { getSeasonalKeywords } from './seasonal';
 
-export type CandidateSignal = 'season' | 'core' | 'ga4_popular' | 'gap';
+export type CandidateSignal = 'season' | 'core' | 'ga4_popular' | 'gap' | 'ai_visibility_gap';
 
 export interface Candidate {
   topic: string; // 80자 이내
   signal: CandidateSignal;
   weight: number; // 1~10
+  factors?: VisibilityGapEvidence;
 }
 
 export interface BusinessContext {
@@ -65,6 +67,7 @@ function isDuplicate(candidate: string, published: string[]): boolean {
 export interface BuildCandidatesInput {
   monthYmd: string; // YYYY-MM-01
   publishedTopics: string[];
+  visibilityGaps?: Candidate[];
   ga4PopularPaths?: { path: string; sessions: number }[];
   businessContext?: BusinessContext;
 }
@@ -90,6 +93,13 @@ export function buildCandidates(input: BuildCandidatesInput): Candidate[] {
     seen.add(key);
     candidates.push({ topic: t, signal, weight });
   };
+
+  // Prioritize evidence-backed gaps before the twenty-candidate cap.
+  for (const gap of input.visibilityGaps ?? []) {
+    const before = candidates.length;
+    push(gap.topic, gap.signal, gap.weight);
+    if (candidates.length > before) candidates[candidates.length - 1].factors = gap.factors;
+  }
 
   // 1) 시즌 × 유저 키워드 조합 (가중치 10)
   for (const season of seasonals) {

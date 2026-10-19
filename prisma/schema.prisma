@@ -24,6 +24,8 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
+  domains            Domain[]
+  visibilityQueries  VisibilityQuery[]
   settings           Setting[]
   channelCredentials ChannelCredential[]
   contents           Content[]
@@ -62,6 +64,7 @@ model Subscription {
 // contents — 핵심 콘텐츠
 // ----------------------------------------------------------------
 model Content {
+  market        String    @default("ko-KR")
   id            String    @id @default(cuid())
   ownerId       String    @map("owner_id")
   channel       String    // 'blog' | 'instagram' | 'facebook'
@@ -118,6 +121,7 @@ model ScheduleSlot {
 // settings — 유저별 설정
 // ----------------------------------------------------------------
 model Setting {
+  defaultMarket   String @default("ko-KR") @map("default_market")
   id              String @id @default(cuid())
   ownerId         String @map("owner_id")
   brandGuide      Json   @default("{}") @map("brand_guide")
@@ -425,4 +429,78 @@ model CafeTarget {
   owner User @relation(fields: [ownerId], references: [id])
 
   @@map("cafe_targets")
+}
+
+model Domain {
+  id           String   @id @default(cuid())
+  ownerId      String   @map("owner_id")
+  url          String // 정규화 호스트만 저장 (https·path·query 제거)
+  market       String   @default("ko-KR")
+  businessType String?  @map("business_type") // 자동감지 or 사용자입력
+  createdAt    DateTime @default(now()) @map("created_at")
+  owner             User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  visibilityQueries VisibilityQuery[]
+  @@unique([ownerId, url]) // 같은 소유자·호스트 중복 차단. 서로 다른 소유자는 같은 호스트 가능
+  @@index([ownerId])
+  @@map("domains")
+}
+model VisibilityQuery {
+  id                String   @id @default(cuid())
+  ownerId           String   @map("owner_id")
+  domainId          String?  @map("domain_id")
+  query             String
+  market            String   @default("ko-KR")
+  engines           String[] // ["chatgpt","ai_overviews",...]
+  brandAliases      String[] @map("brand_aliases")
+  competitorAliases String[] @map("competitor_aliases")
+  frequency         String   @default("weekly") // daily | weekly
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now()) @map("created_at")
+  owner     User                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  domain    Domain?              @relation(fields: [domainId], references: [id], onDelete: SetNull)
+  nextAttemptAt DateTime? @map("next_attempt_at")
+  lastCheckedAt DateTime? @map("last_checked_at")
+  attemptFailures Int @default(0) @map("attempt_failures")
+  snapshots VisibilitySnapshot[]
+  @@index([ownerId])
+  @@index([domainId])
+  @@index([ownerId, createdAt(sort: Desc), id])
+  @@index([active, nextAttemptAt, lastCheckedAt])
+  @@index([active, frequency]) // cron 스캔용
+  @@map("visibility_queries")
+}
+model VisibilitySnapshot {
+  id         String   @id @default(cuid())
+  queryId    String   @map("query_id")
+  engine     String
+  captureConfig Json? @map("capture_config")
+  status     String   @default("ok") // ok | no_result | failed | pending
+  source     String? // llm_scraper | llm_responses | serp_aio | passthrough
+  taskId     String?  @map("task_id") // 벤더 task_id (재폴링·중복방지)
+  runKey     String?  @map("run_key") // 정기 실행 멱등 키 (중복 수집 방지)
+  capturedAt DateTime @default(now()) @map("captured_at")
+  answerText String   @default("") @map("answer_text") @db.Text
+  citations  Json     @default("[]") // [{url,title?,position}]
+  rawJson    Json?    @map("raw_json") // 원본(디버그 전용, 일반 응답 제외)
+  costKrw    Float    @default(0) @map("cost_krw")
+  failReason String?  @map("fail_reason") // 실패/판정대기 사유
+  query    VisibilityQuery     @relation(fields: [queryId], references: [id], onDelete: Cascade)
+  mentions VisibilityMention[]
+  @@unique([queryId, engine, runKey]) // 같은 질문·엔진·실행구간 1회만
+  @@index([queryId, capturedAt(sort: Desc)])
+  @@map("visibility_snapshots")
+}
+model VisibilityMention {
+  id         String  @id @default(cuid())
+  snapshotId String  @map("snapshot_id")
+  subject    String // brand | competitor | domain
+  label      String // 매칭된 alias/도메인
+  mentioned  Boolean
+  cited      Boolean
+  position   Int? // 인용 순서 (본문 순위 아님)
+  sentiment  String? // positive | neutral | negative
+  resolvable Boolean @default(true) // false=판정 불가(지표 분모 제외)
+  snapshot VisibilitySnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  @@index([snapshotId])
+  @@map("visibility_mentions")
 }

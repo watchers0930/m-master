@@ -90,6 +90,13 @@ export function Sidebar() {
           </svg>
           성과 분석
         </Link>
+        <Link href="/visibility" prefetch={false} className={`sb-item${active('/visibility') ? ' active' : ''}`}>
+          <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/>
+          </svg>
+          AI 가시성
+        </Link>
         <Link href="/visitors" prefetch={false} className={`sb-item${active('/visitors') ? ' active' : ''}`}>
           <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
             <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>

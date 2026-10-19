@@ -1,0 +1,331 @@
+{
+  "observedAt": "2026-10-19T08:53:40.037Z",
+  "engine": "chatgpt",
+  "path": "ai_optimization/chat_gpt/llm_scraper/task_post",
+  "request": [
+    {
+      "keyword": "What is OpenAI?",
+      "location_code": 2840,
+      "language_code": "en"
+    }
+  ],
+  "submission": {
+    "status_code": 20000,
+    "task_status_code": 20100,
+    "costKrw": 1.68
+  },
+  "response": {
+    "status_code": 20000,
+    "tasks": [
+      {
+        "status_code": 20000,
+        "result": [
+          {
+            "keyword": "What is OpenAI?",
+            "location_code": 2840,
+            "language_code": "en",
+            "model": "gpt-6",
+            "check_url": "https://chatgpt.com/?prompt=What%20is%20OpenAI%3F",
+            "datetime": "2026-10-19 08:54:00 +00:00",
+            "markdown": "**OpenAI is an artificial intelligence (AI) research and technology company that created ChatGPT — the AI assistant you're talking to right now.** Its goal is to develop AI that benefits people and society. [openai.com](https://openai.com/about/?utm_source=chatgpt.com)\n\n## What does OpenAI do?\n\n![Seperti Apa Tampilan Ikon Aplikasi iOS Resmi ChatGPT? | OpenAI Help Center](https://images.openai.com/static-rsc-4/d9mnrtJpSff4Kqg4hGh7Xpjp8Us3qsDreLzpt4ReDzFm1VfHhsPd4624tr5z3E961C9fZZ1ExpSmy_I1KZ_4MQOnOJG9tbccgWe60d7m3kQuquaY8Q8AEC3WL5MDKFqyXPbs1KVuukTtAKnCJnOBc803I8ThskkatiezrMNfUIH4IsM7anlxuhkR695bhFXt?purpose=fullsize)\n\n**1\\. Creates AI assistants**\n\nOpenAI develops ChatGPT, which can answer questions, explain difficult topics, help with homework, write emails, brainstorm ideas, and assist with coding.\n\n---\n\n![How OpenAI is building its moat](https://images.openai.com/static-rsc-4/qrpUvbOEs27pMulzx7QjlCUnNrAbBd7gb1g6UaLOahgjVXHDzgr1s5Zy87bHHh1AI8E1f7Y469nTLMVaD7dTbgUS4uk9aiUisz0YJV8eRZriuFvQIQu38WOGO-B0bkzMy_AP7o_DEE2VPeqxUphLVJGpMXImxIzSun051M_JT3UBMAAsTV8tv6ZYGi3wCkkf?purpose=fullsize)\n\n**2\\. Researches artificial intelligence**\n\nOpenAI trains AI models to understand and generate language, reason through problems, analyze information, and help people complete tasks.\n\n---\n\n![Databricks, Palantir forge strategic partnership to enhance AI integration | Mi3](https://images.openai.com/static-rsc-4/v0-LVHxL3x1bCXS0e7W2LsP6rhP9poH_0lHgbeRXen1kdHTNvBInaTrznbJPlcaheA8Msi-KLVuSK4r3AHHUddP5Xkm-za1Jza8nXWeD9qu8SNufXX-yvYfJL9OtlRABHDf8ExlME4-lTXLBiQDmtgP1oyEjjI4Sdpi781Uhx002GbLwoov5vSnuwNXxDaEQ?purpose=fullsize)\n\n**3\\. Develops creative tools**\n\nIts technology can help people create images, work with audio, analyze files, write computer programs, and develop new applications. [help.openai.com](https://help.openai.com/en/articles/12677804-what-is-chatgpt-faq?utm_source=chatgpt.com)[developers.openai.com](https://developers.openai.com/api/docs/concepts?utm_source=chatgpt.com)\n\n## Who owns OpenAI?\n\nOpenAI was founded in 2015. Its current organizational structure includes two connected parts: the nonprofit OpenAI Foundation and the for-profit OpenAI Group, which operates as a public benefit corporation. [openai.com](https://openai.com/about/?utm_source=chatgpt.com)\n\n## What is the difference between OpenAI and ChatGPT?\n\nThink of it this way\\:\n\n- **OpenAI** is the organization that develops the technology.\n- **ChatGPT** is one of the products you can use.\n- **GPT models** are the underlying AI systems that power ChatGPT and other applications.\n\n## How does OpenAI make a difference in everyday life?\n\nPeople use OpenAI's technology to learn new skills, save time at work, solve problems, explore ideas, and make creative projects easier.\n\nOne important thing to remember: **AI isn't perfect.** It can sometimes make mistakes or give misleading answers, so important information should be verified.\n\nYou can learn more on the official website: [OpenAI.com](https://openai.com/)\\.\n\n---\n\n**Would you like to learn more about OpenAI?**\n\nHow does ChatGPT actually work?\n\nHow does OpenAI make money?\n\nWho founded OpenAI and who runs it?\n\nIs OpenAI safe, and what happens to my information?\n\n[Explain this to me]",
+            "search_results": [
+              {
+                "type": "chatgpt_search_result",
+                "url": "https://openai.com/about/?utm_source=chatgpt.com",
+                "domain": "openai.com",
+                "title": "About | OpenAI",
+                "description": "About | OpenAI  Company  ABOUT  OpenAI is an AI research and deployment company. Our mission is to ensure that artificial general intelligence benefits all of humanity.  OUR VISION FOR THE FUTURE OF...",
+                "breadcrumb": "openai.com"
+              },
+              {
+                "type": "chatgpt_search_result",
+                "url": "https://help.openai.com/en/articles/12677804-what-is-chatgpt-faq?utm_source=chatgpt.com",
+                "domain": "help.openai.com",
+                "title": "What is ChatGPT: FAQ | OpenAI Help Center",
+                "description": "WHAT IS CHATGPT: FAQ  Get started with ChatGPT and find answers about conversations, available plans, privacy, and support.  Updated: 2 months ago  Welcome! This FAQ walks you through the basics: how...",
+                "breadcrumb": "openai.com"
+              },
+              {
+                "type": "chatgpt_search_result",
+                "url": "https://developers.openai.com/api/docs/concepts?utm_source=chatgpt.com",
+                "domain": "developers.openai.com",
+                "title": "Key concepts | OpenAI API",
+                "description": "KEY CONCEPTS  Key concepts to understand when working with the OpenAI API.  Copy Page  At OpenAI, protecting user data is fundamental to our mission. We do not train our models on inputs and outputs...",
+                "breadcrumb": "openai.com"
+              },
+              {
+                "type": "chatgpt_search_result",
+                "url": "https://openai.com/about/?trk=article-ssr-frontend-pulse_x-social-details_comments-action_comment-text&utm_source=chatgpt.com",
+                "domain": "openai.com",
+                "title": "About | OpenAI",
+                "description": "OpenAI  Company  ABOUT  OpenAI is an AI research and deployment company. Our mission is to ensure that artificial general intelligence benefits all of humanity.  OUR VISION FOR THE FUTURE OF AGI  Our...",
+                "breadcrumb": "openai.com"
+              },
+              {
+                "type": "chatgpt_search_result",
+                "url": "https://help.openai.com/en/articles/6783457-custom-gpts-overview?utm_source=chatgpt.com",
+                "domain": "help.openai.com",
+                "title": "What is ChatGPT? | OpenAI Help Center",
+                "description": "WHAT IS CHATGPT?  Commonly asked questions about ChatGPT  Updated: 27 days ago  HOW MUCH DOES IT COST TO USE CHATGPT?  ChatGPT is free to use, though we do have subscription plans available on our pr...",
+                "breadcrumb": "openai.com"
+              },
+              {
+                "type": "chatgpt_search_result",
+                "url": "https://developers.openai.com/?utm_source=chatgpt.com",
+                "domain": "developers.openai.com",
+                "title": "OpenAI Developers",
+                "description": "OPENAI FOR DEVELOPERS  Docs and resources to help you build with, for, and on OpenAI.  GPT-6.1 SOL  Near-Astra performance for complex work at a lower cost.  Explore GPT-6.1 Sol View model details  I...",
+                "breadcrumb": "openai.com"
+              },
+              {
+                "type": "chatgpt_search_result",
+                "url": "https://developers.openai.com/chatgpt?utm_source=chatgpt.com",
+                "domain": "developers.openai.com",
+                "title": "ChatGPT | OpenAI Developers",
+                "description": "BUILD FOR CHATGPT  Apps and experiences developers can build for ChatGPT users.  Looking for ChatGPT + Codex product documentation? Check out learn.chatgpt.com (opens in a new window)  Plugins Build...",
+                "breadcrumb": "openai.com"
+              },
+              {
+                "type": "chatgpt_search_result",
+                "url": "https://openai.com/charter/?o=602&utm_source=chatgpt.com",
+                "domain": "openai.com",
+                "title": "OpenAI Charter | OpenAI",
+                "description": "OPENAI CHARTER  Our Charter describes the principles we use to execute on OpenAI’s mission.  This document reflects the strategy we’ve refined over the past two years, including feedback from many pe...",
+                "breadcrumb": "openai.com"
+              },
+              {
+                "type": "chatgpt_search_result",
+                "url": "https://community.openai.com/t/open-ai-com-blog-addressing-valid-concerns/64304?utm_source=chatgpt.com",
+                "domain": "community.openai.com",
+                "title": "Open ai.com blog addressing valid concerns… - Community - OpenAI Developer Community",
+                "description": "OPEN AI.COM BLOG ADDRESSING VALID CONCERNS…  Alexia February 17, 2023, 1:34am 1  ** How should AI** systems behave, and who should decide? We’re clarifying how ChatGPT’s behavior is shaped and our pl...",
+                "breadcrumb": "openai.com"
+              },
+              {
+                "type": "chatgpt_search_result",
+                "url": "https://openai.com/index/planning-for-agi-and-beyond/?hss_channel=lis-l2XDk_NCpt&utm_source=chatgpt.com",
+                "domain": "openai.com",
+                "title": "Planning for AGI and beyond | OpenAI",
+                "description": "OpenAI  February 24, 2023  Safety  PLANNING FOR AGI AND BEYOND  Our mission is to ensure that artificial general intelligence—AI systems that are generally smarter than humans—benefits all of humanit...",
+                "breadcrumb": "openai.com"
+              }
+            ],
+            "sources": [
+              {
+                "type": "chat_gpt_source",
+                "title": "About",
+                "snippet": null,
+                "domain": "openai.com",
+                "url": "https://openai.com/about/?utm_source=chatgpt.com",
+                "thumbnail": null,
+                "source_name": "OpenAI",
+                "publication_date": null,
+                "markdown": null
+              },
+              {
+                "type": "chat_gpt_source",
+                "title": "What is ChatGPT: FAQ",
+                "snippet": null,
+                "domain": "help.openai.com",
+                "url": "https://help.openai.com/en/articles/12677804-what-is-chatgpt-faq?utm_source=chatgpt.com",
+                "thumbnail": null,
+                "source_name": "OpenAI Help Center",
+                "publication_date": null,
+                "markdown": null
+              },
+              {
+                "type": "chat_gpt_source",
+                "title": "Key concepts",
+                "snippet": null,
+                "domain": "developers.openai.com",
+                "url": "https://developers.openai.com/api/docs/concepts?utm_source=chatgpt.com",
+                "thumbnail": null,
+                "source_name": "OpenAI API",
+                "publication_date": null,
+                "markdown": null
+              },
+              {
+                "type": "chat_gpt_source",
+                "title": "OpenAI.com",
+                "snippet": null,
+                "domain": "openai.com",
+                "url": "https://openai.com/",
+                "thumbnail": null,
+                "source_name": null,
+                "publication_date": null,
+                "markdown": "[OpenAI.com](https://openai.com/)"
+              }
+            ],
+            "fan_out_queries": [
+              "What is OpenAI official about mission products ChatGPT API"
+            ],
+            "brand_entities": [
+              {
+                "type": "chat_gpt_brand_entity",
+                "title": "AI assistant",
+                "category": "software",
+                "markdown": "ChatGPT",
+                "urls": null
+              }
+            ],
+            "se_results_count": 0,
+            "item_types": [
+              "chat_gpt_text",
+              "chat_gpt_images"
+            ],
+            "items_count": 7,
+            "items": [
+              {
+                "type": "chat_gpt_text",
+                "rank_group": 1,
+                "rank_absolute": 1,
+                "markdown": "**OpenAI is an artificial intelligence (AI) research and technology company that created ChatGPT — the AI assistant you're talking to right now.** Its goal is to develop AI that benefits people and society. [openai.com](https://openai.com/about/?utm_source=chatgpt.com)\n\n## What does OpenAI do?\n\n",
+                "sources": [
+                  {
+                    "type": "chat_gpt_source",
+                    "title": "About",
+                    "snippet": null,
+                    "domain": "openai.com",
+                    "url": "https://openai.com/about/?utm_source=chatgpt.com",
+                    "thumbnail": null,
+                    "source_name": "OpenAI",
+                    "publication_date": null,
+                    "markdown": null
+                  }
+                ],
+                "brand_entities": null
+              },
+              {
+                "type": "chat_gpt_images",
+                "rank_group": 1,
+                "rank_absolute": 2,
+                "markdown": "![Seperti Apa Tampilan Ikon Aplikasi iOS Resmi ChatGPT? | OpenAI Help Center](https://images.openai.com/static-rsc-4/d9mnrtJpSff4Kqg4hGh7Xpjp8Us3qsDreLzpt4ReDzFm1VfHhsPd4624tr5z3E961C9fZZ1ExpSmy_I1KZ_4MQOnOJG9tbccgWe60d7m3kQuquaY8Q8AEC3WL5MDKFqyXPbs1KVuukTtAKnCJnOBc803I8ThskkatiezrMNfUIH4IsM7anlxuhkR695bhFXt?purpose=fullsize)",
+                "items": [
+                  {
+                    "type": "chat_gpt_images_element",
+                    "url": "https://help.openai.com/id-id/articles/7905742-what-does-the-official-chatgpt-ios-app-icon-look-like",
+                    "alt": "Seperti Apa Tampilan Ikon Aplikasi iOS Resmi ChatGPT? | OpenAI Help Center",
+                    "image_url": "https://images.openai.com/static-rsc-4/d9mnrtJpSff4Kqg4hGh7Xpjp8Us3qsDreLzpt4ReDzFm1VfHhsPd4624tr5z3E961C9fZZ1ExpSmy_I1KZ_4MQOnOJG9tbccgWe60d7m3kQuquaY8Q8AEC3WL5MDKFqyXPbs1KVuukTtAKnCJnOBc803I8ThskkatiezrMNfUIH4IsM7anlxuhkR695bhFXt?purpose=fullsize",
+                    "markdown": "![Seperti Apa Tampilan Ikon Aplikasi iOS Resmi ChatGPT? | OpenAI Help Center](https://images.openai.com/static-rsc-4/d9mnrtJpSff4Kqg4hGh7Xpjp8Us3qsDreLzpt4ReDzFm1VfHhsPd4624tr5z3E961C9fZZ1ExpSmy_I1KZ_4MQOnOJG9tbccgWe60d7m3kQuquaY8Q8AEC3WL5MDKFqyXPbs1KVuukTtAKnCJnOBc803I8ThskkatiezrMNfUIH4IsM7anlxuhkR695bhFXt?purpose=fullsize)"
+                  }
+                ]
+              },
+              {
+                "type": "chat_gpt_text",
+                "rank_group": 2,
+                "rank_absolute": 3,
+                "markdown": "\n\n**1\\. Creates AI assistants**\n\nOpenAI develops ChatGPT, which can answer questions, explain difficult topics, help with homework, write emails, brainstorm ideas, and assist with coding.\n\n---\n\n",
+                "sources": null,
+                "brand_entities": [
+                  {
+                    "type": "chat_gpt_brand_entity",
+                    "title": "AI assistant",
+                    "category": "software",
+                    "markdown": "ChatGPT",
+                    "urls": null
+                  }
+                ]
+              },
+              {
+                "type": "chat_gpt_images",
+                "rank_group": 2,
+                "rank_absolute": 4,
+                "markdown": "![How OpenAI is building its moat](https://images.openai.com/static-rsc-4/qrpUvbOEs27pMulzx7QjlCUnNrAbBd7gb1g6UaLOahgjVXHDzgr1s5Zy87bHHh1AI8E1f7Y469nTLMVaD7dTbgUS4uk9aiUisz0YJV8eRZriuFvQIQu38WOGO-B0bkzMy_AP7o_DEE2VPeqxUphLVJGpMXImxIzSun051M_JT3UBMAAsTV8tv6ZYGi3wCkkf?purpose=fullsize)",
+                "items": [
+                  {
+                    "type": "chat_gpt_images_element",
+                    "url": "https://bdtechtalks.com/2024/01/15/how-openai-is-building-its-moat/",
+                    "alt": "How OpenAI is building its moat",
+                    "image_url": "https://images.openai.com/static-rsc-4/qrpUvbOEs27pMulzx7QjlCUnNrAbBd7gb1g6UaLOahgjVXHDzgr1s5Zy87bHHh1AI8E1f7Y469nTLMVaD7dTbgUS4uk9aiUisz0YJV8eRZriuFvQIQu38WOGO-B0bkzMy_AP7o_DEE2VPeqxUphLVJGpMXImxIzSun051M_JT3UBMAAsTV8tv6ZYGi3wCkkf?purpose=fullsize",
+                    "markdown": "![How OpenAI is building its moat](https://images.openai.com/static-rsc-4/qrpUvbOEs27pMulzx7QjlCUnNrAbBd7gb1g6UaLOahgjVXHDzgr1s5Zy87bHHh1AI8E1f7Y469nTLMVaD7dTbgUS4uk9aiUisz0YJV8eRZriuFvQIQu38WOGO-B0bkzMy_AP7o_DEE2VPeqxUphLVJGpMXImxIzSun051M_JT3UBMAAsTV8tv6ZYGi3wCkkf?purpose=fullsize)"
+                  }
+                ]
+              },
+              {
+                "type": "chat_gpt_text",
+                "rank_group": 3,
+                "rank_absolute": 5,
+                "markdown": "\n\n**2\\. Researches artificial intelligence**\n\nOpenAI trains AI models to understand and generate language, reason through problems, analyze information, and help people complete tasks.\n\n---\n\n",
+                "sources": null,
+                "brand_entities": null
+              },
+              {
+                "type": "chat_gpt_images",
+                "rank_group": 3,
+                "rank_absolute": 6,
+                "markdown": "![Databricks, Palantir forge strategic partnership to enhance AI integration | Mi3](https://images.openai.com/static-rsc-4/v0-LVHxL3x1bCXS0e7W2LsP6rhP9poH_0lHgbeRXen1kdHTNvBInaTrznbJPlcaheA8Msi-KLVuSK4r3AHHUddP5Xkm-za1Jza8nXWeD9qu8SNufXX-yvYfJL9OtlRABHDf8ExlME4-lTXLBiQDmtgP1oyEjjI4Sdpi781Uhx002GbLwoov5vSnuwNXxDaEQ?purpose=fullsize)",
+                "items": [
+                  {
+                    "type": "chat_gpt_images_element",
+                    "url": "https://www.mi-3.com.au/14-03-2025/databricks-palantir-forge-strategic-partnership-enhance-ai-integration",
+                    "alt": "Databricks, Palantir forge strategic partnership to enhance AI integration | Mi3",
+                    "image_url": "https://images.openai.com/static-rsc-4/v0-LVHxL3x1bCXS0e7W2LsP6rhP9poH_0lHgbeRXen1kdHTNvBInaTrznbJPlcaheA8Msi-KLVuSK4r3AHHUddP5Xkm-za1Jza8nXWeD9qu8SNufXX-yvYfJL9OtlRABHDf8ExlME4-lTXLBiQDmtgP1oyEjjI4Sdpi781Uhx002GbLwoov5vSnuwNXxDaEQ?purpose=fullsize",
+                    "markdown": "![Databricks, Palantir forge strategic partnership to enhance AI integration | Mi3](https://images.openai.com/static-rsc-4/v0-LVHxL3x1bCXS0e7W2LsP6rhP9poH_0lHgbeRXen1kdHTNvBInaTrznbJPlcaheA8Msi-KLVuSK4r3AHHUddP5Xkm-za1Jza8nXWeD9qu8SNufXX-yvYfJL9OtlRABHDf8ExlME4-lTXLBiQDmtgP1oyEjjI4Sdpi781Uhx002GbLwoov5vSnuwNXxDaEQ?purpose=fullsize)"
+                  }
+                ]
+              },
+              {
+                "type": "chat_gpt_text",
+                "rank_group": 4,
+                "rank_absolute": 7,
+                "markdown": "\n\n**3\\. Develops creative tools**\n\nIts technology can help people create images, work with audio, analyze files, write computer programs, and develop new applications. [help.openai.com](https://help.openai.com/en/articles/12677804-what-is-chatgpt-faq?utm_source=chatgpt.com)[developers.openai.com](https://developers.openai.com/api/docs/concepts?utm_source=chatgpt.com)\n\n## Who owns OpenAI?\n\nOpenAI was founded in 2015. Its current organizational structure includes two connected parts: the nonprofit OpenAI Foundation and the for-profit OpenAI Group, which operates as a public benefit corporation. [openai.com](https://openai.com/about/?utm_source=chatgpt.com)\n\n## What is the difference between OpenAI and ChatGPT?\n\nThink of it this way\\:\n\n- **OpenAI** is the organization that develops the technology.\n- **ChatGPT** is one of the products you can use.\n- **GPT models** are the underlying AI systems that power ChatGPT and other applications.\n\n## How does OpenAI make a difference in everyday life?\n\nPeople use OpenAI's technology to learn new skills, save time at work, solve problems, explore ideas, and make creative projects easier.\n\nOne important thing to remember: **AI isn't perfect.** It can sometimes make mistakes or give misleading answers, so important information should be verified.\n\nYou can learn more on the official website: [OpenAI.com](https://openai.com/)\\.\n\n---\n\n**Would you like to learn more about OpenAI?**\n\nHow does ChatGPT actually work?\n\nHow does OpenAI make money?\n\nWho founded OpenAI and who runs it?\n\nIs OpenAI safe, and what happens to my information?\n\n[Explain this to me]",
+                "sources": [
+                  {
+                    "type": "chat_gpt_source",
+                    "title": "What is ChatGPT: FAQ",
+                    "snippet": null,
+                    "domain": "help.openai.com",
+                    "url": "https://help.openai.com/en/articles/12677804-what-is-chatgpt-faq?utm_source=chatgpt.com",
+                    "thumbnail": null,
+                    "source_name": "OpenAI Help Center",
+                    "publication_date": null,
+                    "markdown": null
+                  },
+                  {
+                    "type": "chat_gpt_source",
+                    "title": "Key concepts",
+                    "snippet": null,
+                    "domain": "developers.openai.com",
+                    "url": "https://developers.openai.com/api/docs/concepts?utm_source=chatgpt.com",
+                    "thumbnail": null,
+                    "source_name": "OpenAI API",
+                    "publication_date": null,
+                    "markdown": null
+                  },
+                  {
+                    "type": "chat_gpt_source",
+                    "title": "About",
+                    "snippet": null,
+                    "domain": "openai.com",
+                    "url": "https://openai.com/about/?utm_source=chatgpt.com",
+                    "thumbnail": null,
+                    "source_name": "OpenAI",
+                    "publication_date": null,
+                    "markdown": null
+                  },
+                  {
+                    "type": "chat_gpt_source",
+                    "title": "OpenAI.com",
+                    "snippet": null,
+                    "domain": "openai.com",
+                    "url": "https://openai.com/",
+                    "thumbnail": null,
+                    "source_name": null,
+                    "publication_date": null,
+                    "markdown": "[OpenAI.com](https://openai.com/)"
+                  }
+                ],
+                "brand_entities": null
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "parsed": {
+    "status": "ok",
+    "answerLength": 4185,
+    "citationCount": 4
+  }
+}

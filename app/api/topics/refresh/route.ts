@@ -1,3 +1,4 @@
+import { visibilityGapCandidates } from '@/lib/topics/visibility-gap';
 // POST /api/topics/refresh — 이번 주 추천 토픽 5건 재생성 후 INSERT
 // 절차: 세션 → 후보 생성(룰 + GA4) → GPT-4o TOP5 → 같은 주 DELETE → 5건 INSERT → cost 적재 → audit
 
@@ -80,7 +81,9 @@ export async function POST() {
     }
 
     // 4) 후보 생성
+    const visibilityGaps = await visibilityGapCandidates(ownerId);
     const candidates = buildCandidates({
+      visibilityGaps,
       monthYmd,
       publishedTopics,
       ga4PopularPaths: ga4Popular ?? undefined,
@@ -117,10 +120,11 @@ export async function POST() {
     // 7) INSERT 5건
     const signalsByTopic = new Map(candidates.map(c => [c.topic, c.signal]));
     const rows = recommended.items.map(item => {
-      const factors: Record<string, Prisma.InputJsonValue> = {
+      const factors: Record<string, Prisma.InputJsonValue | null> = {
         tags: item.tags as unknown as Prisma.InputJsonValue,
         reason: item.reason,
-        signal: signalsByTopic.get(item.topic) ?? 'core',
+        signal: item.factors ? 'ai_visibility_gap' : signalsByTopic.get(item.topic) ?? 'core',
+        ...(item.factors ? { ...item.factors } : {}),
       };
       if (ga4Unavailable) factors.ga4_unavailable = true;
       return {

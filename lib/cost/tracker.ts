@@ -1,8 +1,9 @@
 // lib/cost/tracker.ts — cost_ledger 적재 (서버 전용)
 
 import { prisma } from '@/lib/prisma';
+import type { Prisma } from '@prisma/client';
 
-export type CostKind = 'chat' | 'embedding' | 'image' | 'external';
+export type CostKind = 'chat' | 'embedding' | 'image' | 'external' | 'visibility';
 
 export interface TrackCostOptions {
   ownerId: string;
@@ -13,9 +14,9 @@ export interface TrackCostOptions {
   contentId?: string | null;
 }
 
-export async function trackCost(options: TrackCostOptions): Promise<void> {
+export async function trackCost(options: TrackCostOptions, config?: { strict?: boolean; db?: Prisma.TransactionClient }): Promise<void> {
   try {
-    await prisma.costLedger.create({
+    await (config?.db ?? prisma).costLedger.create({
       data: {
         ownerId: options.ownerId,
         kind: options.kind,
@@ -26,7 +27,8 @@ export async function trackCost(options: TrackCostOptions): Promise<void> {
       },
     });
   } catch (error) {
-    // cost 적재 실패는 서비스 중단 불필요 — 로그만 기록
+    if (config?.strict) throw error;
+    // 기존 호출부의 동작 유지
     console.error('[cost/tracker] costLedger insert 실패:', error);
   }
 }

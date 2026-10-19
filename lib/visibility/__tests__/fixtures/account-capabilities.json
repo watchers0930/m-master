@@ -1,0 +1,75 @@
+{
+  "observedAt": "2026-10-19T08:40:13.049Z",
+  "verified": [
+    {
+      "engine": "chat_gpt",
+      "list": "locations",
+      "status": 20000,
+      "matches": [
+        {
+          "location_code": 2036
+        },
+        {
+          "location_code": 2124
+        },
+        {
+          "location_code": 2410
+        },
+        {
+          "location_code": 2826
+        },
+        {
+          "location_code": 2840
+        }
+      ]
+    },
+    {
+      "engine": "chat_gpt",
+      "list": "languages",
+      "status": 20000,
+      "matches": [
+        {
+          "language_code": "en"
+        },
+        {
+          "language_code": "ko"
+        }
+      ]
+    },
+    {
+      "engine": "gemini",
+      "list": "locations",
+      "status": 20000,
+      "matches": [
+        {
+          "location_code": 2036
+        },
+        {
+          "location_code": 2124
+        },
+        {
+          "location_code": 2410
+        },
+        {
+          "location_code": 2826
+        },
+        {
+          "location_code": 2840
+        }
+      ]
+    },
+    {
+      "engine": "gemini",
+      "list": "languages",
+      "status": 20000,
+      "matches": [
+        {
+          "language_code": "en"
+        },
+        {
+          "language_code": "ko"
+        }
+      ]
+    }
+  ]
+}

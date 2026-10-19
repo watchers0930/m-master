@@ -12,6 +12,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/analytics': '성과 분석',
   '/visitors': '방문자 분석',
   '/ab-test': 'A/B 테스트',
+  '/visibility': 'AI 가시성',
   '/rag': 'RAG 지식베이스',
   '/settings': '설정',
 };

@@ -3,6 +3,7 @@
 
 import { z } from 'zod';
 import { CLAUDE_MODEL, getClient, toChatUsage, type ChatUsage } from '@/lib/claude/chat';
+import type { VisibilityGapEvidence } from './visibility-gap';
 import type { Candidate, BusinessContext } from './candidates';
 
 export type TagType = 's' | 'e' | 't'; // s=시즌, e=SEO/경쟁도, t=트렌드
@@ -13,6 +14,7 @@ export interface TopicTag {
 }
 
 export interface RecommendedTopic {
+  factors?: VisibilityGapEvidence;
   rank: number; // 1~7
   topic: string; // 80자 이내
   score: number; // 0~100
@@ -47,6 +49,7 @@ const ItemSchema = z.object({
   score: z.number().min(0).max(100),
   tags: z.array(TagSchema).max(3),
   reason: z.string().min(1).max(60),
+  candidateIndex: z.number().int().min(1).optional(),
 });
 
 const ResponseSchema = z.object({
@@ -116,6 +119,7 @@ function clamp(n: number, min: number, max: number): number {
 function sanitize(items: RecommendedTopic[]): RecommendedTopic[] {
   const sorted = [...items]
     .map(it => ({
+      ...(it.factors ? { factors: it.factors } : {}),
       rank: clamp(Math.floor(it.rank), 1, 7),
       topic: it.topic.slice(0, 80),
       score: clamp(it.score, 0, 100),
@@ -145,6 +149,7 @@ function fillFromCandidates(
     if (used.has(c.topic)) continue;
     used.add(c.topic);
     filled.push({
+      factors: c.factors,
       rank: filled.length + 1,
       topic: c.topic.slice(0, 80),
       score: 60 + c.weight, // 보정 점수
@@ -166,10 +171,10 @@ export async function recommendTopFive(input: RecommendInput): Promise<Recommend
   const userPrompt = [
     `후보 목록 (${input.candidates.length}개):`,
     ...input.candidates.map((c, i) =>
-      `${i + 1}. [${c.signal}/w${c.weight}] ${c.topic}`,
+      `${i + 1}. [${c.signal}/w${c.weight}] ${c.topic}${c.factors ? ` 근거=${JSON.stringify(c.factors)}` : ""}`,
     ),
     '',
-    '위 후보에서 TOP 7을 선정하여 submit_recommendations를 호출하세요.',
+    '위 후보에서 TOP 7을 선정하여 submit_recommendations를 호출하세요. 각 항목 candidateIndex에 후보 번호를 반드시 포함하세요. ai_visibility_gap은 관측된 미노출 개선 기회로 우선 고려하되 브랜드 언급을 보장하지 마세요.',
   ].join('\n');
 
   const response = await client.chat.completions.create({
@@ -192,6 +197,7 @@ export async function recommendTopFive(input: RecommendInput): Promise<Recommend
               items: {
                 type: 'object',
                 properties: {
+                  candidateIndex: { type: 'integer', minimum: 1, maximum: input.candidates.length },
                   rank: { type: 'integer', minimum: 1, maximum: 7 },
                   topic: { type: 'string', maxLength: 80 },
                   score: { type: 'number', minimum: 0, maximum: 100 },
@@ -209,7 +215,7 @@ export async function recommendTopFive(input: RecommendInput): Promise<Recommend
                   },
                   reason: { type: 'string', maxLength: 60 },
                 },
-                required: ['rank', 'topic', 'score', 'tags', 'reason'],
+                required: ['candidateIndex', 'rank', 'topic', 'score', 'tags', 'reason'],
               },
             },
           },
@@ -236,14 +242,14 @@ export async function recommendTopFive(input: RecommendInput): Promise<Recommend
   const safe = ResponseSchema.safeParse(parsedRaw);
   let items: RecommendedTopic[] = [];
   if (safe.success) {
-    items = safe.data.items;
+    items = safe.data.items.map(item => ({ ...item, factors: item.candidateIndex ? input.candidates[item.candidateIndex - 1]?.factors : undefined }));
   } else {
     // 실패 시 raw에서 가능한 항목만 추출
     const rawObj = parsedRaw as { items?: unknown[] };
     const rawItems = Array.isArray(rawObj?.items) ? rawObj.items : [];
     for (const ri of rawItems) {
       const it = ItemSchema.safeParse(ri);
-      if (it.success) items.push(it.data);
+      if (it.success) items.push({ ...it.data, factors: it.data.candidateIndex ? input.candidates[it.data.candidateIndex - 1]?.factors : undefined });
     }
   }
 
