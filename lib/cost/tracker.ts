@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
 
-export type CostKind = 'chat' | 'embedding' | 'image' | 'external' | 'visibility' | 'seo';
+export type CostKind = 'chat' | 'embedding' | 'image' | 'external' | 'visibility' | 'seo' | 'consulting';
 
 export interface TrackCostOptions {
   ownerId: string;

@@ -4,8 +4,10 @@
 // AI 가시성 추적 대시보드 — 패칭·조립만 (≤500줄). 표시=components/, 패칭·상태=hooks/.
 // 설계 §1.2·§3.8 계약을 따르며 알고리즘은 포함하지 않는다.
 
-import { useMemo, useState } from 'react';
-import { DEFAULT_MARKET } from './constants';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { DEFAULT_MARKET, MARKET_LABELS } from './constants';
 import { VisibilityGate } from './components/VisibilityGate';
 import { VisibilityFilters, type FiltersState } from './components/VisibilityFilters';
 import { EngineBreakdown } from './components/EngineBreakdown';
@@ -13,6 +15,7 @@ import { SovTrendChart } from './components/SovTrendChart';
 import { CompetitorCompare } from './components/CompetitorCompare';
 import { CitationSources } from './components/CitationSources';
 import { QueryManager } from './components/QueryManager';
+import { useDomains } from './hooks/use-domains';
 import { useVisibilityQueries } from './hooks/use-visibility-queries';
 import { useVisibilityData } from './hooks/use-visibility-data';
 
@@ -39,7 +42,7 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub?: string
   );
 }
 
-export default function VisibilityPage() {
+function VisibilityPageInner() {
   const initialRange = useMemo(() => recentRange(30), []);
   const [filters, setFilters] = useState<FiltersState>({
     market: DEFAULT_MARKET,
@@ -49,9 +52,30 @@ export default function VisibilityPage() {
     engine: null,
   });
 
+  // 컨설팅 등 타 화면에서 넘어온 domainId 딥링크 — 소유 도메인과 대조해 질문 범위·시장을 좁힌다(지적 2).
+  const searchParams = useSearchParams();
+  const requestedDomainId = searchParams.get('domainId');
+  const domainsQuery = useDomains(!!requestedDomainId);
+  const scopedDomain = requestedDomainId
+    ? domainsQuery.data?.find((d) => d.id === requestedDomainId) ?? null
+    : null;
+  // 딥링크 ID 가 소유 목록에 없으면(미존재·타 소유자) 범위를 적용하지 않고 안내만 한다.
+  const deepLinkUnresolved = !!requestedDomainId && !domainsQuery.isPending && !scopedDomain;
+
   // 질문 목록 (필터 드롭다운 + 질문 관리 공용 — react-query 캐시 공유)
   const queriesQuery = useVisibilityQueries({ limit: 100 });
   const queries = queriesQuery.data?.pages.flatMap((page) => page.data) ?? [];
+
+  // 딥링크 도메인으로 좁힌 질문 목록(집계 API 는 도메인 필터가 없어 질문 범위만 좁힌다 — 아래 안내로 명시).
+  const scopedQueries = scopedDomain ? queries.filter((q) => q.domainId === scopedDomain.id) : queries;
+
+  // 유효 딥링크면 시장 필터를 해당 도메인 시장으로 1회 맞춘다(이후 사용자의 수동 변경은 덮지 않음).
+  const appliedScopeRef = useRef(false);
+  useEffect(() => {
+    if (appliedScopeRef.current || !scopedDomain) return;
+    appliedScopeRef.current = true;
+    setFilters((f) => ({ ...f, market: scopedDomain.market, queryId: null }));
+  }, [scopedDomain]);
 
   // 집계 데이터
   const dataQuery = useVisibilityData({
@@ -88,12 +112,27 @@ export default function VisibilityPage() {
       </div>
 
       <VisibilityGate>
+        {/* 딥링크 도메인 범위 안내 (지적 2) — 집계 KPI·차트는 시장 전체 기준임을 명시 */}
+        {scopedDomain && (
+          <div role="status" className="card" style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: '10px 16px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11.5, color: 'var(--text)', flex: 1, minWidth: 220, lineHeight: 1.6 }}>
+              <strong>{scopedDomain.url}</strong> 도메인의 추적 질문 {scopedQueries.length}개로 좁혔습니다.
+              KPI·차트 집계는 시장({MARKET_LABELS[scopedDomain.market]}) 전체 기준입니다.
+            </span>
+            <Link href="/visibility" className="btn btn-ghost" style={{ padding: '4px 10px', flexShrink: 0 }}>전체 보기</Link>
+          </div>
+        )}
+        {deepLinkUnresolved && (
+          <div role="status" className="card" style={{ padding: '10px 16px' }}>
+            <span style={{ fontSize: 11.5, color: 'var(--sub)' }}>요청한 도메인을 찾을 수 없어 전체 기준으로 표시합니다.</span>
+          </div>
+        )}
         {queriesQuery.hasNextPage && (
           <button className="btn btn-ghost" disabled={queriesQuery.isFetchingNextPage} onClick={() => queriesQuery.fetchNextPage()}>
             {queriesQuery.isFetchingNextPage ? '불러오는 중…' : '질문 더 보기'}
           </button>
         )}
-        <VisibilityFilters value={filters} queries={queries} onChange={setFilters} />
+        <VisibilityFilters value={filters} queries={scopedQueries} onChange={setFilters} />
 
         {/* KPI 요약 */}
         <div className="kpi-row" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
@@ -136,5 +175,14 @@ export default function VisibilityPage() {
         />
       </VisibilityGate>
     </div>
+  );
+}
+
+export default function VisibilityPage() {
+  // useSearchParams 는 Suspense 경계가 필요하다(Next.js app router).
+  return (
+    <Suspense fallback={null}>
+      <VisibilityPageInner />
+    </Suspense>
   );
 }

@@ -4,7 +4,8 @@
 // SEO 진단 대시보드 — 패칭·조립만 (≤500줄). 표시=components/, 패칭·상태=hooks/.
 // 설계 §1.2·§8 계약을 따르며 수집/판정/점수/집계 알고리즘은 포함하지 않는다(서버 lib/seo).
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import type { Market } from '@/types/visibility';
 import type { SeoAuditDTO } from '@/types/seo';
 import { SeoGate, useSeoAccess } from './components/SeoGate';
@@ -48,6 +49,10 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub?: string
 function SeoAuditContent() {
   const { canWrite } = useSeoAccess();
 
+  // 컨설팅 등 타 화면에서 넘어온 domainId 딥링크 — 소유 도메인 목록과 대조해 초기 선택에 반영(지적 2).
+  const searchParams = useSearchParams();
+  const requestedDomainId = searchParams.get('domainId');
+
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
   const [activeAuditId, setActiveAuditId] = useState<string | null>(null);
 
@@ -63,10 +68,12 @@ function SeoAuditContent() {
   const domainsQuery = useDomains();
   const domains = useMemo(() => domainsQuery.data ?? [], [domainsQuery.data]);
 
-  // 첫 도메인 자동 선택 (목록 로드 후)
+  // 초기 도메인 선택 — 딥링크 domainId 가 소유 목록에 있으면 그 도메인을, 없으면(미존재·타 소유자) 첫 도메인(지적 2).
   useEffect(() => {
-    if (!selectedDomainId && domains.length > 0) setSelectedDomainId(domains[0].id);
-  }, [domains, selectedDomainId]);
+    if (selectedDomainId || domains.length === 0) return;
+    const deepLinked = requestedDomainId && domains.some((d) => d.id === requestedDomainId) ? requestedDomainId : null;
+    setSelectedDomainId(deepLinked ?? domains[0].id);
+  }, [domains, selectedDomainId, requestedDomainId]);
 
   const selectedDomain = domains.find((d) => d.id === selectedDomainId) ?? null;
   const market: Market = selectedDomain?.market ?? DEFAULT_MARKET;
@@ -235,7 +242,9 @@ export default function SeoAuditPage() {
       </div>
 
       <SeoGate>
-        <SeoAuditContent />
+        <Suspense fallback={null}>
+          <SeoAuditContent />
+        </Suspense>
       </SeoGate>
     </div>
   );

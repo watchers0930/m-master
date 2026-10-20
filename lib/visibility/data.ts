@@ -8,7 +8,7 @@ import { citationHost } from "./normalize";
 import { encodeCursor } from "./cursor";
 const rate = (n: number, d: number) => d ? n / d : null;
 type Counts = { engine: string; day: string | null; valid: number; citationValid: number; mentioned: number; cited: number; unresolved: number; failed: number; latest: Date };
-export async function visibilityData(ownerId: string, filter: z.infer<typeof dataSchema>): Promise<VisibilityDataResponse> {
+export async function visibilityData(ownerId: string, filter: z.infer<typeof dataSchema>, db: Pick<Prisma.TransactionClient, "$queryRaw"> = prisma): Promise<VisibilityDataResponse> {
   const { market, queryId, domainId, engine, from, to, citationLimit, citationCursor } = filter;
   // All sample facts and denominators stay in PostgreSQL; no snapshot/mention hydration.
   const base = Prisma.sql`WITH filtered AS (
@@ -23,7 +23,7 @@ export async function visibilityData(ownerId: string, filter: z.infer<typeof dat
       ${engine ? Prisma.sql`AND s.engine = ${engine}` : Prisma.empty}
   )`;
   const [counts, competitors, page] = await Promise.all([
-    prisma.$queryRaw<Counts[]>(Prisma.sql`${base}, facts AS (
+    db.$queryRaw<Counts[]>(Prisma.sql`${base}, facts AS (
       SELECT s.id, s.engine, s.captured_at, s.status,
         s.status = 'ok' AND EXISTS (SELECT 1 FROM visibility_mentions m WHERE m.snapshot_id=s.id AND m.subject='brand')
           AND NOT EXISTS (SELECT 1 FROM visibility_mentions m WHERE m.snapshot_id=s.id AND m.subject='brand' AND NOT m.resolvable) AS valid,
@@ -40,7 +40,7 @@ export async function visibilityData(ownerId: string, filter: z.infer<typeof dat
       (count(*) FILTER (WHERE status IN ('failed','no_result')))::int AS failed,
       max(captured_at) AS latest
     FROM facts GROUP BY GROUPING SETS ((engine), (engine, to_char(captured_at, 'YYYY-MM-DD')))`),
-    prisma.$queryRaw<CompetitorScore[]>(Prisma.sql`${base}, subjects AS (
+    db.$queryRaw<CompetitorScore[]>(Prisma.sql`${base}, subjects AS (
       SELECT s.id, m.label, bool_and(m.resolvable) AS valid, bool_or(m.mentioned) AS mentioned,
         bool_or(m.resolvable AND m.cited) AS cited
       FROM filtered s JOIN visibility_mentions m ON m.snapshot_id=s.id
@@ -48,7 +48,7 @@ export async function visibilityData(ownerId: string, filter: z.infer<typeof dat
     ) SELECT label, (count(*) FILTER (WHERE valid AND mentioned))::int AS "mentionedCount",
       (count(*) FILTER (WHERE valid AND mentioned))::float / NULLIF(count(*) FILTER (WHERE valid),0) AS "mentionRate",
       bool_or(cited) AS cited FROM subjects GROUP BY label ORDER BY "mentionedCount" DESC, label LIMIT 100`),
-    prisma.$queryRaw<(CitationItem & { id: string; ordinal: number; domain: string | null })[]>(Prisma.sql`${base}
+    db.$queryRaw<(CitationItem & { id: string; ordinal: number; domain: string | null })[]>(Prisma.sql`${base}
       SELECT s.id, c.ordinality::int AS ordinal, c.item->>'url' AS url, c.item->>'title' AS title,
         (c.item->>'position')::int AS position, s.engine, s.captured_at AS "capturedAt",
         s.captured_domain AS domain

@@ -13,6 +13,7 @@ export const PLAN_LIMITS = {
     visibility: false,
     visibilityQueries: 0,
     domains: 1,
+    consulting: false,
     seo: false,
     seoAuditsPerMonth: 0,
     seoKeywordsPerDomain: 0,
@@ -26,6 +27,7 @@ export const PLAN_LIMITS = {
     visibility: true,
     visibilityQueries: 10,
     domains: 5,
+    consulting: true,
     seo: true,
     seoAuditsPerMonth: 10,
     seoKeywordsPerDomain: 100,
@@ -39,6 +41,7 @@ export const PLAN_LIMITS = {
     visibility: true,
     visibilityQueries: -1,
     domains: -1,
+    consulting: true,
     seo: true,
     seoAuditsPerMonth: 50,
     seoKeywordsPerDomain: 500,
@@ -46,7 +49,7 @@ export const PLAN_LIMITS = {
 } as const;
 
 export type PlanKey = keyof typeof PLAN_LIMITS;
-export type FeatureKey = "rag" | "abTest" | "visibility" | "seo";
+export type FeatureKey = "rag" | "abTest" | "visibility" | "seo" | "consulting";
 
 /** DB에서 유저 플랜 조회 (API route에서 간편 사용) */
 export async function getUserPlan(userId: string): Promise<PlanKey> {
@@ -142,6 +145,7 @@ export function checkFeatureAccess(plan: string, feature: FeatureKey): void {
       abTest: "A/B 테스트",
       visibility: "AI 가시성",
       seo: "SEO 진단",
+      consulting: "마케팅 컨설팅",
     };
     throw new Error(
       `${featureNames[feature]}은(는) ${plan === "free" ? "Starter" : "Pro"} 플랜부터 사용 가능합니다.`,
@@ -154,6 +158,7 @@ export const FEATURE_MIN_PLAN: Record<FeatureKey, PlanKey> = {
   abTest: "pro",
   visibility: "starter",
   seo: "starter",
+  consulting: "starter",
 };
 
 export async function checkVisibilityQueryLimit(

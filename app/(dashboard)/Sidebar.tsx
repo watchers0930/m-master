@@ -104,6 +104,12 @@ export function Sidebar() {
           </svg>
           SEO 진단
         </Link>
+        <Link href="/consulting" prefetch={false} className={`sb-item${active('/consulting') ? ' active' : ''}`}>
+          <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+          </svg>
+          마케팅 컨설팅
+        </Link>
         <Link href="/visitors" prefetch={false} className={`sb-item${active('/visitors') ? ' active' : ''}`}>
           <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
             <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>

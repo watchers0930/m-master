@@ -26,7 +26,9 @@ export function jsonError(error: unknown) {
     );
   if (error instanceof VisibilityError)
     return NextResponse.json(
-      { error: { code: error.code, message: error.message } },
+      { error: { code: error.code, message: error.message,
+        ...(["generation_in_progress", "generation_uncertain"].includes(error.code) && "reportId" in error && typeof error.reportId === "string" ? { reportId: error.reportId } : {}),
+      } },
       { status: error.status },
     );
   console.error("[visibility] request failed", {

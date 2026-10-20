@@ -8,6 +8,7 @@ import type { DomainDTO } from "@/types/visibility";
 import type { z } from "zod";
 import type { domainCreateSchema } from "@/schemas/visibility";
 import { logAudit } from "@/lib/audit/logger";
+import { expireStaleReports } from "@/lib/consulting/lifecycle";
 import { expireAbandonedAudit } from "@/lib/seo/reservations";
 const select = {
   id: true,
@@ -104,6 +105,11 @@ export async function deleteDomain(ownerId: string, id: string) {
       }))
     )
       notFound();
+    await expireStaleReports(tx, ownerId);
+    if (await tx.consultingReport.count({ where: {
+      ownerId, domainId: id,
+      OR: [{ status: { in: ["generating", "uncertain"] } }, { reservedKrw: { gt: 0 } }],
+    } })) throw new VisibilityError("conflict", "진행 중인 컨설팅 비용을 먼저 정산하세요.", 409);
     await expireAbandonedAudit(tx, ownerId, id);
     if (
       await tx.seoAudit.count({

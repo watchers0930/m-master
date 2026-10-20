@@ -73,7 +73,7 @@ export async function pendingReservedKrw(
   tx: Prisma.TransactionClient,
   ownerId: string,
 ) {
-  const [geo, seo] = await Promise.all([
+  const [geo, seo, consulting] = await Promise.all([
     tx.visibilitySnapshot.count({
       where: { query: { ownerId }, status: "pending" },
     }),
@@ -84,6 +84,10 @@ export async function pendingReservedKrw(
       },
       _sum: { reservedKrw: true },
     }),
+    tx.consultingReport.aggregate({
+      where: { ownerId, OR: [{ ledgerId: null }, { reservedKrw: { gt: 0 } }] },
+      _sum: { reservedKrw: true },
+    }),
   ]);
-  return geo * CAPTURE_RESERVE_KRW + (seo._sum.reservedKrw ?? 0);
+  return (consulting._sum.reservedKrw ?? 0) + geo * CAPTURE_RESERVE_KRW + (seo._sum.reservedKrw ?? 0);
 }

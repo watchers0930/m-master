@@ -106,7 +106,8 @@ export class DataForSeoClient {
       }
       if (!response.ok)
         throw new DataForSeoError(
-          response.status === 401 ? "vendor_auth_failed" : "vendor_http_failed",
+          response.status === 401 ? "vendor_auth_failed" :
+            [400, 403, 404, 413, 422, 429].includes(response.status) ? "vendor_request_rejected" : "vendor_http_failed",
         );
       let raw: unknown;
       try {

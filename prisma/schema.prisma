@@ -328,6 +328,7 @@ model Domain {
   owner             User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   seoAudits SeoAudit[]
   seoKeywords SeoKeyword[]
+  consultingReports ConsultingReport[]
   visibilityQueries VisibilityQuery[]
   @@unique([ownerId, url]) // 같은 소유자·호스트 중복 차단. 서로 다른 소유자는 같은 호스트 가능
   @@index([ownerId])
@@ -498,4 +499,35 @@ model SeoTask {
   @@index([ownerId, status, leaseUntil])
   @@index([auditId])
   @@map("seo_tasks")
+}
+
+model ConsultingReport { // consulting_reports — 마케팅 컨설팅 리포트
+  id                String    @id @default(cuid())
+  domainId          String    @map("domain_id")
+  ownerId           String    @map("owner_id")        // 설계 추가(위 사유)
+  market            String    @default("ko-KR")       // 분석 시점 market
+  diagnosisSummary  String?   @map("diagnosis_summary") @db.Text  // 완료 전 null
+  strategyJson      Json?     @map("strategy_json")    // 채널 믹스·근거·한계. 완료 전 null
+  budgetProposal    Json?     @map("budget_proposal")  // 완료 전 null
+  priorityActions   Json?     @map("priority_actions") // 완료 전 null
+  inputSnapshotHash String    @map("input_snapshot_hash")
+  inputSnapshot     Json      @map("input_snapshot")   // 정규화 입력·evidence·소스 상태
+  schemaVersion     String    @default("v1") @map("schema_version")
+  promptVersion     String    @map("prompt_version")
+  model             String                             // 'gpt-4o'
+  status            String    @default("generating")   // generating | completed | failed | uncertain
+  failCode          String?   @map("fail_code")        // 사용자 공개 가능 실패 코드
+  attemptId         String    @map("attempt_id")       // LLM 호출 시도 ID(감사·정산 추적)
+  ledgerId          String?   @map("ledger_id")        // CostLedger 연결. 중복 과금 방지(nullable unique)
+  costKrw           Float     @default(0) @map("cost_krw")       // 정산된 실사용 비용
+  reservedKrw       Float     @default(0) @map("reserved_krw")   // 진행 중 보유액(정산 시 0)
+  startedAt         DateTime? @map("started_at")        // LLM 호출 경계
+  generatedAt       DateTime? @map("generated_at")      // 성공 생성일. 완료 전 null
+  createdAt         DateTime  @default(now()) @map("created_at")
+  domain Domain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  @@unique([domainId, market, inputSnapshotHash])
+  @@unique([ledgerId])
+  @@index([domainId, createdAt(sort: Desc), id])
+  @@index([ownerId, createdAt(sort: Desc), id])
+  @@map("consulting_reports")
 }
