@@ -57,6 +57,10 @@ export const rankingSchema = z
   .strictObject({ ...base, keywordIds: ids, engines })
   .refine((v) => v.keywordIds.length * v.engines.length <= 10);
 export const resumeSchema = z.strictObject({});
+export const seoCronSchema = z.strictObject({
+  limit: z.coerce.number().int().min(1).max(20).default(10),
+  passes: z.coerce.number().int().min(1).max(10).default(6),
+});
 export const cursorSchema = z.string().max(1000);
 const list = {
   domainId: idSchema,

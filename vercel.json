@@ -1,6 +1,7 @@
 {
   "framework": "nextjs",
   "crons": [
-    { "path": "/api/cron/visibility-track", "schedule": "0 0 * * *" }
+    { "path": "/api/cron/visibility-track", "schedule": "0 0 * * *" },
+    { "path": "/api/cron/seo-resume", "schedule": "*/15 * * * *" }
   ]
 }

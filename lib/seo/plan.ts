@@ -32,6 +32,15 @@ export interface TaskPlan {
   status: string;
   failReason?: string;
 }
+/** TaskPlan → SeoTask.create 입력. frozenInput 직렬화 캐스팅만 담당. */
+export function taskData(t: TaskPlan, ownerId: string, runKey: string) {
+  return {
+    ...t,
+    ownerId,
+    runKey,
+    frozenInput: t.frozenInput as unknown as Prisma.InputJsonValue,
+  };
+}
 export function taskPlan(
   operation: string,
   itemKey: string,

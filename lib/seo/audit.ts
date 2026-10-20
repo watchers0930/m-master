@@ -14,11 +14,11 @@ import { filterHash } from "./pagination";
 import { checkSeoBudget } from "./budget";
 import {
   buildPlans,
-  rankPlans,
+  taskData,
   type Config,
   type RunInput,
-  type TaskPlan,
 } from "./plan";
+import { scheduleAutomaticRankings } from "./automatic-rankings";
 import { claimTasks } from "./tasks";
 import { executeTask } from "./execute";
 import {
@@ -179,110 +179,16 @@ function conflict(): never {
     409,
   );
 }
-function taskData(t: TaskPlan, ownerId: string, runKey: string) {
-  return {
-    ...t,
-    ownerId,
-    runKey,
-    frozenInput: t.frozenInput as unknown as Prisma.InputJsonValue,
-  };
-}
 export async function resumeAudit(ownerId: string, id: string) {
   await getAudit(ownerId, id);
   await processAudit(ownerId, id);
   return getAudit(ownerId, id);
 }
-async function scheduleAutomaticRankings(ownerId: string, id: string) {
-  await prisma.$transaction(async (tx) => {
-    const plan = await lockOwner(tx, ownerId);
-    const audit = await tx.seoAudit.findFirst({
-      where: { id, domain: { ownerId } },
-    });
-    if (!audit) notFound();
-    const config = audit.frozenConfig as unknown as Config;
-    if (!config.autoRankings) return;
-    const research = await tx.seoTask.count({
-      where: {
-        auditId: id,
-        operation: { in: ["labs_ranked", "keywords_for_site"] },
-        status: { in: ["pending", "claimed", "submitted"] },
-      },
-    });
-    if (research) return;
-    try {
-      checkSeoFeature(plan);
-      const candidates = await tx.seoKeyword.findMany({
-        where: {
-          domainId: audit.domainId,
-          market: audit.market,
-          engine: "google",
-          lastAuditId: id,
-        },
-        select: { id: true },
-        orderBy: [{ searchVolume: "desc" }, { id: "asc" }],
-        take: Math.floor(10 / config.engines.length),
-      });
-      const frozen = {
-        ...config,
-        autoRankings: false,
-        autoRankingsState: "scheduled" as const,
-        keywordIds: candidates.map((k) => k.id),
-      };
-      const tasks = await rankPlans(tx, ownerId, frozen, plan, true);
-      await checkSeoBudget(
-        tx,
-        ownerId,
-        plan,
-        tasks.reduce((n, t) => n + t.reservedKrw, 0),
-      );
-      if (tasks.length)
-        await tx.seoTask.createMany({
-          data: tasks.map((t) => ({
-            ...taskData(t, ownerId, audit.runKey),
-            auditId: id,
-          })),
-          skipDuplicates: true,
-        });
-      await tx.seoAudit.update({
-        where: { id },
-        data: { frozenConfig: frozen as unknown as Prisma.InputJsonValue },
-      });
-    } catch (error) {
-      // Policy/budget refusals are genuine incomplete work, not unsupported skips.
-      // Database failures still abort, so no failed transaction is used for further writes.
-      if (!(error instanceof VisibilityError)) throw error;
-      await tx.seoTask.createMany({
-        data: [
-          {
-            auditId: id,
-            ownerId,
-            runKey: audit.runKey,
-            operation: "automatic_rankings",
-            itemKey: "-",
-            frozenInput: {},
-            status: "failed",
-            reservedKrw: 0,
-            failReason:
-              "예산 또는 실행 조건으로 자동 순위 수집을 생략했습니다.",
-          },
-        ],
-        skipDuplicates: true,
-      });
-      await tx.seoAudit.update({
-        where: { id },
-        data: {
-          frozenConfig: {
-            ...config,
-            autoRankings: false,
-            autoRankingsState: "skipped",
-          } as unknown as Prisma.InputJsonValue,
-        },
-      });
-      await releaseKeywordReservations(tx, audit.domainId);
-    }
-  });
-}
-async function processAudit(ownerId: string, id: string) {
+export async function processAudit(
+  ownerId: string,
+  id: string,
+  options: { collectOnly?: boolean } = {},
+) {
   await prisma.$transaction(async (tx) => {
     await lockOwner(tx, ownerId);
     await recoverExpired(tx, ownerId, id);
@@ -294,12 +200,15 @@ async function processAudit(ownerId: string, id: string) {
   });
   // At most two tasks per request, at most two concurrent external collectors.
   // Processing result-only tasks also consumes a slot, keeping I/O bounded.
+  // collectOnly restricts work to already-submitted tasks (vendorTaskId present):
+  // task_get reconciliation never bills, and no never-submitted task is posted.
   const candidates = await prisma.seoTask.findMany({
     where: {
       auditId: id,
       ownerId,
       status: { in: ["pending", "claimed", "submitted"] },
       OR: [{ leaseUntil: null }, { leaseUntil: { lte: new Date() } }],
+      ...(options.collectOnly ? { vendorTaskId: { not: null } } : {}),
     },
     select: { id: true },
     orderBy: { createdAt: "asc" },
@@ -310,6 +219,11 @@ async function processAudit(ownerId: string, id: string) {
     candidates.map((candidate) => candidate.id),
   );
   await Promise.all(claims.map((task) => executeTask(task)));
+  // collectOnly never schedules new paid work; it only reconciles and finalizes.
+  if (options.collectOnly) {
+    await synthesize(ownerId, id);
+    return;
+  }
   // New candidates are only reserved here; they are submitted by an explicit subsequent resume.
   try {
     await scheduleAutomaticRankings(ownerId, id);
