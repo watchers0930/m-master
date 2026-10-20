@@ -44,7 +44,7 @@ export function taskPlan(
       itemKey,
       frozenInput: input,
       reservedKrw: 0,
-      status: "failed",
+      status: "skipped",
       failReason: "지원이 확인되지 않은 작업입니다.",
     };
   return {

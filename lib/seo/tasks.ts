@@ -46,6 +46,25 @@ async function claimInTransaction(
     (task.leaseUntil && task.leaseUntil.getTime() > Date.now())
   )
     return null;
+  const input = task.frozenInput as unknown as FrozenInput;
+  // Only never-submitted work may be skipped. Paid work must still reconcile.
+  if (
+    !task.vendorTaskId &&
+    !task.resultCheckpoint &&
+    !supported(task.operation, input.market)
+  ) {
+    await tx.seoTask.updateMany({
+      where: { id, ownerId, claimVersion: task.claimVersion, status: task.status },
+      data: {
+        status: "skipped",
+        failReason: "지원이 확인되지 않은 작업입니다.",
+        reservedKrw: 0,
+        leaseUntil: null,
+        claimVersion: { increment: 1 },
+      },
+    });
+    return null;
+  }
   if (
     (await tx.seoTask.count({
       where: {
@@ -58,13 +77,6 @@ async function claimInTransaction(
     return null;
   if (!task.vendorTaskId && !task.resultCheckpoint) {
     checkSeoFeature(plan);
-    const input = task.frozenInput as unknown as FrozenInput;
-    if (!supported(task.operation, input.market))
-      throw new VisibilityError(
-        "bad_request",
-        "이 시장에서 지원이 확인되지 않은 작업입니다.",
-        400,
-      );
     const units =
       task.operation === "onpage_crawl"
         ? 20

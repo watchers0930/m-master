@@ -248,7 +248,7 @@ async function scheduleAutomaticRankings(ownerId: string, id: string) {
         data: { frozenConfig: frozen as unknown as Prisma.InputJsonValue },
       });
     } catch (error) {
-      // Policy/budget refusals are terminal skips. Do not roll back completed base collection.
+      // Policy/budget refusals are genuine incomplete work, not unsupported skips.
       // Database failures still abort, so no failed transaction is used for further writes.
       if (!(error instanceof VisibilityError)) throw error;
       await tx.seoTask.createMany({
@@ -260,7 +260,7 @@ async function scheduleAutomaticRankings(ownerId: string, id: string) {
             operation: "automatic_rankings",
             itemKey: "-",
             frozenInput: {},
-            status: "skipped",
+            status: "failed",
             reservedKrw: 0,
             failReason:
               "예산 또는 실행 조건으로 자동 순위 수집을 생략했습니다.",
@@ -343,9 +343,14 @@ async function synthesize(ownerId: string, id: string) {
     const success = tasks.filter((t) =>
       ["completed", "partial"].includes(t.status),
     ).length;
+    // Preserve incomplete automatic collection, including legacy skipped policy markers.
+    const automaticIncomplete =
+      config.autoRankingsState === "skipped" ||
+      config.autoRankingsState === "expired";
     const status = pending
       ? "pending"
-      : tasks.every((t) => t.status === "completed")
+      : !automaticIncomplete &&
+          tasks.every((t) => ["completed", "skipped"].includes(t.status))
         ? "completed"
         : success
           ? "partial"
@@ -377,7 +382,7 @@ async function synthesize(ownerId: string, id: string) {
         failReason: tasks.some((t) => t.status === "uncertain")
           ? "과금 대조 및 복구가 필요한 작업이 있습니다."
           : status === "partial" || status === "failed"
-            ? "일부 수집이 실패했거나 지원되지 않습니다."
+            ? "일부 수집이 실패했거나 실행 조건으로 완료되지 않았습니다."
             : null,
       },
     });
