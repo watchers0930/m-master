@@ -9,37 +9,49 @@ const CLIENT_TTL = 5 * 60 * 1000;
 // DB 우선 credential 캐시 (ChannelCredential 테이블)
 let dbCredentialsCache: object | null = null;
 let dbCredentialsLoaded = false;
+// 동시 호출이 같은 로드를 공유하도록 in-flight promise로 가드 (race 방지)
+let dbCredentialsPromise: Promise<void> | null = null;
 
 /** DB에서 GA4 OAuth 정보를 로드하여 모듈 캐시에 저장 */
 export async function ensureDbCredentials(): Promise<void> {
   if (dbCredentialsLoaded) return;
-  dbCredentialsLoaded = true;
-  try {
-    const { prisma } = await import('@/lib/prisma');
-    const cred = await prisma.channelCredential.findFirst({
-      where: { channel: 'ga4' },
-      select: { refreshToken: true, meta: true },
-    });
-    if (cred?.refreshToken) {
-      const meta = (cred.meta ?? {}) as Record<string, string>;
-      dbCredentialsCache = {
-        type: 'authorized_user',
-        client_id: meta.client_id || process.env.GA4_OAUTH_CLIENT_ID,
-        client_secret: meta.client_secret || process.env.GA4_OAUTH_CLIENT_SECRET,
-        refresh_token: cred.refreshToken,
-      };
-      // 새 credential 반영을 위해 클라이언트 캐시 초기화
-      client = null;
-      clientExp = 0;
-    }
-  } catch (e) {
-    console.warn('[ga4] DB credential load failed:', e);
+  // ⚠️ dbCredentialsLoaded를 await 전에 true로 바꾸면, 동시 호출 중 '진 쪽'이
+  // 로드 완료 전에 리턴해 dbCredentialsCache=null(→만료 env 토큰 폴백)로 실패한다.
+  // in-flight promise를 공유해 모든 동시 호출이 같은 로드 완료를 기다리게 한다.
+  if (!dbCredentialsPromise) {
+    dbCredentialsPromise = (async () => {
+      try {
+        const { prisma } = await import('@/lib/prisma');
+        const cred = await prisma.channelCredential.findFirst({
+          where: { channel: 'ga4' },
+          select: { refreshToken: true, meta: true },
+        });
+        if (cred?.refreshToken) {
+          const meta = (cred.meta ?? {}) as Record<string, string>;
+          dbCredentialsCache = {
+            type: 'authorized_user',
+            client_id: meta.client_id || process.env.GA4_OAUTH_CLIENT_ID,
+            client_secret: meta.client_secret || process.env.GA4_OAUTH_CLIENT_SECRET,
+            refresh_token: cred.refreshToken,
+          };
+          // 새 credential 반영을 위해 클라이언트 캐시 초기화
+          client = null;
+          clientExp = 0;
+        }
+        dbCredentialsLoaded = true;
+      } catch (e) {
+        console.warn('[ga4] DB credential load failed:', e);
+        dbCredentialsPromise = null; // 실패 시 다음 호출에서 재시도 허용
+      }
+    })();
   }
+  await dbCredentialsPromise;
 }
 
 /** DB credential 캐시 무효화 (토큰 변경 시 호출) */
 export function invalidateDbCredentials(): void {
   dbCredentialsLoaded = false;
+  dbCredentialsPromise = null;
   dbCredentialsCache = null;
   client = null;
   clientExp = 0;
