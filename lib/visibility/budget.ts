@@ -37,9 +37,13 @@ export async function checkCaptureBudget(
       _sum: { krw: true },
     });
     spend = total._sum.krw ?? 0;
-    pending = await tx.visibilitySnapshot.count({
-      where: { query: { ownerId }, status: "pending" },
-    });
+    pending = await pendingReservedKrw(tx, ownerId);
+    if (
+      ![spend, pending, reserved, config.budgetMonthly].every(
+        (v) => Number.isFinite(v) && v >= 0,
+      )
+    )
+      throw new Error("invalid_budget");
   } catch {
     throw new VisibilityError(
       "rate_limited",
@@ -54,7 +58,7 @@ export async function checkCaptureBudget(
       403,
     );
   if (
-    spend + pending * CAPTURE_RESERVE_KRW + reserved >
+    spend + pending + reserved >
     Math.min(PLAN_LIMITS[config.plan].costLimitKrw, config.budgetMonthly)
   )
     throw new VisibilityError(
@@ -62,4 +66,24 @@ export async function checkCaptureBudget(
       "수집에 필요한 예산이 부족합니다.",
       429,
     );
+}
+
+/** Owner lock must be held by both GEO and SEO reserving callers. */
+export async function pendingReservedKrw(
+  tx: Prisma.TransactionClient,
+  ownerId: string,
+) {
+  const [geo, seo] = await Promise.all([
+    tx.visibilitySnapshot.count({
+      where: { query: { ownerId }, status: "pending" },
+    }),
+    tx.seoTask.aggregate({
+      where: {
+        ownerId,
+        OR: [{ ledgerRecordedAt: null }, { reservedKrw: { gt: 0 } }],
+      },
+      _sum: { reservedKrw: true },
+    }),
+  ]);
+  return geo * CAPTURE_RESERVE_KRW + (seo._sum.reservedKrw ?? 0);
 }

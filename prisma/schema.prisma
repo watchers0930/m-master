@@ -2,18 +2,13 @@ generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
 }
-
 datasource db {
   provider   = "postgresql"
   url        = env("DATABASE_URL")
   directUrl  = env("DIRECT_URL")
   extensions = [vector]
 }
-
-// ----------------------------------------------------------------
-// users — 사용자 (멀티테넌시 핵심)
-// ----------------------------------------------------------------
-model User {
+model User { // users — 사용자 (멀티테넌시 핵심)
   id           String   @id @default(cuid())
   email        String   @unique
   name         String?
@@ -23,7 +18,6 @@ model User {
   stripeId     String?  @map("stripe_id")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
-
   domains            Domain[]
   visibilityQueries  VisibilityQuery[]
   settings           Setting[]
@@ -38,14 +32,9 @@ model User {
   ideaDocuments      IdeaDocument[]
   ideaPublishJobs    IdeaPublishJob[]    @relation("IdeaPublishJobOwner")
   ideaSchedules      IdeaSchedule[]     @relation("IdeaScheduleOwner")
-
   @@map("users")
 }
-
-// ----------------------------------------------------------------
-// subscriptions — Stripe 구독
-// ----------------------------------------------------------------
-model Subscription {
+model Subscription { // subscriptions — Stripe 구독
   id               String    @id @default(cuid())
   userId           String    @map("user_id")
   stripeSubId      String?   @unique @map("stripe_sub_id")
@@ -53,17 +42,11 @@ model Subscription {
   status           String    @default("active") // active | past_due | canceled
   currentPeriodEnd DateTime? @map("current_period_end")
   createdAt        DateTime  @default(now()) @map("created_at")
-
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   @@index([userId])
   @@map("subscriptions")
 }
-
-// ----------------------------------------------------------------
-// contents — 핵심 콘텐츠
-// ----------------------------------------------------------------
-model Content {
+model Content { // contents — 핵심 콘텐츠
   market        String    @default("ko-KR")
   id            String    @id @default(cuid())
   ownerId       String    @map("owner_id")
@@ -79,21 +62,15 @@ model Content {
   status        String    @default("draft") // draft | scheduled | published | failed
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
-
   owner         User           @relation(fields: [ownerId], references: [id])
   scheduleSlots ScheduleSlot[]
   abTestsAsA    AbTest[]       @relation("AbTestVariantA")
   abTestsAsB    AbTest[]       @relation("AbTestVariantB")
-
   @@index([ownerId, status])
   @@index([ownerId, createdAt])
   @@map("contents")
 }
-
-// ----------------------------------------------------------------
-// schedule_slots — 발행 스케줄
-// ----------------------------------------------------------------
-model ScheduleSlot {
+model ScheduleSlot { // schedule_slots — 발행 스케줄
   id          String    @id @default(cuid())
   ownerId     String    @map("owner_id")
   contentId   String?   @map("content_id")
@@ -108,19 +85,13 @@ model ScheduleSlot {
   retryCount  Int       @default(0) @map("retry_count")
   lastError   String?   @map("last_error") @db.Text
   createdAt   DateTime  @default(now()) @map("created_at")
-
   content Content? @relation(fields: [contentId], references: [id], onDelete: Cascade)
-
   @@index([ownerId])
   @@index([contentId])
   @@index([status, scheduledAt])
   @@map("schedule_slots")
 }
-
-// ----------------------------------------------------------------
-// settings — 유저별 설정
-// ----------------------------------------------------------------
-model Setting {
+model Setting { // settings — 유저별 설정
   defaultMarket   String @default("ko-KR") @map("default_market")
   id              String @id @default(cuid())
   ownerId         String @map("owner_id")
@@ -129,17 +100,11 @@ model Setting {
   budgetMonthly   Int    @default(500000) @map("budget_monthly")
   alertThreshold  Float  @default(0.8) @map("alert_threshold")
   notifications   Json   @default("{}") @map("notifications")
-
   owner User @relation(fields: [ownerId], references: [id])
-
   @@unique([ownerId])
   @@map("settings")
 }
-
-// ----------------------------------------------------------------
-// topic_recommendations — 주간 주제 추천
-// ----------------------------------------------------------------
-model TopicRecommendation {
+model TopicRecommendation { // topic_recommendations — 주간 주제 추천
   id        String   @id @default(cuid())
   ownerId   String   @map("owner_id")
   month     String?  // 'YYYY-MM' (레거시, nullable)
@@ -149,16 +114,11 @@ model TopicRecommendation {
   factors   Json?
   channel   String   @default("blog")
   createdAt DateTime @default(now()) @map("created_at")
-
   @@index([ownerId, weekStart, channel])
   @@index([ownerId, month, channel])
   @@map("topic_recommendations")
 }
-
-// ----------------------------------------------------------------
-// ab_tests — A/B 테스트 (Content 2중 FK)
-// ----------------------------------------------------------------
-model AbTest {
+model AbTest { // ab_tests — A/B 테스트 (Content 2중 FK)
   id              String    @id @default(cuid())
   ownerId         String    @map("owner_id")
   topic           String
@@ -180,20 +140,14 @@ model AbTest {
   ga4Snapshot     Json?     @map("ga4_snapshot")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
-
   owner    User    @relation(fields: [ownerId], references: [id])
   variantA Content @relation("AbTestVariantA", fields: [variantAId], references: [id], onDelete: Cascade)
   variantB Content @relation("AbTestVariantB", fields: [variantBId], references: [id], onDelete: Cascade)
-
   @@index([ownerId, status])
   @@index([status, startedAt])
   @@map("ab_tests")
 }
-
-// ----------------------------------------------------------------
-// content_plans — 주간/월간 콘텐츠 계획
-// ----------------------------------------------------------------
-model ContentPlan {
+model ContentPlan { // content_plans — 주간/월간 콘텐츠 계획
   id             String    @id @default(cuid())
   ownerId        String    @map("owner_id")
   monthKey       String?   @map("month_key") // 'YYYY-MM' (레거시, nullable)
@@ -203,19 +157,13 @@ model ContentPlan {
   lastExecutedAt DateTime? @map("last_executed_at")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
-
   owner User              @relation(fields: [ownerId], references: [id])
   items ContentPlanItem[]
-
   @@unique([ownerId, weekKey])
   @@unique([ownerId, monthKey])
   @@map("content_plans")
 }
-
-// ----------------------------------------------------------------
-// content_plan_items — 월간 계획 개별 토픽
-// ----------------------------------------------------------------
-model ContentPlanItem {
+model ContentPlanItem { // content_plan_items — 월간 계획 개별 토픽
   id            String    @id @default(cuid())
   contentPlanId String    @map("content_plan_id")
   sortOrder     Int       @default(0) @map("sort_order")
@@ -226,18 +174,12 @@ model ContentPlanItem {
   generatedAt   DateTime? @map("generated_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
-
   plan ContentPlan @relation(fields: [contentPlanId], references: [id], onDelete: Cascade)
-
   @@index([contentPlanId, sortOrder])
   @@index([scheduledDate, status])
   @@map("content_plan_items")
 }
-
-// ----------------------------------------------------------------
-// rag_documents — RAG 문서 메타
-// ----------------------------------------------------------------
-model RagDocument {
+model RagDocument { // rag_documents — RAG 문서 메타
   id          String   @id @default(cuid())
   ownerId     String   @map("owner_id")
   title       String
@@ -245,35 +187,23 @@ model RagDocument {
   storagePath String?  @map("storage_path")
   status      String   @default("uploaded") // uploaded | indexed | failed
   createdAt   DateTime @default(now()) @map("created_at")
-
   owner  User       @relation(fields: [ownerId], references: [id])
   chunks RagChunk[]
-
   @@index([ownerId, status])
   @@map("rag_documents")
 }
-
-// ----------------------------------------------------------------
-// rag_chunks — 벡터 임베딩
-// ----------------------------------------------------------------
-model RagChunk {
+model RagChunk { // rag_chunks — 벡터 임베딩
   id         String                       @id @default(cuid())
   docId      String                       @map("doc_id")
   chunkIndex Int                          @map("chunk_index")
   content    String                       @db.Text
   embedding  Unsupported("vector(1536)")?
   tokens     Int
-
   document RagDocument @relation(fields: [docId], references: [id], onDelete: Cascade)
-
   @@index([docId])
   @@map("rag_chunks")
 }
-
-// ----------------------------------------------------------------
-// cost_ledger — AI 비용 원장
-// ----------------------------------------------------------------
-model CostLedger {
+model CostLedger { // cost_ledger — AI 비용 원장
   id         String   @id @default(cuid())
   ownerId    String   @map("owner_id")
   occurredAt DateTime @default(now()) @map("occurred_at")
@@ -282,17 +212,11 @@ model CostLedger {
   tokensOut  Int      @default(0) @map("tokens_out")
   krw        Float    @default(0)
   contentId  String?  @map("content_id")
-
   owner User @relation(fields: [ownerId], references: [id])
-
   @@index([ownerId, occurredAt])
   @@map("cost_ledger")
 }
-
-// ----------------------------------------------------------------
-// audit_log — 감사 로그 (INSERT only)
-// ----------------------------------------------------------------
-model AuditLog {
+model AuditLog { // audit_log — 감사 로그 (INSERT only)
   id         String   @id @default(cuid())
   actor      String?
   action     String
@@ -300,15 +224,10 @@ model AuditLog {
   targetId   String?  @map("target_id")
   payload    Json?
   createdAt  DateTime @default(now()) @map("created_at")
-
   @@index([action, createdAt])
   @@map("audit_log")
 }
-
-// ----------------------------------------------------------------
-// analytics_daily — 일별 분석
-// ----------------------------------------------------------------
-model AnalyticsDaily {
+model AnalyticsDaily { // analytics_daily — 일별 분석
   id        String   @id @default(cuid())
   ownerId   String   @map("owner_id")
   date      String   // 'YYYY-MM-DD'
@@ -320,16 +239,11 @@ model AnalyticsDaily {
   saves     Int      @default(0)
   ctr       Float    @default(0)
   source    String   @default("ga4") // ga4 | naver | instagram | facebook
-
   @@unique([ownerId, date, channel, contentId, source])
   @@index([ownerId, date, channel])
   @@map("analytics_daily")
 }
-
-// ----------------------------------------------------------------
-// channel_credentials — 채널 자격증명
-// ----------------------------------------------------------------
-model ChannelCredential {
+model ChannelCredential { // channel_credentials — 채널 자격증명
   id           String   @id @default(cuid())
   ownerId      String   @map("owner_id")
   channel      String   // 'naver_cafe' | 'instagram' | 'facebook'
@@ -338,17 +252,11 @@ model ChannelCredential {
   expiresAt    String?  @map("expires_at")
   meta         Json?
   updatedAt    DateTime @updatedAt @map("updated_at")
-
   owner User @relation(fields: [ownerId], references: [id])
-
   @@unique([ownerId, channel])
   @@map("channel_credentials")
 }
-
-// ----------------------------------------------------------------
-// idea_documents — 리치 에디터 문서
-// ----------------------------------------------------------------
-model IdeaDocument {
+model IdeaDocument { // idea_documents — 리치 에디터 문서
   id          String   @id @default(cuid())
   ownerId     String   @map("owner_id")
   title       String   @default("")
@@ -359,18 +267,12 @@ model IdeaDocument {
   bodyImageUrls String[] @default([]) @map("body_image_urls")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
-
   owner       User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   publishJob  IdeaPublishJob?
-
   @@index([ownerId, createdAt])
   @@map("idea_documents")
 }
-
-// ----------------------------------------------------------------
-// idea_publish_jobs — 발행 예약 잡
-// ----------------------------------------------------------------
-model IdeaPublishJob {
+model IdeaPublishJob { // idea_publish_jobs — 발행 예약 잡
   id          String    @id @default(cuid())
   ownerId     String    @map("owner_id")
   docId       String?   @unique @map("doc_id")
@@ -385,19 +287,13 @@ model IdeaPublishJob {
   finishedAt  DateTime? @map("finished_at")
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
-
   owner User          @relation("IdeaPublishJobOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   doc   IdeaDocument? @relation(fields: [docId], references: [id], onDelete: Cascade)
-
   @@index([ownerId, status])
   @@index([status, scheduledAt])
   @@map("idea_publish_jobs")
 }
-
-// ----------------------------------------------------------------
-// idea_schedules — 달력 계획 일정
-// ----------------------------------------------------------------
-model IdeaSchedule {
+model IdeaSchedule { // idea_schedules — 달력 계획 일정
   id            String   @id @default(cuid())
   ownerId       String   @map("owner_id")
   title         String
@@ -406,17 +302,11 @@ model IdeaSchedule {
   status        String   @default("planned") // planned | in_progress | completed
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
-
   owner User @relation("IdeaScheduleOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-
   @@index([ownerId, scheduledDate])
   @@map("idea_schedules")
 }
-
-// ----------------------------------------------------------------
-// cafe_targets — 네이버 카페 발행 대상 목록
-// ----------------------------------------------------------------
-model CafeTarget {
+model CafeTarget { // cafe_targets — 네이버 카페 발행 대상 목록
   id        String   @id @default(cuid())
   ownerId   String   @map("owner_id")
   name      String
@@ -425,12 +315,9 @@ model CafeTarget {
   isDefault Boolean  @default(false) @map("is_default")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-
   owner User @relation(fields: [ownerId], references: [id])
-
   @@map("cafe_targets")
 }
-
 model Domain {
   id           String   @id @default(cuid())
   ownerId      String   @map("owner_id")
@@ -439,6 +326,8 @@ model Domain {
   businessType String?  @map("business_type") // 자동감지 or 사용자입력
   createdAt    DateTime @default(now()) @map("created_at")
   owner             User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  seoAudits SeoAudit[]
+  seoKeywords SeoKeyword[]
   visibilityQueries VisibilityQuery[]
   @@unique([ownerId, url]) // 같은 소유자·호스트 중복 차단. 서로 다른 소유자는 같은 호스트 가능
   @@index([ownerId])
@@ -503,4 +392,110 @@ model VisibilityMention {
   snapshot VisibilitySnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
   @@index([snapshotId])
   @@map("visibility_mentions")
+}
+model SeoAudit {
+  id             String    @id @default(cuid())
+  domainId       String    @map("domain_id")
+  market         String    @default("ko-KR")
+  scope          String
+  mode           String?
+  technicalScore Int?      @map("technical_score")
+  scoreVersion   String    @default("v1") @map("score_version")
+  coverage       Float?
+  checks         Json      @default("[]")
+  status         String    @default("pending")
+  runKey         String    @map("run_key")
+  configHash     String    @map("config_hash")
+  frozenConfig   Json      @map("frozen_config")
+  costKrw        Float     @default(0) @map("cost_krw")
+  failReason     String?   @map("fail_reason")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  completedAt    DateTime? @map("completed_at")
+  domain   Domain       @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  tasks    SeoTask[]
+  rankings SeoRanking[]
+  @@unique([domainId, runKey])
+  @@index([domainId, createdAt(sort: Desc), id])
+  @@map("seo_audits")
+}
+model SeoKeyword {
+  id                String    @id @default(cuid())
+  domainId          String    @map("domain_id")
+  keyword           String
+  normalizedKeyword String    @map("normalized_keyword")
+  market            String    @default("ko-KR")
+  engine            String
+  searchVolume      Int?      @map("search_volume")
+  volumeSource      String?   @map("volume_source")
+  volumeScale       String?   @map("volume_scale")
+  volumePeriod      String?   @map("volume_period")
+  competition       Float?
+  competitionRaw    String?   @map("competition_raw")
+  rank              Int?
+  rankStatus        String?   @map("rank_status")
+  rankSource        String?   @map("rank_source")
+  rankObservedAt    DateTime? @map("rank_observed_at")
+  metricsUpdatedAt  DateTime? @map("metrics_updated_at")
+  reservationOnly   Boolean   @default(false) @map("reservation_only")
+  lastAuditId       String?   @map("last_audit_id")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  rankings SeoRanking[]
+  domain Domain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  @@unique([domainId, market, engine, normalizedKeyword])
+  @@index([domainId, market, engine])
+  @@map("seo_keywords")
+}
+model SeoRanking {
+  domainId        String    @map("domain_id")
+  id              String    @id @default(cuid())
+  keywordId       String    @map("keyword_id")
+  auditId         String    @map("audit_id")
+  market          String    @default("ko-KR")
+  engine          String
+  device          String    @default("desktop")
+  rank            Int?
+  rankAbsolute    Int?      @map("rank_absolute")
+  matchedUrl      String?   @map("matched_url")
+  status          String
+  source          String
+  sourceObservedAt DateTime? @map("source_observed_at")
+  depth           Int?
+  requestedPages  Int?      @map("requested_pages")
+  returnedRange   Int?      @map("returned_range")
+  runKey          String?   @map("run_key")
+  capturedAt      DateTime  @default(now()) @map("captured_at")
+  keyword SeoKeyword @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+  audit   SeoAudit   @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  @@unique([keywordId, auditId, source, device])
+  @@index([domainId, capturedAt(sort: Desc), id])
+  @@index([keywordId, capturedAt(sort: Desc), id])
+  @@index([auditId])
+  @@map("seo_rankings")
+}
+model SeoTask {
+  id               String    @id @default(cuid())
+  auditId          String    @map("audit_id")
+  ownerId          String    @map("owner_id")
+  operation        String
+  itemKey          String    @map("item_key")
+  runKey           String    @map("run_key")
+  status           String    @default("pending")
+  frozenInput      Json      @map("frozen_input")
+  vendorTaskId     String?   @map("vendor_task_id")
+  resultCheckpoint Json?     @map("result_checkpoint")
+  costKrw          Float     @default(0) @map("cost_krw")
+  reservedKrw      Float     @default(0) @map("reserved_krw")
+  ledgerRecordedAt DateTime? @map("ledger_recorded_at")
+  leaseUntil       DateTime? @map("lease_until")
+  claimVersion     Int       @default(0) @map("claim_version")
+  failReason       String?   @map("fail_reason")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  audit SeoAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  @@unique([auditId, operation, itemKey])
+  @@unique([vendorTaskId])
+  @@index([ownerId, status, leaseUntil])
+  @@index([auditId])
+  @@map("seo_tasks")
 }

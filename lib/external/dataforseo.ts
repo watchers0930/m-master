@@ -1,6 +1,7 @@
 import { z } from "zod";
 export interface RunContext {
   ownerId: string;
+  deadline?: number;
   queryId?: string;
   requestId: string;
   taskId?: string;
@@ -47,6 +48,10 @@ export function usdToKrw(usd: number): number {
   if (!Number.isFinite(rate) || rate <= 0)
     throw new DataForSeoError("invalid_exchange_rate");
   return usd * rate;
+}
+export interface TaskStrategy {
+  resultPath?(base: string, taskId: string): string;
+  isComplete?(response: VendorEnvelope): boolean;
 }
 export class DataForSeoClient {
   constructor(private transport: typeof fetch = fetch) {}
@@ -115,14 +120,23 @@ export class DataForSeoClient {
     }
     throw new DataForSeoError("vendor_rate_limited");
   }
-  async post<T = VendorEnvelope>(path: string, body: unknown): Promise<T> {
-    const result = await this.request(path, body);
+  async post<T = VendorEnvelope>(
+    path: string,
+    body: unknown,
+    ctx?: RunContext,
+  ): Promise<T> {
+    const result = await this.request(path, body, ctx?.deadline);
+    await ctx?.onTask?.(
+      result.tasks?.[0]?.id ?? undefined,
+      responseCost(result),
+      result,
+    );
     this.assertSuccess(result);
     return result as T;
   }
   private assertSuccess(result: VendorEnvelope) {
-    const task = result.tasks?.[0];
-    if (result.status_code !== 20000 || !task || task.status_code !== 20000) {
+    const task = result.tasks?.find((t) => t.status_code !== 20000) ?? result.tasks?.[0];
+    if (result.status_code !== 20000 || !result.tasks?.length || result.tasks.some((t) => t.status_code !== 20000)) {
       throw new DataForSeoError(
         `vendor_status_${task?.status_code ?? result.status_code}`,
         responseCost(result),
@@ -134,8 +148,9 @@ export class DataForSeoClient {
     path: string,
     body: unknown,
     ctx: RunContext,
+    strategy?: TaskStrategy,
   ): Promise<T> {
-    const deadline = Date.now() + 45000;
+    const deadline = Math.min(ctx.deadline ?? Infinity, Date.now() + 45000);
     let taskId = ctx.taskId;
     if (!taskId) {
       const created = await this.request(path, body, deadline);
@@ -168,16 +183,20 @@ export class DataForSeoClient {
     const suffix = base.includes("llm_responses") ? "" : "/advanced";
     for (let i = 0; i < 4; i++) {
       const result = await this.request(
-        `${base}/task_get${suffix}/${encodeURIComponent(taskId)}`,
+        strategy?.resultPath?.(base, taskId) ??
+          `${base}/task_get${suffix}/${encodeURIComponent(taskId)}`,
         undefined,
         deadline,
       );
       const code = result.tasks?.[0]?.status_code;
-      if (code === 20000) {
+      if (
+        code === 20000 &&
+        (!strategy?.isComplete || strategy.isComplete(result))
+      ) {
         this.assertSuccess(result);
         return result as T;
       }
-      if (![20100, 40601, 40602, 40104].includes(code ?? 0))
+      if (code !== 20000 && ![20100, 40601, 40602, 40104].includes(code ?? 0))
         this.assertSuccess(result);
       if (i < 3 && Date.now() + 500 * 2 ** i + 150 < deadline)
         await sleep(500 * 2 ** i + Math.random() * 150);

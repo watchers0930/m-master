@@ -8,6 +8,7 @@ import type { DomainDTO } from "@/types/visibility";
 import type { z } from "zod";
 import type { domainCreateSchema } from "@/schemas/visibility";
 import { logAudit } from "@/lib/audit/logger";
+import { expireAbandonedAudit } from "@/lib/seo/reservations";
 const select = {
   id: true,
   url: true,
@@ -45,26 +46,48 @@ export async function createDomain(
   const row = await prisma.$transaction(async (tx) => {
     const plan = await lockOwner(tx, ownerId);
     const max = PLAN_LIMITS[plan].domains;
-    if (max >= 0 && await tx.domain.count({ where: { ownerId } }) >= max)
-      throw new VisibilityError("rate_limited", "도메인 한도를 초과했습니다.", 429);
-    const recent = await tx.auditLog.count({ where: { actor: ownerId, action: "visibility.domain.create", createdAt: { gt: new Date(Date.now() - 60000) } } });
-    if (recent >= 5) throw new VisibilityError("rate_limited", "잠시 후 도메인을 등록하세요.", 429);
-  const settings = await tx.setting.findUnique({
-    where: { ownerId },
-    select: { defaultMarket: true },
-  });
-  const created = await tx.domain.create({
-    data: {
-      ...input,
-      ownerId,
-      market:
-        input.market ??
-        marketSchema.parse(settings?.defaultMarket ?? DEFAULT_MARKET),
-    },
-    select,
-  });
+    if (max >= 0 && (await tx.domain.count({ where: { ownerId } })) >= max)
+      throw new VisibilityError(
+        "rate_limited",
+        "도메인 한도를 초과했습니다.",
+        429,
+      );
+    const recent = await tx.auditLog.count({
+      where: {
+        actor: ownerId,
+        action: "visibility.domain.create",
+        createdAt: { gt: new Date(Date.now() - 60000) },
+      },
+    });
+    if (recent >= 5)
+      throw new VisibilityError(
+        "rate_limited",
+        "잠시 후 도메인을 등록하세요.",
+        429,
+      );
+    const settings = await tx.setting.findUnique({
+      where: { ownerId },
+      select: { defaultMarket: true },
+    });
+    const created = await tx.domain.create({
+      data: {
+        ...input,
+        ownerId,
+        market:
+          input.market ??
+          marketSchema.parse(settings?.defaultMarket ?? DEFAULT_MARKET),
+      },
+      select,
+    });
     // Durable rate-limit event in the owner-serialized transaction; deletion cannot reset it.
-    await tx.auditLog.create({ data: { actor: ownerId, action: "visibility.domain.create", targetType: "domain", targetId: created.id } });
+    await tx.auditLog.create({
+      data: {
+        actor: ownerId,
+        action: "visibility.domain.create",
+        targetType: "domain",
+        targetId: created.id,
+      },
+    });
     return created;
   });
   return dto(row);
@@ -74,14 +97,54 @@ export async function createDomain(
 export async function deleteDomain(ownerId: string, id: string) {
   await prisma.$transaction(async (tx) => {
     await lockOwner(tx, ownerId);
-    if (!await tx.domain.findFirst({ where: { id, ownerId }, select: { id: true } })) notFound();
+    if (
+      !(await tx.domain.findFirst({
+        where: { id, ownerId },
+        select: { id: true },
+      }))
+    )
+      notFound();
+    await expireAbandonedAudit(tx, ownerId, id);
+    if (
+      await tx.seoAudit.count({
+        where: {
+          domainId: id,
+          OR: [
+            { status: "pending" },
+            {
+              tasks: {
+                some: {
+                  OR: [
+                    { status: { in: ["pending", "claimed", "submitted", "uncertain"] } },
+                    { ledgerRecordedAt: null, reservedKrw: { gt: 0 } },
+                  ],
+                },
+              },
+            },
+          ],
+        },
+      })
+    )
+      throw new VisibilityError(
+        "conflict",
+        "진행 중인 SEO 작업을 먼저 정산하세요.",
+        409,
+      );
     await tx.visibilitySnapshot.updateMany({
       where: { query: { ownerId, domainId: id }, status: "pending" },
       data: { status: "failed", failReason: "domain_deleted" },
     });
-    await tx.visibilityQuery.updateMany({ where: { ownerId, domainId: id }, data: { domainId: null, active: false } });
+    await tx.visibilityQuery.updateMany({
+      where: { ownerId, domainId: id },
+      data: { domainId: null, active: false },
+    });
     await tx.domain.delete({ where: { id, ownerId } });
   });
-  await logAudit({ actor: ownerId, action: "visibility.domain.delete", targetType: "domain", targetId: id });
+  await logAudit({
+    actor: ownerId,
+    action: "visibility.domain.delete",
+    targetType: "domain",
+    targetId: id,
+  });
   return { id, deleted: true as const };
 }

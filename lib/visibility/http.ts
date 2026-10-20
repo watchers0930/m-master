@@ -2,15 +2,8 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 import { requireSession } from "@/lib/auth";
-export class VisibilityError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-    public status: number,
-  ) {
-    super(message);
-  }
-}
+import { VisibilityError } from './errors';
+export { VisibilityError } from './errors';
 export function jsonOk<T>(data: T, status = 200) {
   return NextResponse.json({ data }, { status });
 }
