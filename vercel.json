@@ -1,4 +1,6 @@
 {
   "framework": "nextjs",
-  "crons": []
+  "crons": [
+    { "path": "/api/cron/visibility-track", "schedule": "0 0 * * *" }
+  ]
 }
