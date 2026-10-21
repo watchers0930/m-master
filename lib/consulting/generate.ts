@@ -57,7 +57,9 @@ export async function generateReport(ownerId: string, input: z.infer<typeof cons
         let strategy = null;
         try {
             const choice = response.choices[0], calls = choice?.message.tool_calls;
-            if (choice?.finish_reason !== "tool_calls" || choice.message.refusal || calls?.length !== 1 || calls[0].type !== "function" || calls[0].function.name !== "submit_strategy")
+            // Forced tool_choice returns finish_reason "stop" (not "tool_calls") with a complete call;
+            // reject only truncation/filtering ("length"/"content_filter"), not the normal forced case.
+            if (!choice || !["stop", "tool_calls"].includes(choice.finish_reason) || choice.message.refusal || calls?.length !== 1 || calls[0].type !== "function" || calls[0].function.name !== "submit_strategy")
                 throw new Error("invalid tool");
             strategy = validateStrategy(JSON.parse(calls[0].function.arguments), snapshot);
         }
