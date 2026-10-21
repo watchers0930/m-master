@@ -26,7 +26,7 @@ export function sectionsSchema(strategy: z.ZodType) {
   return z.strictObject({
     summary: section({monthly: z.array(z.strictObject({location: z.number().int(),year: count,month: z.number().int().min(1).max(12),volume: count,evidenceId: z.string().max(100)})).max(600),
       observedMonths: z.array(z.string()).max(600), missingMonths: z.array(z.string()).max(600)}),
-    focus: section({items: z.array(sectionKeywordSchema.pick({keywordId:true,difficulty:true,volume:true,cpc:true,adCompetition:true,adValue:true}).extend({evidenceIds:refs})).max(50)}),
+    focus: section({items: z.array(sectionKeywordSchema.pick({keywordId:true,difficulty:true,volume:true,cpc:true,adCompetition:true,adValue:true}).extend({evidenceIds:refs,metricPeriods:z.strictObject({volume:period.optional(),cpc:period.optional(),adCompetition:period.optional(),adValue:period.optional()}).optional()})).max(50)}),
     competitors: section({items: z.array(z.strictObject({source: z.literal("geo"),name:z.string().max(600),metric:z.string().max(80),value:z.number().finite(),evidenceId:z.string().max(100)})).max(20).nullable()}),
     gtm: section({strategy: strategy.nullable()}),
     keywords: section({rows: z.array(sectionKeywordSchema).max(50)}),

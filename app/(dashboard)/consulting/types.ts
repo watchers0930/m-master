@@ -162,6 +162,7 @@ export interface SummarySection {
 
 /** 02 우선순위 — 관측 지표만(종합 점수·4분면 임계값·전망은 서버 미생성) */
 export interface FocusItem {
+  metricPeriods?: Partial<Record<"volume"|"cpc"|"adCompetition"|"adValue", {from:string;to:string}>>;
   keywordId: string;
   difficulty: number | null;
   volume: number | null;

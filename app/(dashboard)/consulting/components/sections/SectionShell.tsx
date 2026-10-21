@@ -4,7 +4,7 @@
 // (설계 §3.3: 빈 0배열로 가짜 차트를 만들지 않는다 — 근거 없으면 사유를 명시한다)
 'use client';
 
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import type { SectionMeta } from '../../types';
 import { SOURCE_STATUS_META, formatDate, formatCoverage } from '../../constants';
 
@@ -38,15 +38,16 @@ function MetaLine({ meta }: { meta: SectionMeta }) {
 }
 
 export function SectionShell({ title, icon, meta, forceDegraded, children }: Props) {
+  const titleId = useId();
   const sm = SOURCE_STATUS_META[meta.sourceStatus] ?? { label: meta.sourceStatus, color: 'var(--sub)' };
   // degrade = 근거 자체가 없음. partial/stale 은 부분 자료라도 표시한다.
   const degraded = forceDegraded || meta.sourceStatus === 'missing' || meta.sourceStatus === 'unmapped' || meta.sourceStatus === 'error';
 
   return (
-    <div className="card">
+    <section className="card" aria-labelledby={titleId}>
       <div className="card-head">
         {icon}
-        <span className="card-title">{title}</span>
+        <h2 id={titleId} className="card-title" style={{ margin: 0 }}>{title}</h2>
         <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, color: sm.color, background: 'var(--n100)', borderRadius: 5, padding: '2px 8px' }}>
           {degraded ? '준비 필요' : sm.label}
         </span>
@@ -82,6 +83,6 @@ export function SectionShell({ title, icon, meta, forceDegraded, children }: Pro
           </>
         )}
       </div>
-    </div>
+    </section>
   );
 }

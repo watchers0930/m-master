@@ -9,7 +9,7 @@ export function sectionMeta(snapshot: ConsultingSnapshot, ids: string[], ready: 
   return {sourceStatus: ready ? stale ? "stale" : "partial" : "missing",
     reason: ready ? stale ? "관측 기간보다 오래된 저장 근거입니다." : "선택 키워드와 관측된 자료 범위의 부분 자료입니다." : "준비 필요: 검증된 저장 근거가 없습니다.",
     evidenceIds, observedAt, market:snapshot.market, location:snapshot.structuredMetrics?.location ?? null,
-    period:snapshot.structuredMetrics?.period ?? null, unit, currency:null,
+    period:null, unit, currency:null,
     selection:snapshot.selection.find(s => s.source === "structured_keywords") ? (()=>{const {source:_,...s}=snapshot.selection.find(s=>s.source==="structured_keywords")!;return s;})() : null,
     coverage:null};
 }

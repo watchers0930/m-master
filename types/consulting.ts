@@ -93,7 +93,7 @@ export type SectionMeta = import("zod").infer<typeof import("@/schemas/consultin
 export type StructuredMetrics = import("zod").infer<typeof import("@/schemas/consulting-sections").structuredMetricsSchema>;
 export interface ConsultingSectionsDTO {
     summary: {meta: SectionMeta; monthly: {location:number; year:number; month:number; volume:number; evidenceId:string}[]; observedMonths:string[]; missingMonths:string[]};
-    focus: {meta: SectionMeta; items: {keywordId:string; difficulty:number|null; volume:number|null; cpc:number|null; adCompetition:string|null; adValue:number|null; evidenceIds:string[]}[]};
+    focus: {meta: SectionMeta; items: {keywordId:string; difficulty:number|null; volume:number|null; cpc:number|null; adCompetition:string|null; adValue:number|null; metricPeriods?: Partial<Record<"volume"|"cpc"|"adCompetition"|"adValue", {from:string;to:string}>>; evidenceIds:string[]}[]};
     competitors: {meta: SectionMeta; items: {source:"geo"; name:string; metric:string; value:number; evidenceId:string}[]|null};
     gtm: {meta: SectionMeta; strategy: ConsultingStrategy|null};
     keywords: {meta: SectionMeta; rows: Omit<StructuredMetrics["keywords"][number], "evidenceIds"|"currency">[]};

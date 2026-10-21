@@ -5,7 +5,7 @@
 'use client';
 
 import type { EvidenceRef, FocusSection as FocusSectionDTO, Currency } from '../../types';
-import { formatMetric, formatAdCompetition, formatCurrencyMetric } from '../../constants';
+import { formatDate, formatMetric, formatAdCompetition, formatCurrencyMetric } from '../../constants';
 import { SectionShell } from './SectionShell';
 import { EvidenceDetails } from './EvidenceDetails';
 
@@ -32,11 +32,11 @@ export function FocusSection({ section, labelOf, evidenceById }: Props) {
           <div key={it.keywordId} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '10px 12px' }}>
             <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>{labelOf(it.keywordId)}</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
-              <Metric label="검색량" value={formatMetric(it.volume)} />
+              <Metric period={it.metricPeriods?.volume} label="검색량" value={formatMetric(it.volume)} />
               <Metric label="난이도" value={formatMetric(it.difficulty, { suffix: it.difficulty === null ? '' : ' / 100' })} />
-              <Metric label="CPC" value={formatCurrencyMetric(it.cpc, currency)} />
-              <Metric label="광고 경쟁도" value={formatAdCompetition(it.adCompetition)} />
-              <Metric label="참고 가치(검색량×CPC)" value={formatCurrencyMetric(it.adValue, currency)} />
+              <Metric period={it.metricPeriods?.cpc} label="CPC" value={formatCurrencyMetric(it.cpc, currency)} />
+              <Metric period={it.metricPeriods?.adCompetition} label="광고 경쟁도" value={formatAdCompetition(it.adCompetition)} />
+              <Metric period={it.metricPeriods?.adValue} label="참고 가치(검색량×CPC)" value={formatCurrencyMetric(it.adValue, currency)} />
             </div>
             <EvidenceDetails ids={it.evidenceIds} evidenceById={evidenceById} />
           </div>
@@ -46,11 +46,12 @@ export function FocusSection({ section, labelOf, evidenceById }: Props) {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ label, value, period }: { label: string; value: string; period?: {from:string;to:string} }) {
   return (
     <div style={{ minWidth: 92 }}>
       <span style={{ display: 'block', fontSize: 10, color: 'var(--sub)' }}>{label}</span>
       <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{value}</span>
+      {period && <span style={{ display: 'block', fontSize: 10, color: 'var(--sub)' }}>{formatDate(period.from)} ~ {formatDate(period.to)}</span>}
     </div>
   );
 }
