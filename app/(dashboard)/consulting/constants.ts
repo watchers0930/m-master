@@ -166,3 +166,55 @@ export function formatDate(iso: string | null | undefined): string {
   if (!iso) return '—';
   return iso.slice(0, 10);
 }
+
+// ─────────────────────────────────────────────────────────────
+// 구조화 리포트 v2 — 6섹션 표시용 라벨·포맷터 (설계 §3.3)
+// 전부 '표시만'. 수치·파생값·증감은 서버가 산출한 값만 보여주며 프론트는 재계산하지 않는다.
+// ─────────────────────────────────────────────────────────────
+
+/** 섹션 데이터 상태 → degrade 여부 ("준비 필요" = 근거 없음) */
+export function isSectionDegraded(status: string): boolean {
+  return status === 'missing' || status === 'unmapped' || status === 'error';
+}
+
+/** 광고 경쟁도(문자열 enum) 라벨 — 자연검색 난이도(difficulty)와 구분 */
+export const AD_COMPETITION_LABELS: Record<string, string> = {
+  LOW: '낮음',
+  MEDIUM: '보통',
+  HIGH: '높음',
+};
+
+export function formatAdCompetition(v: string | null | undefined): string {
+  if (v === null || v === undefined) return '미관측';
+  return AD_COMPETITION_LABELS[v] ?? v;
+}
+
+/** 정수/소수 관측값 — null = '미관측'(0 과 구분). 관측 0 은 '0'으로 표시 */
+export function formatMetric(v: number | null | undefined, opts?: { decimals?: number; suffix?: string }): string {
+  if (v === null || v === undefined || !Number.isFinite(v)) return '미관측';
+  const base =
+    opts?.decimals != null
+      ? v.toLocaleString('ko-KR', { minimumFractionDigits: opts.decimals, maximumFractionDigits: opts.decimals })
+      : v.toLocaleString('ko-KR');
+  return opts?.suffix ? `${base}${opts.suffix}` : base;
+}
+
+/** year·month → 'YYYY-MM' (month 범위 밖이면 그대로 방어 표기) */
+export function formatYearMonth(year: number, month: number): string {
+  const mm = month >= 1 && month <= 12 ? String(month).padStart(2, '0') : String(month);
+  return `${year}-${mm}`;
+}
+
+/** 통화 코드가 확정된 CPC/금액 — 미확정(null)이면 '통화 미확정'(금액 의미 집계 미생성과 일치) */
+export function formatCurrencyMetric(v: number | null | undefined, currency: Currency | null | undefined): string {
+  if (v === null || v === undefined || !Number.isFinite(v)) return '미관측';
+  if (!currency) return `${v.toLocaleString('ko-KR')} (통화 미확정)`;
+  return `${CURRENCY_SYMBOL[currency]}${v.toLocaleString('ko-KR')}`;
+}
+
+/** 커버리지(0~1) → '72%'. null = 표기 생략 */
+export function formatCoverage(v: number | null | undefined): string | null {
+  if (v === null || v === undefined || !Number.isFinite(v)) return null;
+  const pct = Math.round(Math.max(0, Math.min(1, v)) * 100);
+  return `${pct}%`;
+}

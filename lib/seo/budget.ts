@@ -7,6 +7,7 @@ import { usdToKrw } from "@/lib/external/dataforseo";
 // No guessed prices: missing/unverified ceilings disable new paid submissions.
 export function estimate(operation: string, units = 1): number {
   try {
+    if (!Number.isSafeInteger(units) || units < 1) throw new Error();
     const config = JSON.parse(process.env.SEO_VERIFIED_PRICING_JSON ?? "{}");
     const price = config[operation];
     if (

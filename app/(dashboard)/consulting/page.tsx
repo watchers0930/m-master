@@ -19,6 +19,7 @@ import { DiagnosisCard } from './components/DiagnosisCard';
 import { ChannelMixCard } from './components/ChannelMixCard';
 import { BudgetProposalCard } from './components/BudgetProposalCard';
 import { PriorityActionsCard } from './components/PriorityActionsCard';
+import { ReportSections } from './components/sections/ReportSections';
 import { ReportHistory } from './components/ReportHistory';
 import { useDomain, useDomains } from './hooks/use-domains';
 import { useReportHistory, useReportDetail } from './hooks/use-consulting';
@@ -40,7 +41,12 @@ function Spinner() {
   );
 }
 
-/** 완료 리포트 본문 (진단 → 채널 믹스 → 예산 → 액션). evidence 토큰 치환 맵을 한 번 만들어 내려준다. */
+/**
+ * 완료 리포트 본문. evidence 토큰 치환 맵을 한 번 만들어 내려준다.
+ * - v2(schemaVersion==='v2'): 구조화 6섹션 렌더(설계 §3.3). GTM 섹션이 기존 전략 카드를 재노출한다.
+ * - v1(그 외): 기존 전략 카드(진단→채널→예산→액션) + "구조화 섹션은 재생성 필요" 안내(§3.2.5 degrade).
+ * 프론트는 어느 경로에서도 수치를 재계산하지 않는다.
+ */
 function ReportBody({ report, domainId }: { report: ConsultingReportDTO; domainId: string }) {
   const evidenceById = useMemo(() => {
     const m = new Map<string, EvidenceRef>();
@@ -50,6 +56,16 @@ function ReportBody({ report, domainId }: { report: ConsultingReportDTO; domainI
 
   if (report.status !== 'completed') return null;
 
+  // v2 구조화 경로 판정은 schemaVersion 으로 한다. 서버 reportDto 는 v1 에도 sections 를 합성해
+  // 내려주므로(buildSections with evidence:[]·selection:[] → gtm.strategy=null) sections 존재만으로
+  // 분기하면 v1 의 기존 진단·채널·예산·액션이 통째로 숨겨지는 회귀가 생긴다(설계 §2.6·§3.2.5).
+  const isStructured = report.schemaVersion === 'v2' && !!report.sections;
+
+  if (isStructured) {
+    return <ReportSections sections={report.sections!} evidenceById={evidenceById} domainId={domainId} />;
+  }
+
+  // v1 하위호환 — 기존 전략 카드 유지(일괄 재저장 금지). 신규 구조화 섹션은 준비 필요로 안내.
   return (
     <>
       {report.diagnosis && <DiagnosisCard diagnosis={report.diagnosis} evidenceById={evidenceById} />}
@@ -60,6 +76,14 @@ function ReportBody({ report, domainId }: { report: ConsultingReportDTO; domainI
       {report.priorityActions && report.priorityActions.length > 0 && (
         <PriorityActionsCard actions={report.priorityActions} evidenceById={evidenceById} domainId={domainId} />
       )}
+      <div className="card" style={{ padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" strokeWidth="1.8" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 1 }}>
+          <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
+        </svg>
+        <p style={{ fontSize: 11.5, color: 'var(--sub)', lineHeight: 1.6, margin: 0 }}>
+          이 리포트는 이전 형식(v1)이라 수요 추이·키워드 지표 등 구조화 섹션이 준비되지 않았습니다. 새로 생성하면 최신 구조화 리포트로 제공됩니다.
+        </p>
+      </div>
     </>
   );
 }

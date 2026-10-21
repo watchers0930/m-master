@@ -1,3 +1,5 @@
+import { metricUnits, isMetricOperation } from "./adapters/metric-contract";
+import { writeMetricCheckpoint } from "./metric-writer";
 import { Prisma, type SeoTask } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { lockOwner } from "@/lib/visibility/queries";
@@ -77,14 +79,7 @@ async function claimInTransaction(
     return null;
   if (!task.vendorTaskId && !task.resultCheckpoint) {
     checkSeoFeature(plan);
-    const units =
-      task.operation === "onpage_crawl"
-        ? 20
-        : task.operation === "onpage_instant"
-          ? (input.paths ?? ["/"]).length
-          : task.operation === "labs_ranked"
-            ? 100
-            : 1;
+    const units = metricUnits(task.operation, input);
     const reserve = estimate(task.operation, units);
     await checkSeoBudget(
       tx,
@@ -223,6 +218,8 @@ export async function taskResult(task: SeoTask, result: Checkpoint) {
         where: { id: task.auditId },
         select: { domainId: true, market: true, runKey: true },
       });
+      const checked = checkpointSchema.parse(result);
+      if (isMetricOperation(task.operation)) await writeMetricCheckpoint(tx, task, checked);
       const ids = await writeKeywords(
         tx,
         audit.domainId,
@@ -251,14 +248,14 @@ export async function taskResult(task: SeoTask, result: Checkpoint) {
       await tx.seoTask.update({
         where: { id: task.id },
         data: {
-          status: result.pageFailures.length
+          status: result.issues?.length ? "partial" : result.pageFailures.length
             ? result.pages.length
               ? "partial"
               : "failed"
             : "completed",
           leaseUntil: null,
           reservedKrw: 0,
-          failReason: result.pageFailures.length
+          failReason: result.issues?.length ? "일부 지표를 수집하지 못했습니다." : result.pageFailures.length
             ? "일부 URL 수집에 실패했습니다."
             : null,
           resultCheckpoint: result as unknown as Prisma.InputJsonValue,

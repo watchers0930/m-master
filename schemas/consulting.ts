@@ -1,3 +1,4 @@
+import { sectionsSchema, structuredMetricsSchema } from "./consulting-sections";
 import { z } from "zod";
 import { marketSchema } from "@/lib/market/schema";
 const id = z.string().cuid();
@@ -53,3 +54,31 @@ export const consultingStrategySchema = z.strictObject({
         destination: z.enum(["content_create", "seo_audit", "visibility"]),
     })).min(1).max(10),
 });
+
+// v1 stays strict and unchanged. Versioned readers select the matching contract.
+export const consultingSnapshotV1Schema = consultingSnapshotSchema;
+
+export const consultingSectionsSchema = sectionsSchema(consultingStrategySchema);
+export const consultingSnapshotV2Schema = consultingSnapshotV1Schema.extend({
+    schemaVersion: z.literal("v2"),
+    evidence: z.array(evidenceSchema).max(10000),
+    structuredMetrics: structuredMetricsSchema,
+    sections: consultingSectionsSchema,
+    llmInput: consultingSnapshotV1Schema,
+}).superRefine((snapshot, ctx) => {
+    const ids = new Set(snapshot.evidence.map(e => e.id));
+    if (ids.size !== snapshot.evidence.length) ctx.addIssue({code:"custom", message:"duplicate evidence"});
+    const check = (ref: string) => {if (!ids.has(ref)) ctx.addIssue({code:"custom", message:"unknown section evidence"});};
+    for (const section of Object.values(snapshot.sections)) section.meta.evidenceIds.forEach(check);
+    for (const p of snapshot.structuredMetrics.demand) check(p.evidenceId);
+    for (const k of snapshot.structuredMetrics.keywords) k.evidenceIds.forEach(check);
+    for (const p of snapshot.sections.summary.monthly) check(p.evidenceId);
+    for (const p of snapshot.sections.focus.items) p.evidenceIds.forEach(check);
+    for (const p of snapshot.sections.competitors.items ?? []) check(p.evidenceId);
+    for (const e of snapshot.llmInput.evidence) check(e.id);
+});
+export function parseConsultingSnapshot(value: unknown, version: string) {
+    if (version === "v1") return consultingSnapshotV1Schema.parse(value);
+    if (version === "v2") return consultingSnapshotV2Schema.parse(value);
+    throw new Error("unsupported_snapshot_version");
+}

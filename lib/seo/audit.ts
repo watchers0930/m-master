@@ -1,3 +1,4 @@
+import { scheduleMetricTasks } from "./metric-scheduling";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { lockOwner } from "@/lib/visibility/queries";
@@ -134,6 +135,7 @@ export async function runAudit(
             ? 20
             : (input.paths ?? ["/"]).length
           : null,
+      metricScheduling: scope === "full" || scope === "research" ? "waiting" : undefined,
       autoRankings: scope === "full" && !input.keywordIds,
       autoRankingsState:
         scope === "full" && !input.keywordIds ? "waiting" : undefined,
@@ -194,9 +196,12 @@ export async function processAudit(
     await recoverExpired(tx, ownerId, id);
     const audit = await tx.seoAudit.findFirst({
       where: { id, domain: { ownerId } },
-      select: { domainId: true },
+      select: { domainId: true, frozenConfig: true },
     });
-    if (audit) await releaseKeywordReservations(tx, audit.domainId);
+    if (audit) {
+      await expireAbandonedAudit(tx, ownerId, audit.domainId, id);
+      await releaseKeywordReservations(tx, audit.domainId);
+    }
   });
   // At most two tasks per request, at most two concurrent external collectors.
   // Processing result-only tasks also consumes a slot, keeping I/O bounded.
@@ -208,7 +213,9 @@ export async function processAudit(
       ownerId,
       status: { in: ["pending", "claimed", "submitted"] },
       OR: [{ leaseUntil: null }, { leaseUntil: { lte: new Date() } }],
-      ...(options.collectOnly ? { vendorTaskId: { not: null } } : {}),
+      ...(options.collectOnly ? { AND: [{ OR: [
+        { vendorTaskId: { not: null } }, { resultCheckpoint: { not: Prisma.DbNull } },
+      ] }] } : {}),
     },
     select: { id: true },
     orderBy: { createdAt: "asc" },
@@ -219,13 +226,15 @@ export async function processAudit(
     candidates.map((candidate) => candidate.id),
   );
   await Promise.all(claims.map((task) => executeTask(task)));
-  // collectOnly never schedules new paid work; it only reconciles and finalizes.
+  // collectOnly never executes a new paid POST; it may finish reservation scheduling (budget holds).
   if (options.collectOnly) {
+    await scheduleMetricTasks(ownerId, id);
     await synthesize(ownerId, id);
     return;
   }
   // New candidates are only reserved here; they are submitted by an explicit subsequent resume.
   try {
+    await scheduleMetricTasks(ownerId, id);
     await scheduleAutomaticRankings(ownerId, id);
   } catch (error) {
     await synthesize(ownerId, id);
@@ -252,7 +261,7 @@ async function synthesize(ownerId: string, id: string) {
     });
     const config = audit.frozenConfig as unknown as Config;
     const pending =
-      config.autoRankings ||
+      config.autoRankings || config.metricScheduling === "waiting" ||
       tasks.some((t) => ["pending", "claimed", "submitted"].includes(t.status));
     const success = tasks.filter((t) =>
       ["completed", "partial"].includes(t.status),
@@ -260,7 +269,7 @@ async function synthesize(ownerId: string, id: string) {
     // Preserve incomplete automatic collection, including legacy skipped policy markers.
     const automaticIncomplete =
       config.autoRankingsState === "skipped" ||
-      config.autoRankingsState === "expired";
+      config.autoRankingsState === "expired" || config.metricScheduling === "expired";
     const status = pending
       ? "pending"
       : !automaticIncomplete &&

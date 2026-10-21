@@ -1,3 +1,4 @@
+import { freezeSnapshot } from "./freeze";
 import { isDefinitiveRejection } from "./rejection";
 import { randomUUID } from "node:crypto";
 import type { z } from "zod";
@@ -6,7 +7,7 @@ import { getClient, toChatUsage, calcChatKrw } from "@/lib/claude/chat";
 import { VisibilityError } from "@/lib/visibility/http";
 import { collectInput } from "./input";
 import { snapshotHash } from "./hash";
-import { VERSIONS, RESERVE_KRW, MAX_OUTPUT_TOKENS, strategyTool, buildPrompt, fitSnapshot } from "./prompt";
+import { VERSIONS, RESERVE_KRW, MAX_OUTPUT_TOKENS, strategyTool, buildPrompt } from "./prompt";
 import { MARKET_CURRENCY, validateStrategy } from "./validate";
 import { canRetry, ownedDomain, findExisting, existingResult, claimReport, beginAttempt, reportDto } from "./data";
 import { markRejected, markUncertain, settleReport } from "./budget";
@@ -15,7 +16,7 @@ export async function generateReport(ownerId: string, input: z.infer<typeof cons
     if ((input.market && input.market !== domain.market) ||
         (input.monthlyMarketingBudget && input.monthlyMarketingBudget.currency !== MARKET_CURRENCY[domain.market]))
         throw new VisibilityError("bad_request", "도메인 시장과 통화를 확인하세요.", 400);
-    const snapshot = fitSnapshot(await collectInput(ownerId, domain, input.monthlyMarketingBudget ?? null));
+    const snapshot = freezeSnapshot(await collectInput(ownerId, domain, input.monthlyMarketingBudget ?? null));
     if (!snapshot.sourceStatus.some(s => (s.source === "seo" || s.source === "geo") && (s.status === "available" || s.status === "partial" || s.status === "stale")))
         throw new VisibilityError("data_required", "SEO 또는 AI 가시성 데이터를 먼저 준비하세요. GA4 성과는 현재 지원하지 않습니다.", 409);
     const hash = snapshotHash({ snapshot, ...VERSIONS });
@@ -61,7 +62,7 @@ export async function generateReport(ownerId: string, input: z.infer<typeof cons
             // reject only truncation/filtering ("length"/"content_filter"), not the normal forced case.
             if (!choice || !["stop", "tool_calls"].includes(choice.finish_reason) || choice.message.refusal || calls?.length !== 1 || calls[0].type !== "function" || calls[0].function.name !== "submit_strategy")
                 throw new Error("invalid tool");
-            strategy = validateStrategy(JSON.parse(calls[0].function.arguments), snapshot);
+            strategy = validateStrategy(JSON.parse(calls[0].function.arguments), snapshot.llmInput ?? snapshot);
         }
         catch { /* Rejected outputs still settle their actual token cost. */ }
         const saved = await settleReport(ownerId, id, attemptId, usage, calcChatKrw(usage), strategy);
@@ -86,6 +87,6 @@ export async function generateReport(ownerId: string, input: z.infer<typeof cons
         catch {
             console.error("[consulting] uncertainty persistence failed", { reportId: id, attemptId });
         }
-        throw Object.assign(new VisibilityError("generation_uncertain", "생성 비용을 확인 중입니다. 이력을 확인하세요.", 409), { reportId: id });
+        throw Object.assign(new VisibilityError("generation_uncertain", "생성 비용을 확인 중입니다. 이력을 확인하세요.", 502), { reportId: id });
     }
 }

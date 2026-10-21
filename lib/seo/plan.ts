@@ -1,3 +1,4 @@
+import { isMetricOperation, metricUnits } from "./adapters/metric-contract";
 import { PLAN_LIMITS, type PlanKey } from "@/lib/billing/limits";
 import type { Prisma } from "@prisma/client";
 import { notFound, VisibilityError } from "@/lib/visibility/http";
@@ -22,6 +23,7 @@ export interface Config extends RunInput {
   engines: SeoEngine[];
   requestedPages: number | null;
   autoRankings: boolean;
+  metricScheduling?: "waiting" | "scheduled" | "expired";
   autoRankingsState?: "waiting" | "scheduled" | "skipped" | "expired";
 }
 export interface TaskPlan {
@@ -47,6 +49,7 @@ export function taskPlan(
   input: FrozenInput,
   units = 1,
 ): TaskPlan {
+  if (isMetricOperation(operation)) units = metricUnits(operation, input);
   if (!supported(operation, input.market))
     return {
       operation,

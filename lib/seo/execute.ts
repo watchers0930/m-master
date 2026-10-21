@@ -1,3 +1,6 @@
+import { difficultyRequest, parseDifficulty } from "./adapters/difficulty";
+import { demandRequest, parseDemand } from "./adapters/demand";
+import { adsRequest, parseAds } from "./adapters/ads";
 import type { SeoTask } from "@prisma/client";
 import {
   DataForSeoClient,
@@ -34,7 +37,11 @@ function normalize(
       task.operation === "onpage_instant" ? input : undefined,
     );
   if (task.operation.startsWith("serp")) return parseSerp(response, input);
-  return parseKeywords(response, task.operation, input);
+  if (task.operation === "kw_difficulty") return parseDifficulty(response, input);
+  if (task.operation === "kw_demand") return parseDemand(response, input);
+  if (task.operation === "kw_ads") return parseAds(response, input);
+  if (["labs_ranked", "keywords_for_site", "naver_volume"].includes(task.operation)) return parseKeywords(response, task.operation, input);
+  throw new Error("unsupported_operation");
 }
 export async function executeTask(
   task: SeoTask,
@@ -53,7 +60,10 @@ export async function executeTask(
     }
     const input = task.frozenInput as unknown as FrozenInput;
     if (!task.vendorTaskId) await publicHost(input.host);
-    const request = task.operation.startsWith("onpage")
+    const request = task.operation === "kw_difficulty" ? difficultyRequest(input)
+      : task.operation === "kw_demand" ? demandRequest(input)
+      : task.operation === "kw_ads" ? adsRequest(input)
+      : task.operation.startsWith("onpage")
       ? onpageRequest(task.operation, input)
       : task.operation.startsWith("serp")
         ? serpRequest(input)
@@ -73,10 +83,15 @@ export async function executeTask(
             response?.status_code === 20000 &&
             !!response.tasks?.length &&
             response.tasks.every((t) => t.status_code === 20000);
-          const result =
-            live && response && (success || task.operation === "onpage_instant")
-              ? normalize(task, response, input)
-              : undefined;
+          let result: import("./adapters/types").Checkpoint | undefined;
+          try {
+            result = live && response && (success || task.operation === "onpage_instant")
+              ? normalize(task, response, input) : undefined;
+          } catch {
+            // Parsing failure cannot erase a confirmed charge or permit a live re-purchase.
+            await checkpointTask(task, id, cost);
+            throw new Error("normalization_failed");
+          }
           await checkpointTask(task, id, cost, result);
         } catch {
           checkpointFailed = true;

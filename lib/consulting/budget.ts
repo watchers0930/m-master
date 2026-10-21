@@ -1,3 +1,6 @@
+import { parseConsultingSnapshot, consultingSnapshotV2Schema } from "@/schemas/consulting";
+import { gtmSection } from "./sections/gtm";
+import type { ConsultingSnapshot } from "@/types/consulting";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { checkFeatureAccess, type PlanKey } from "@/lib/billing/limits";
@@ -38,8 +41,14 @@ export async function settleReport(ownerId: string, id: string, attemptId: strin
             return row;
         if (!row.startedAt || !["generating", "uncertain"].includes(row.status))
             throw new Error("invalid settlement state");
+        const snapshot = parseConsultingSnapshot(row.inputSnapshot, row.schemaVersion) as ConsultingSnapshot;
+        if (row.schemaVersion === "v2" && snapshot.sections) {
+            snapshot.sections.gtm = gtmSection(snapshot, strategy);
+            consultingSnapshotV2Schema.parse(snapshot);
+        }
         const ledger = await tx.costLedger.create({ data: { ownerId, kind: "consulting", tokensIn: usage.prompt_tokens, tokensOut: usage.completion_tokens, krw } });
         const updated = await tx.consultingReport.update({ where: { id }, data: {
+                ...(row.schemaVersion === "v2" ? {inputSnapshot: snapshot as unknown as Prisma.InputJsonValue} : {}),
                 status: strategy ? "completed" : "failed", failCode: strategy ? null : "llm_failed",
                 ledgerId: ledger.id, costKrw: krw, reservedKrw: 0,
                 diagnosisSummary: strategy?.diagnosis.summary ?? null,

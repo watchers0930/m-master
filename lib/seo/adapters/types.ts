@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { difficultySchema, adsSchema, demandSchema, NEW_METRIC_KEYWORD_CAP, DEMAND_ROWS_PER_CHECKPOINT_CAP } from "./metric-contract";
 export const safeUrl = z
   .string()
   .max(2048)
@@ -90,6 +91,10 @@ export const checkpointSchema = z.object({
     )
     .max(20)
     .default([]),
+  difficulties: z.array(difficultySchema).max(NEW_METRIC_KEYWORD_CAP).default([]),
+  adsMetrics: z.array(adsSchema).max(NEW_METRIC_KEYWORD_CAP).default([]),
+  demandPoints: z.array(demandSchema).max(DEMAND_ROWS_PER_CHECKPOINT_CAP).default([]),
+  issues: z.array(z.string().max(120)).max(200).default([]),
   metrics: z.array(metricSchema).max(100).default([]),
   observations: z.array(observationSchema).max(100).default([]),
   crawledPages: z.number().int().nonnegative().nullable().default(null),
@@ -99,6 +104,12 @@ export type Page = z.infer<typeof pageSchema>;
 export type Metric = z.infer<typeof metricSchema>;
 export type Observation = z.infer<typeof observationSchema>;
 export interface FrozenInput {
+  keywordIds?: string[];
+  location?: number;
+  language?: string;
+  targetPeriod?: { fromYear: number; fromMonth: number; toYear: number; toMonth: number } | null;
+  batchIndex?: number;
+  units?: number;
   host: string;
   market: import("@/types/visibility").Market;
   engine?: "google" | "naver";

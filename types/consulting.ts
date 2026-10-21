@@ -45,6 +45,7 @@ export interface PriorityAction {
     destination: ActionDestination; // 서버 allowlist로 URL 매핑
 }
 export interface ConsultingReportDTO {
+    sections?: ConsultingSectionsDTO;
     id: string;
     domainId: string;
     market: Market; // types/visibility 재사용
@@ -88,7 +89,21 @@ export interface EvidenceRef {
     rangeFrom?: string | null;
     rangeTo?: string | null;
 }
+export type SectionMeta = import("zod").infer<typeof import("@/schemas/consulting-sections").sectionMetaSchema>;
+export type StructuredMetrics = import("zod").infer<typeof import("@/schemas/consulting-sections").structuredMetricsSchema>;
+export interface ConsultingSectionsDTO {
+    summary: {meta: SectionMeta; monthly: {location:number; year:number; month:number; volume:number; evidenceId:string}[]; observedMonths:string[]; missingMonths:string[]};
+    focus: {meta: SectionMeta; items: {keywordId:string; difficulty:number|null; volume:number|null; cpc:number|null; adCompetition:string|null; adValue:number|null; evidenceIds:string[]}[]};
+    competitors: {meta: SectionMeta; items: {source:"geo"; name:string; metric:string; value:number; evidenceId:string}[]|null};
+    gtm: {meta: SectionMeta; strategy: ConsultingStrategy|null};
+    keywords: {meta: SectionMeta; rows: Omit<StructuredMetrics["keywords"][number], "evidenceIds"|"currency">[]};
+    methodology: {meta: SectionMeta; metricDefs: {key:string; definition:string; source:string; formula:string|null; version:string}[]; selectionLimits: (SectionMeta["selection"])[]};
+}
 export interface ConsultingSnapshot {
+    schemaVersion?: "v2";
+    structuredMetrics?: StructuredMetrics;
+    sections?: ConsultingSectionsDTO;
+    llmInput?: Omit<ConsultingSnapshot, "llmInput"|"sections"|"structuredMetrics"|"schemaVersion">;
     market: Market;
     range: {
         from: string;

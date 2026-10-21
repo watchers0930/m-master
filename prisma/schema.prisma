@@ -328,6 +328,7 @@ model Domain {
   owner             User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   seoAudits SeoAudit[]
   seoKeywords SeoKeyword[]
+  seoDemandPoints SeoDemandPoint[]
   consultingReports ConsultingReport[]
   visibilityQueries VisibilityQuery[]
   @@unique([ownerId, url]) // 같은 소유자·호스트 중복 차단. 서로 다른 소유자는 같은 호스트 가능
@@ -415,6 +416,7 @@ model SeoAudit {
   domain   Domain       @relation(fields: [domainId], references: [id], onDelete: Cascade)
   tasks    SeoTask[]
   rankings SeoRanking[]
+  demandPoints SeoDemandPoint[]
   @@unique([domainId, runKey])
   @@index([domainId, createdAt(sort: Desc), id])
   @@map("seo_audits")
@@ -430,7 +432,12 @@ model SeoKeyword {
   volumeSource      String?   @map("volume_source")
   volumeScale       String?   @map("volume_scale")
   volumePeriod      String?   @map("volume_period")
-  competition       Float?
+  competitionIndex  Float? @map("competition")
+  difficulty        Int?
+  cpc               Float?
+  adCompetition     String? @map("ad_competition")
+  adValue           Float? @map("ad_value")
+  demandPoints      SeoDemandPoint[]
   competitionRaw    String?   @map("competition_raw")
   rank              Int?
   rankStatus        String?   @map("rank_status")
@@ -498,6 +505,7 @@ model SeoTask {
   @@unique([vendorTaskId])
   @@index([ownerId, status, leaseUntil])
   @@index([auditId])
+  @@index([frozenInput(ops: JsonbPathOps)], type: Gin, map: "seo_tasks_frozen_input_path_idx")
   @@map("seo_tasks")
 }
 
@@ -530,4 +538,22 @@ model ConsultingReport { // consulting_reports — 마케팅 컨설팅 리포트
   @@index([domainId, createdAt(sort: Desc), id])
   @@index([ownerId, createdAt(sort: Desc), id])
   @@map("consulting_reports")
+}
+
+model SeoDemandPoint {
+  id String @id @default(cuid())
+  domainId String @map("domain_id")
+  keywordId String? @map("keyword_id")
+  market String
+  location Int
+  year Int
+  month Int
+  volume Int
+  auditId String @map("audit_id")
+  domain Domain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  keyword SeoKeyword? @relation(fields: [keywordId], references: [id], onDelete: Cascade)
+  audit SeoAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  @@unique([keywordId, location, year, month])
+  @@index([domainId, market, location])
+  @@map("seo_demand_points")
 }

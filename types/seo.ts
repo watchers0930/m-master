@@ -67,6 +67,10 @@ export interface SeoKeywordDTO {
   volumePeriod: string | null;
   competition: number | null; // 광고 경쟁도(SEO 난이도 아님)
   competitionRaw: string | null;
+  difficulty?: number | null;
+  cpc?: number | null;
+  adCompetition?: string | null;
+  adValue?: number | null;
   rank: number | null; // 직접 SERP 최신 유효 캐시
   rankStatus: RankStatus | null;
   rankObservedAt: string | null;

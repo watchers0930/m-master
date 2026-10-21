@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { processAudit } from "./audit";
+import { ABANDONED_AUDIT_MS, abandonedAuditTasks } from "./reservations";
 
 const ACTIVE = ["pending", "claimed", "submitted"] as const;
 const SETTLED = ["completed", "partial", "failed", "skipped", "uncertain"] as const;
@@ -17,7 +18,7 @@ function collectableCount(auditId: string) {
     where: {
       auditId,
       status: { in: [...ACTIVE] },
-      vendorTaskId: { not: null },
+      AND: [{ OR: [{ vendorTaskId: { not: null } }, { resultCheckpoint: { not: Prisma.DbNull } }] }],
       OR: [{ leaseUntil: null }, { leaseUntil: { lte: new Date() } }],
     },
   });
@@ -41,8 +42,8 @@ function settledCount(auditId: string) {
  * 진행 중(pending)인 감사의 **이미 제출된** DataForSEO 태스크 결과만 배치 수거한다.
  * 온디맨드 resume과 동일한 processAudit(collectOnly)을 재사용 → 2건 동시·소유자락·예산가드 그대로.
  *
- * - collectOnly: vendorTaskId 있는 태스크만 claim → task_get 수거는 추가 과금 0원.
- *   미제출(pending) 태스크나 자동순위 신규 생성은 하지 않는다(의도치 않은 과금 차단).
+ * - collectOnly: vendorTaskId 또는 checkpoint가 있는 태스크만 claim → task_get 수거는 추가 과금 0원.
+ *   미제출 태스크를 실행하거나 자동순위를 생성하지 않는다(의도치 않은 과금 차단).
  * - 모든 태스크가 종결됐는데 status만 pending인 감사(마감 트랜잭션 실패 등 고아 상태)는
  *   candidate 0으로 processAudit→synthesize가 상태를 마감시킨다.
  *
@@ -55,13 +56,21 @@ export async function resumeBatch(input: { limit: number; passes: number }) {
   const deadline = start + HARD_CEILING_MS;
   const eligibleTask: Prisma.SeoTaskWhereInput = {
     status: { in: [...ACTIVE] },
-    vendorTaskId: { not: null },
+    AND: [{ OR: [{ vendorTaskId: { not: null } }, { resultCheckpoint: { not: Prisma.DbNull } }] }],
     OR: [{ leaseUntil: null }, { leaseUntil: { lte: new Date() } }],
   };
   const audits = await prisma.seoAudit.findMany({
     where: {
       status: "pending",
       OR: [
+        // Release stale untouched reservations even when no vendor result can be collected.
+        { createdAt: { lte: new Date(start - ABANDONED_AUDIT_MS) },
+          tasks: abandonedAuditTasks(new Date(start - ABANDONED_AUDIT_MS)) },
+        // Discovery finished but reservation scheduling was interrupted. No paid POST in cron.
+        { AND: [
+          { frozenConfig: { path: ["metricScheduling"], equals: "waiting" } },
+          { tasks: { none: { operation: { in: ["labs_ranked", "keywords_for_site"] }, status: { in: [...ACTIVE] } } } },
+        ] },
         // 수거할 제출 태스크가 있는 감사.
         { tasks: { some: eligibleTask } },
         // 활성 태스크가 전혀 없어 마감(synthesize)만 남은 고아 감사.
@@ -75,7 +84,7 @@ export async function resumeBatch(input: { limit: number; passes: number }) {
         },
       ],
     },
-    select: { id: true, domain: { select: { ownerId: true } } },
+    select: { id: true, frozenConfig: true, domain: { select: { ownerId: true } } },
     orderBy: { createdAt: "asc" },
     take: input.limit,
   });
@@ -108,7 +117,14 @@ export async function resumeBatch(input: { limit: number; passes: number }) {
     }
 
     while (passes < input.passes && Date.now() + PASS_BUDGET_MS < deadline) {
-      if ((await collectableCount(audit.id)) === 0) break;
+      if ((await collectableCount(audit.id)) === 0) {
+        // Expire stale reservations or advance waiting state without never-submitted POSTs.
+        if (passes === 0) {
+          try { await processAudit(ownerId, audit.id, { collectOnly: true }); passes++; }
+          catch { error = true; }
+        }
+        break;
+      }
       try {
         await processAudit(ownerId, audit.id, { collectOnly: true });
       } catch {

@@ -136,7 +136,11 @@ export async function listKeywords(
       searchVolume: true,
       volumeScale: true,
       volumePeriod: true,
-      competition: true,
+      competitionIndex: true,
+      difficulty: true,
+      cpc: true,
+      adCompetition: true,
+      adValue: true,
       competitionRaw: true,
       rank: true,
       rankStatus: true,
@@ -151,8 +155,9 @@ export async function listKeywords(
     last = items.at(-1);
   return {
     items: items.map(
-      ({ createdAt: _createdAt, ...r }): SeoKeywordDTO => ({
+      ({ createdAt: _createdAt, competitionIndex, ...r }): SeoKeywordDTO => ({
         ...r,
+        competition: competitionIndex,
         market: r.market as SeoKeywordDTO["market"],
         engine: r.engine as SeoKeywordDTO["engine"],
         rankStatus: r.rankStatus as SeoKeywordDTO["rankStatus"],

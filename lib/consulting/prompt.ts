@@ -2,7 +2,7 @@ import { z } from "zod";
 import { consultingStrategySchema } from "@/schemas/consulting";
 import { CLAUDE_MODEL, calcChatKrw } from "@/lib/claude/chat";
 import type { ConsultingSnapshot } from "@/types/consulting";
-export const VERSIONS = { schemaVersion: "v1", promptVersion: "consulting-v1", model: CLAUDE_MODEL };
+export const VERSIONS = { schemaVersion: "v2", promptVersion: "consulting-v2", model: CLAUDE_MODEL };
 export const MAX_OUTPUT_TOKENS = 4096;
 export const MAX_INPUT_BYTES = 80000;
 // A byte per token plus tool/message overhead is a conservative upper bound for UTF-8 input.
@@ -22,7 +22,7 @@ Missing/error/unmapped sources only justify data preparation actions using statu
 Null means unobserved, never zero. Respect source periods, range/bucket metrics and coverage. Do not equate content performance with site totals.
 The optional marketing budget is separate from platform costs. Echo its total/currency; otherwise total and all amounts null, currency per market KRW/USD/GBP/CAD/AUD.
 Allocation ratios must match channelMix. Amounts are calculated by the server; provide null placeholders. Suggested actions use only content_create, seo_audit, visibility destinations.`;
-    const user = JSON.stringify({ untrustedStoredEvidence: snapshot });
+    const user = JSON.stringify({ untrustedStoredEvidence: snapshot.llmInput ?? snapshot });
     return [{ role: "system" as const, content: system }, { role: "user" as const, content: user }];
 }
 

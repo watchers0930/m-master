@@ -28,31 +28,18 @@ export async function expireAbandonedAudit(
   tx: Prisma.TransactionClient,
   ownerId: string,
   domainId: string,
+  auditId?: string,
 ) {
   await releaseExpiredClaims(tx, ownerId, undefined, domainId);
   const cutoff = new Date(Date.now() - ABANDONED_AUDIT_MS);
   const audit = await tx.seoAudit.findFirst({
     where: {
+      id: auditId,
       domainId,
       domain: { ownerId },
       status: "pending",
       createdAt: { lte: cutoff },
-      tasks: {
-        none: {
-          OR: [
-            { status: { in: ["claimed", "submitted", "uncertain"] } },
-            { updatedAt: { gt: cutoff } },
-            {
-              status: "pending",
-              OR: [
-                { vendorTaskId: { not: null } },
-                { costKrw: { gt: 0 } },
-                { resultCheckpoint: { not: Prisma.DbNull } },
-              ],
-            },
-          ],
-        },
-      },
+      tasks: abandonedAuditTasks(cutoff),
     },
     select: {
       id: true,
@@ -78,6 +65,9 @@ export async function expireAbandonedAudit(
       frozenConfig: {
         ...object(audit.frozenConfig),
         autoRankings: false,
+        ...(["waiting", "scheduled"].includes(String(object(audit.frozenConfig).metricScheduling))
+          ? { metricScheduling: "expired" }
+          : {}),
         ...(object(audit.frozenConfig).autoRankings
           ? { autoRankingsState: "expired" }
           : {}),
@@ -86,4 +76,24 @@ export async function expireAbandonedAudit(
       failReason,
     },
   });
+}
+
+/** Untouched reservations may expire; stale uncertain charges and holds stay intact. */
+export function abandonedAuditTasks(cutoff: Date): Prisma.SeoTaskListRelationFilter {
+  return {
+    none: {
+      OR: [
+        { status: { in: ["claimed", "submitted"] } },
+        { updatedAt: { gt: cutoff } },
+        {
+          status: "pending",
+          OR: [
+            { vendorTaskId: { not: null } },
+            { costKrw: { gt: 0 } },
+            { resultCheckpoint: { not: Prisma.DbNull } },
+          ],
+        },
+      ],
+    },
+  };
 }

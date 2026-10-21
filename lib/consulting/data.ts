@@ -1,8 +1,9 @@
+import { buildSections } from "./sections";
 import { Prisma, type ConsultingReport } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { notFound, VisibilityError } from "@/lib/visibility/http";
 import { marketSchema } from "@/lib/market/schema";
-import { consultingSnapshotSchema, consultingStrategySchema } from "@/schemas/consulting";
+import { parseConsultingSnapshot, consultingStrategySchema } from "@/schemas/consulting";
 import type { consultingQuerySchema } from "@/schemas/consulting";
 import type { ConsultingReportDTO, ConsultingReportSummaryDTO, ConsultingSnapshot } from "@/types/consulting";
 import type { z } from "zod";
@@ -32,9 +33,10 @@ export async function ownedDomain(ownerId: string, id: string) {
     return { ...d, market: marketSchema.parse(d.market) };
 }
 export function reportDto(row: ConsultingReport): ConsultingReportDTO {
-    const snapshot = consultingSnapshotSchema.parse(row.inputSnapshot);
+    const snapshot = parseConsultingSnapshot(row.inputSnapshot, row.schemaVersion) as ConsultingSnapshot;
     const strategy = row.status === "completed" ? consultingStrategySchema.parse(row.strategyJson) : null;
     return {
+        sections: snapshot.sections ?? buildSections({...snapshot, evidence: [], selection: []}).sections,
         id: row.id, domainId: row.domainId, market: marketSchema.parse(row.market),
         status: row.status as ConsultingReportDTO["status"], failCode: row.failCode,
         diagnosis: strategy?.diagnosis ?? null, channelMix: strategy?.channelMix ?? null,

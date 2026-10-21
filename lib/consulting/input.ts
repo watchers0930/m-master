@@ -1,3 +1,4 @@
+import { readStructuredInput } from "./structured-input";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { visibilityData } from "@/lib/visibility/data";
@@ -47,6 +48,7 @@ export async function collectInput(ownerId: string, domain: {
                 let status = "missing";
                 let reason: string | null = null;
                 if (source === "seo") {
+                    snapshot.structuredMetrics = await readStructuredInput(tx, ownerId, domain.id, snapshot);
                     const where = { domainId: domain.id, market: domain.market, domain: { ownerId } };
                     const audit = await tx.seoAudit.findFirst({ where: { ...where, scope: "full", status: "completed", completedAt: { lte: to } },
                         orderBy: [{ completedAt: "desc" }, { id: "asc" }],
@@ -109,7 +111,16 @@ export async function collectInput(ownerId: string, domain: {
                         if (!observedAt || r.capturedAt > observedAt)
                             observedAt = r.capturedAt;
                     }
-                    if (audit && audit.technicalScore === null && !snapshot.evidence.some(e => e.id.startsWith("seo_check_")))
+                    const structured = snapshot.structuredMetrics;
+                    const structuredObserved = !!structured?.demand.length || structured?.keywords.some(k =>
+                        [k.difficulty, k.volume, k.cpc, k.rank].some(value => value !== null));
+                    if (structuredObserved) {
+                        for (const e of snapshot.evidence.filter(e => /^(metric_|demand_)/.test(e.id))) {
+                            if (e.observedAt && (!observedAt || e.observedAt > observedAt.toISOString())) observedAt = new Date(e.observedAt);
+                        }
+                        if (status === "missing") status = "partial";
+                    }
+                    if (audit && audit.technicalScore === null && !structuredObserved && !snapshot.evidence.some(e => e.id.startsWith("seo_check_")))
                         status = "missing";
                     if (status === "missing" && (keywords.some(k => k.searchVolume !== null) || rankings.some(r => r.rank !== null || (r.status === "not_found_in_range" && r.returnedRange !== null))))
                         status = "partial";
@@ -160,7 +171,8 @@ export async function collectInput(ownerId: string, domain: {
         snapshot.evidence = [...new Map(snapshot.evidence.map(e => [e.id, e])).values()];
         for (const s of snapshot.sourceStatus)
             add(`status_${s.source}`, "status", `${s.source} data readiness`, s.status, null);
-        return consultingSnapshotSchema.parse(snapshot);
+        const {structuredMetrics, ...legacy} = snapshot;
+        return {...consultingSnapshotSchema.parse({...legacy, evidence: legacy.evidence.slice(0,700)}), evidence: legacy.evidence, ...(structuredMetrics ? {structuredMetrics} : {})};
         }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 20000 });
       } catch (error) {
         if (!(error instanceof SourceReadFailure)) throw error;
