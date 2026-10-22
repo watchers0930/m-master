@@ -39,11 +39,13 @@ export async function collectInput(ownerId: string, domain: {
         // 근거 라벨은 운영 대시보드(한글)에 그대로 노출된다 → 한글 고정. 지표/소스 키 한글 매핑.
         const GEO_METRIC_KO: Record<string, string> = { sov: "점유율", citationRate: "인용률", validSamples: "유효 표본", citationValidSamples: "인용 유효 표본", unresolvableCount: "미해결 수", failedCount: "실패 수" };
         const SOURCE_KO: Record<string, string> = { seo: "SEO", geo: "GEO", ga4: "GA4" };
+        const STATUS_KO: Record<string, string> = { available: "수집됨", partial: "부분 수집", stale: "오래된 데이터", missing: "미수집", unmapped: "매핑 불가", error: "조회 오류" };
+        const srcKo = (s: string) => SOURCE_KO[s] ?? s;
         // A source failure aborts this read; recovery re-reads all remaining sources together.
         for (const source of ["seo", "geo", "ga4"] as const) {
             if (unavailable.has(source)) {
                 snapshot.sourceStatus.push({ source, status: "error", observedAt: null, reason: "저장된 소스 조회에 실패했습니다." });
-                snapshot.limitations.push(`${source}: 저장 데이터 조회 실패`);
+                snapshot.limitations.push(`${srcKo(source)}: 저장 데이터 조회 실패`);
                 continue;
             }
             try {
@@ -165,7 +167,7 @@ export async function collectInput(ownerId: string, domain: {
                 }
                 snapshot.sourceStatus.push({ source, status, observedAt: observedAt?.toISOString() ?? null, reason });
                 if (status !== "available")
-                    snapshot.limitations.push(reason ?? `${source}: ${status}`);
+                    snapshot.limitations.push(reason ?? `${srcKo(source)}: ${STATUS_KO[status] ?? status}`);
             }
             catch {
                 throw new SourceReadFailure(source);
