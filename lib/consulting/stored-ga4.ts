@@ -11,5 +11,5 @@ export async function readStoredGa4(tx: Prisma.TransactionClient, ownerId: strin
             select: { variantAUrl: true, variantBUrl: true }, take: 20, orderBy: [{ completedAt: "desc" }, { id: "asc" }] });
     const mapped = tests.some(t => citationHost(t.variantAUrl ?? "") === host && citationHost(t.variantBUrl ?? "") === host);
     return { status: daily || mapped ? "unmapped" : "missing",
-        reason: "GA4 저장분의 property·호스트·실제 수집 성공 메타데이터가 부족합니다. 방문자·상위페이지·트래픽소스·콘텐츠 성과는 추정하지 않습니다." };
+        reason: "GA4 저장분의 속성·호스트·실제 수집 성공 메타데이터가 부족합니다. 방문자·상위페이지·트래픽소스·콘텐츠 성과는 추정하지 않습니다." };
 }
