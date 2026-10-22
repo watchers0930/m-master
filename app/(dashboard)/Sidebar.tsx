@@ -78,17 +78,13 @@ export function Sidebar() {
 
       <div className="sb-section">
         <div className="sb-label">분석</div>
-        <Link href="/ab-test" prefetch={false} className={`sb-item${active('/ab-test') ? ' active' : ''}`}>
+        {/* 프로세스 순서: 도메인 앵커 → ①Organic 진단(SEO) → ②GEO 추적(AI가시성) → 종합(컨설팅) → 성과(성과·방문자) → 실험(A/B) */}
+        <Link href="/seo-audit" prefetch={false} className={`sb-item${active('/seo-audit') ? ' active' : ''}`}>
           <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M9 3h6M9 3v8L5 21h14L15 11V3"/>
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
-          A/B 테스트
-        </Link>
-        <Link href="/analytics" prefetch={false} className={`sb-item${active('/analytics') ? ' active' : ''}`}>
-          <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M18 20V10M12 20V4M6 20v-6"/>
-          </svg>
-          성과 분석
+          SEO 진단
         </Link>
         <Link href="/visibility" prefetch={false} className={`sb-item${active('/visibility') ? ' active' : ''}`}>
           <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -97,18 +93,17 @@ export function Sidebar() {
           </svg>
           AI 가시성
         </Link>
-        <Link href="/seo-audit" prefetch={false} className={`sb-item${active('/seo-audit') ? ' active' : ''}`}>
-          <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <circle cx="11" cy="11" r="8"/>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-          SEO 진단
-        </Link>
         <Link href="/consulting" prefetch={false} className={`sb-item${active('/consulting') ? ' active' : ''}`}>
           <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
           </svg>
           마케팅 컨설팅
+        </Link>
+        <Link href="/analytics" prefetch={false} className={`sb-item${active('/analytics') ? ' active' : ''}`}>
+          <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M18 20V10M12 20V4M6 20v-6"/>
+          </svg>
+          성과 분석
         </Link>
         <Link href="/visitors" prefetch={false} className={`sb-item${active('/visitors') ? ' active' : ''}`}>
           <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
@@ -117,6 +112,12 @@ export function Sidebar() {
             <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
           </svg>
           방문자 분석
+        </Link>
+        <Link href="/ab-test" prefetch={false} className={`sb-item${active('/ab-test') ? ' active' : ''}`}>
+          <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M9 3h6M9 3v8L5 21h14L15 11V3"/>
+          </svg>
+          A/B 테스트
         </Link>
       </div>
 

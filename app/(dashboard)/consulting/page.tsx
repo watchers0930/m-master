@@ -12,7 +12,8 @@ import type { ConsultingReportDTO, EvidenceRef } from './types';
 import { DEFAULT_MARKET } from './constants';
 import { ConsultingApiError } from './api';
 import { ConsultingGate, useConsultingAccess } from './components/ConsultingGate';
-import { ConsultingDomainSelector } from './components/ConsultingDomainSelector';
+import { DomainBar } from '../components/domain/DomainBar';
+import { readSelectedDomain, writeSelectedDomain } from '../components/domain/selected-domain';
 import { GenerationPanel } from './components/GenerationPanel';
 import { ReportHeader } from './components/ReportHeader';
 import { DiagnosisCard } from './components/DiagnosisCard';
@@ -128,11 +129,15 @@ function ConsultingContent() {
     const target = domainQuery.data;
     return target && !rows.some(d => d.id === target.id) ? [target, ...rows] : rows;
   }, [domainsQuery.data, domainQuery.data]);
+  // 초기 선택 — 우선순위: 딥링크 ?domainId= > 마지막 선택(localStorage) > 첫 도메인.
   useEffect(() => {
     if (selectedDomainId) return;
     if (requestedId) {
       if (domainQuery.data?.id === requestedId) setSelectedDomainId(requestedId);
-    } else if (domains.length) setSelectedDomainId(domains[0].id);
+    } else if (domains.length) {
+      const stored = readSelectedDomain();
+      setSelectedDomainId(stored && domains.some((d) => d.id === stored) ? stored : domains[0].id);
+    }
   }, [domains, selectedDomainId, requestedId, domainQuery.data]);
 
   const selectedDomain = domains.find((d) => d.id === selectedDomainId) ?? null;
@@ -150,10 +155,16 @@ function ConsultingContent() {
     if (!activeReportId && reports.length > 0) setActiveReportId(reports[0].id);
   }, [reports, activeReportId]);
 
-  // 도메인 변경 시 활성 리포트 초기화
+  // 도메인 변경 시 활성 리포트 초기화 + 선택 기억(화면 간 유지)
   const handleSelectDomain = (id: string) => {
     setSelectedDomainId(id);
     setActiveReportId(null);
+    writeSelectedDomain(id);
+  };
+
+  // 등록 성공 → 새 도메인 선택. useDomain(id) 가 단건 해석해 목록에 선두 병합한다(검색 필터 무관).
+  const handleCreatedDomain = (d: { id: string }) => {
+    handleSelectDomain(d.id);
   };
 
   // 단건 상세 (generating 폴링 포함)
@@ -162,13 +173,16 @@ function ConsultingContent() {
 
   return (
     <>
-      <ConsultingDomainSelector
+      <DomainBar
+        label="컨설팅 대상 도메인"
         domains={domains}
         loading={domainsQuery.isPending || (!!requestedId && !selectedDomainId && domainQuery.isPending)}
         error={errMsg(domainsQuery.error ?? domainQuery.error)}
         selectedId={selectedDomainId}
+        defaultMarket={market}
         onSelect={handleSelectDomain}
         onRetry={() => { domainsQuery.refetch(); if (selectedDomainId ?? requestedId) domainQuery.refetch(); }}
+        onCreated={handleCreatedDomain}
         search={search}
         onSearch={setSearch}
         hasMore={!!domainsQuery.hasNextPage}

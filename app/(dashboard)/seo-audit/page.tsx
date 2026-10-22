@@ -9,7 +9,8 @@ import { useSearchParams } from 'next/navigation';
 import type { Market } from '@/types/visibility';
 import type { SeoAuditDTO } from '@/types/seo';
 import { SeoGate, useSeoAccess } from './components/SeoGate';
-import { SeoDomainSelector } from './components/SeoDomainSelector';
+import { DomainBar } from '../components/domain/DomainBar';
+import { readSelectedDomain, writeSelectedDomain } from '../components/domain/selected-domain';
 import { AuditRunPanel } from './components/AuditRunPanel';
 import { AuditStatus } from './components/AuditStatus';
 import { TechnicalScoreCard } from './components/TechnicalScoreCard';
@@ -68,11 +69,12 @@ function SeoAuditContent() {
   const domainsQuery = useDomains();
   const domains = useMemo(() => domainsQuery.data ?? [], [domainsQuery.data]);
 
-  // 초기 도메인 선택 — 딥링크 domainId 가 소유 목록에 있으면 그 도메인을, 없으면(미존재·타 소유자) 첫 도메인(지적 2).
+  // 초기 도메인 선택 — 우선순위: 딥링크 ?domainId= > 마지막 선택(localStorage) > 첫 도메인.
+  // 모두 소유 목록과 대조해 미존재·타 소유자 값은 무시한다(지적 2).
   useEffect(() => {
     if (selectedDomainId || domains.length === 0) return;
-    const deepLinked = requestedDomainId && domains.some((d) => d.id === requestedDomainId) ? requestedDomainId : null;
-    setSelectedDomainId(deepLinked ?? domains[0].id);
+    const owned = (id: string | null) => (id && domains.some((d) => d.id === id) ? id : null);
+    setSelectedDomainId(owned(requestedDomainId) ?? owned(readSelectedDomain()) ?? domains[0].id);
   }, [domains, selectedDomainId, requestedDomainId]);
 
   const selectedDomain = domains.find((d) => d.id === selectedDomainId) ?? null;
@@ -90,10 +92,11 @@ function SeoAuditContent() {
     if (!activeAuditId && audits.length > 0) setActiveAuditId(audits[0].id);
   }, [audits, activeAuditId]);
 
-  // 도메인 변경 시 활성 진단 초기화
+  // 도메인 변경 시 활성 진단 초기화 + 선택 기억(화면 간 유지)
   const handleSelectDomain = (id: string) => {
     setSelectedDomainId(id);
     setActiveAuditId(null);
+    writeSelectedDomain(id);
   };
 
   // 단건 상세 (pending 폴링 포함). pollExhausted·manualCheck 는 훅이 실제 요청 횟수로 판정(지적 6).
@@ -121,28 +124,24 @@ function SeoAuditContent() {
   const opportunityCount = useMemo(() => keywords.filter((k) => k.isOpportunity).length, [keywords]);
   const loadedSuffix = (more: boolean) => (more ? '+' : '');
 
-  if (!selectedDomainId && domains.length === 0 && !domainsQuery.isPending) {
-    return (
-      <SeoDomainSelector
-        domains={domains}
-        loading={domainsQuery.isPending}
-        error={errMsg(domainsQuery.error)}
-        selectedId={selectedDomainId}
-        onSelect={handleSelectDomain}
-        onRetry={() => domainsQuery.refetch()}
-      />
-    );
-  }
+  // 등록 성공 → 목록 갱신 후 새 도메인 선택
+  const handleCreatedDomain = (d: typeof domains[number]) => {
+    domainsQuery.refetch();
+    handleSelectDomain(d.id);
+  };
 
   return (
     <>
-      <SeoDomainSelector
+      <DomainBar
+        label="진단 대상 도메인"
         domains={domains}
         loading={domainsQuery.isPending}
         error={errMsg(domainsQuery.error)}
         selectedId={selectedDomainId}
+        defaultMarket={market}
         onSelect={handleSelectDomain}
         onRetry={() => domainsQuery.refetch()}
+        onCreated={handleCreatedDomain}
       />
 
       {selectedDomainId && (
