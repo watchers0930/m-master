@@ -121,11 +121,20 @@ export const DESTINATION_CTA: Record<ActionDestination, string> = {
 };
 
 /** 관측값(evidence.value) + 단위를 표시 문자열로. null = '미관측'(0 아님) */
+// 내부 단위 sentinel(서버 구조 매칭용)의 표시용 한글 매핑. 저장값은 영문 유지, 화면만 한글.
+const UNIT_KO: Record<string, string> = { searches: '회', position: '위' };
+
 export function formatEvidenceValue(ev: EvidenceRef | undefined): string {
   if (!ev) return '(근거 없음)';
   if (ev.value === null || ev.value === undefined) return '미관측';
+  // 데이터 상태(status) 근거의 값은 준비상태 enum → 한글 라벨로 표시(예: missing → 미수집)
+  if (ev.source === 'status' && typeof ev.value === 'string' && SOURCE_STATUS_META[ev.value]) {
+    return SOURCE_STATUS_META[ev.value].label;
+  }
   const base = typeof ev.value === 'number' ? ev.value.toLocaleString('ko-KR') : ev.value;
-  return ev.unit ? `${base}${ev.unit}` : String(base);
+  if (!ev.unit) return String(base);
+  const unit = UNIT_KO[ev.unit] ?? ev.unit;
+  return `${base}${unit}`;
 }
 
 const TOKEN_RE = /\{\{ev:([a-zA-Z0-9_.-]+)\}\}/g;

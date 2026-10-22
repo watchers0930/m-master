@@ -36,6 +36,9 @@ export async function collectInput(ownerId: string, domain: {
             snapshot.evidence.push({ id, source, label, value, observedAt: at?.toISOString() ?? null,
                 rangeFrom: source === "geo" ? range.from : null, rangeTo: source === "geo" ? range.to : null, ...(unit ? { unit } : {}) });
         };
+        // 근거 라벨은 운영 대시보드(한글)에 그대로 노출된다 → 한글 고정. 지표/소스 키 한글 매핑.
+        const GEO_METRIC_KO: Record<string, string> = { sov: "점유율", citationRate: "인용률", validSamples: "유효 표본", citationValidSamples: "인용 유효 표본", unresolvableCount: "미해결 수", failedCount: "실패 수" };
+        const SOURCE_KO: Record<string, string> = { seo: "SEO", geo: "GEO", ga4: "GA4" };
         // A source failure aborts this read; recovery re-reads all remaining sources together.
         for (const source of ["seo", "geo", "ga4"] as const) {
             if (unavailable.has(source)) {
@@ -85,13 +88,13 @@ export async function collectInput(ownerId: string, domain: {
                     snapshot.selection.push({ source: "seo_rankings", total: groups[0].total, selected: rankings.length, limit: 100, rule: "latest per keyword/engine/device" });
                     if (audit) {
                         observedAt = audit.completedAt;
-                        add("seo_tech_score", source, "Technical score", audit.technicalScore, observedAt, "점");
-                        add("seo_coverage", source, "Known check coverage", audit.coverage, observedAt);
+                        add("seo_tech_score", source, "기술 점수", audit.technicalScore, observedAt, "점");
+                        add("seo_coverage", source, "점검 커버리지", audit.coverage, observedAt);
                         const checks = Array.isArray(audit.checks) ? audit.checks : [];
                         for (const check of checks.slice(0, 15)) {
                             if (check && typeof check === "object" && !Array.isArray(check) && typeof check.key === "string" && /^[a-z_]+$/.test(check.key) &&
                                 ["pass", "warning", "fail", "not_applicable"].includes(String(check.status)))
-                                add(`seo_check_${check.key}`, source, `Technical check: ${check.key}`, String(check.status), observedAt);
+                                add(`seo_check_${check.key}`, source, `기술 점검: ${check.key}`, String(check.status), observedAt);
                         }
                         if (observedAt && observedAt < from) {
                             status = "stale";
@@ -101,13 +104,13 @@ export async function collectInput(ownerId: string, domain: {
                             status = audit.coverage === 1 ? "available" : "partial";
                     }
                     for (const k of keywords) {
-                        add(`seo_kw_${k.id}`, source, `Untrusted keyword: ${k.keyword.slice(0, 150)} (${k.volumeScale ?? "unknown scale"}, ${k.volumePeriod ?? "unknown period"})`, k.searchVolume, k.metricsUpdatedAt);
+                        add(`seo_kw_${k.id}`, source, `키워드: ${k.keyword.slice(0, 150)} (규모 ${k.volumeScale ?? "미상"}, 기간 ${k.volumePeriod ?? "미상"})`, k.searchVolume, k.metricsUpdatedAt);
                         if (k.metricsUpdatedAt && (!observedAt || k.metricsUpdatedAt > observedAt))
                             observedAt = k.metricsUpdatedAt;
                     }
                     for (const r of rankings) {
-                        add(`seo_rank_${r.id}`, source, `${r.engine}/${r.device} rank (${r.status})`, r.rank, r.capturedAt, "position");
-                        add(`seo_range_${r.id}`, source, "Returned rank range", r.returnedRange, r.capturedAt);
+                        add(`seo_rank_${r.id}`, source, `${r.engine}/${r.device} 순위 (${r.status})`, r.rank, r.capturedAt, "position");
+                        add(`seo_range_${r.id}`, source, "반환 순위 범위", r.returnedRange, r.capturedAt);
                         if (!observedAt || r.capturedAt > observedAt)
                             observedAt = r.capturedAt;
                     }
@@ -140,15 +143,15 @@ export async function collectInput(ownerId: string, domain: {
                         if (at && (!observedAt || at > observedAt))
                             observedAt = at;
                         for (const key of ["sov", "citationRate", "validSamples", "citationValidSamples", "unresolvableCount", "failedCount"] as const)
-                            add(`geo_${engine.engine}_${key}`, source, `${engine.engine} ${key}`, engine[key], at);
+                            add(`geo_${engine.engine}_${key}`, source, `${engine.engine} ${GEO_METRIC_KO[key] ?? key}`, engine[key], at);
                     }
                     for (const c of geo.citations) {
                         const host = citationHost(c.url);
                         if (host)
-                            add(`geo_citation_${snapshotHash({ host, at: c.capturedAt }).slice(0, 24)}`, source, "Observed citation host", host, new Date(c.capturedAt));
+                            add(`geo_citation_${snapshotHash({ host, at: c.capturedAt }).slice(0, 24)}`, source, "인용 출처 호스트", host, new Date(c.capturedAt));
                     }
                     for (const c of geo.competitors.slice(0, 20)) {
-                        add(`geo_competitor_${snapshotHash(c.label).slice(0, 24)}`, source, `Untrusted competitor label: ${c.label.slice(0, 150)}`, c.mentionRate, observedAt);
+                        add(`geo_competitor_${snapshotHash(c.label).slice(0, 24)}`, source, `경쟁사 라벨: ${c.label.slice(0, 150)}`, c.mentionRate, observedAt);
                     }
                     // Zero valid denominators remain missing even though failure counters exist.
                     status = geo.engines.some(e => e.validSamples > 0 || e.citationValidSamples > 0) ?
@@ -170,7 +173,7 @@ export async function collectInput(ownerId: string, domain: {
         }
         snapshot.evidence = [...new Map(snapshot.evidence.map(e => [e.id, e])).values()];
         for (const s of snapshot.sourceStatus)
-            add(`status_${s.source}`, "status", `${s.source} data readiness`, s.status, null);
+            add(`status_${s.source}`, "status", `${SOURCE_KO[s.source] ?? s.source} 데이터 준비 상태`, s.status, null);
         const {structuredMetrics, ...legacy} = snapshot;
         return {...consultingSnapshotSchema.parse({...legacy, evidence: legacy.evidence.slice(0,700)}), evidence: legacy.evidence, ...(structuredMetrics ? {structuredMetrics} : {})};
         }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 20000 });
