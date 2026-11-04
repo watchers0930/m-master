@@ -78,12 +78,14 @@ export async function completeWorkerClaim(contentId: string, token: string, exte
   catch { cafe = { status: 'skipped', reason: 'derive_failed' }; }
   return { ok: true, cafe };
 }
-export async function failWorkerClaim(contentId: string, token: string, outcome: 'not_posted' | 'unknown') {
+export async function failWorkerClaim(contentId: string, token: string, outcome: 'not_posted' | 'unknown', reason?: string) {
   const claim = await ownedClaim(contentId, token);
   const target = outcome === 'not_posted' ? 'released' : 'unknown';
-  if (claim.status === target) return { ok: true };
+  if (claim.status === target) return { ok: true }; // 같은 보고 재전송은 멱등
+  // errorCode는 'outcome:사유코드' 형식 — 'lease_expired'(서버 전용, complete 허용 조건)와 겹치지 않는다.
+  const errorCode = reason && /^[a-z][a-z0-9_]{0,63}$/.test(reason) ? `${outcome}:${reason}` : outcome;
   const changed = await prisma.publishClaim.updateMany({ where: { id: claim.id, ownerId: claim.ownerId, status: 'claimed' },
-    data: { status: target, finishedAt: new Date(), errorCode: outcome } });
+    data: { status: target, finishedAt: new Date(), errorCode } });
   if (!changed.count) publishError('claim_invalid');
   return { ok: true };
 }
