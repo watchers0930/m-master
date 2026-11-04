@@ -1,6 +1,7 @@
 import { persistGeneratedContent, type GenerationCost } from '@/lib/content/persist-generated';
 // POST → 예산체크 → RAG → GPT-4o (SSE stream) → 검수 → DB insert
 import { z } from 'zod';
+import { VisibilityError, parseBody } from '@/lib/visibility/http';
 import { prisma } from '@/lib/prisma';
 import { isBudgetExceeded } from '@/lib/cost/budget';
 import { retrieveTopK, buildRagContext, hasIndexedDocs } from '@/lib/rag/retriever';
@@ -29,31 +30,17 @@ const RequestSchema = z.object({
   use_rag: z.boolean().optional(),
 }).strict();
 
-export const maxDuration = 60; // Hobby 플랜 최대 60초
 
 const REVIEW_PASS_SCORE = 75;
 const enc = new TextEncoder();
 const sse = (obj: object) => enc.encode(`data: ${JSON.stringify(obj)}\n\n`);
 
-function jsonError(code: string, message: string, status: number) {
-  return new Response(JSON.stringify({ error: { code, message } }), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
+const fail = (code: string, message: string, status: number): never => { throw new VisibilityError(code, message, status); };
 
-export async function streamGenerate(ownerId: string, request: Request) {
-  // 1) 세션 검증
-
-  // 2) 요청 파싱
-  let body: unknown;
-  try { body = await request.json(); }
-  catch { return jsonError('bad_request', 'JSON 파싱 실패', 400); }
-
-  const parsed = RequestSchema.safeParse(body);
-  if (!parsed.success) return jsonError('validation', parsed.error.issues[0]?.message ?? 'validation error', 400);
-
-  const req: ContentGenerateRequest = parsed.data;
+/** Returns the SSE body stream; pre-stream failures throw VisibilityError (the route sets HTTP headers). */
+export async function streamGenerate(ownerId: string, body: unknown): Promise<ReadableStream<Uint8Array>> {
+  // 요청 검증
+  const req: ContentGenerateRequest = parseBody(RequestSchema, body);
 
   // 3) 플랜 제한 체크
   const user = await prisma.user.findUnique({ where: { id: ownerId }, select: { plan: true } });
@@ -61,11 +48,11 @@ export async function streamGenerate(ownerId: string, request: Request) {
     await checkContentLimit(ownerId, user?.plan ?? 'free');
     await checkCostLimit(ownerId, user?.plan ?? 'free');
   } catch (limitErr) {
-    return jsonError('plan_limit', '플랜 한도를 확인하세요.', 429);
+    return fail('plan_limit', '플랜 한도를 확인하세요.', 429);
   }
 
   // 3b) 예산 체크
-  if (await isBudgetExceeded(ownerId)) return jsonError('budget_exceeded', '월 예산 한도 초과. 설정에서 한도를 조정하세요.', 429);
+  if (await isBudgetExceeded(ownerId)) return fail('budget_exceeded', '월 예산 한도 초과. 설정에서 한도를 조정하세요.', 429);
 
   // 4) settings (유저별)
   const settingsData = await prisma.setting.findUnique({
@@ -245,12 +232,5 @@ export async function streamGenerate(ownerId: string, request: Request) {
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no',
-    },
-  });
+  return stream;
 }

@@ -3,6 +3,7 @@ import type { Ga4Result } from '@/types/ga4';
 import type { ConsultingGa4 } from '@/schemas/ga4-consulting';
 import { resolveGa4Scope } from '@/lib/ga4/scope';
 import { runGa4 } from '@/lib/ga4/run';
+import { stripUnsafeControls } from '@/lib/utils/untrusted-text';
 export const GA4_REPORTS = {
   channels: { dimension: 'sessionDefaultChannelGroup', metrics: ['activeUsers','sessions','engagedSessions','engagementRate'] },
   sourceMedium: { dimension: 'sessionSourceMedium', metrics: ['sessions','activeUsers'] },
@@ -13,7 +14,7 @@ export const GA4_REPORTS = {
 export type ReportName = keyof typeof GA4_REPORTS;
 type RawReport = protos.google.analytics.data.v1beta.IRunReportResponse;
 export type Ga4Collection = Ga4Result<ConsultingGa4>;
-export function ga4Text(value: string) { return value.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 200); }
+export function ga4Text(value: string) { return stripUnsafeControls(value).slice(0, 200); }
 function metric(value?: string | null) {
   if (value == null) return null;
   const parsed = Number(value);
@@ -25,6 +26,7 @@ export async function collectGa4(ownerId: string, domainId: string, range: { fro
   if (!resolved.ok) return { status: 'unavailable', reason: resolved.reason };
   const dates = { startDate: range.from.slice(0,10), endDate: range.to.slice(0,10) };
   const names = Object.keys(GA4_REPORTS) as ReportName[];
+  // Each report is an intentional top-20 (explicit limit) with server totals, so >20 rows is not "partial".
   const result = await runGa4(resolved.scope, 'ga4-consulting-v1', dates, async (client, property) => {
     const requests = names.map(name => {
       const definition = GA4_REPORTS[name];

@@ -30,6 +30,8 @@ export interface RecommendInput {
   channel: 'blog';
   businessContext?: BusinessContext;
   onUsage?: (usage: ChatUsage) => Promise<void>;
+  /** Called synchronously right before the billable request is sent. */
+  onDispatch?: () => void;
 }
 
 export interface RecommendResult {
@@ -184,6 +186,7 @@ export async function recommendTopFive(input: RecommendInput): Promise<Recommend
     '위 후보에서 TOP 7을 선정하여 submit_recommendations를 호출하세요. 각 항목 candidateIndex에 후보 번호를 반드시 포함하세요. ai_visibility_gap은 관측된 미노출 개선 기회로 우선 고려하되 브랜드 언급을 보장하지 마세요.',
   ].join('\n');
 
+  input.onDispatch?.();
   const response = await client.chat.completions.create({
     model: CLAUDE_MODEL,
     max_tokens: 2048,

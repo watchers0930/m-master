@@ -35,13 +35,16 @@ export async function fetchDowChannelPattern(scope?: Ga4Scope): Promise<Ga4Resul
 export async function fetchPopularPages(days = 30, scope?: Ga4Scope): Promise<Ga4Result<PopularPage[]>> {
   const safeDays = Math.max(1, Math.min(Math.floor(days), 365));
   const key = `popular:${safeDays}`;
-  const result = await runGa4(scope, key, { startDate: '90daysAgo', endDate: 'today' }, async (client, property) => {
+  const range = { startDate: `${safeDays}daysAgo`, endDate: 'today' };
+  const result = await runGa4(scope, key, range, async (client, property) => {
+    // Intentional top-10: the explicit limit tells runGa4 this is not a truncated (partial) read.
     const [res] = await client.runReport({
       property,
-      dateRanges: [{ startDate: `${safeDays}daysAgo`, endDate: 'today' }],
+      dateRanges: [range],
       dimensions: [{ name: 'pagePath' }],
       metrics: [{ name: 'sessions' }],
       orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+      limit: 10,
     });
     return (res.rows ?? []).slice(0, 10)
       .map((row) => ({

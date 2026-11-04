@@ -1,5 +1,5 @@
 import { consultingStrategySchema } from "@/schemas/consulting";
-import type { ConsultingSnapshot, ConsultingStrategy, Currency } from "@/types/consulting";
+import type { ConsultingLlmSnapshot, ConsultingStrategy, Currency } from "@/types/consulting";
 import type { Market } from "@/types/visibility";
 export const MARKET_CURRENCY: Record<Market, Currency> = {
     "ko-KR": "KRW", "en-US": "USD", "en-GB": "GBP", "en-CA": "CAD", "en-AU": "AUD",
@@ -20,7 +20,7 @@ function narrative(value: string, evidence: Set<string>) {
     if (/[\p{N}]|\{\{|https?:\/\//u.test(rest) || /(?:매출|수익|전환|노출).{0,12}보장|guarantee.{0,20}(?:revenue|profit|conversion|ranking)/i.test(rest))
         throw new Error("unverified narrative");
 }
-export function validateStrategy(raw: unknown, snapshot: ConsultingSnapshot): ConsultingStrategy {
+export function validateStrategy(raw: unknown, snapshot: ConsultingLlmSnapshot): ConsultingStrategy {
     const result = consultingStrategySchema.parse(raw);
     const known = new Set(snapshot.evidence.map(e => e.id));
     const refs = (ids: string[]) => { if (ids.some(id => !known.has(id)))

@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireSession } from '@/lib/auth';
 import { toSnakeCase } from '@/lib/utils/case';
-import { VisibilityError, jsonError as visibilityJsonError } from '@/lib/visibility/http';
+import { VisibilityError, authenticated, jsonError as visibilityJsonError } from '@/lib/visibility/http';
 import { prisma } from '@/lib/prisma';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
 import { extractPath, InvalidUrlError } from '@/lib/ab-test/url-utils';
@@ -80,17 +80,17 @@ const PatchSchema = z.object({
   measure_days: z.union([z.literal(7), z.literal(14), z.literal(30)]).optional(),
   action: z.enum(['start', 'complete', 'confirm_winner', 'cancel']).optional(),
   winner: z.enum(['a', 'b', 'tie']).optional(),
-});
+}).strict();
 
+// Session writes require a same-origin request (CSRF), like the other session write routes.
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await requireSession();
-  const ownerId = session.user.id;
+  return authenticated(async ownerId => patchTest(ownerId, (await params).id, request), request, { requireOrigin: true });
+}
 
-  const { id } = await params;
-
+async function patchTest(ownerId: string, id: string, request: NextRequest): Promise<Response> {
   let body: unknown;
   try { body = await request.json(); }
   catch { return jsonError('bad_request', 'JSON 파싱 실패', 400); }
@@ -172,12 +172,12 @@ export async function PATCH(
       if (before.status !== 'running') {
         return jsonError('invalid_state', `complete는 running 상태에서만 가능합니다 (현재: ${before.status})`, 422);
       }
-      // GA4 fetch + winner 산정
+      // GA4 fetch + winner 산정 — host(URL)와 path는 같은 최종 URL에서 계산한다 (N5)
       try {
         const completion = await buildCompletionFromGa4(ownerId, {
           ...before,
-          variant_a_path: nextAPath ?? before.variant_a_path,
-          variant_b_path: nextBPath ?? before.variant_b_path,
+          variant_a_url: nextAUrl, variant_b_url: nextBUrl,
+          variant_a_path: nextAPath, variant_b_path: nextBPath,
         });
         Object.assign(update, completion.update);
       } catch (err) {
@@ -236,13 +236,12 @@ export async function PATCH(
   let updated;
   try {
     updated = await prisma.abTest.update({
-      where: { id },
+      where: { id, ownerId },
       data: prismaData,
     });
   } catch (updateError) {
-    console.error('[ab-test PATCH] update 실패:', updateError);
-    const message = updateError instanceof Error ? updateError.message : 'update 실패';
-    return jsonError('db_error', message, 500);
+    console.error('[ab-test PATCH] update 실패', { type: updateError instanceof Error ? updateError.name : 'unknown' });
+    return jsonError('db_error', 'A/B 테스트를 저장하지 못했습니다', 500);
   }
 
   await logAudit({
@@ -265,14 +264,13 @@ export async function PATCH(
 // DELETE
 // ----------------------------------------------------------------
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await requireSession();
-  const ownerId = session.user.id;
+  return authenticated(async ownerId => deleteTest(ownerId, (await params).id), request, { requireOrigin: true });
+}
 
-  const { id } = await params;
-
+async function deleteTest(ownerId: string, id: string): Promise<Response> {
   const before = await loadTest(id, ownerId);
   if (!before) return jsonError('not_found', 'A/B 테스트를 찾을 수 없습니다', 404);
 
@@ -286,12 +284,11 @@ export async function DELETE(
 
   try {
     await prisma.abTest.delete({
-      where: { id },
+      where: { id, ownerId },
     });
   } catch (delError) {
-    console.error('[ab-test DELETE] 실패:', delError);
-    const message = delError instanceof Error ? delError.message : 'Unknown error';
-    return jsonError('db_error', message, 500);
+    console.error('[ab-test DELETE] 실패', { type: delError instanceof Error ? delError.name : 'unknown' });
+    return jsonError('db_error', 'A/B 테스트를 삭제하지 못했습니다', 500);
   }
 
   await logAudit({

@@ -102,12 +102,14 @@ export interface ConsultingSectionsDTO {
     keywords: {meta: SectionMeta; rows: Omit<StructuredMetrics["keywords"][number], "evidenceIds"|"currency">[]};
     methodology: {meta: SectionMeta; metricDefs: {key:string; definition:string; source:string; formula:string|null; version:string}[]; selectionLimits: (SectionMeta["selection"])[]};
 }
+/** What may be sent to the external LLM (non-identifying GA4 provenance). */
+export type ConsultingLlmSnapshot = NonNullable<ConsultingSnapshot["llmInput"]>;
 export interface ConsultingSnapshot {
     schemaVersion?: "v2" | "v3";
     ga4?: import("@/schemas/ga4-consulting").ConsultingGa4;
     structuredMetrics?: StructuredMetrics;
     sections?: ConsultingSectionsDTO;
-    llmInput?: Omit<ConsultingSnapshot, "llmInput"|"sections"|"structuredMetrics"|"schemaVersion">;
+    llmInput?: Omit<ConsultingSnapshot, "llmInput"|"sections"|"structuredMetrics"|"schemaVersion"|"ga4"> & { ga4?: import("@/schemas/ga4-consulting").ConsultingLlmGa4 };
     market: Market;
     range: {
         from: string;

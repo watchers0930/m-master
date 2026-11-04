@@ -80,7 +80,7 @@ export default async function DashboardPage() {
         const { getMondayOfWeekKST } = await import('@/lib/topics/week-utils');
         const weekStart = getMondayOfWeekKST();
         return prisma.topicRecommendation.findMany({
-          where: { weekStart, channel: 'blog' },
+          where: { ownerId: ownerId ?? '', weekStart, channel: 'blog' },
           orderBy: { score: 'desc' },
           take: 5,
           select: { id: true, topic: true, score: true, factors: true },

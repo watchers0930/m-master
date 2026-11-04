@@ -19,7 +19,8 @@ function stableGa4(value: unknown): unknown {
     if (!value || typeof value !== 'object' || value instanceof Date) return value;
     const object = value as Record<string,unknown>;
     return Object.fromEntries(Object.entries(object).filter(([key]) =>
-      !(key === 'collectedAt' && 'credentialSource' in object) &&
+      // GA4 provenance (full or the identifier-free LLM projection, which still carries queryVersion).
+      !(key === 'collectedAt' && ('credentialSource' in object || 'queryVersion' in object)) &&
       !(key === 'observedAt' && (object.source === 'ga4' || object.id === 'status_ga4'))
     ).map(([key, v]) => [key, stableGa4(v)]));
 }

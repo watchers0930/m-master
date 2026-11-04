@@ -74,6 +74,17 @@ export async function authenticated(
     return jsonError(error);
   }
 }
+/** Route-layer JSON body read; malformed JSON is a 400 (keeps lib functions free of Request/Response). */
+export async function readJsonBody(request: Request): Promise<unknown> {
+  try { return await request.json(); }
+  catch { throw new VisibilityError("bad_request", "JSON 파싱 실패", 400); }
+}
+/** Validate a body with a zod schema, surfacing the first issue as a 400 `validation` error. */
+export function parseBody<T>(schema: { safeParse(v: unknown): { success: true; data: T } | { success: false; error: { issues: { message: string }[] } } }, body: unknown): T {
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) throw new VisibilityError("validation", parsed.error.issues[0]?.message ?? "validation error", 400);
+  return parsed.data;
+}
 /** Reject duplicate parameters rather than silently selecting one. */
 export function queryParams(request: Request): Record<string, string> {
   const result: Record<string, string> = {};

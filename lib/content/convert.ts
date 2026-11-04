@@ -1,8 +1,8 @@
 import { persistGeneratedContent } from '@/lib/content/persist-generated';
 // POST /api/content/[id]/convert
 // 블로그 콘텐츠를 인스타/페이스북 형식으로 변환 + 새 contents row insert
-import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { VisibilityError, parseBody } from '@/lib/visibility/http';
 import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { isBudgetExceeded } from '@/lib/cost/budget';
@@ -15,22 +15,11 @@ const RequestSchema = z.object({
   channel: z.enum(['instagram', 'facebook', 'naver_cafe']),
 }).strict();
 
-function jsonError(code: string, message: string, status: number) {
-  return NextResponse.json(
-    { data: null, error: { code, message } },
-    { status },
-  );
-}
+const fail = (code: string, message: string, status: number): never => { throw new VisibilityError(code, message, status); };
 
-export async function convertContent(ownerId: string, id: string, request: Request) {
-  let body: unknown;
-  try { body = await request.json(); }
-  catch { return jsonError('bad_request', 'JSON 파싱 실패', 400); }
-
-  const parsed = RequestSchema.safeParse(body);
-  if (!parsed.success) return jsonError('validation', parsed.error.issues[0]?.message ?? 'validation error', 400);
-
-  const { channel } = parsed.data;
+/** Returns the converted row summary; failures throw VisibilityError (the route shapes HTTP). */
+export async function convertContent(ownerId: string, id: string, body: unknown) {
+  const { channel } = parseBody(RequestSchema, body);
 
   // 1) 원본 블로그 조회
   const source = await prisma.content.findFirst({
@@ -49,9 +38,9 @@ export async function convertContent(ownerId: string, id: string, request: Reque
     },
   });
 
-  if (!source) return jsonError('not_found', '원본 콘텐츠를 찾을 수 없습니다', 404);
-  if (source.channel !== 'blog') return jsonError('invalid_state', '블로그 콘텐츠만 변환 가능합니다', 422);
-  if (!source.textBody) return jsonError('invalid_state', '본문이 비어있습니다', 422);
+  if (!source) return fail('not_found', '원본 콘텐츠를 찾을 수 없습니다', 404);
+  if (source.channel !== 'blog') return fail('invalid_state', '블로그 콘텐츠만 변환 가능합니다', 422);
+  if (!source.textBody) return fail('invalid_state', '본문이 비어있습니다', 422);
 
   // 2) 플랜 제한 체크 (콘텐츠 수 + 비용 한도 + 유저 커스텀 예산)
   const plan = await getUserPlan(ownerId);
@@ -59,10 +48,10 @@ export async function convertContent(ownerId: string, id: string, request: Reque
     await checkContentLimit(ownerId, plan);
     await checkCostLimit(ownerId, plan);
   } catch (err) {
-    return jsonError('plan_limit', '플랜 한도 초과', 429);
+    return fail('plan_limit', '플랜 한도 초과', 429);
   }
   if (await isBudgetExceeded(ownerId)) {
-    return jsonError('budget_exceeded', '월 예산 한도 초과', 429);
+    return fail('budget_exceeded', '월 예산 한도 초과', 429);
   }
 
   // 3) Claude 변환
@@ -71,11 +60,11 @@ export async function convertContent(ownerId: string, id: string, request: Reque
     convertResult = await convertBlogToChannel(source.textBody, source.topic, channel);
   } catch (err) {
     console.error(`[convert/${channel}] Claude 호출 실패:`, err);
-    return jsonError('convert_failed', '변환 실패. 다시 시도해주세요.', 502);
+    return fail('convert_failed', '변환 실패. 다시 시도해주세요.', 502);
   }
 
   // 4) 인스타그램 카드 이미지 파이프라인
-  let bodyImageUrls: string[] = [];
+  const bodyImageUrls: string[] = [];
   let captionText = convertResult.text;
 
   if (channel === 'instagram') {
@@ -138,13 +127,10 @@ export async function convertContent(ownerId: string, id: string, request: Reque
       tokensOut:convertResult.usage.completion_tokens, krw:convertResult.krw }], undefined,
       { action:'content.generate',payload:{ source_id:id,channel,cost_krw:convertResult.krw } });
 
-  return NextResponse.json({
-    data: {
-      id: newRow.id,
-      channel,
-      text: convertResult.text,
-      cost_krw: convertResult.krw,
-    },
-    error: null,
-  });
+  return {
+    id: newRow.id,
+    channel,
+    text: convertResult.text,
+    cost_krw: convertResult.krw,
+  };
 }

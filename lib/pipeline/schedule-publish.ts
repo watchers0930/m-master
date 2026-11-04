@@ -5,6 +5,11 @@ import { deriveCafeContent } from '@/lib/publish/derive';
 import { VisibilityError } from '@/lib/visibility/errors';
 import { pipelineOwners } from './owners';
 import type { Channel } from '@/types/db';
+/** A non-blog slot that failed this many times is parked as `failed` instead of re-sending every cycle (L9). */
+export const MAX_SLOT_RETRIES = 3;
+function failureCode(error: unknown) {
+  return (error instanceof VisibilityError ? error.code : error instanceof Error ? error.name : 'unknown').slice(0, 100);
+}
 export async function publishScheduledContent(deadline=Date.now()+240000) {
   const result={ ok:true,social:[] as Record<string,unknown>[],cafe:[] as Record<string,unknown>[],idea_jobs:[] as Record<string,unknown>[],held:0,deadline_hit:false };
   await expireClaims();
@@ -13,8 +18,8 @@ export async function publishScheduledContent(deadline=Date.now()+240000) {
     if (Date.now()+30000>=deadline) { result.deadline_hit=true;break; }
     let cursor: { scheduledAt: Date; id: string } | undefined;
     while (Date.now()+30000 < deadline) {
-      const slots=await prisma.scheduleSlot.findMany({ where:{ ownerId:owner.ownerId,status:'scheduled',scheduledAt:{ lte:cutoff }, ...(cursor ? { OR: [{ scheduledAt:{ gt:cursor.scheduledAt,lte:cutoff } },{ scheduledAt:cursor.scheduledAt,id:{ gt:cursor.id } }] } : {}) },
-        select:{ id:true,contentId:true,channel:true,scheduledAt:true },orderBy:[{ scheduledAt:'asc' },{ id:'asc' }],take:20 });
+      const slots=await prisma.scheduleSlot.findMany({ where:{ ownerId:owner.ownerId,status:'scheduled',retryCount:{ lt:MAX_SLOT_RETRIES },scheduledAt:{ lte:cutoff }, ...(cursor ? { OR: [{ scheduledAt:{ gt:cursor.scheduledAt,lte:cutoff } },{ scheduledAt:cursor.scheduledAt,id:{ gt:cursor.id } }] } : {}) },
+        select:{ id:true,contentId:true,channel:true,scheduledAt:true,retryCount:true },orderBy:[{ scheduledAt:'asc' },{ id:'asc' }],take:20 });
       for (const slot of slots) {
         if (Date.now()+30000>=deadline) { result.deadline_hit=true;break; }
         if (!slot.contentId) continue;
@@ -30,7 +35,14 @@ export async function publishScheduledContent(deadline=Date.now()+240000) {
           result.social.push({ slot_id:slot.id,status:'published' });
         } catch(error) {
           if (error instanceof VisibilityError && error.status===409) result.held++;
-          else result.social.push({ slot_id:slot.id,status:'failed' });
+          else if (slot.channel==='blog') result.social.push({ slot_id:slot.id,status:'failed' });
+          else {
+            // Count the failure on the slot (code only, never upstream messages); park it at the cap.
+            const exhausted=slot.retryCount+1>=MAX_SLOT_RETRIES;
+            await prisma.scheduleSlot.updateMany({ where:{ id:slot.id,ownerId:owner.ownerId,status:'scheduled',retryCount:slot.retryCount },
+              data:{ retryCount:{ increment:1 },lastError:failureCode(error),...(exhausted ? { status:'failed' } : {}) } });
+            result.social.push({ slot_id:slot.id,status:exhausted ? 'failed_final' : 'failed' });
+          }
         }
       }
       if (result.deadline_hit || slots.length < 20) break;

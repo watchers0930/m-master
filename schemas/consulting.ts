@@ -1,4 +1,4 @@
-import { ga4ConsultingSchema } from './ga4-consulting';
+import { ga4ConsultingSchema, ga4LlmConsultingSchema } from './ga4-consulting';
 import { sectionsSchema, structuredMetricsSchema } from "./consulting-sections";
 import { z } from "zod";
 import { marketSchema } from "@/lib/market/schema";
@@ -80,7 +80,7 @@ export const consultingSnapshotV2Schema = consultingSnapshotV1Schema.extend({
 });
 export const consultingSnapshotV3Schema = z.strictObject({ ...consultingSnapshotV2Schema.shape,
     schemaVersion: z.literal("v3"), ga4: ga4ConsultingSchema.optional(),
-    llmInput: consultingSnapshotV1Schema.extend({ ga4: ga4ConsultingSchema.optional() }),
+    llmInput: consultingSnapshotV1Schema.extend({ ga4: ga4LlmConsultingSchema.optional() }),
 }).superRefine((snapshot,ctx) => {
     const ids = new Set(snapshot.evidence.map(e=>e.id));
     const llmIds = new Set(snapshot.llmInput.evidence.map(e=>e.id));

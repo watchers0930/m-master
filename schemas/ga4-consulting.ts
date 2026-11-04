@@ -7,6 +7,7 @@ export const ga4ProvenanceSchema = z.object({
   range: z.object({ startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }).strict(),
   timeZone: z.string().nullable(), queryVersion: z.string(), completeness: z.enum(['complete','partial']),
   quality: z.object({ thresholded: z.boolean().optional(), sampled: z.boolean().optional(), truncatedRows: z.boolean().optional(), dataLossFromOtherRow: z.boolean().optional() }).strict(),
+  scopeLevel: z.enum(['host','stream']).optional(),
 }).strict();
 const key = { key: z.string().max(200), evidenceIds: z.array(z.string()).max(10) };
 const num = z.number().finite().nonnegative();
@@ -24,3 +25,7 @@ export const ga4ConsultingSchema = z.object({
   failedQueries: z.array(z.object({ report: z.enum(['channels','sourceMedium','landing','pages','events']), code: errorCode }).strict()).max(5),
 }).strict();
 export type ConsultingGa4 = z.infer<typeof ga4ConsultingSchema>;
+/** LLM projection: tenant/binding/credential identifiers are never sent externally (optional only for legacy rows). */
+export const ga4LlmProvenanceSchema = ga4ProvenanceSchema.partial({ ownerId: true, domainId: true, bindingId: true, propertyId: true, credentialSource: true });
+export const ga4LlmConsultingSchema = ga4ConsultingSchema.extend({ provenance: ga4LlmProvenanceSchema });
+export type ConsultingLlmGa4 = z.infer<typeof ga4LlmConsultingSchema>;

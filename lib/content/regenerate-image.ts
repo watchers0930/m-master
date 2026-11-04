@@ -1,8 +1,7 @@
 import { updateContentBody, assertNoPublishClaim, lockContent, contentConflict } from '@/lib/content/review';
-import { notFound } from '@/lib/visibility/http';
+import { notFound, parseBody, VisibilityError } from '@/lib/visibility/http';
 // POST /api/content/[id]/body-image/regen
 // 본문 이미지 개별 재생성 — 같은 설명으로 Unsplash 검색해서 새 URL로 교체
-import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { searchOne } from '@/lib/unsplash/search';
@@ -14,21 +13,11 @@ const RequestSchema = z.object({
   description: z.string().min(1).max(500),
 }).strict();
 
-function jsonError(code: string, message: string, status: number) {
-  return new Response(JSON.stringify({ error: { code, message } }), {
-    status, headers: { 'Content-Type': 'application/json' },
-  });
-}
+const fail = (code: string, message: string, status: number): never => { throw new VisibilityError(code, message, status); };
 
-export async function regenerateBodyImage(ownerId: string, id: string, request: Request) {
-  let body: unknown;
-  try { body = await request.json(); }
-  catch { return jsonError('bad_request', 'JSON 파싱 실패', 400); }
-
-  const parsed = RequestSchema.safeParse(body);
-  if (!parsed.success) return jsonError('validation', parsed.error.issues[0]?.message ?? 'validation error', 400);
-
-  const { index, description } = parsed.data;
+/** Returns `{ url, index }`; failures throw VisibilityError (the route shapes HTTP). */
+export async function regenerateBodyImage(ownerId: string, id: string, body: unknown) {
+  const { index, description } = parseBody(RequestSchema, body);
 
   // 기존 row 조회
   const row = await prisma.content.findFirst({
@@ -48,7 +37,7 @@ export async function regenerateBodyImage(ownerId: string, id: string, request: 
   try {
     await checkCostLimit(ownerId, plan);
   } catch (err) {
-    return jsonError('plan_limit', '플랜 한도를 확인하세요.', 429);
+    return fail('plan_limit', '플랜 한도를 확인하세요.', 429);
   }
 
   const currentUrls = Array.isArray(row.bodyImageUrls) ? [...(row.bodyImageUrls as string[])] : [];
@@ -75,7 +64,7 @@ export async function regenerateBodyImage(ownerId: string, id: string, request: 
   }
 
   if (!newUrl) {
-    return jsonError('not_found_image', '대체 이미지를 찾지 못했습니다', 404);
+    return fail('not_found_image', '대체 이미지를 찾지 못했습니다', 404);
   }
 
   currentUrls[index] = newUrl;
@@ -83,8 +72,6 @@ export async function regenerateBodyImage(ownerId: string, id: string, request: 
   // DB 업데이트
   await updateContentBody(ownerId, id, row.updatedAt, { bodyImageUrls: currentUrls });
 
-  return new Response(JSON.stringify({ data: { url: newUrl, index } }), {
-    status: 200, headers: { 'Content-Type': 'application/json' },
-  });
+  return { url: newUrl, index };
 }
 

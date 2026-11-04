@@ -8,6 +8,7 @@ import type { Ga4Block } from '@/types/ga4';
 import { toGa4Block } from '@/lib/ga4/block';
 import { claimPipelineRun, finishPipelineRun } from '@/lib/pipeline/run-claim';
 import { calcChatKrw } from '@/lib/claude/chat';
+import { isUnbilledFailure } from '@/lib/consulting/rejection';
 import { buildCandidates, type Candidate, type BusinessContext } from './candidates';
 import { recommendTopFive } from './recommend';
 import { visibilityGapCandidates } from './visibility-gap';
@@ -33,7 +34,7 @@ export async function refreshTopics(input: TopicRefreshInput): Promise<TopicRefr
   if (!run.acquired) {
     const metadata = run.resultRef as { strategy?: StrategySelection; ga4Status?: Ga4Block<unknown>['state']; items?: TopicRecommendation[] } | null;
     const items = run.status === 'succeeded' ? orderTopics(metadata?.items?.map(item=>({...item,createdAt:new Date(item.createdAt)})) ?? await prisma.topicRecommendation.findMany({ where: { ownerId, weekStart, channel:'blog',factors:{path:['domainId'],equals:domainId === null ? Prisma.JsonNull : domainId} }, take:7 })) : [];
-    return { status:run.status === 'succeeded' ? 'reused':run.status === 'skipped' ? 'insufficient':'in_progress', items, count:items.length,
+    return { status:run.status === 'succeeded' ? 'reused':run.status === 'skipped' || run.status === 'failed' ? 'insufficient':'in_progress', items, count:items.length,
       shortfallReason:items.length < 7 ? 'not_enough_candidates':null,
       strategy: metadata?.strategy ?? { reportId:null, reason:'no_completed_report' }, ga4Status:metadata?.ga4Status ?? 'not_configured', costKrw:0 };
   }
@@ -64,8 +65,9 @@ export async function refreshTopics(input: TopicRefreshInput): Promise<TopicRefr
       await finishPipelineRun(run,'skipped',{ count:0,strategyReportId:strategic.strategy.reportId,strategy:strategic.strategy,ga4Status:toGa4Block(ga4).state });
       return { status:'insufficient',items:[],count:0,shortfallReason:'not_enough_candidates',strategy:strategic.strategy,ga4Status:toGa4Block(ga4).state,costKrw:0 };
     }
-    billingUncertain = true;
+    // Uncertain only from dispatch until usage is recorded; pre-dispatch errors are plain failures.
     const recommended = await recommendTopFive({ monthYmd,candidates,channel:'blog',businessContext,
+      onDispatch: () => { billingUncertain = true; },
       onUsage: async usage => {
         await prisma.costLedger.create({ data: { ownerId, kind:'chat', krw:calcChatKrw(usage),
           tokensIn:usage.prompt_tokens, tokensOut:usage.completion_tokens } });
@@ -87,7 +89,9 @@ export async function refreshTopics(input: TopicRefreshInput): Promise<TopicRefr
     return { status:items.length ? 'created':'insufficient',items,count:items.length,
       shortfallReason:items.length<7 ? 'not_enough_candidates':null,strategy:strategic.strategy,ga4Status,costKrw };
   } catch (error) {
-    await finishPipelineRun(run,billingUncertain ? 'skipped' : 'failed',undefined,billingUncertain ? 'billing_uncertain' : 'recommend_failed');
+    // No response / definitive rejection → not billed → `failed` stays re-claimable by the next cron run.
+    const uncertain = billingUncertain && !isUnbilledFailure(error);
+    await finishPipelineRun(run,uncertain ? 'skipped' : 'failed',undefined,uncertain ? 'billing_uncertain' : 'recommend_failed');
     if (error instanceof VisibilityError) throw error;
     throw new VisibilityError('recommend_failed','추천 생성에 실패했습니다.',500);
   }

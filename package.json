@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "postinstall": "prisma generate",
-    "db:push": "prisma db push",
+    "db:push": "echo 'db:push 금지: prisma db push는 부분 유니크 인덱스를 삭제합니다. prisma/manual-migrations/*.sql 을 수동 적용하세요.' >&2 && exit 1",
     "db:status": "prisma migrate status"
   },
   "dependencies": {
