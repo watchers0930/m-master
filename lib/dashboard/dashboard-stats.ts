@@ -17,6 +17,8 @@ export interface AvgScorePair {
 export interface RecentContentPath {
   contentId: string;
   path: string | null; // extractPath(schedule_slots.external_url). URL 없으면 null.
+  /** external_url 의 hostname(소문자). GA4 scope.host 와 대조해 다른 사이트 지표가 붙지 않게 한다(설계 §2.3) */
+  host: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -189,15 +191,15 @@ export async function fetchRecentContentPaths(
     // extractPath 안전 호출 (throw 허용 -> null 폴백)
     return contentIds.map(id => {
       const url = urlMap.get(id);
-      if (!url) return { contentId: id, path: null };
+      if (!url) return { contentId: id, path: null, host: null };
       try {
-        return { contentId: id, path: extractPath(url) };
+        return { contentId: id, path: extractPath(url), host: new URL(url).hostname.toLowerCase() };
       } catch {
-        return { contentId: id, path: null };
+        return { contentId: id, path: null, host: null };
       }
     });
   } catch (e) {
     console.error('[dashboard-stats] fetchRecentContentPaths 실패:', e);
-    return contentIds.map(id => ({ contentId: id, path: null }));
+    return contentIds.map(id => ({ contentId: id, path: null, host: null }));
   }
 }

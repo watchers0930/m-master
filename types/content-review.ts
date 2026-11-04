@@ -1,4 +1,4 @@
-// app/(dashboard)/content/manage/types.ts
+// types/content-review.ts
 // 콘텐츠 검토·수정·발행 화면 DTO (설계 §4.1~§4.4·§5.7).
 // 엔티티·목록 타입의 단일 출처는 공용 계약 types/db.ts·types/api.ts(백엔드 소유) — 여기서는 재노출만 하고,
 // 공용 파일에 없는 화면 전용 요청·응답 형태만 선언한다(중복 정의 금지). 타입 전용.

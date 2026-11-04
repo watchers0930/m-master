@@ -1,6 +1,6 @@
 // 콘텐츠 목록 필터 — 발행 상태 + 검토 상태 (설계 §6). 표시·입력만 담당.
 import type { ContentStatus } from '@/types/db';
-import type { ReviewStatus } from '../types';
+import type { ReviewStatus } from '@/types/content-review';
 
 const STATUS_OPTIONS: { value: ContentStatus | ''; label: string }[] = [
   { value: '', label: '전체' },

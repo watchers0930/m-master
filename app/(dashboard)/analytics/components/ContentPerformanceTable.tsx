@@ -4,9 +4,8 @@
 // GA4 실패 시 지표를 0 으로 채우지 않고 상태 안내 + 지표 칸 '—' 로 둔다.
 
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import type { PathMetrics } from '@/lib/ga4/visitors';
-import { fetchContentPerformance } from '../api';
+import { useContentPerformance } from '@/hooks/useGa4Analytics';
 import { Ga4BlockState } from '@/components/ga4/Ga4BlockState';
 
 const CH_LABEL: Record<string, string> = {
@@ -52,11 +51,7 @@ const NA = <span style={{ color: 'var(--sub)' }}>—</span>;
 export function ContentPerformanceTable({ days, domainId }: Props) {
   const [channelFilter, setChannelFilter] = useState<'all' | 'blog' | 'naver_cafe' | 'instagram' | 'facebook'>('all');
 
-  const { data, isPending: loading, error: queryError, refetch } = useQuery({
-    queryKey: ['analytics', 'content-performance', days, domainId ?? 'default'],
-    queryFn: ({ signal }) => fetchContentPerformance(days, domainId, signal),
-    retry: false,
-  });
+  const { data, isPending: loading, error: queryError, refetch } = useContentPerformance(days, domainId);
   const rows = data?.data ?? [];
   const period = data?.period ? { from: data.period.from, to: data.period.to } : null;
   const ga4 = data?.ga4 ?? null;

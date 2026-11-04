@@ -6,20 +6,10 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { Ga4Block, Ga4FailedBlock } from './types';
+import { GA4_FAILURE_MESSAGES, ga4FailureText } from '@/lib/analytics/ga4-block-text';
 
-const MESSAGES: Record<Ga4FailedBlock['state'], string> = {
-  not_configured: 'GA4 연결 필요',
-  unmapped: '이 도메인은 GA4 속성과 연결되지 않았습니다',
-  domain_required: '도메인을 선택하세요',
-  binding_disabled: 'GA4 연결이 비활성화되었습니다',
-  error: 'GA4 연결 오류',
-};
-
-/** 짧은 한 줄 문구 (KPI 칸·배지 등 좁은 자리용) */
-export function ga4FailureText(block: Ga4FailedBlock): string {
-  if (block.state === 'error') return block.retryable ? 'GA4 연결 오류 · 잠시 후 다시 시도' : 'GA4 연결 오류';
-  return MESSAGES[block.state];
-}
+// 문구 단일 출처는 lib/analytics/ga4-block-text.ts (컴포넌트 밖 소비처와 공유)
+const MESSAGES = GA4_FAILURE_MESSAGES;
 
 /** ok 면 render(data), 아니면 상태 안내. 호출부가 실패 블록에서 값을 그리는 실수를 구조적으로 막는다. */
 export function Ga4BlockView<T>({

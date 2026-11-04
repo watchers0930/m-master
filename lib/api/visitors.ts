@@ -1,6 +1,6 @@
-// app/(dashboard)/visitors/api.ts
+// lib/api/visitors.ts
 // 방문자 분석 API 래퍼 (설계 §4.7). 각 섹션은 Ga4Block — 실패를 0·빈 배열로 바꾸지 않는다(§2.4).
-import type { Ga4Block } from '@/components/ga4/types';
+import type { Ga4Block } from '@/types/ga4';
 import type {
   OverviewKpi, TrafficSource, DailyPoint, TopPage, ReferralSource, SearchTermRow,
   AgeGroup, GenderRow, CityRow, CountryRow, DeviceRow, BrowserRow, OsRow, LandingPage, ExitPage,

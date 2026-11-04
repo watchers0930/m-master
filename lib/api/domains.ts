@@ -1,4 +1,4 @@
-// app/(dashboard)/components/domain/api.ts
+// lib/api/domains.ts
 // 분석 섹션 공통 도메인 API (GET·POST /api/domains). 화면별 중복 호출 래퍼 대신
 // 공통 DomainBar·생성 훅이 쓰는 단일 소스. 서버가 owner 스코프로 검증한다(IDOR 차단).
 'use client';

@@ -1,6 +1,9 @@
 // lib/api/schedule.ts — 스케줄 API 래퍼 (Supabase 영구 저장)
 import type { ApiResponse, ScheduleManualRequest, ScheduleManualResponse } from '@/types/api';
 import type { ScheduleSlot } from '@/types/db';
+import { fetchDowPattern } from '@/lib/api/ga4-analytics';
+import { aggregateDowPattern } from '@/lib/analytics/dow-pattern';
+import { ga4FailureText } from '@/lib/analytics/ga4-block-text';
 
 // ── API 함수 ──────────────────────────────────────────────────────
 
@@ -48,7 +51,7 @@ export interface AiProposal {
 
 export interface AutoScheduleResult {
   proposals: AiProposal[];
-  ga4Fallback: boolean;  // true = GA4 실패, 폴백 패턴 사용
+  ga4Fallback: boolean;  // true = GA4 패턴 사용 불가 → 제안 없음(임의 편성하지 않음)
   ga4Error?: string;
 }
 
@@ -103,7 +106,7 @@ function calcQuota(
   };
 }
 
-// GA4 방문자 패턴 완전 반영 자동편성
+// GA4 방문자 패턴 완전 반영 자동편성 (패턴을 쓸 수 없으면 제안 0건 + ga4Error 안내)
 // - 채널별 슬롯 수: GA4 90일 세션 비율 기반 (총 16건/월)
 // - 발행 요일: 채널별 GA4 상위 요일
 // - 주차 분산: 월간 quota를 4주에 균등 배치
@@ -123,19 +126,28 @@ export async function autoSchedule(
   let ga4Fallback = false;
   let ga4Error: string | undefined;
 
+  // 히트맵과 같은 API 래퍼·집계 함수를 공유한다 (응답 = Ga4Block<DowChannelRow[]>, 설계 §2.4·§4.7).
+  // ok 일 때만 집계한다 — 실패·미연결 블록을 0 패턴으로 바꾸지 않고 상태 문구로 안내한다.
   try {
-    const res = await fetch('/api/analytics/ga4-pattern');
-    const json = await res.json();
-    if (json.ga4_fallback) {
-      ga4Fallback = true;
-      ga4Error = json.error ?? 'GA4 데이터를 가져올 수 없습니다';
+    const block = await fetchDowPattern(null);
+    if (block.state === 'ok') {
+      const agg = aggregateDowPattern(block.data);
+      if (agg.totals.blog + agg.totals.instagram + agg.totals.facebook > 0) {
+        pattern = agg.pattern;
+        channelTotals = agg.totals;
+      } else {
+        ga4Fallback = true;
+        ga4Error = '최근 90일 GA4 세션 데이터가 없습니다';
+      }
     } else {
-      pattern = json.data;
-      channelTotals = json.channel_totals;
+      ga4Fallback = true;
+      ga4Error = block.state === 'domain_required'
+        ? 'GA4가 연결된 도메인이 여러 개라 기준 도메인을 정할 수 없습니다. 설정에서 자동화 도메인을 지정해 주세요.'
+        : ga4FailureText(block);
     }
   } catch (e) {
     ga4Fallback = true;
-    ga4Error = e instanceof Error ? e.message : 'GA4 API 연결 실패';
+    ga4Error = e instanceof Error && e.message ? e.message : 'GA4 API 연결 실패';
   }
 
   // 채널별 월간 목표 건수 산출

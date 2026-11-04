@@ -1,13 +1,12 @@
 'use client';
 
 // 채널×요일 히트맵 (B 단계)
-// GET /api/analytics/ga4-pattern → Ga4Block<DowChannelRow[]> (설계 §4.7). 집계는 dow-pattern.ts(순수).
+// GET /api/analytics/ga4-pattern → Ga4Block<DowChannelRow[]> (설계 §4.7). 집계는 lib/analytics/dow-pattern.ts(순수, 자동편성과 공유).
 // GA4 실패·미연결이면 0 행렬 대신 상태 안내를 표시한다(설계 §2.4).
 
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { fetchDowPattern } from '../api';
-import { aggregateDowPattern, type PatternChannel } from '../dow-pattern';
+import { useDowPattern } from '@/hooks/useGa4Analytics';
+import { aggregateDowPattern, type PatternChannel } from '@/lib/analytics/dow-pattern';
 import { Ga4BlockState } from '@/components/ga4/Ga4BlockState';
 
 const DOW_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -91,11 +90,7 @@ function HeatmapTable({ agg }: { agg: ReturnType<typeof aggregateDowPattern> }) 
 }
 
 export function DowHeatmap({ domainId }: { domainId: string | null }) {
-  const { data: block, isPending: loading, error, refetch } = useQuery({
-    queryKey: ['analytics', 'ga4-pattern', domainId ?? 'default'],
-    queryFn: ({ signal }) => fetchDowPattern(domainId, signal),
-    retry: false,
-  });
+  const { data: block, isPending: loading, error, refetch } = useDowPattern(domainId);
   const agg = useMemo(() => (block?.state === 'ok' ? aggregateDowPattern(block.data) : null), [block]);
 
   return (

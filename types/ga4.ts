@@ -7,13 +7,14 @@ export interface Ga4Provenance {
   range: { startDate: string; endDate: string }; timeZone: string | null; queryVersion: string;
   completeness: 'complete' | 'partial';
   quality: { thresholded?: boolean; sampled?: boolean; truncatedRows?: boolean; dataLossFromOtherRow?: boolean };
+  scopeLevel?: 'host' | 'stream';
 }
 export type Ga4Result<T> =
   | { status: 'success'; data: T; provenance: Ga4Provenance }
   | { status: 'unavailable'; reason: Ga4UnavailableReason }
   | { status: 'error'; code: Ga4ErrorCode; retryable: boolean; attempts?: { source: Ga4CredentialSource; code: Ga4ErrorCode }[] };
 export type Ga4Block<T> =
-  | { state: 'ok'; data: T; collected_at: string; host: string; property_id: string }
+  | { state: 'ok'; data: T; collected_at: string; host: string; property_id: string; scope_level?: 'host' | 'stream' }
   | { state: Ga4UnavailableReason }
   | { state: 'error'; code: Ga4ErrorCode; retryable: boolean };
 export interface Ga4Scope {

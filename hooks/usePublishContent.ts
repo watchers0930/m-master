@@ -8,9 +8,9 @@ import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { createAbTest } from '@/lib/api/ab-test';
 import type { AbTestMeasureDays } from '@/types/db';
-import { publishContent, convertContent, ContentApiError } from '@/app/(dashboard)/content/manage/api';
-import type { ConvertChannel, PublishChannel } from '@/app/(dashboard)/content/manage/types';
-import { refreshContent } from './useContentDetail';
+import { publishContent, convertContent, ContentApiError } from '@/lib/api/content';
+import type { ConvertChannel, PublishChannel } from '@/types/content-review';
+import { contentKeys, refreshContent } from './useContentDetail';
 
 const CHANNEL_LABEL: Record<PublishChannel, string> = {
   naver_cafe: '네이버 카페', instagram: '인스타그램', facebook: '페이스북',
@@ -69,7 +69,9 @@ export function usePublishContent(contentId: string | null) {
     setConverting(channel);
     try {
       const r = await convertContent(id, channel);
-      if (r?.id) router.push(`/content/manage?id=${r.id}`);
+      // 새 콘텐츠가 목록에 바로 보이도록 목록 캐시를 무효화한다(신선한 캐시에 가려지지 않게)
+      await qc.invalidateQueries({ queryKey: contentKeys.listRoot });
+      if (r?.id) router.push(`/content/manage?id=${encodeURIComponent(r.id)}`);
       else alert('변환은 성공했지만 ID를 받지 못했습니다');
     } catch (err) {
       alert(`${channel === 'instagram' ? '인스타' : '페이스북'} 변환 실패: ${errText(err, '변환 오류')}`);

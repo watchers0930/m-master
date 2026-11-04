@@ -12,7 +12,6 @@ import type {
   ActionDestination,
   Currency,
   EvidenceSource,
-  EvidenceRef,
 } from './types';
 
 /** 기본 시장 (lib/market 이 최종 소유 → UI 는 로컬 기본값만 사용) */
@@ -120,40 +119,11 @@ export const DESTINATION_CTA: Record<ActionDestination, string> = {
   visibility: 'AI 가시성으로',
 };
 
-/** 관측값(evidence.value) + 단위를 표시 문자열로. null = '미관측'(0 아님) */
-// 내부 단위 sentinel(서버 구조 매칭용)의 표시용 한글 매핑. 저장값은 영문 유지, 화면만 한글.
-const UNIT_KO: Record<string, string> = { searches: '회', position: '위' };
-// 기술 점검 상태값(seo 근거) 표시용 한글. 저장값은 영문 유지(구조 매칭 보존).
-const CHECK_STATUS_KO: Record<string, string> = { pass: '통과', warning: '경고', fail: '실패', not_applicable: '해당 없음' };
-
-export function formatEvidenceValue(ev: EvidenceRef | undefined): string {
-  if (!ev) return '(근거 없음)';
-  if (ev.value === null || ev.value === undefined) return '미관측';
-  // 데이터 상태(status) 근거의 값은 준비상태 enum → 한글 라벨로 표시(예: missing → 미수집)
-  if (ev.source === 'status' && typeof ev.value === 'string' && SOURCE_STATUS_META[ev.value]) {
-    return SOURCE_STATUS_META[ev.value].label;
-  }
-  // 기술 점검 상태값(pass/warning/fail/not_applicable) → 한글 표시
-  if (ev.source === 'seo' && typeof ev.value === 'string' && CHECK_STATUS_KO[ev.value]) {
-    return CHECK_STATUS_KO[ev.value];
-  }
-  const base = typeof ev.value === 'number' ? ev.value.toLocaleString('ko-KR') : ev.value;
-  if (!ev.unit) return String(base);
-  const unit = UNIT_KO[ev.unit] ?? ev.unit;
-  return `${base}${unit}`;
-}
-
-const TOKEN_RE = /\{\{ev:([a-zA-Z0-9_.-]+)\}\}/g;
-
 /**
- * 자유 서술 내 {{ev:id}} 토큰을 '서버가 검증해 전달한' evidence 값으로 치환한다(설계 §3.4·§7).
- * 재계산이 아니라 조회·표시다. 미존재 토큰은 서버 검증(§4.3-2)을 통과했다는 전제이나,
- * 방어적으로 '(근거 없음)'으로 표시해 허구 수치가 새지 않게 한다.
+ * evidence 값 표시·{{ev:id}} 토큰 치환 — 단일 구현은 lib/consulting/evidence-format.ts (순수 함수, 서버 import 없음).
+ * 서버(전략 근거 스냅샷 생성)와 화면이 같은 문구를 쓰도록 재노출만 한다(중복 구현 금지, M12).
  */
-export function renderEvidenceTokens(text: string, evidenceById: Map<string, EvidenceRef>): string {
-  if (!text) return '';
-  return text.replace(TOKEN_RE, (_m, id: string) => formatEvidenceValue(evidenceById.get(id)));
-}
+export { formatEvidenceValue, renderEvidenceTokens } from '@/lib/consulting/evidence-format';
 
 /** 금액 표시: null = '비율만 제안'(미입력), 숫자는 통화 기호 + 로케일 */
 export function formatAmount(amount: number | null, currency: Currency): string {

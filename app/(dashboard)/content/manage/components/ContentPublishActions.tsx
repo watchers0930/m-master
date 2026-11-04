@@ -7,7 +7,7 @@ import { useState } from 'react';
 import type { AbTestMeasureDays } from '@/types/db';
 import { usePublishContent } from '@/hooks/usePublishContent';
 import { ConvertBtn } from '@/app/(dashboard)/content/create/components/ContentPreview';
-import type { ContentDetail, PublishBlockReason, PublishChannel } from '../types';
+import type { ContentDetail, PublishBlockReason, PublishChannel } from '@/types/content-review';
 
 const BLOCK_TEXT: Record<PublishBlockReason, string> = {
   not_approved: '승인 후 발행할 수 있습니다',

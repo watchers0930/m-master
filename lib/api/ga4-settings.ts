@@ -1,4 +1,4 @@
-// app/(dashboard)/settings/ga4-api.ts
+// lib/api/ga4-settings.ts
 // 설정 화면 GA4 연결 API 래퍼 (GA4 설계 §4.6). 바인딩 생성은 운영자 CLI 전용 — 여기엔 조회·해제·자동화 도메인 저장만.
 // 쓰기(DELETE·PUT)는 브라우저 fetch 가 Origin 을 자동 첨부한다(서버 requireOrigin).
 

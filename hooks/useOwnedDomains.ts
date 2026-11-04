@@ -5,7 +5,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { listDomains } from '@/app/(dashboard)/components/domain/api';
+import { listDomains } from '@/lib/api/domains';
 
 export function useOwnedDomains(enabled = true) {
   return useQuery({
