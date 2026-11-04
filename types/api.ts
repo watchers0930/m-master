@@ -1,3 +1,5 @@
+export type { Ga4Block, Ga4Result, Ga4Provenance } from './ga4';
+export type { ReviewStatus, ContentOrigin } from './db';
 // types/api.ts — API Request/Response 타입 정의
 
 import type {
@@ -87,6 +89,11 @@ export interface ScheduleSlotPatchRequest {
 // Content List (관리)
 // ----------------------------------------------------------------
 export interface ContentListItem {
+  origin: import('./db').ContentOrigin;
+  review_status: import('./db').ReviewStatus;
+  reviewed_at: string | null;
+  parent_content_id: string | null;
+  has_strategy: boolean;
   id: string;
   channel: Channel;
   topic: string;

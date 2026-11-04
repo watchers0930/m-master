@@ -1,30 +1,12 @@
-// GET /api/settings/ga4 — GA4 연동 상태 조회
-// DELETE /api/settings/ga4 — GA4 연결 해제
 import { NextResponse } from 'next/server';
-import { requireSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-
-export async function GET() {
-  const session = await requireSession();
-
-  const cred = await prisma.channelCredential.findUnique({
-    where: { ownerId_channel: { ownerId: session.user.id, channel: 'ga4' } },
-    select: { updatedAt: true },
-  });
-
-  return NextResponse.json({
-    ga4_property_id: process.env.GA4_PROPERTY_ID ?? '',
-    connected: !!cred,
-    updated_at: cred?.updatedAt?.toISOString() ?? null,
-  });
+import { authenticated } from '@/lib/visibility/http';
+import { ga4Settings, disconnectGa4 } from '@/lib/settings/service';
+export async function GET(request: Request) {
+  return authenticated(async ownerId => NextResponse.json(await ga4Settings(ownerId)), request);
 }
-
-export async function DELETE() {
-  const session = await requireSession();
-
-  await prisma.channelCredential.deleteMany({
-    where: { ownerId: session.user.id, channel: 'ga4' },
-  });
-
-  return NextResponse.json({ ok: true });
+export async function DELETE(request: Request) {
+  return authenticated(async ownerId => {
+    await disconnectGa4(ownerId);
+    return NextResponse.json({ ok: true });
+  }, request, { requireOrigin: true });
 }

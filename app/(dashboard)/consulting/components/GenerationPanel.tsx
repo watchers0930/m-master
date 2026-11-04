@@ -38,11 +38,12 @@ function DataRequiredGuide({ domainId }: { domainId: string }) {
     <div role="status" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', borderRadius: 8, background: 'var(--n100)' }}>
       <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>종합할 진단 데이터가 아직 없습니다</p>
       <p style={{ fontSize: 11, color: 'var(--sub)', lineHeight: 1.6 }}>
-        컨설팅은 새로 수집하지 않고 저장된 SEO·GEO 데이터를 종합합니다. GA4 방문자·상위페이지·트래픽소스는 현재 리포트에 포함되지 않습니다. 아래에서 먼저 SEO 또는 GEO 진단을 수집해 주세요.
+        SEO·AI 가시성·GA4 중 사용 가능한 데이터가 없습니다. 데이터 연결 후 다시 시도하세요. 아래에서 SEO 또는 AI 가시성 진단을 수집하거나, 설정에서 GA4 연결 상태를 확인해 주세요.
       </p>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <Link href={`/seo-audit${q}`} className="btn btn-ghost" style={{ padding: '5px 12px' }}>SEO 진단 수집</Link>
         <Link href={`/visibility${q}`} className="btn btn-ghost" style={{ padding: '5px 12px' }}>AI 가시성 수집</Link>
+        <Link href="/settings" className="btn btn-ghost" style={{ padding: '5px 12px' }}>GA4 연결 확인</Link>
       </div>
     </div>
   );
@@ -100,8 +101,8 @@ export function GenerationPanel({ domainId, market, canWrite, onReport, onPendin
 
       <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <p style={{ fontSize: 10.5, color: 'var(--sub)', lineHeight: 1.6 }}>
-          저장된 <strong style={{ color: 'var(--text)' }}>SEO·GEO 진단</strong>을 종합해 채널 믹스·예산 배분·우선순위 액션을
-          한 번에 제안합니다. 새 데이터를 수집하거나 광고를 집행하지 않으며, 전략 생성에만 AI를 1회 호출합니다.
+          저장된 <strong style={{ color: 'var(--text)' }}>SEO·GEO 진단</strong>과 연결된 <strong style={{ color: 'var(--text)' }}>GA4 성과</strong>(생성 시 1회 조회)를 종합해
+          채널 믹스·예산 배분·우선순위 액션을 한 번에 제안합니다. 광고를 집행하지 않으며, 전략 생성에만 AI를 1회 호출합니다.
         </p>
 
         {/* 월 마케팅 예산 (선택) — 금액 배분은 서버가 계산(§4.2) */}

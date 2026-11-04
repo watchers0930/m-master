@@ -4,9 +4,12 @@
 import type { VisibilityGapEvidence } from './visibility-gap';
 import { getSeasonalKeywords } from './seasonal';
 
-export type CandidateSignal = 'season' | 'core' | 'ga4_popular' | 'gap' | 'ai_visibility_gap';
+export type CandidateSignal = 'season' | 'core' | 'ga4_popular' | 'gap' | 'ai_visibility_gap' | 'strategy';
 
 export interface Candidate {
+  candidateId?: string;
+  strategy?: { reportId: string; actionId: string; priority: 'P0' | 'P1' | 'P2'; evidenceIds: string[] };
+  strategyContext?: import('@/lib/content/strategy-context').StrategyContext;
   topic: string; // 80자 이내
   signal: CandidateSignal;
   weight: number; // 1~10

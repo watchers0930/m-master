@@ -36,6 +36,10 @@ export function reportDto(row: ConsultingReport): ConsultingReportDTO {
     const snapshot = parseConsultingSnapshot(row.inputSnapshot, row.schemaVersion) as ConsultingSnapshot;
     const strategy = row.status === "completed" ? consultingStrategySchema.parse(row.strategyJson) : null;
     return {
+        ga4Provenance: snapshot.ga4 ? { property_id: snapshot.ga4.provenance.propertyId,
+          host: snapshot.ga4.provenance.host, collected_at: snapshot.ga4.provenance.collectedAt,
+          range: snapshot.ga4.provenance.range, time_zone: snapshot.ga4.provenance.timeZone,
+          completeness: snapshot.ga4.provenance.completeness, failed_reports: snapshot.ga4.failedQueries } : null,
         sections: snapshot.sections ?? buildSections({...snapshot, evidence: [], selection: []}).sections,
         id: row.id, domainId: row.domainId, market: marketSchema.parse(row.market),
         status: row.status as ConsultingReportDTO["status"], failCode: row.failCode,

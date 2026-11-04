@@ -5,6 +5,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireSession } from '@/lib/auth';
+import { toSnakeCase } from '@/lib/utils/case';
+import { VisibilityError, jsonError as visibilityJsonError } from '@/lib/visibility/http';
 import { prisma } from '@/lib/prisma';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
 import { extractPath, InvalidUrlError } from '@/lib/ab-test/url-utils';
@@ -23,7 +25,7 @@ async function loadTest(id: string, ownerId: string): Promise<AbTest | null> {
   const data = await prisma.abTest.findFirst({
     where: { id, ownerId },
   });
-  return (data as unknown as AbTest) ?? null;
+  return data ? toSnakeCase(data) as unknown as AbTest : null;
 }
 
 // ----------------------------------------------------------------
@@ -172,14 +174,15 @@ export async function PATCH(
       }
       // GA4 fetch + winner 산정
       try {
-        const completion = await buildCompletionFromGa4({
+        const completion = await buildCompletionFromGa4(ownerId, {
           ...before,
           variant_a_path: nextAPath ?? before.variant_a_path,
           variant_b_path: nextBPath ?? before.variant_b_path,
         });
         Object.assign(update, completion.update);
       } catch (err) {
-        console.error('[ab-test PATCH complete] GA4 실패:', err);
+        if (err instanceof VisibilityError) return visibilityJsonError(err);
+        console.error('[ab-test PATCH complete] GA4 실패', { type: err instanceof Error ? err.name : 'unknown' });
         return jsonError('ga4_upstream', 'GA4 측정값 조회 실패', 502);
       }
       break;

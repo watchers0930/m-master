@@ -10,10 +10,14 @@ const BASE = '/api/content';
 export async function listContents(params?: {
   status?: string;
   channel?: string;
+  review_status?: import("@/types/db").ReviewStatus;
+  origin?: import("@/types/db").ContentOrigin;
   page?: number;
   per_page?: number;
 }): Promise<ApiResponse<ContentListResponse>> {
   const qs = new URLSearchParams();
+  if (params?.review_status) qs.set('review_status',params.review_status);
+  if (params?.origin) qs.set('origin',params.origin);
   if (params?.status)   qs.set('status',   params.status);
   if (params?.channel)  qs.set('channel',  params.channel);
   if (params?.page)     qs.set('page',     String(params.page));
@@ -55,4 +59,13 @@ export async function generateKeywords(topic: string): Promise<ApiResponse<strin
   ['부동산', 'AI권리분석', '시세분석', '부동산안전', 'VESTRA'].forEach(k => keywords.add(k));
 
   return { data: Array.from(keywords).slice(0, 12), error: null };
+}
+
+export async function updateContent(id: string, input: import('zod').infer<typeof import('@/schemas/content').contentEditSchema>) {
+  const response=await fetch(`${BASE}/${encodeURIComponent(id)}`,{ method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(input) });
+  return response.json() as Promise<ApiResponse<Content>>;
+}
+export async function reviewContent(id: string, input: import('zod').infer<typeof import('@/schemas/content').contentReviewSchema>) {
+  const response=await fetch(`${BASE}/${encodeURIComponent(id)}/review`,{ method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input) });
+  return response.json() as Promise<ApiResponse<{ id:string;review_status:import('@/types/db').ReviewStatus;reviewed_at:string|null;updated_at:string;changed:boolean }>>;
 }

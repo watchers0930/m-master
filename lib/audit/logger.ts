@@ -36,6 +36,15 @@ export async function logAudit(options: LogAuditOptions): Promise<void> {
 // 공통 액션 상수 (오타 방지)
 // ----------------------------------------------------------------
 export const AUDIT_ACTIONS = {
+  CONTENT_REVIEW_APPROVE: 'content.review_approve',
+  CONTENT_REVIEW_REJECT: 'content.review_reject',
+  CONTENT_REVIEW_REQUEST: 'content.review_request',
+  CONTENT_REVIEW_RESET: 'content.review_reset',
+  CONTENT_EDIT: 'content.edit',
+  PUBLISH_BLOCKED: 'publish.blocked',
+  PUBLISH_CLAIM_UNKNOWN: 'publish.claim_unknown',
+  GA4_BINDING_UPSERT: 'ga4.binding_upsert',
+  CRON_STRATEGY_REFRESH: 'cron.strategy_refresh',
   RAG_UPLOAD: 'rag.upload',
   RAG_INDEX: 'rag.index',
   RAG_DELETE: 'rag.delete',

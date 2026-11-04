@@ -3,6 +3,8 @@
 export type SourceType = 'pdf' | 'md' | 'docx' | 'url' | 'manual';
 export type DocumentStatus = 'uploaded' | 'indexed' | 'failed';
 export type Channel = 'blog' | 'instagram' | 'facebook' | 'naver_cafe';
+export type ContentOrigin = 'manual' | 'auto';
+export type ReviewStatus = 'pending_review' | 'approved' | 'rejected';
 export type ContentStatus = 'draft' | 'scheduled' | 'published' | 'failed';
 export type SlotStatus = 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled';
 export type SlotMode = 'manual' | 'ai_auto';
@@ -58,6 +60,17 @@ export interface ContentScores {
 }
 
 export interface Content {
+  origin: ContentOrigin;
+  review_status: ReviewStatus;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  parent_content_id: string | null;
+  strategy_context: {
+    v?: 1; report_id: string; action_id: string; priority: 'P0' | 'P1' | 'P2';
+    action_title: string; action_description?: string;
+    evidence: { id: string; label: string; value: string }[];
+    range: { from: string; to: string }; limitations: string[]; truncated?: boolean;
+  } | null;
   id: string;
   owner_id: string;
   channel: Channel;

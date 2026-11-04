@@ -1,4 +1,4 @@
-// lib/topics/recommend.ts — GPT-4o tool_use 추천기 (TOP5 선정)
+// lib/topics/recommend.ts — GPT-4o tool_use 추천기 (TOP7 선정)
 // 후보 15~20개 -> score(0~100) + tags(s/e/t) + reason 부여
 
 import { z } from 'zod';
@@ -14,6 +14,8 @@ export interface TopicTag {
 }
 
 export interface RecommendedTopic {
+  candidateIndex?: number;
+  recommendRank?: number | null;
   factors?: VisibilityGapEvidence;
   rank: number; // 1~7
   topic: string; // 80자 이내
@@ -27,6 +29,7 @@ export interface RecommendInput {
   candidates: Candidate[];
   channel: 'blog';
   businessContext?: BusinessContext;
+  onUsage?: (usage: ChatUsage) => Promise<void>;
 }
 
 export interface RecommendResult {
@@ -119,6 +122,8 @@ function clamp(n: number, min: number, max: number): number {
 function sanitize(items: RecommendedTopic[]): RecommendedTopic[] {
   const sorted = [...items]
     .map(it => ({
+      candidateIndex: it.candidateIndex,
+      recommendRank: it.rank,
       ...(it.factors ? { factors: it.factors } : {}),
       rank: clamp(Math.floor(it.rank), 1, 7),
       topic: it.topic.slice(0, 80),
@@ -149,6 +154,8 @@ function fillFromCandidates(
     if (used.has(c.topic)) continue;
     used.add(c.topic);
     filled.push({
+      candidateIndex: candidates.indexOf(c) + 1,
+      recommendRank: null,
       factors: c.factors,
       rank: filled.length + 1,
       topic: c.topic.slice(0, 80),
@@ -224,7 +231,10 @@ export async function recommendTopFive(input: RecommendInput): Promise<Recommend
       },
     }],
     tool_choice: { type: 'function', function: { name: 'submit_recommendations' } },
-  });
+  }, { maxRetries: 0, timeout: 60_000 });
+  if (!response.usage || ![response.usage.prompt_tokens, response.usage.completion_tokens].every(n => Number.isSafeInteger(n) && n >= 0)) throw new Error('usage_missing');
+  const usage: ChatUsage = toChatUsage(response.usage);
+  await input.onUsage?.(usage);
 
   const toolCall = response.choices[0]?.message?.tool_calls?.[0];
   if (!toolCall || toolCall.type !== 'function') {
@@ -253,10 +263,21 @@ export async function recommendTopFive(input: RecommendInput): Promise<Recommend
     }
   }
 
+  const seen = new Set<number>();
+  items = items.filter(item => {
+    const index = item.candidateIndex;
+    if (!index || index > input.candidates.length || seen.has(index)) return false;
+    seen.add(index); item.topic = input.candidates[index - 1].topic;
+    return true;
+  });
   items = sanitize(items);
   items = fillFromCandidates(items, input.candidates);
 
-  const usage: ChatUsage = toChatUsage(response.usage);
-
+  const priority = (item: RecommendedTopic) => {
+    const candidate = input.candidates[(item.candidateIndex ?? 1) - 1];
+    return candidate.strategy ? { P0:0, P1:1, P2:2 }[candidate.strategy.priority] : 3;
+  };
+  items.sort((a,b) => priority(a)-priority(b) || b.score-a.score || (a.candidateIndex ?? 0)-(b.candidateIndex ?? 0));
+  items = items.map((item,index) => ({ ...item, rank:index+1 }));
   return { items, usage };
 }

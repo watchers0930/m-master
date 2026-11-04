@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { ContentPerformanceTable } from './components/ContentPerformanceTable';
 import { DowHeatmap } from './components/DowHeatmap';
+import { Ga4DomainSelect } from '@/components/ga4/Ga4DomainSelect';
 
 const PERIOD_OPTIONS = [
   { value: 7,  label: '최근 7일' },
@@ -17,6 +18,7 @@ const PERIOD_OPTIONS = [
 
 export default function AnalyticsPage() {
   const [days, setDays] = useState<number>(30);
+  const [domainId, setDomainId] = useState<string | null>(null); // null = 서버 기본 GA4 도메인
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 1100 }}>
@@ -29,7 +31,8 @@ export default function AnalyticsPage() {
             발행한 콘텐츠의 GA4 성과 + 채널별 요일 패턴 통합 뷰
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Ga4DomainSelect value={domainId} onChange={setDomainId} />
           <span style={{ fontSize: 11, color: 'var(--sub)' }}>기간</span>
           {PERIOD_OPTIONS.map((opt) => (
             <button
@@ -53,10 +56,10 @@ export default function AnalyticsPage() {
       </div>
 
       {/* A. 콘텐츠별 성과 */}
-      <ContentPerformanceTable days={days} />
+      <ContentPerformanceTable days={days} domainId={domainId} />
 
       {/* B. 채널×요일 히트맵 */}
-      <DowHeatmap />
+      <DowHeatmap domainId={domainId} />
 
       {/* C. 네이버 검색 성과 — 다음 단계에서 추가 */}
     </div>

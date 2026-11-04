@@ -27,6 +27,7 @@ export function jsonError(error: unknown) {
   if (error instanceof VisibilityError)
     return NextResponse.json(
       { error: { code: error.code, message: error.message,
+        ...("details" in error && typeof error.details === "object" ? error.details : {}),
         ...(["generation_in_progress", "generation_uncertain"].includes(error.code) && "reportId" in error && typeof error.reportId === "string" ? { reportId: error.reportId } : {}),
       } },
       { status: error.status },
@@ -45,12 +46,18 @@ export function jsonError(error: unknown) {
   );
 }
 export async function authenticated(
-  work: (ownerId: string) => Promise<NextResponse>,
+  work: (ownerId: string) => Promise<Response>,
   request?: Request,
+  opts?: { requireOrigin?: boolean },
 ) {
   try {
+    const session = await requireSession();
     if (request && !["GET", "HEAD"].includes(request.method)) {
       const origin = request.headers.get("origin");
+      if (opts?.requireOrigin && (request.headers.get("sec-fetch-site") === "cross-site" || !(origin === new URL(request.url).origin ||
+          (!origin && request.headers.get("sec-fetch-site") === "same-origin")))) {
+        throw new VisibilityError("forbidden_origin", "허용되지 않은 요청 출처입니다.", 403);
+      }
       if (
         request.headers.get("sec-fetch-site") === "cross-site" ||
         (origin && origin !== new URL(request.url).origin)
@@ -62,7 +69,6 @@ export async function authenticated(
         );
       }
     }
-    const session = await requireSession();
     return await work(session.user.id);
   } catch (error) {
     return jsonError(error);

@@ -8,45 +8,66 @@ datasource db {
   directUrl  = env("DIRECT_URL")
   extensions = [vector]
 }
-model User { // users — 사용자 (멀티테넌시 핵심)
+
+
+model ChannelCredential { // channel_credentials — 채널 자격증명
   id           String   @id @default(cuid())
-  email        String   @unique
-  name         String?
-  phone        String?
-  passwordHash String   @map("password_hash")
-  plan         String   @default("free") // free | starter | pro
-  stripeId     String?  @map("stripe_id")
-  createdAt    DateTime @default(now()) @map("created_at")
+  ownerId      String   @map("owner_id")
+  channel      String   // 'naver_cafe' | 'instagram' | 'facebook'
+  accessToken  String?  @map("access_token") @db.Text
+  refreshToken String?  @map("refresh_token") @db.Text
+  expiresAt    String?  @map("expires_at")
+  meta         Json?
   updatedAt    DateTime @updatedAt @map("updated_at")
-  domains            Domain[]
-  visibilityQueries  VisibilityQuery[]
-  settings           Setting[]
-  channelCredentials ChannelCredential[]
-  contents           Content[]
-  abTests            AbTest[]
-  contentPlans       ContentPlan[]
-  ragDocuments       RagDocument[]
-  costLedgers        CostLedger[]
-  cafeTargets        CafeTarget[]
-  subscriptions      Subscription[]
-  ideaDocuments      IdeaDocument[]
-  ideaPublishJobs    IdeaPublishJob[]    @relation("IdeaPublishJobOwner")
-  ideaSchedules      IdeaSchedule[]     @relation("IdeaScheduleOwner")
-  @@map("users")
+  owner User @relation(fields: [ownerId], references: [id])
+  @@unique([ownerId, channel])
+  @@map("channel_credentials")
 }
-model Subscription { // subscriptions — Stripe 구독
+
+model CafeTarget { // cafe_targets — 네이버 카페 발행 대상 목록
+  id        String   @id @default(cuid())
+  ownerId   String   @map("owner_id")
+  name      String
+  clubId    String   @map("club_id")
+  menuId    String   @map("menu_id")
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  owner User @relation(fields: [ownerId], references: [id])
+  @@map("cafe_targets")
+}
+
+model Ga4Binding {
   id               String    @id @default(cuid())
-  userId           String    @map("user_id")
-  stripeSubId      String?   @unique @map("stripe_sub_id")
-  plan             String    @default("free")
-  status           String    @default("active") // active | past_due | canceled
-  currentPeriodEnd DateTime? @map("current_period_end")
+  ownerId          String    @map("owner_id")
+  domainId         String    @unique @map("domain_id")
+  propertyId       String    @map("property_id")        // 'properties/123'
+  streamId         String? @map("stream_id")
+  host             String                               // Domain.url 정규화 host 복사
+  allowedSources   String[]  @default(["service_account"]) @map("allowed_sources")
+  conversionEvents String[]  @default([]) @map("conversion_events")
+  status           String    @default("pending")        // pending | verified | error | disabled
+  lastCheckedAt    DateTime? @map("last_checked_at")
+  lastErrorCode    String?   @map("last_error_code")
   createdAt        DateTime  @default(now()) @map("created_at")
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  @@index([userId])
-  @@map("subscriptions")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+  owner  User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  domain Domain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  @@index([ownerId, status])
+  @@map("ga4_bindings")
 }
+
+
 model Content { // contents — 핵심 콘텐츠
+  origin String @default("manual")
+  reviewStatus String @default("approved") @map("review_status")
+  reviewedAt DateTime? @map("reviewed_at")
+  reviewedBy String? @map("reviewed_by")
+  parentContentId String? @map("parent_content_id")
+  strategyContext Json? @map("strategy_context")
+  @@index([ownerId, reviewStatus, createdAt(sort: Desc)])
+  @@index([parentContentId])
+
   market        String    @default("ko-KR")
   id            String    @id @default(cuid())
   ownerId       String    @map("owner_id")
@@ -70,6 +91,7 @@ model Content { // contents — 핵심 콘텐츠
   @@index([ownerId, createdAt])
   @@map("contents")
 }
+
 model ScheduleSlot { // schedule_slots — 발행 스케줄
   id          String    @id @default(cuid())
   ownerId     String    @map("owner_id")
@@ -91,33 +113,7 @@ model ScheduleSlot { // schedule_slots — 발행 스케줄
   @@index([status, scheduledAt])
   @@map("schedule_slots")
 }
-model Setting { // settings — 유저별 설정
-  defaultMarket   String @default("ko-KR") @map("default_market")
-  id              String @id @default(cuid())
-  ownerId         String @map("owner_id")
-  brandGuide      Json   @default("{}") @map("brand_guide")
-  promptTemplates Json   @default("{}") @map("prompt_templates")
-  budgetMonthly   Int    @default(500000) @map("budget_monthly")
-  alertThreshold  Float  @default(0.8) @map("alert_threshold")
-  notifications   Json   @default("{}") @map("notifications")
-  owner User @relation(fields: [ownerId], references: [id])
-  @@unique([ownerId])
-  @@map("settings")
-}
-model TopicRecommendation { // topic_recommendations — 주간 주제 추천
-  id        String   @id @default(cuid())
-  ownerId   String   @map("owner_id")
-  month     String?  // 'YYYY-MM' (레거시, nullable)
-  weekStart String?  @map("week_start") // 'YYYY-MM-DD' (해당 주 월요일)
-  topic     String
-  score     Float
-  factors   Json?
-  channel   String   @default("blog")
-  createdAt DateTime @default(now()) @map("created_at")
-  @@index([ownerId, weekStart, channel])
-  @@index([ownerId, month, channel])
-  @@map("topic_recommendations")
-}
+
 model AbTest { // ab_tests — A/B 테스트 (Content 2중 FK)
   id              String    @id @default(cuid())
   ownerId         String    @map("owner_id")
@@ -147,86 +143,7 @@ model AbTest { // ab_tests — A/B 테스트 (Content 2중 FK)
   @@index([status, startedAt])
   @@map("ab_tests")
 }
-model ContentPlan { // content_plans — 주간/월간 콘텐츠 계획
-  id             String    @id @default(cuid())
-  ownerId        String    @map("owner_id")
-  monthKey       String?   @map("month_key") // 'YYYY-MM' (레거시, nullable)
-  weekKey        String?   @map("week_key")  // 'YYYY-MM-DD' (해당 주 월요일)
-  status         String    @default("active") // active | paused | completed
-  autoGenerate   Boolean   @default(true) @map("auto_generate")
-  lastExecutedAt DateTime? @map("last_executed_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
-  owner User              @relation(fields: [ownerId], references: [id])
-  items ContentPlanItem[]
-  @@unique([ownerId, weekKey])
-  @@unique([ownerId, monthKey])
-  @@map("content_plans")
-}
-model ContentPlanItem { // content_plan_items — 월간 계획 개별 토픽
-  id            String    @id @default(cuid())
-  contentPlanId String    @map("content_plan_id")
-  sortOrder     Int       @default(0) @map("sort_order")
-  topic         String
-  scheduledDate String    @map("scheduled_date") // 'YYYY-MM-DD'
-  status        String    @default("planned") // planned | generating | generated | failed
-  contentJobId  String?   @map("content_job_id") // 생성된 content.id
-  generatedAt   DateTime? @map("generated_at")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
-  plan ContentPlan @relation(fields: [contentPlanId], references: [id], onDelete: Cascade)
-  @@index([contentPlanId, sortOrder])
-  @@index([scheduledDate, status])
-  @@map("content_plan_items")
-}
-model RagDocument { // rag_documents — RAG 문서 메타
-  id          String   @id @default(cuid())
-  ownerId     String   @map("owner_id")
-  title       String
-  sourceType  String   @map("source_type") // pdf | md | docx | url | manual
-  storagePath String?  @map("storage_path")
-  status      String   @default("uploaded") // uploaded | indexed | failed
-  createdAt   DateTime @default(now()) @map("created_at")
-  owner  User       @relation(fields: [ownerId], references: [id])
-  chunks RagChunk[]
-  @@index([ownerId, status])
-  @@map("rag_documents")
-}
-model RagChunk { // rag_chunks — 벡터 임베딩
-  id         String                       @id @default(cuid())
-  docId      String                       @map("doc_id")
-  chunkIndex Int                          @map("chunk_index")
-  content    String                       @db.Text
-  embedding  Unsupported("vector(1536)")?
-  tokens     Int
-  document RagDocument @relation(fields: [docId], references: [id], onDelete: Cascade)
-  @@index([docId])
-  @@map("rag_chunks")
-}
-model CostLedger { // cost_ledger — AI 비용 원장
-  id         String   @id @default(cuid())
-  ownerId    String   @map("owner_id")
-  occurredAt DateTime @default(now()) @map("occurred_at")
-  kind       String   // 'chat' | 'embedding' | 'image'
-  tokensIn   Int      @default(0) @map("tokens_in")
-  tokensOut  Int      @default(0) @map("tokens_out")
-  krw        Float    @default(0)
-  contentId  String?  @map("content_id")
-  owner User @relation(fields: [ownerId], references: [id])
-  @@index([ownerId, occurredAt])
-  @@map("cost_ledger")
-}
-model AuditLog { // audit_log — 감사 로그 (INSERT only)
-  id         String   @id @default(cuid())
-  actor      String?
-  action     String
-  targetType String?  @map("target_type")
-  targetId   String?  @map("target_id")
-  payload    Json?
-  createdAt  DateTime @default(now()) @map("created_at")
-  @@index([action, createdAt])
-  @@map("audit_log")
-}
+
 model AnalyticsDaily { // analytics_daily — 일별 분석
   id        String   @id @default(cuid())
   ownerId   String   @map("owner_id")
@@ -243,19 +160,8 @@ model AnalyticsDaily { // analytics_daily — 일별 분석
   @@index([ownerId, date, channel])
   @@map("analytics_daily")
 }
-model ChannelCredential { // channel_credentials — 채널 자격증명
-  id           String   @id @default(cuid())
-  ownerId      String   @map("owner_id")
-  channel      String   // 'naver_cafe' | 'instagram' | 'facebook'
-  accessToken  String?  @map("access_token") @db.Text
-  refreshToken String?  @map("refresh_token") @db.Text
-  expiresAt    String?  @map("expires_at")
-  meta         Json?
-  updatedAt    DateTime @updatedAt @map("updated_at")
-  owner User @relation(fields: [ownerId], references: [id])
-  @@unique([ownerId, channel])
-  @@map("channel_credentials")
-}
+
+
 model IdeaDocument { // idea_documents — 리치 에디터 문서
   id          String   @id @default(cuid())
   ownerId     String   @map("owner_id")
@@ -272,6 +178,7 @@ model IdeaDocument { // idea_documents — 리치 에디터 문서
   @@index([ownerId, createdAt])
   @@map("idea_documents")
 }
+
 model IdeaPublishJob { // idea_publish_jobs — 발행 예약 잡
   id          String    @id @default(cuid())
   ownerId     String    @map("owner_id")
@@ -293,6 +200,7 @@ model IdeaPublishJob { // idea_publish_jobs — 발행 예약 잡
   @@index([status, scheduledAt])
   @@map("idea_publish_jobs")
 }
+
 model IdeaSchedule { // idea_schedules — 달력 계획 일정
   id            String   @id @default(cuid())
   ownerId       String   @map("owner_id")
@@ -306,18 +214,35 @@ model IdeaSchedule { // idea_schedules — 달력 계획 일정
   @@index([ownerId, scheduledDate])
   @@map("idea_schedules")
 }
-model CafeTarget { // cafe_targets — 네이버 카페 발행 대상 목록
-  id        String   @id @default(cuid())
-  ownerId   String   @map("owner_id")
-  name      String
-  clubId    String   @map("club_id")
-  menuId    String   @map("menu_id")
-  isDefault Boolean  @default(false) @map("is_default")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+
+
+model CostLedger { // cost_ledger — AI 비용 원장
+  id         String   @id @default(cuid())
+  ownerId    String   @map("owner_id")
+  occurredAt DateTime @default(now()) @map("occurred_at")
+  kind       String   // 'chat' | 'embedding' | 'image'
+  tokensIn   Int      @default(0) @map("tokens_in")
+  tokensOut  Int      @default(0) @map("tokens_out")
+  krw        Float    @default(0)
+  contentId  String?  @map("content_id")
   owner User @relation(fields: [ownerId], references: [id])
-  @@map("cafe_targets")
+  @@index([ownerId, occurredAt])
+  @@map("cost_ledger")
 }
+
+model AuditLog { // audit_log — 감사 로그 (INSERT only)
+  id         String   @id @default(cuid())
+  actor      String?
+  action     String
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id")
+  payload    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+  @@index([action, createdAt])
+  @@map("audit_log")
+}
+
+
 model Domain {
   id           String   @id @default(cuid())
   ownerId      String   @map("owner_id")
@@ -326,6 +251,7 @@ model Domain {
   businessType String?  @map("business_type") // 자동감지 or 사용자입력
   createdAt    DateTime @default(now()) @map("created_at")
   owner             User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ga4Binding Ga4Binding?
   seoAudits SeoAudit[]
   seoKeywords SeoKeyword[]
   seoDemandPoints SeoDemandPoint[]
@@ -335,6 +261,7 @@ model Domain {
   @@index([ownerId])
   @@map("domains")
 }
+
 model VisibilityQuery {
   id                String   @id @default(cuid())
   ownerId           String   @map("owner_id")
@@ -360,6 +287,7 @@ model VisibilityQuery {
   @@index([active, frequency]) // cron 스캔용
   @@map("visibility_queries")
 }
+
 model VisibilitySnapshot {
   id         String   @id @default(cuid())
   queryId    String   @map("query_id")
@@ -381,6 +309,7 @@ model VisibilitySnapshot {
   @@index([queryId, capturedAt(sort: Desc)])
   @@map("visibility_snapshots")
 }
+
 model VisibilityMention {
   id         String  @id @default(cuid())
   snapshotId String  @map("snapshot_id")
@@ -395,6 +324,7 @@ model VisibilityMention {
   @@index([snapshotId])
   @@map("visibility_mentions")
 }
+
 model SeoAudit {
   id             String    @id @default(cuid())
   domainId       String    @map("domain_id")
@@ -421,6 +351,7 @@ model SeoAudit {
   @@index([domainId, createdAt(sort: Desc), id])
   @@map("seo_audits")
 }
+
 model SeoKeyword {
   id                String    @id @default(cuid())
   domainId          String    @map("domain_id")
@@ -454,6 +385,7 @@ model SeoKeyword {
   @@index([domainId, market, engine])
   @@map("seo_keywords")
 }
+
 model SeoRanking {
   domainId        String    @map("domain_id")
   id              String    @id @default(cuid())
@@ -481,6 +413,7 @@ model SeoRanking {
   @@index([auditId])
   @@map("seo_rankings")
 }
+
 model SeoTask {
   id               String    @id @default(cuid())
   auditId          String    @map("audit_id")
@@ -556,4 +489,182 @@ model SeoDemandPoint {
   @@unique([keywordId, location, year, month])
   @@index([domainId, market, location])
   @@map("seo_demand_points")
+}
+
+
+model PublishClaim {
+  id             String    @id @default(cuid())
+  ownerId        String    @map("owner_id")
+  targetType     String    @map("target_type")        // content | idea_job
+  targetId       String    @map("target_id")
+  channel        String                               // blog | naver_cafe | facebook | instagram
+  destinationKey String    @default("default") @map("destination_key") // CafeTarget.id 등
+  contentVersion DateTime? @map("content_version")    // claim 시점 Content.updatedAt
+  token          String    @unique                    // 32바이트 난수 base64url, 응답에만 노출
+  trigger        String                               // manual | schedule | worker
+  status         String    @default("claimed")        // claimed | sent | failed | unknown | released
+  leaseUntil     DateTime  @map("lease_until")
+  externalId     String?   @map("external_id")
+  externalUrl    String?   @map("external_url")
+  errorCode      String?   @map("error_code")
+  claimedAt      DateTime  @default(now()) @map("claimed_at")
+  finishedAt     DateTime? @map("finished_at")
+  @@index([ownerId, channel, finishedAt])
+  @@index([targetType, targetId])
+  @@index([status, leaseUntil])
+  @@map("publish_claims")
+}
+
+model PipelineRun {
+  id         String    @id @default(cuid())
+  kind       String                               // strategy | topics | plan | content_item
+  ownerId    String    @map("owner_id")
+  scopeKey   String    @map("scope_key")          // 예: '<domainId>:blog', '<planItemId>'
+  periodKey  String    @map("period_key")         // 'YYYY-MM-DD'(주 시작 또는 일자)
+  status     String    @default("running")        // running | succeeded | failed | skipped
+  leaseUntil DateTime  @map("lease_until")
+  attempts   Int       @default(1)
+  resultRef  Json?     @map("result_ref")         // { reportId } / { count, strategyReportId } / { contentId }
+  errorCode  String?   @map("error_code")
+  startedAt  DateTime  @default(now()) @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+  @@unique([kind, ownerId, scopeKey, periodKey])
+  @@index([kind, periodKey, status])
+  @@map("pipeline_runs")
+}
+
+
+model TopicRecommendation { // topic_recommendations — 주간 주제 추천
+  id        String   @id @default(cuid())
+  ownerId   String   @map("owner_id")
+  month     String?  // 'YYYY-MM' (레거시, nullable)
+  weekStart String?  @map("week_start") // 'YYYY-MM-DD' (해당 주 월요일)
+  topic     String
+  score     Float
+  factors   Json?
+  channel   String   @default("blog")
+  createdAt DateTime @default(now()) @map("created_at")
+  @@index([ownerId, weekStart, channel])
+  @@index([ownerId, month, channel])
+  @@map("topic_recommendations")
+}
+
+model ContentPlan { // content_plans — 주간/월간 콘텐츠 계획
+  id             String    @id @default(cuid())
+  ownerId        String    @map("owner_id")
+  monthKey       String?   @map("month_key") // 'YYYY-MM' (레거시, nullable)
+  weekKey        String?   @map("week_key")  // 'YYYY-MM-DD' (해당 주 월요일)
+  status         String    @default("active") // active | paused | completed
+  autoGenerate   Boolean   @default(true) @map("auto_generate")
+  lastExecutedAt DateTime? @map("last_executed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  owner User              @relation(fields: [ownerId], references: [id])
+  items ContentPlanItem[]
+  @@unique([ownerId, weekKey])
+  @@unique([ownerId, monthKey])
+  @@map("content_plans")
+}
+
+model ContentPlanItem { // content_plan_items — 월간 계획 개별 토픽
+  id            String    @id @default(cuid())
+  contentPlanId String    @map("content_plan_id")
+  sortOrder     Int       @default(0) @map("sort_order")
+  topic         String
+  scheduledDate String    @map("scheduled_date") // 'YYYY-MM-DD'
+  status        String    @default("planned") // planned | generating | generated | failed
+  topicRecommendationId String? @map("topic_recommendation_id")
+  strategyContext Json? @map("strategy_context")
+  contentJobId  String?   @map("content_job_id") // 생성된 content.id
+  generatedAt   DateTime? @map("generated_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  plan ContentPlan @relation(fields: [contentPlanId], references: [id], onDelete: Cascade)
+  @@index([contentPlanId, sortOrder])
+  @@index([scheduledDate, status])
+  @@map("content_plan_items")
+}
+
+
+model RagDocument { // rag_documents — RAG 문서 메타
+  id          String   @id @default(cuid())
+  ownerId     String   @map("owner_id")
+  title       String
+  sourceType  String   @map("source_type") // pdf | md | docx | url | manual
+  storagePath String?  @map("storage_path")
+  status      String   @default("uploaded") // uploaded | indexed | failed
+  createdAt   DateTime @default(now()) @map("created_at")
+  owner  User       @relation(fields: [ownerId], references: [id])
+  chunks RagChunk[]
+  @@index([ownerId, status])
+  @@map("rag_documents")
+}
+
+model RagChunk { // rag_chunks — 벡터 임베딩
+  id         String                       @id @default(cuid())
+  docId      String                       @map("doc_id")
+  chunkIndex Int                          @map("chunk_index")
+  content    String                       @db.Text
+  embedding  Unsupported("vector(1536)")?
+  tokens     Int
+  document RagDocument @relation(fields: [docId], references: [id], onDelete: Cascade)
+  @@index([docId])
+  @@map("rag_chunks")
+}
+
+
+model User { // users — 사용자 (멀티테넌시 핵심)
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  phone        String?
+  passwordHash String   @map("password_hash")
+  plan         String   @default("free") // free | starter | pro
+  stripeId     String?  @map("stripe_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  ga4Bindings        Ga4Binding[]
+  domains            Domain[]
+  visibilityQueries  VisibilityQuery[]
+  settings           Setting[]
+  channelCredentials ChannelCredential[]
+  contents           Content[]
+  abTests            AbTest[]
+  contentPlans       ContentPlan[]
+  ragDocuments       RagDocument[]
+  costLedgers        CostLedger[]
+  cafeTargets        CafeTarget[]
+  subscriptions      Subscription[]
+  ideaDocuments      IdeaDocument[]
+  ideaPublishJobs    IdeaPublishJob[]    @relation("IdeaPublishJobOwner")
+  ideaSchedules      IdeaSchedule[]     @relation("IdeaScheduleOwner")
+  @@map("users")
+}
+
+model Subscription { // subscriptions — Stripe 구독
+  id               String    @id @default(cuid())
+  userId           String    @map("user_id")
+  stripeSubId      String?   @unique @map("stripe_sub_id")
+  plan             String    @default("free")
+  status           String    @default("active") // active | past_due | canceled
+  currentPeriodEnd DateTime? @map("current_period_end")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@map("subscriptions")
+}
+
+model Setting { // settings — 유저별 설정
+  defaultMarket   String @default("ko-KR") @map("default_market")
+  id              String @id @default(cuid())
+  ownerId         String @map("owner_id")
+  automationDomainId String? @map("automation_domain_id")
+  brandGuide      Json   @default("{}") @map("brand_guide")
+  promptTemplates Json   @default("{}") @map("prompt_templates")
+  budgetMonthly   Int    @default(500000) @map("budget_monthly")
+  alertThreshold  Float  @default(0.8) @map("alert_threshold")
+  notifications   Json   @default("{}") @map("notifications")
+  owner User @relation(fields: [ownerId], references: [id])
+  @@unique([ownerId])
+  @@map("settings")
 }

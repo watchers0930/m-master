@@ -42,7 +42,7 @@ function UpgradeBanner({ plan }: { plan: PlanKey }) {
       </svg>
       <div style={{ flex: 1, minWidth: 180 }}>
         <p style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600 }}>
-          저장 SEO·GEO 기반 전략 리포트 생성은 <strong>Starter</strong> 플랜부터 사용할 수 있습니다. GA4 성과 분석은 현재 포함되지 않습니다.
+          SEO·AI 가시성·GA4 기반 전략 리포트 생성은 <strong>Starter</strong> 플랜부터 사용할 수 있습니다.
         </p>
         <p style={{ fontSize: 11, color: 'var(--sub)', marginTop: 2 }}>
           이미 생성된 리포트 조회는 현재 플랜({PLAN_LABELS[plan]})에서도 계속 가능합니다.

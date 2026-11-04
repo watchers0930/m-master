@@ -14,6 +14,15 @@ export function canonical(value: unknown): string {
         throw new Error("undefined input");
     return JSON.stringify(value);
 }
+function stableGa4(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(stableGa4);
+    if (!value || typeof value !== 'object' || value instanceof Date) return value;
+    const object = value as Record<string,unknown>;
+    return Object.fromEntries(Object.entries(object).filter(([key]) =>
+      !(key === 'collectedAt' && 'credentialSource' in object) &&
+      !(key === 'observedAt' && (object.source === 'ga4' || object.id === 'status_ga4'))
+    ).map(([key, v]) => [key, stableGa4(v)]));
+}
 export function snapshotHash(value: unknown) {
-    return createHash("sha256").update(canonical(value)).digest("hex");
+    return createHash("sha256").update(canonical(stableGa4(value))).digest("hex");
 }

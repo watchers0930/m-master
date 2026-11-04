@@ -1,54 +1,35 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+// 실시간 활성 사용자 배지 (GET /api/visitors/realtime → Ga4Block, 설계 §2.5).
+// 연결 오류·미연결이면 0명이 아니라 상태 문구를 보여준다.
 
-export function RealtimeBadge() {
-  const [users, setUsers] = useState<number | null>(null);
+import { useRealtimeVisitors } from '@/hooks/useVisitorsData';
+import { ga4FailureText } from '@/components/ga4/Ga4BlockState';
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const res = await fetch('/api/visitors/realtime', { cache: 'no-store' });
-        if (!res.ok) return;
-        const j = await res.json();
-        if (!cancelled) setUsers(j.activeUsers ?? 0);
-      } catch {
-        /* ignore */
-      }
-    };
-    load();
-    const t = setInterval(load, 30000);
-    return () => { cancelled = true; clearInterval(t); };
-  }, []);
+export function RealtimeBadge({ domainId }: { domainId: string | null }) {
+  const { data: block, isError } = useRealtimeVisitors(domainId);
+  const ok = block?.state === 'ok' ? block.data : null;
+  const failText = block && block.state !== 'ok' ? ga4FailureText(block) : isError ? '실시간 조회 실패' : null;
 
   return (
     <div
       style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
-        padding: '6px 10px',
-        borderRadius: 6,
-        background: 'var(--green-100)',
-        border: '1px solid #bbf7d0',
-        color: '#166534',
-        fontSize: 11,
-        fontWeight: 600,
+        display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px', borderRadius: 6,
+        background: failText ? 'var(--n100)' : 'var(--green-100)',
+        border: failText ? '1px solid var(--border)' : '1px solid #bbf7d0',
+        color: failText ? 'var(--sub)' : '#166534', fontSize: 11, fontWeight: 600,
       }}
       aria-live="polite"
     >
       <span
         style={{
-          width: 7,
-          height: 7,
-          borderRadius: '50%',
-          background: '#22c55e',
-          animation: 'rt-pulse 1.4s infinite',
+          width: 7, height: 7, borderRadius: '50%',
+          background: failText ? '#9ca3af' : '#22c55e',
+          animation: failText ? undefined : 'rt-pulse 1.4s infinite',
         }}
       />
       <style>{`@keyframes rt-pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }`}</style>
-      실시간 {users ?? '·'}명
+      {failText ? `실시간 · ${failText}` : `실시간 ${ok ? ok.active_users.toLocaleString() : '·'}명`}
     </div>
   );
 }

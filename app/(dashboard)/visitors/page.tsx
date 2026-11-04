@@ -1,6 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+// 방문자 분석 — 섹션별 Ga4Block 상태 렌더 (설계 §2.4·§2.5). 실패 섹션에 0·빈 차트를 그리지 않는다.
+
+import { useState } from 'react';
 import { PeriodPicker } from './PeriodPicker';
 import { RealtimeBadge } from './RealtimeBadge';
 import {
@@ -8,56 +10,27 @@ import {
   ReferralTables, DemographicsBlock, DevicesBlock, EntryExitBlock,
   nfmt, pct100, dur,
 } from './components';
+import type { VisitorPeriod } from './api';
+import { useVisitorsData } from '@/hooks/useVisitorsData';
+import { Ga4BlockState, Ga4BlockView } from '@/components/ga4/Ga4BlockState';
+import { Ga4DomainSelect } from '@/components/ga4/Ga4DomainSelect';
 
-type Period = 'today' | 'this_week' | 'this_month' | '7d' | '30d' | '90d' | '365d';
-const VALID: Period[] = ['today', 'this_week', 'this_month', '7d', '30d', '90d', '365d'];
-
-const EMPTY_KPI = {
-  sessions: 0, sessionsDelta: 0, activeUsers: 0, activeUsersDelta: 0,
-  newUsers: 0, newUsersDelta: 0, pageViews: 0, pageViewsDelta: 0,
-  bounceRate: 0, bounceRateDelta: 0, avgSessionDuration: 0, avgSessionDurationDelta: 0,
-  engagementRate: 0, engagementRateDelta: 0, eventsPerSession: 0,
-};
+const VALID: VisitorPeriod[] = ['today', 'this_week', 'this_month', '7d', '30d', '90d', '365d'];
+/** 연결 범위 자체가 없는 상태 — 모든 섹션이 같으므로 한 번만 안내한다 */
+const SCOPE_STATES = new Set(['not_configured', 'unmapped', 'domain_required', 'binding_disabled']);
 
 export default function VisitorsPage() {
-  const [period, setPeriod] = useState<Period>('30d');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [data, setData] = useState<any>(null);
-
-  const load = useCallback(async (p: Period) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 15000);
-      const res = await fetch(`/api/visitors/data?period=${p}`, { signal: controller.signal });
-      clearTimeout(timer);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      setData(json.data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { load(period); }, [period, load]);
+  const [period, setPeriod] = useState<VisitorPeriod>('30d');
+  const [domainId, setDomainId] = useState<string | null>(null);
+  const { data, isPending: loading, error, refetch, isFetching } = useVisitorsData(period, domainId);
 
   const handlePeriodChange = (p: string) => {
-    if ((VALID as string[]).includes(p)) setPeriod(p as Period);
+    if ((VALID as string[]).includes(p)) setPeriod(p as VisitorPeriod);
   };
 
-  const kpi = data?.kpi ?? EMPTY_KPI;
-  const traffic = data?.traffic ?? [];
-  const daily = data?.daily ?? [];
-  const pages = data?.pages ?? [];
-  const refs = data?.refs ?? { sources: [], searchTerms: [] };
-  const demo = data?.demo ?? { ages: [], genders: [], cities: [], countries: [] };
-  const devs = data?.devs ?? { devices: [], browsers: [], os: [] };
-  const entry = data?.entry ?? { landings: [], exits: [] };
+  const domainSelect = <Ga4DomainSelect value={domainId} onChange={setDomainId} disabled={isFetching} />;
+  const retry = () => { void refetch(); };
+  const scopeBlock = data && data.kpi.state !== 'ok' && SCOPE_STATES.has(data.kpi.state) ? data.kpi : null;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 1400 }}>
@@ -71,8 +44,9 @@ export default function VisitorsPage() {
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {domainSelect}
           <PeriodPicker value={period} onChange={handlePeriodChange} />
-          <RealtimeBadge />
+          <RealtimeBadge domainId={domainId} />
         </div>
       </div>
 
@@ -84,14 +58,22 @@ export default function VisitorsPage() {
 
       {error && (
         <div style={{ padding: 24, textAlign: 'center', color: 'var(--sub)', fontSize: 12, background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)' }}>
-          GA4 데이터를 불러올 수 없습니다: {error}<br />
-          GA4 자격증명과 Property ID를 확인해주세요.
+          방문자 데이터를 불러올 수 없습니다: {error.message}
+          <div style={{ marginTop: 10 }}>
+            <button type="button" className="btn btn-ghost" style={{ fontSize: 11.5 }} onClick={retry}>다시 시도</button>
+          </div>
         </div>
       )}
 
-      {!loading && !error && (
+      {data && !error && scopeBlock && (
+        <div className="card"><Ga4BlockState block={scopeBlock} domainSelect={domainSelect} /></div>
+      )}
+
+      {/* 재조회 실패 시 이전 값을 함께 보여주지 않는다(설계 §2.4 stale 미제공) */}
+      {data && !error && !scopeBlock && (
         <>
           {/* KPI */}
+          <Ga4BlockView block={data.kpi} onRetry={retry} render={(kpi) => (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
             <KpiCard label="세션" value={nfmt(kpi.sessions)} delta={kpi.sessionsDelta} sub="전기 대비" />
             <KpiCard label="활성 사용자" value={nfmt(kpi.activeUsers)} delta={kpi.activeUsersDelta} sub="전기 대비" />
@@ -102,6 +84,7 @@ export default function VisitorsPage() {
             <KpiCard label="평균 체류시간" value={dur(kpi.avgSessionDuration)} delta={kpi.avgSessionDurationDelta} sub="전기 대비" />
             <KpiCard label="세션당 이벤트" value={kpi.eventsPerSession.toFixed(1)} sub="이벤트 / 세션" />
           </div>
+          )} />
 
           {/* 일별 시계열 + 트래픽 소스 */}
           <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 14 }}>
@@ -113,7 +96,7 @@ export default function VisitorsPage() {
                 <span className="card-title">일별 추이</span>
                 <span style={{ fontSize: 10, color: 'var(--sub)' }}>페이지뷰</span>
               </div>
-              <div style={{ padding: 16 }}><DailySparkline data={daily} /></div>
+              <div style={{ padding: 16 }}><Ga4BlockView block={data.daily} onRetry={retry} render={(daily) => <DailySparkline data={daily} />} /></div>
             </div>
             <div className="card">
               <div className="card-head">
@@ -122,7 +105,7 @@ export default function VisitorsPage() {
                 </svg>
                 <span className="card-title">트래픽 소스</span>
               </div>
-              <div style={{ padding: '8px 12px 12px' }}><TrafficSourcesTable rows={traffic} /></div>
+              <div style={{ padding: '8px 12px 12px' }}><Ga4BlockView block={data.traffic} onRetry={retry} render={(rows) => <TrafficSourcesTable rows={rows} />} /></div>
             </div>
           </div>
 
@@ -135,7 +118,7 @@ export default function VisitorsPage() {
               <span className="card-title">인기 페이지</span>
               <span style={{ fontSize: 10, color: 'var(--sub)' }}>TOP 20 · 조회수 기준</span>
             </div>
-            <div style={{ padding: '8px 12px 12px' }}><TopPagesTable rows={pages} /></div>
+            <div style={{ padding: '8px 12px 12px' }}><Ga4BlockView block={data.pages} onRetry={retry} render={(rows) => <TopPagesTable rows={rows} />} /></div>
           </div>
 
           {/* 유입 경로 */}
@@ -148,7 +131,7 @@ export default function VisitorsPage() {
               <span className="card-title">유입 경로</span>
             </div>
             <div style={{ padding: 16 }}>
-              <ReferralTables sources={refs.sources} searchTerms={refs.searchTerms} />
+              <Ga4BlockView block={data.refs} onRetry={retry} render={(refs) => <ReferralTables sources={refs.sources} searchTerms={refs.searchTerms} />} />
             </div>
           </div>
 
@@ -162,7 +145,9 @@ export default function VisitorsPage() {
               <span style={{ fontSize: 10, color: 'var(--sub)' }}>연령 · 성별 · 지역</span>
             </div>
             <div style={{ padding: 16 }}>
-              <DemographicsBlock ages={demo.ages} genders={demo.genders} cities={demo.cities} countries={demo.countries} />
+              <Ga4BlockView block={data.demo} onRetry={retry} render={(demo) => (
+                <DemographicsBlock ages={demo.ages} genders={demo.genders} cities={demo.cities} countries={demo.countries} />
+              )} />
             </div>
           </div>
 
@@ -175,7 +160,7 @@ export default function VisitorsPage() {
               <span className="card-title">디바이스 · 브라우저 · OS</span>
             </div>
             <div style={{ padding: 16 }}>
-              <DevicesBlock devices={devs.devices} browsers={devs.browsers} os={devs.os} />
+              <Ga4BlockView block={data.devs} onRetry={retry} render={(devs) => <DevicesBlock devices={devs.devices} browsers={devs.browsers} os={devs.os} />} />
             </div>
           </div>
 
@@ -188,7 +173,7 @@ export default function VisitorsPage() {
               <span className="card-title">랜딩 · 이탈</span>
             </div>
             <div style={{ padding: 16 }}>
-              <EntryExitBlock landings={entry.landings} exits={entry.exits} />
+              <Ga4BlockView block={data.entry} onRetry={retry} render={(entry) => <EntryExitBlock landings={entry.landings} exits={entry.exits} />} />
             </div>
           </div>
 

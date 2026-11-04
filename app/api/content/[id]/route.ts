@@ -1,33 +1,17 @@
-// GET /api/content/[id] — 단건 콘텐츠 조회
-import { NextRequest, NextResponse } from 'next/server';
-import { requireSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
-import { toSnakeCase } from '@/lib/utils/case';
-
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const session = await requireSession();
-  const ownerId = session.user.id;
-  const { id } = await params;
-
-  try {
-    const row = await prisma.content.findUnique({ where: { id } });
-
-    if (!row || row.ownerId !== ownerId) {
-      return NextResponse.json(
-        { data: null, error: { code: 'not_found', message: '콘텐츠를 찾을 수 없습니다' } },
-        { status: 404 },
-      );
-    }
-
-    return NextResponse.json({ data: toSnakeCase(row), error: null });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error';
-    return NextResponse.json(
-      { data: null, error: { code: 'db_error', message } },
-      { status: 500 },
-    );
-  }
+import { NextResponse } from 'next/server';
+import { authenticated } from '@/lib/visibility/http';
+import { contentIdSchema, contentEditSchema } from '@/schemas/content';
+import { getContentRecord } from '@/lib/content/queries';
+import { editContentRecord } from '@/lib/content/review';
+type Context = { params: Promise<{ id: string }> };
+export async function GET(request: Request, context: Context) {
+  return authenticated(async ownerId => NextResponse.json({ data: await getContentRecord(ownerId,
+    contentIdSchema.parse((await context.params).id)), error: null }), request);
+}
+export async function PATCH(request: Request, context: Context) {
+  return authenticated(async ownerId => {
+    const id = contentIdSchema.parse((await context.params).id);
+    await editContentRecord(ownerId, id, contentEditSchema.parse(await request.json()));
+    return NextResponse.json({ data: await getContentRecord(ownerId, id), error: null });
+  }, request, { requireOrigin: true });
 }

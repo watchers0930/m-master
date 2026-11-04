@@ -1,3 +1,4 @@
+import { ChannelRejection } from './errors';
 // lib/publish/instagram.ts — Instagram Graph API 발행
 //
 // 흐름 (Meta Graph API 표준 2단계):
@@ -24,7 +25,7 @@ export interface InstagramPublishResult {
 async function resolveCredentials(ownerId: string): Promise<{ token: string; igUserId: string }> {
   const creds = await getInstagramCreds(ownerId);
   if (!creds) {
-    throw new Error(`인스타그램 credential 없음 (ownerId=${ownerId})`);
+    throw new ChannelRejection();
   }
   return { token: creds.accessToken, igUserId: creds.businessId };
 }
@@ -60,13 +61,14 @@ async function graphPost(path: string, body: Record<string, string>): Promise<un
   const url = `https://graph.facebook.com/${getGraphVersion()}/${path}`;
   const params = new URLSearchParams(body);
   const res = await fetch(url, {
-    method: 'POST',
+    method: 'POST', signal: AbortSignal.timeout(20000),
     body: params,
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg = (json as { error?: { message?: string } })?.error?.message ?? `HTTP ${res.status}`;
-    throw new Error(`Instagram Graph API 실패: ${msg}`);
+    if (res.status >= 400 && res.status < 500) throw new ChannelRejection();
+    throw new Error('channel_response_error');
   }
   return json;
 }

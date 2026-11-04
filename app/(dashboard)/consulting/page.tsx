@@ -24,6 +24,10 @@ import { ReportSections } from './components/sections/ReportSections';
 import { ReportHistory } from './components/ReportHistory';
 import { useDomain, useDomains } from './hooks/use-domains';
 import { useReportHistory, useReportDetail } from './hooks/use-consulting';
+import { Ga4ProvenanceCard } from './components/Ga4ProvenanceCard';
+
+/** 구조화 6섹션 스키마 버전 (v3 = v2 + GA4, additive) */
+const STRUCTURED_VERSIONS = new Set(['v2', 'v3']);
 
 function errMsg(err: unknown): string | null {
   if (!err) return null;
@@ -44,7 +48,8 @@ function Spinner() {
 
 /**
  * 완료 리포트 본문. evidence 토큰 치환 맵을 한 번 만들어 내려준다.
- * - v2(schemaVersion==='v2'): 구조화 6섹션 렌더(설계 §3.3). GTM 섹션이 기존 전략 카드를 재노출한다.
+ * - v2·v3(schemaVersion==='v2'|'v3'): 구조화 6섹션 렌더(설계 §3.3). GTM 섹션이 기존 전략 카드를 재노출한다.
+ *   v3 = v2 + GA4 관측(additive, GA4 설계 §3.2) — 같은 구조화 경로로 렌더하고 GA4 출처 카드만 추가한다.
  * - v1(그 외): 기존 전략 카드(진단→채널→예산→액션) + "구조화 섹션은 재생성 필요" 안내(§3.2.5 degrade).
  * 프론트는 어느 경로에서도 수치를 재계산하지 않는다.
  */
@@ -60,7 +65,7 @@ function ReportBody({ report, domainId }: { report: ConsultingReportDTO; domainI
   // v2 구조화 경로 판정은 schemaVersion 으로 한다. 서버 reportDto 는 v1 에도 sections 를 합성해
   // 내려주므로(buildSections with evidence:[]·selection:[] → gtm.strategy=null) sections 존재만으로
   // 분기하면 v1 의 기존 진단·채널·예산·액션이 통째로 숨겨지는 회귀가 생긴다(설계 §2.6·§3.2.5).
-  const isStructured = report.schemaVersion === 'v2' && !!report.sections;
+  const isStructured = STRUCTURED_VERSIONS.has(report.schemaVersion) && !!report.sections;
 
   if (isStructured) {
     return <ReportSections sections={report.sections!} evidenceById={evidenceById} domainId={domainId} />;
@@ -93,8 +98,10 @@ function ReportBody({ report, domainId }: { report: ConsultingReportDTO; domainI
 function ConsultingContent() {
   const { canWrite } = useConsultingAccess();
 
+  const searchParams = useSearchParams();
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
-  const [activeReportId, setActiveReportId] = useState<string | null>(null);
+  // 딥링크 ?reportId= (콘텐츠 관리 전략 근거 카드) — 선택 도메인 소유가 아니면 서버가 404 → 오류 안내(조용한 오표시 없음)
+  const [activeReportId, setActiveReportId] = useState<string | null>(() => searchParams.get('reportId'));
 
   // 현재 선택 도메인을 ref 로 추적 — 늦게 도착한 다른 도메인의 생성 응답이 활성 ID 를 덮지 않도록(§7).
   const selectedDomainRef = useRef<string | null>(null);
@@ -111,7 +118,6 @@ function ConsultingContent() {
     setActiveReportId(reportId);
   }, []);
 
-  const searchParams = useSearchParams();
   const requestedId = searchParams.get('domainId');
   const previousRequestedId = useRef(requestedId);
   useEffect(() => {
@@ -220,6 +226,7 @@ function ConsultingContent() {
                 onManualCheck={manualCheck}
                 manualChecking={detailQuery.isFetching}
               />
+              {activeReport.ga4Provenance && <Ga4ProvenanceCard p={activeReport.ga4Provenance} />}
               <ReportBody report={activeReport} domainId={selectedDomainId} />
             </>
           )}
@@ -248,7 +255,7 @@ export default function ConsultingPage() {
       <div>
         <h1 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>마케팅 컨설팅</h1>
         <p style={{ fontSize: 12, color: 'var(--sub)', marginTop: 2 }}>
-          저장된 SEO·GEO 진단을 종합해 채널 믹스·예산 배분·우선순위 액션을 제안합니다. GA4 성과는 현재 포함되지 않습니다.
+          저장된 SEO·GEO 진단과 연결된 GA4 성과를 종합해 채널 믹스·예산 배분·우선순위 액션을 제안합니다.
         </p>
       </div>
 

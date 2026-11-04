@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
+import { auth } from '@/lib/auth';
 import { getMonthlySpendKrw } from '@/lib/cost/tracker';
 import { fetchMonthlyVisitorsPair, fetchMultiplePathMetrics } from '@/lib/ga4/visitors';
 import { DashboardCalendar } from '../DashboardCalendar';
@@ -15,6 +16,10 @@ import {
 } from '@/lib/dashboard/dashboard-stats';
 import { gradeFromScore, calcMonthDelta, calcScoreDelta, nextMonthInfo } from '@/lib/dashboard/grades';
 import { kstNow } from '@/lib/ga4/_internal';
+import { resolveGa4Scope } from '@/lib/ga4/scope';
+import { toGa4Block, type Ga4Block } from '@/types/ga4';
+import type { PathMetrics } from '@/lib/ga4/visitors';
+import { Ga4BlockState } from '@/components/ga4/Ga4BlockState';
 
 // ── 페이지 ──────────────────────────────────────────────────────────
 
@@ -41,10 +46,22 @@ export default async function DashboardPage() {
   const nextMonth = monthStartDate.getMonth() + 1;
   const monthEndDate = new Date(monthStartDate.getFullYear(), nextMonth, 1);
 
+  // GA4 범위: 로그인 소유자의 바인딩만 (설계 §2.3). 미연결·미매핑은 블록 상태로 표시 — 0 표시 금지(§2.4)
+  const session = await auth();
+  const ownerId = session?.user?.id ?? null;
+  // 조회 예외는 페이지 전체 500 대신 해당 KPI 만 '연결 오류'로 (기존 .catch 동작 유지, 단 0 표시 없음)
+  const GA4_THROWN: Ga4Block<never> = { state: 'error', code: 'upstream_error', retryable: true };
+  const ga4Scope = ownerId ? await resolveGa4Scope(ownerId).catch(() => null) : null;
+  const scopeFail: Ga4Block<never> = ownerId && !ga4Scope ? GA4_THROWN
+    : { state: ga4Scope && !ga4Scope.ok ? ga4Scope.reason : 'not_configured' };
+  const scope = ga4Scope?.ok ? ga4Scope.scope : null;
+
   // ── 1차 데이터 로딩 ──────────────────────────────────────────────
   const [recent, publishedCount, costMtd, ga4VisitorsPair, avgScorePair, nextMonthScheduleCount, topicRows] =
     await Promise.all([
+      // 본인 콘텐츠만 — 이 목록의 경로를 본인 GA4 속성으로 조회하므로 타 소유자 글이 섞이면 안 된다
       prisma.content.findMany({
+        where: { ownerId: ownerId ?? '' },
         select: { id: true, channel: true, topic: true, status: true, scores: true, costKrw: true, createdAt: true, updatedAt: true },
         orderBy: { createdAt: 'desc' },
         take: 3,
@@ -56,7 +73,7 @@ export default async function DashboardPage() {
         },
       }),
       getMonthlySpendKrw().catch(() => 0),
-      fetchMonthlyVisitorsPair().catch(() => null),
+      scope ? fetchMonthlyVisitorsPair(scope).then(toGa4Block, () => GA4_THROWN) : Promise.resolve(scopeFail),
       fetchAvgScorePair(monthStr),
       fetchUpcomingMonthScheduleCount(),
       (async () => {
@@ -91,15 +108,18 @@ export default async function DashboardPage() {
     .map(r => r.path)
     .filter((p): p is string => p !== null);
 
-  const recentMetrics = validPaths.length > 0
-    ? await fetchMultiplePathMetrics(validPaths, monthStart, today).catch(() => null)
-    : {};
+  const recentMetrics: Ga4Block<Record<string, PathMetrics>> = !scope
+    ? scopeFail
+    : validPaths.length > 0
+      ? await fetchMultiplePathMetrics(validPaths, monthStart, today, scope).then(toGa4Block, () => GA4_THROWN)
+      : { state: 'ok', data: {}, collected_at: '', host: scope.host, property_id: scope.propertyId };
 
   const pathMap = new Map(recentPaths.map(r => [r.contentId, r.path]));
 
   // ── 변화율 계산 ──────────────────────────────────────────────────
-  const thisMonthVisitors = ga4VisitorsPair?.thisMonth ?? null;
-  const lastMonthVisitors = ga4VisitorsPair?.lastMonth ?? null;
+  const visitorsOk = ga4VisitorsPair.state === 'ok' ? ga4VisitorsPair.data : null;
+  const thisMonthVisitors = visitorsOk?.thisMonth ?? null;
+  const lastMonthVisitors = visitorsOk?.lastMonth ?? null;
   const visitorDelta = calcMonthDelta(thisMonthVisitors, lastMonthVisitors);
 
   const scoreDelta = calcScoreDelta(avgScorePair.thisAvg, avgScorePair.lastAvg);
@@ -121,9 +141,9 @@ export default async function DashboardPage() {
           <div className="kpi-body">
             <div className="kpi-label">이번달 방문자 (GA4)</div>
             <div className="kpi-val">
-              {ga4VisitorsPair
-                ? ga4VisitorsPair.thisMonth.toLocaleString()
-                : <span style={{color:'var(--sub)'}}>—</span>}
+              {visitorsOk
+                ? visitorsOk.thisMonth.toLocaleString()
+                : ga4VisitorsPair.state !== 'ok' && <Ga4BlockState block={ga4VisitorsPair} compact />}
             </div>
             {visitorDelta === null ? (
               <div className="kpi-change">
@@ -336,19 +356,23 @@ export default async function DashboardPage() {
               const ch = c.channel === 'blog' ? '블로그' : c.channel === 'instagram' ? '인스타그램' : '페이스북';
 
               const path = pathMap.get(c.id) ?? null;
-              const metrics = path && recentMetrics ? recentMetrics[path] ?? null : null;
+              const metrics = path && recentMetrics.state === 'ok' ? recentMetrics.data[path] ?? null : null;
+              // GA4 실패는 0·'—'(미수집)과 구분해 상태 문구로 표시 (설계 §2.4)
+              const ga4Fail = path !== null && recentMetrics.state !== 'ok'
+                ? <Ga4BlockState block={recentMetrics} compact />
+                : null;
 
               const viewsDisplay = path === null
                 ? <span title="발행 URL 없음" style={{color:'var(--sub)'}}>—</span>
-                : metrics === null
+                : ga4Fail ?? (metrics === null
                   ? <span title="GA4 미수집" style={{color:'var(--sub)'}}>—</span>
-                  : metrics.screenPageViews.toLocaleString();
+                  : metrics.screenPageViews.toLocaleString());
 
               const clicksDisplay = path === null
                 ? <span title="발행 URL 없음" style={{color:'var(--sub)'}}>—</span>
-                : metrics === null
+                : ga4Fail ?? (metrics === null
                   ? <span title="GA4 미수집" style={{color:'var(--sub)'}}>—</span>
-                  : metrics.sessions.toLocaleString();
+                  : metrics.sessions.toLocaleString());
 
               return (
                 <div key={c.id} className="perf-item">

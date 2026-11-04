@@ -1,8 +1,13 @@
 'use client';
 
+// 콘텐츠별 성과 — 발행 목록(DB)은 항상 표시, GA4 경로 지표는 ga4 블록이 ok 일 때만 (설계 §2.5·§4.7).
+// GA4 실패 시 지표를 0 으로 채우지 않고 상태 안내 + 지표 칸 '—' 로 둔다.
+
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { ContentPerformanceResponse } from '@/app/api/analytics/content-performance/route';
+import type { PathMetrics } from '@/lib/ga4/visitors';
+import { fetchContentPerformance } from '../api';
+import { Ga4BlockState } from '@/components/ga4/Ga4BlockState';
 
 const CH_LABEL: Record<string, string> = {
   blog: '블로그',
@@ -39,34 +44,47 @@ function fmtPercent(rate: number): string {
 
 interface Props {
   days: number;
+  domainId: string | null;
 }
 
-export function ContentPerformanceTable({ days }: Props) {
+const NA = <span style={{ color: 'var(--sub)' }}>—</span>;
+
+export function ContentPerformanceTable({ days, domainId }: Props) {
   const [channelFilter, setChannelFilter] = useState<'all' | 'blog' | 'naver_cafe' | 'instagram' | 'facebook'>('all');
 
-  const { data, isPending: loading, error: queryError } = useQuery({
-    queryKey: ['analytics', 'content-performance', days],
-    queryFn: async (): Promise<ContentPerformanceResponse> => {
-      const r = await fetch(`/api/analytics/content-performance?days=${days}`);
-      return r.json() as Promise<ContentPerformanceResponse>;
-    },
+  const { data, isPending: loading, error: queryError, refetch } = useQuery({
+    queryKey: ['analytics', 'content-performance', days, domainId ?? 'default'],
+    queryFn: ({ signal }) => fetchContentPerformance(days, domainId, signal),
+    retry: false,
   });
   const rows = data?.data ?? [];
   const period = data?.period ? { from: data.period.from, to: data.period.to } : null;
-  const ga4Fallback = data?.ga4_fallback ?? false;
-  const error = data?.error ?? (queryError ? queryError.message : null);
+  const ga4 = data?.ga4 ?? null;
+  const metricsByPath = ga4?.state === 'ok' ? ga4.data : null;
+  const error = queryError ? queryError.message : null;
+  const metricsOf = (path: string | null): PathMetrics | null => (path && metricsByPath ? metricsByPath[path] ?? null : null);
 
   const filtered = channelFilter === 'all' ? rows : rows.filter((r) => r.channel === channelFilter);
 
-  const totals = filtered.reduce(
-    (acc, r) => ({
-      sessions: acc.sessions + r.metrics.sessions,
-      pageViews: acc.pageViews + r.metrics.screenPageViews,
-      naverSessions: acc.naverSessions + r.naver_sessions,
-    }),
-    { sessions: 0, pageViews: 0, naverSessions: 0 },
-  );
-  const naverPctTotal = totals.sessions > 0 ? (totals.naverSessions / totals.sessions) : 0;
+  // 정렬: 세션 내림차순(지표 없는 행은 뒤로) — 기존 서버 정렬을 GA4 블록 기준으로 유지
+  const sorted = [...filtered].sort((a, b) => (metricsOf(b.page_path)?.sessions ?? -1) - (metricsOf(a.page_path)?.sessions ?? -1));
+
+  const totals = metricsByPath
+    ? filtered.reduce(
+      (acc, r) => {
+        const m = metricsOf(r.page_path);
+        return {
+          sessions: acc.sessions + (m?.sessions ?? 0),
+          pageViews: acc.pageViews + (m?.screenPageViews ?? 0),
+          naverSessions: acc.naverSessions + (r.naver_sessions ?? 0),
+        };
+      },
+      { sessions: 0, pageViews: 0, naverSessions: 0 },
+    )
+    : null;
+  const naverPctTotal = totals && totals.sessions > 0 ? (totals.naverSessions / totals.sessions) : 0;
+  // 네이버 유입은 행별 null(조회 실패·미관측) 가능 — 하나라도 모르면 합계를 0 으로 오표시하지 않는다
+  const naverKnown = filtered.every((r) => !metricsOf(r.page_path) || r.naver_sessions !== null);
 
   return (
     <div className="card" style={{ padding: 16 }}>
@@ -74,7 +92,8 @@ export function ContentPerformanceTable({ days }: Props) {
         <div>
           <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>콘텐츠별 성과</h2>
           <p style={{ fontSize: 11, color: 'var(--sub)', marginTop: 2 }}>
-            {period ? `${period.from} ~ ${period.to}` : '-'} · 발행 {filtered.length}건 · 합계 세션 {totals.sessions.toLocaleString()} · PV {totals.pageViews.toLocaleString()} · 네이버 유입 {totals.naverSessions.toLocaleString()} ({(naverPctTotal * 100).toFixed(1)}%)
+            {period ? `${period.from} ~ ${period.to}` : '-'} · 발행 {filtered.length}건
+            {totals && ` · 합계 세션 ${totals.sessions.toLocaleString()} · PV ${totals.pageViews.toLocaleString()} · 네이버 유입 ${naverKnown ? `${totals.naverSessions.toLocaleString()} (${(naverPctTotal * 100).toFixed(1)}%)` : '—'}`}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
@@ -99,15 +118,21 @@ export function ContentPerformanceTable({ days }: Props) {
         </div>
       </div>
 
-      {ga4Fallback && (
-        <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: 4, padding: '6px 10px', fontSize: 11, color: '#92400e', marginBottom: 8 }}>
-          GA4 데이터를 가져올 수 없어 메트릭이 0으로 표시됩니다 — {error}
+      {error && (
+        <div role="alert" style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 4, padding: '6px 10px', fontSize: 11, color: '#b91c1c', marginBottom: 8 }}>
+          성과를 불러오지 못했습니다 — {error}
+        </div>
+      )}
+      {ga4 && ga4.state !== 'ok' && (
+        <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: 4, marginBottom: 8 }}>
+          <Ga4BlockState block={ga4} onRetry={() => { void refetch(); }} />
+          <p style={{ fontSize: 10.5, color: '#92400e', textAlign: 'center', margin: '0 0 8px' }}>발행 목록은 표시되지만 GA4 지표는 비어 있습니다(0 아님).</p>
         </div>
       )}
 
       {loading ? (
         <div style={{ padding: 40, textAlign: 'center', fontSize: 12, color: 'var(--sub)' }}>로딩 중...</div>
-      ) : filtered.length === 0 ? (
+      ) : error ? null : filtered.length === 0 ? (
         <div style={{ padding: 40, textAlign: 'center', fontSize: 12, color: 'var(--sub)' }}>
           {channelFilter === 'all' ? '발행된 콘텐츠가 없습니다.' : `${CH_LABEL[channelFilter]} 채널에 발행된 콘텐츠가 없습니다.`}
         </div>
@@ -128,7 +153,7 @@ export function ContentPerformanceTable({ days }: Props) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => (
+              {sorted.map((r) => { const m = metricsOf(r.page_path); return (
                 <tr key={r.content_id} style={{ borderBottom: '1px solid var(--n100)' }}>
                   <td style={{ padding: '8px 6px', color: 'var(--text)', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {r.external_url ? (
@@ -146,32 +171,32 @@ export function ContentPerformanceTable({ days }: Props) {
                   </td>
                   <td style={{ padding: '8px 6px', color: 'var(--sub)' }}>{fmtDate(r.published_at)}</td>
                   <td style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 600, color: 'var(--text)' }}>
-                    {r.metrics.sessions.toLocaleString()}
+                    {m ? m.sessions.toLocaleString() : NA}
                   </td>
                   <td style={{ padding: '8px 6px', textAlign: 'right', color: '#03c75a' }}>
-                    {r.naver_sessions > 0 ? (
+                    {m && r.naver_sessions !== null && r.naver_sessions > 0 ? (
                       <>
                         <span style={{ fontWeight: 600 }}>{r.naver_sessions.toLocaleString()}</span>
                         <span style={{ fontSize: 10, color: 'var(--sub)', marginLeft: 4 }}>
-                          ({r.metrics.sessions > 0 ? ((r.naver_sessions / r.metrics.sessions) * 100).toFixed(0) : 0}%)
+                          ({m.sessions > 0 ? ((r.naver_sessions / m.sessions) * 100).toFixed(0) : 0}%)
                         </span>
                       </>
-                    ) : <span style={{ color: 'var(--sub)' }}>-</span>}
+                    ) : m && r.naver_sessions === 0 ? <span style={{ color: 'var(--sub)' }}>-</span> : NA}
                   </td>
                   <td style={{ padding: '8px 6px', textAlign: 'right', color: 'var(--text)' }}>
-                    {r.metrics.screenPageViews.toLocaleString()}
+                    {m ? m.screenPageViews.toLocaleString() : NA}
                   </td>
                   <td style={{ padding: '8px 6px', textAlign: 'right', color: 'var(--sub)' }}>
-                    {fmtDuration(r.metrics.averageSessionDuration)}
+                    {m ? fmtDuration(m.averageSessionDuration) : NA}
                   </td>
                   <td style={{ padding: '8px 6px', textAlign: 'right', color: 'var(--sub)' }}>
-                    {fmtPercent(r.metrics.bounceRate)}
+                    {m ? fmtPercent(m.bounceRate) : NA}
                   </td>
                   <td style={{ padding: '8px 6px', textAlign: 'right', color: 'var(--sub)' }}>
-                    {fmtPercent(r.metrics.engagementRate)}
+                    {m ? fmtPercent(m.engagementRate) : NA}
                   </td>
                 </tr>
-              ))}
+              ); })}
             </tbody>
           </table>
         </div>

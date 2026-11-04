@@ -1,4 +1,6 @@
-import { getCached, getClient, getPropertyId, parseNum, safe, setCache, TTL } from './_internal';
+import type { Ga4Scope, Ga4Result } from '@/types/ga4';
+import { runGa4 } from './run';
+import { parseNum } from './_internal';
 
 export interface DowChannelRow {
   dow: number;
@@ -11,13 +13,9 @@ export interface PopularPage {
   sessions: number;
 }
 
-export async function fetchDowChannelPattern(): Promise<DowChannelRow[] | null> {
+export async function fetchDowChannelPattern(scope?: Ga4Scope): Promise<Ga4Result<DowChannelRow[]>> {
   const key = 'pattern:';
-  const cached = getCached<DowChannelRow[]>(key);
-  if (cached) return cached;
-  const result = await safe(async () => {
-    const client = getClient();
-    const property = getPropertyId();
+  const result = await runGa4(scope, key, { startDate: '90daysAgo', endDate: 'today' }, async (client, property) => {
     const [res] = await client.runReport({
       property,
       dateRanges: [{ startDate: '90daysAgo', endDate: 'today' }],
@@ -30,19 +28,14 @@ export async function fetchDowChannelPattern(): Promise<DowChannelRow[] | null> 
       channel: row.dimensionValues?.[1]?.value ?? '(none)',
       sessions: Math.round(parseNum(row.metricValues?.[0]?.value)),
     }));
-  }, 'pattern', null as DowChannelRow[] | null);
-  if (result !== null) setCache(key, result, TTL.DETAIL);
+  });
   return result;
 }
 
-export async function fetchPopularPages(days = 30): Promise<PopularPage[] | null> {
+export async function fetchPopularPages(days = 30, scope?: Ga4Scope): Promise<Ga4Result<PopularPage[]>> {
   const safeDays = Math.max(1, Math.min(Math.floor(days), 365));
   const key = `popular:${safeDays}`;
-  const cached = getCached<PopularPage[]>(key);
-  if (cached) return cached;
-  const result = await safe(async () => {
-    const client = getClient();
-    const property = getPropertyId();
+  const result = await runGa4(scope, key, { startDate: '90daysAgo', endDate: 'today' }, async (client, property) => {
     const [res] = await client.runReport({
       property,
       dateRanges: [{ startDate: `${safeDays}daysAgo`, endDate: 'today' }],
@@ -56,7 +49,6 @@ export async function fetchPopularPages(days = 30): Promise<PopularPage[] | null
         sessions: Math.round(parseNum(row.metricValues?.[0]?.value)),
       }))
       .filter((row) => row.path);
-  }, 'popularPages', null as PopularPage[] | null);
-  if (result !== null) setCache(key, result, TTL.DETAIL);
+  });
   return result;
 }

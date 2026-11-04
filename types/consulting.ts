@@ -45,6 +45,9 @@ export interface PriorityAction {
     destination: ActionDestination; // 서버 allowlist로 URL 매핑
 }
 export interface ConsultingReportDTO {
+    ga4Provenance?: { property_id: string; host: string; collected_at: string;
+      range: { startDate: string; endDate: string }; time_zone: string | null;
+      completeness: 'complete' | 'partial'; failed_reports: { report: string; code: string }[] } | null;
     sections?: ConsultingSectionsDTO;
     id: string;
     domainId: string;
@@ -100,7 +103,8 @@ export interface ConsultingSectionsDTO {
     methodology: {meta: SectionMeta; metricDefs: {key:string; definition:string; source:string; formula:string|null; version:string}[]; selectionLimits: (SectionMeta["selection"])[]};
 }
 export interface ConsultingSnapshot {
-    schemaVersion?: "v2";
+    schemaVersion?: "v2" | "v3";
+    ga4?: import("@/schemas/ga4-consulting").ConsultingGa4;
     structuredMetrics?: StructuredMetrics;
     sections?: ConsultingSectionsDTO;
     llmInput?: Omit<ConsultingSnapshot, "llmInput"|"sections"|"structuredMetrics"|"schemaVersion">;

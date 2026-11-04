@@ -8,7 +8,8 @@ import type { ConsultingSnapshot, EvidenceRef, EvidenceSource } from "@/types/co
 import type { Market } from "@/types/visibility";
 import { snapshotHash } from "./hash";
 import { citationHost } from "@/lib/visibility/normalize";
-import { readStoredGa4 } from "./stored-ga4";
+import { ga4Evidence } from "./ga4-evidence";
+import type { Ga4Collection } from "./ga4-collect";
 class SourceReadFailure extends Error {
     constructor(readonly source: EvidenceSource) { super("stored source read failed"); }
 }
@@ -21,7 +22,7 @@ export async function collectInput(ownerId: string, domain: {
     id: string;
     market: Market;
     url: string;
-}, budget: ConsultingSnapshot["monthlyMarketingBudget"], now = new Date()): Promise<ConsultingSnapshot> {
+}, budget: ConsultingSnapshot["monthlyMarketingBudget"], now = new Date(), injected?: { ga4: Ga4Collection }): Promise<ConsultingSnapshot> {
     const unavailable = new Set<EvidenceSource>();
     // A SQL failure may invalidate the Prisma transaction/connection. Restart the whole read,
     // excluding that source, so all surviving observations still share one repeatable snapshot.
@@ -161,23 +162,30 @@ export async function collectInput(ownerId: string, domain: {
                     snapshot.selection.push({ source: "geo_citations", total: geo.citations.length + (geo.nextCitationCursor ? 1 : 0), selected: geo.citations.length, limit: 20, rule: "earliest citations; total is a lower bound when truncated" });
                 }
                 else {
-                    const stored = await readStoredGa4(tx, ownerId, domain.url, range);
-                    status = stored.status;
-                    reason = stored.reason;
+                    const ga4 = ga4Evidence(injected?.ga4 ?? { status: 'unavailable', reason: 'not_configured' });
+                    if (ga4.ga4) snapshot.ga4 = ga4.ga4;
+                    snapshot.evidence.push(...ga4.evidence);
+                    snapshot.limitations.push(...ga4.limitations);
+                    const state = ga4.sourceStatus[0];
+                    status = state.status; reason = state.reason;
+                    observedAt = state.observedAt ? new Date(state.observedAt) : null;
                 }
                 snapshot.sourceStatus.push({ source, status, observedAt: observedAt?.toISOString() ?? null, reason });
-                if (status !== "available")
+                if (source !== "ga4" && !["available", "missing", "unmapped"].includes(status))
                     snapshot.limitations.push(reason ?? `${srcKo(source)}: ${STATUS_KO[status] ?? status}`);
             }
             catch {
                 throw new SourceReadFailure(source);
             }
         }
+        for (const [source, message] of [['seo','검색 노출 데이터 없음'],['geo','AI 가시성 데이터 없음']] as const)
+          if (!snapshot.sourceStatus.some(s=>s.source===source && ['available','partial','stale'].includes(s.status))) snapshot.limitations.push(message);
+        snapshot.limitations = [...new Set(snapshot.limitations)];
         snapshot.evidence = [...new Map(snapshot.evidence.map(e => [e.id, e])).values()];
         for (const s of snapshot.sourceStatus)
             add(`status_${s.source}`, "status", `${SOURCE_KO[s.source] ?? s.source} 데이터 준비 상태`, s.status, null);
-        const {structuredMetrics, ...legacy} = snapshot;
-        return {...consultingSnapshotSchema.parse({...legacy, evidence: legacy.evidence.slice(0,700)}), evidence: legacy.evidence, ...(structuredMetrics ? {structuredMetrics} : {})};
+        const {structuredMetrics, ga4, ...legacy} = snapshot;
+        return {...consultingSnapshotSchema.parse({...legacy, evidence: legacy.evidence.slice(0,700)}), evidence: legacy.evidence, ...(structuredMetrics ? {structuredMetrics} : {}), ...(ga4 ? {ga4} : {})};
         }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 20000 });
       } catch (error) {
         if (!(error instanceof SourceReadFailure)) throw error;

@@ -1,4 +1,6 @@
-import { getCached, getClient, getPropertyId, parseNum, safe, setCache, TTL, ymd } from './_internal';
+import type { Ga4Scope, Ga4Result } from '@/types/ga4';
+import { runGa4 } from './run';
+import { parseNum, ymd } from './_internal';
 
 export interface PathMetrics {
   sessions: number;
@@ -18,16 +20,12 @@ function emptyPathMetrics(): PathMetrics {
   };
 }
 
-export async function fetchPathMetrics(pagePath: string, from: Date | string, to: Date | string): Promise<PathMetrics | null> {
-  if (!pagePath || typeof pagePath !== 'string') return null;
+export async function fetchPathMetrics(pagePath: string, from: Date | string, to: Date | string, scope?: Ga4Scope): Promise<Ga4Result<PathMetrics>> {
+  if (!pagePath || typeof pagePath !== 'string') return { status: 'error', code: 'invalid_query', retryable: false };
   const startDate = typeof from === 'string' ? from : ymd(from);
   const endDate = typeof to === 'string' ? to : ymd(to);
   const key = `pathMetric:${pagePath}:${startDate}:${endDate}`;
-  const cached = getCached<PathMetrics>(key);
-  if (cached) return cached;
-  const result = await safe(async () => {
-    const client = getClient();
-    const property = getPropertyId();
+  const result = await runGa4(scope, key, { startDate, endDate }, async (client, property) => {
     const [res] = await client.runReport({
       property,
       dateRanges: [{ startDate, endDate }],
@@ -49,21 +47,17 @@ export async function fetchPathMetrics(pagePath: string, from: Date | string, to
       bounceRate: parseNum(values[3]?.value),
       engagementRate: parseNum(values[4]?.value),
     };
-  }, 'pathMetric', null as PathMetrics | null);
-  if (result !== null) setCache(key, result, TTL.DETAIL);
+  });
   return result;
 }
 
-export async function fetchMultiplePathMetrics(paths: string[], from: Date | string, to: Date | string): Promise<Record<string, PathMetrics> | null> {
-  if (paths.length === 0) return {};
+export async function fetchMultiplePathMetrics(paths: string[], from: Date | string, to: Date | string, scope?: Ga4Scope): Promise<Ga4Result<Record<string, PathMetrics>>> {
+
   const startDate = typeof from === 'string' ? from : ymd(from);
   const endDate = typeof to === 'string' ? to : ymd(to);
-  const key = `pathMulti:${paths.join(',')}:${startDate}:${endDate}`;
-  const cached = getCached<Record<string, PathMetrics>>(key);
-  if (cached) return cached;
-  const result = await safe(async () => {
-    const client = getClient();
-    const property = getPropertyId();
+  const key = `pathMulti:${[...paths].sort().join(',')}:${startDate}:${endDate}`;
+  const result = await runGa4(scope, key, { startDate, endDate }, async (client, property) => {
+    if (!paths.length) return {};
     const output = Object.fromEntries(paths.map((entry) => [entry, emptyPathMetrics()])) as Record<string, PathMetrics>;
     const [res] = await client.runReport({
       property,
@@ -91,21 +85,17 @@ export async function fetchMultiplePathMetrics(paths: string[], from: Date | str
       };
     }
     return output;
-  }, 'pathMulti', null as Record<string, PathMetrics> | null);
-  if (result !== null) setCache(key, result, TTL.DETAIL);
+  });
   return result;
 }
 
-export async function fetchMultiplePathSessionsByNaver(paths: string[], from: Date | string, to: Date | string): Promise<Record<string, number> | null> {
-  if (paths.length === 0) return {};
+export async function fetchMultiplePathSessionsByNaver(paths: string[], from: Date | string, to: Date | string, scope?: Ga4Scope): Promise<Ga4Result<Record<string, number>>> {
+
   const startDate = typeof from === 'string' ? from : ymd(from);
   const endDate = typeof to === 'string' ? to : ymd(to);
-  const key = `naverMulti:${paths.join(',')}:${startDate}:${endDate}`;
-  const cached = getCached<Record<string, number>>(key);
-  if (cached) return cached;
-  const result = await safe(async () => {
-    const client = getClient();
-    const property = getPropertyId();
+  const key = `naverMulti:${[...paths].sort().join(',')}:${startDate}:${endDate}`;
+  const result = await runGa4(scope, key, { startDate, endDate }, async (client, property) => {
+    if (!paths.length) return {};
     const output = Object.fromEntries(paths.map((entry) => [entry, 0])) as Record<string, number>;
     const [res] = await client.runReport({
       property,
@@ -126,7 +116,6 @@ export async function fetchMultiplePathSessionsByNaver(paths: string[], from: Da
       if (pagePath in output) output[pagePath] = Math.round(parseNum(row.metricValues?.[0]?.value));
     }
     return output;
-  }, 'naverMulti', null as Record<string, number> | null);
-  if (result !== null) setCache(key, result, TTL.DETAIL);
+  });
   return result;
 }

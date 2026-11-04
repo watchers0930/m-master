@@ -1,3 +1,4 @@
+import { ga4ConsultingSchema } from './ga4-consulting';
 import { sectionsSchema, structuredMetricsSchema } from "./consulting-sections";
 import { z } from "zod";
 import { marketSchema } from "@/lib/market/schema";
@@ -77,8 +78,26 @@ export const consultingSnapshotV2Schema = consultingSnapshotV1Schema.extend({
     for (const p of snapshot.sections.competitors.items ?? []) check(p.evidenceId);
     for (const e of snapshot.llmInput.evidence) check(e.id);
 });
+export const consultingSnapshotV3Schema = z.strictObject({ ...consultingSnapshotV2Schema.shape,
+    schemaVersion: z.literal("v3"), ga4: ga4ConsultingSchema.optional(),
+    llmInput: consultingSnapshotV1Schema.extend({ ga4: ga4ConsultingSchema.optional() }),
+}).superRefine((snapshot,ctx) => {
+    const ids = new Set(snapshot.evidence.map(e=>e.id));
+    const llmIds = new Set(snapshot.llmInput.evidence.map(e=>e.id));
+    for (const [projection, allowed] of [[snapshot.ga4, ids], [snapshot.llmInput.ga4, llmIds]] as const) {
+      if (!projection) continue;
+      for (const report of ['channels','sourceMedium','landing','pages','events'] as const)
+        for (const row of projection.reports[report])
+          for (const id of row.evidenceIds) if (!allowed.has(id)) ctx.addIssue({code:'custom',message:'unknown GA4 evidence'});
+    }
+    const {ga4: _ga4, ...base} = snapshot;
+    const {ga4: _llmGa4, ...llmInput} = snapshot.llmInput;
+    const legacy = consultingSnapshotV2Schema.safeParse({...base, schemaVersion:'v2', llmInput});
+    if (!legacy.success) for (const issue of legacy.error.issues) ctx.addIssue({...issue, code:'custom', message:issue.message});
+});
 export function parseConsultingSnapshot(value: unknown, version: string) {
     if (version === "v1") return consultingSnapshotV1Schema.parse(value);
+    if (version === "v3") return consultingSnapshotV3Schema.parse(value);
     if (version === "v2") return consultingSnapshotV2Schema.parse(value);
     throw new Error("unsupported_snapshot_version");
 }

@@ -1,4 +1,6 @@
-import { calcDelta, getCached, getClient, getPropertyId, parseNum, periodToDates, prevPeriodDates, safe, setCache, TTL } from './_internal';
+import type { Ga4Scope, Ga4Result } from '@/types/ga4';
+import { runGa4 } from './run';
+import { calcDelta, parseNum, periodToDates, prevPeriodDates } from './_internal';
 import type { Period } from './_internal';
 import type { ReportRow } from './_internal';
 
@@ -107,10 +109,8 @@ export interface ExitPage {
   exits: number;
 }
 
-export async function fetchOverviewKpi(period: Period): Promise<OverviewKpi> {
+export async function fetchOverviewKpi(period: Period, scope?: Ga4Scope): Promise<Ga4Result<OverviewKpi>> {
   const key = `kpi:${period}`;
-  const cached = getCached<OverviewKpi>(key);
-  if (cached) return cached;
   const fallback: OverviewKpi = {
     sessions: 0,
     sessionsDelta: 0,
@@ -128,9 +128,7 @@ export async function fetchOverviewKpi(period: Period): Promise<OverviewKpi> {
     engagementRateDelta: 0,
     eventsPerSession: 0,
   };
-  const result = await safe(async () => {
-    const client = getClient();
-    const property = getPropertyId();
+  const result = await runGa4(scope, key, periodToDates(period), async (client, property) => {
     const metrics = [
       { name: 'sessions' },
       { name: 'activeUsers' },
@@ -172,18 +170,13 @@ export async function fetchOverviewKpi(period: Period): Promise<OverviewKpi> {
       engagementRateDelta: calcDelta(engagementRate, parseNum(previous[6]?.value)),
       eventsPerSession: sessions > 0 ? events / sessions : 0,
     };
-  }, 'overview', fallback);
-  setCache(key, result, TTL.OVERVIEW);
+  });
   return result;
 }
 
-export async function fetchTrafficSources(period: Period): Promise<TrafficSource[]> {
+export async function fetchTrafficSources(period: Period, scope?: Ga4Scope): Promise<Ga4Result<TrafficSource[]>> {
   const key = `traffic:${period}`;
-  const cached = getCached<TrafficSource[]>(key);
-  if (cached) return cached;
-  const result = await safe(async () => {
-    const client = getClient();
-    const property = getPropertyId();
+  const result = await runGa4(scope, key, periodToDates(period), async (client, property) => {
     const [res] = await client.runReport({
       property,
       dateRanges: [periodToDates(period)],
@@ -201,18 +194,13 @@ export async function fetchTrafficSources(period: Period): Promise<TrafficSource
         percentage: total > 0 ? Math.round((sessions / total) * 1000) / 10 : 0,
       };
     });
-  }, 'traffic', [] as TrafficSource[]);
-  setCache(key, result, TTL.DETAIL);
+  });
   return result;
 }
 
-export async function fetchDailySeries(period: Period): Promise<DailyPoint[]> {
+export async function fetchDailySeries(period: Period, scope?: Ga4Scope): Promise<Ga4Result<DailyPoint[]>> {
   const key = `daily:${period}`;
-  const cached = getCached<DailyPoint[]>(key);
-  if (cached) return cached;
-  const result = await safe(async () => {
-    const client = getClient();
-    const property = getPropertyId();
+  const result = await runGa4(scope, key, periodToDates(period), async (client, property) => {
     const [res] = await client.runReport({
       property,
       dateRanges: [periodToDates(period)],
@@ -228,18 +216,13 @@ export async function fetchDailySeries(period: Period): Promise<DailyPoint[]> {
         sessions: parseNum(row.metricValues?.[1]?.value),
       };
     });
-  }, 'daily', [] as DailyPoint[]);
-  setCache(key, result, TTL.DETAIL);
+  });
   return result;
 }
 
-export async function fetchTopPages(period: Period, limit = 20): Promise<TopPage[]> {
+export async function fetchTopPages(period: Period, limit = 20, scope?: Ga4Scope): Promise<Ga4Result<TopPage[]>> {
   const key = `pages:${period}:${limit}`;
-  const cached = getCached<TopPage[]>(key);
-  if (cached) return cached;
-  const result = await safe(async () => {
-    const client = getClient();
-    const property = getPropertyId();
+  const result = await runGa4(scope, key, periodToDates(period), async (client, property) => {
     const [res] = await client.runReport({
       property,
       dateRanges: [periodToDates(period)],
@@ -254,18 +237,13 @@ export async function fetchTopPages(period: Period, limit = 20): Promise<TopPage
       avgTimeOnPage: parseNum(row.metricValues?.[1]?.value),
       bounceRate: parseNum(row.metricValues?.[2]?.value),
     }));
-  }, 'topPages', [] as TopPage[]);
-  setCache(key, result, TTL.DETAIL);
+  });
   return result;
 }
 
-export async function fetchReferrals(period: Period): Promise<{ sources: ReferralSource[]; searchTerms: SearchTermRow[] }> {
+export async function fetchReferrals(period: Period, scope?: Ga4Scope): Promise<Ga4Result<{ sources: ReferralSource[]; searchTerms: SearchTermRow[] }>> {
   const key = `referrals:${period}`;
-  const cached = getCached<{ sources: ReferralSource[]; searchTerms: SearchTermRow[] }>(key);
-  if (cached) return cached;
-  const result = await safe(async () => {
-    const client = getClient();
-    const property = getPropertyId();
+  const result = await runGa4(scope, key, periodToDates(period), async (client, property) => {
     const dates = [periodToDates(period)];
     const [sourceRes, termRes] = await Promise.all([
       client.runReport({
@@ -304,18 +282,13 @@ export async function fetchReferrals(period: Period): Promise<{ sources: Referra
         return true;
       });
     return { sources, searchTerms };
-  }, 'referrals', { sources: [] as ReferralSource[], searchTerms: [] as SearchTermRow[] });
-  setCache(key, result, TTL.DETAIL);
+  });
   return result;
 }
 
-export async function fetchDemographics(period: Period): Promise<{ ages: AgeGroup[]; genders: GenderRow[]; cities: CityRow[]; countries: CountryRow[] }> {
+export async function fetchDemographics(period: Period, scope?: Ga4Scope): Promise<Ga4Result<{ ages: AgeGroup[]; genders: GenderRow[]; cities: CityRow[]; countries: CountryRow[] }>> {
   const key = `demo:${period}`;
-  const cached = getCached<{ ages: AgeGroup[]; genders: GenderRow[]; cities: CityRow[]; countries: CountryRow[] }>(key);
-  if (cached) return cached;
-  const result = await safe(async () => {
-    const client = getClient();
-    const property = getPropertyId();
+  const result = await runGa4(scope, key, periodToDates(period), async (client, property) => {
     const dates = [periodToDates(period)];
     const [ageGenderRes, cityRes, countryRes] = await Promise.all([
       client.runReport({ property, dateRanges: dates, dimensions: [{ name: 'userAgeBracket' }, { name: 'userGender' }], metrics: [{ name: 'activeUsers' }] }),
@@ -348,18 +321,13 @@ export async function fetchDemographics(period: Period): Promise<{ ages: AgeGrou
         return { country: row.dimensionValues?.[0]?.value ?? '(not set)', users, percentage: rowTotal > 0 ? Math.round((users / rowTotal) * 1000) / 10 : 0 };
       }),
     };
-  }, 'demographics', { ages: [] as AgeGroup[], genders: [] as GenderRow[], cities: [] as CityRow[], countries: [] as CountryRow[] });
-  setCache(key, result, TTL.DETAIL);
+  });
   return result;
 }
 
-export async function fetchDevices(period: Period): Promise<{ devices: DeviceRow[]; browsers: BrowserRow[]; os: OsRow[] }> {
+export async function fetchDevices(period: Period, scope?: Ga4Scope): Promise<Ga4Result<{ devices: DeviceRow[]; browsers: BrowserRow[]; os: OsRow[] }>> {
   const key = `devices:${period}`;
-  const cached = getCached<{ devices: DeviceRow[]; browsers: BrowserRow[]; os: OsRow[] }>(key);
-  if (cached) return cached;
-  const result = await safe(async () => {
-    const client = getClient();
-    const property = getPropertyId();
+  const result = await runGa4(scope, key, periodToDates(period), async (client, property) => {
     const dates = [periodToDates(period)];
     const [deviceRes, browserRes, osRes] = await Promise.all([
       client.runReport({ property, dateRanges: dates, dimensions: [{ name: 'deviceCategory' }], metrics: [{ name: 'sessions' }] }),
@@ -382,18 +350,13 @@ export async function fetchDevices(period: Period): Promise<{ devices: DeviceRow
       browsers: (mapRows(browserRes[0]?.rows ?? [], 'browser') as BrowserRow[]).slice(0, 10),
       os: (mapRows(osRes[0]?.rows ?? [], 'os') as OsRow[]).slice(0, 10),
     };
-  }, 'devices', { devices: [] as DeviceRow[], browsers: [] as BrowserRow[], os: [] as OsRow[] });
-  setCache(key, result, TTL.DETAIL);
+  });
   return result;
 }
 
-export async function fetchEntryExit(period: Period): Promise<{ landings: LandingPage[]; exits: ExitPage[] }> {
+export async function fetchEntryExit(period: Period, scope?: Ga4Scope): Promise<Ga4Result<{ landings: LandingPage[]; exits: ExitPage[] }>> {
   const key = `entryExit:${period}`;
-  const cached = getCached<{ landings: LandingPage[]; exits: ExitPage[] }>(key);
-  if (cached) return cached;
-  const result = await safe(async () => {
-    const client = getClient();
-    const property = getPropertyId();
+  const result = await runGa4(scope, key, periodToDates(period), async (client, property) => {
     const dates = [periodToDates(period)];
     const [landingRes, exitRes] = await Promise.all([
       client.runReport({ property, dateRanges: dates, dimensions: [{ name: 'landingPage' }], metrics: [{ name: 'sessions' }, { name: 'bounceRate' }], orderBys: [{ metric: { metricName: 'sessions' }, desc: true }] }),
@@ -417,25 +380,20 @@ export async function fetchEntryExit(period: Period): Promise<{ landings: Landin
         exits: parseNum(row.metricValues?.[0]?.value),
       })),
     };
-  }, 'entryExit', { landings: [] as LandingPage[], exits: [] as ExitPage[] });
-  setCache(key, result, TTL.DETAIL);
+  });
   return result;
 }
 
-export async function fetchRealtime(): Promise<{ activeUsers: number; timestamp: string }> {
+export async function fetchRealtime(scope?: Ga4Scope): Promise<Ga4Result<{ activeUsers: number; timestamp: string }>> {
+  if (scope && !scope.streamId) return { status: 'unavailable', reason: 'unmapped' };
   const key = 'realtime';
-  const cached = getCached<{ activeUsers: number; timestamp: string }>(key);
-  if (cached) return cached;
-  const result = await safe(async () => {
-    const client = getClient();
-    const property = getPropertyId();
+  const result = await runGa4(scope, key, periodToDates('today'), async (client, property) => {
     const [res] = await client.runRealtimeReport({ property, metrics: [{ name: 'activeUsers' }] });
     return {
       activeUsers: parseNum(res.rows?.[0]?.metricValues?.[0]?.value),
       timestamp: new Date().toISOString(),
     };
-  }, 'realtime', { activeUsers: 0, timestamp: new Date().toISOString() });
-  setCache(key, result, TTL.REALTIME);
+  }, 30000);
   return result;
 }
 

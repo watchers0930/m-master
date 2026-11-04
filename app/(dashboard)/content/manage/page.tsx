@@ -2,28 +2,13 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { listContents } from '@/lib/api/content';
 import type { ContentStatus, Channel } from '@/types/db';
-import type { ContentListItem } from '@/types/api';
+import { contentKeys } from '@/hooks/useContentDetail';
+import { listReviewContents } from './api';
+import type { ReviewListItem, ReviewStatus } from './types';
 import ContentDetailPanel from './components/ContentDetailPanel';
-
-const STATUS_OPTIONS: { value: ContentStatus | ''; label: string }[] = [
-  { value: '', label: '전체' },
-  { value: 'draft', label: '초안' },
-  { value: 'scheduled', label: '예약됨' },
-  { value: 'published', label: '발행됨' },
-  { value: 'failed', label: '실패' },
-];
-
-const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
-  draft:     { bg: 'var(--n100)',       color: 'var(--sub)' },
-  scheduled: { bg: 'var(--blue-100)',   color: 'var(--blue-600)' },
-  published: { bg: 'var(--green-100)',  color: 'var(--green-700)' },
-  failed:    { bg: '#fee2e2',           color: '#dc2626' },
-};
-const STATUS_LABEL: Record<string, string> = {
-  draft: '초안', scheduled: '예약됨', published: '발행됨', failed: '실패',
-};
+import ContentListFilters from './components/ContentListFilters';
+import { OriginBadge, PublishStatusBadge, ReviewStatusBadge } from './components/ReviewBadge';
 
 const CHANNEL_LABEL: Record<Channel, string> = {
   blog: '블로그',
@@ -40,26 +25,27 @@ const CHANNEL_COLOR: Record<Channel, { bg: string; color: string }> = {
 
 interface TopicGroup {
   topic: string;
-  items: ContentListItem[];
+  items: ReviewListItem[];
   latestDate: string;
 }
 
 export default function ContentManagePage() {
   const [statusFilter, setStatusFilter] = useState<ContentStatus | ''>('');
+  const [reviewFilter, setReviewFilter] = useState<ReviewStatus | ''>('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(new Set());
 
-  const { data: items = [], isPending: loading } = useQuery({
-    queryKey: ['contents', 'list', statusFilter || 'all'],
+  const { data: items = [], isPending: loading, isError, error: listError } = useQuery({
+    queryKey: [...contentKeys.listRoot, statusFilter || 'all', reviewFilter || 'all'],
     queryFn: async () => {
-      const res = await listContents({ status: statusFilter || undefined });
-      return res.data?.items ?? [];
+      const res = await listReviewContents({ status: statusFilter || undefined, review_status: reviewFilter || undefined });
+      return res.items;
     },
   });
 
   // 토픽 기준 그룹핑
   const groups = useMemo<TopicGroup[]>(() => {
-    const map = new Map<string, ContentListItem[]>();
+    const map = new Map<string, ReviewListItem[]>();
     for (const item of items) {
       const list = map.get(item.topic) ?? [];
       list.push(item);
@@ -89,17 +75,12 @@ export default function ContentManagePage() {
       </div>
 
       {/* 필터 */}
-      <div style={{ display: 'flex', gap: 6 }}>
-        {STATUS_OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            onClick={() => setStatusFilter(opt.value)}
-            style={{ borderRadius: 20, padding: '4px 12px', fontSize: 11.5, fontWeight: 600, border: statusFilter === opt.value ? '1px solid var(--blue-400)' : '1px solid var(--border)', background: statusFilter === opt.value ? 'var(--blue-400)' : 'var(--surface)', color: statusFilter === opt.value ? '#fff' : 'var(--sub)', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.12s' }}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
+      <ContentListFilters
+        status={statusFilter}
+        reviewStatus={reviewFilter}
+        onStatusChange={setStatusFilter}
+        onReviewStatusChange={setReviewFilter}
+      />
 
       {/* 2열 레이아웃: 좌 목록 / 우 미리보기 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.1fr)', gap: 14, flex: 1, minHeight: 0 }}>
@@ -120,6 +101,8 @@ export default function ContentManagePage() {
                 <path d="M21 12a9 9 0 11-6.219-8.56"/>
               </svg>
             </div>
+          ) : isError ? (
+            <p role="alert" style={{ textAlign: 'center', padding: '48px 0', fontSize: 12, color: '#dc2626' }}>{listError?.message || '목록을 불러오지 못했습니다'}</p>
           ) : groups.length === 0 ? (
             <p style={{ textAlign: 'center', padding: '48px 0', fontSize: 12, color: 'var(--sub)' }}>콘텐츠가 없습니다</p>
           ) : (
@@ -146,6 +129,11 @@ export default function ContentManagePage() {
                         <path d="M4.5 2.5L8 6L4.5 9.5" stroke="var(--sub)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                       <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{group.topic}</p>
+                      {group.items.some((i) => i.review_status === 'pending_review') && (
+                        <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 3, background: 'var(--amber-100)', color: 'var(--amber-700)', flexShrink: 0 }}>
+                          검토 대기 {group.items.filter((i) => i.review_status === 'pending_review').length}
+                        </span>
+                      )}
                     </div>
                     <span style={{ fontSize: 10.5, color: 'var(--sub)' }}>{group.items.length}개</span>
                     <span style={{ fontSize: 11, color: 'var(--sub)' }}>{new Date(group.latestDate).toLocaleDateString('ko-KR')}</span>
@@ -153,7 +141,6 @@ export default function ContentManagePage() {
 
                   {/* 아코디언 바디 — 채널별 콘텐츠 */}
                   {isOpen && group.items.map((item) => {
-                    const st = STATUS_STYLE[item.status] ?? STATUS_STYLE.draft;
                     const ch = CHANNEL_COLOR[item.channel] ?? CHANNEL_COLOR.blog;
                     const isSelected = selectedId === item.id;
                     return (
@@ -173,7 +160,9 @@ export default function ContentManagePage() {
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                           <span style={{ fontSize: 10.5, fontWeight: 700, padding: '1px 6px', borderRadius: 3, background: ch.bg, color: ch.color, flexShrink: 0 }}>{CHANNEL_LABEL[item.channel] ?? item.channel}</span>
-                          <span style={{ display: 'inline-block', padding: '1px 6px', borderRadius: 3, fontSize: 10, fontWeight: 600, background: st.bg, color: st.color, flexShrink: 0 }}>{STATUS_LABEL[item.status] ?? item.status}</span>
+                          <PublishStatusBadge status={item.status} />
+                          <ReviewStatusBadge reviewStatus={item.review_status} origin={item.origin} reviewedAt={item.reviewed_at} />
+                          <OriginBadge origin={item.origin} />
                           {item.scores?.avg !== undefined && (
                             <span style={{ fontSize: 10, color: 'var(--sub)' }}>{item.scores.avg}점</span>
                           )}

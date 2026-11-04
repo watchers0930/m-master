@@ -81,6 +81,17 @@ export interface SourceStatus {
   reason: string | null;
 }
 
+/** GA4 수집 출처 (GA4 설계 §4.8) — v3 리포트만, v1·v2 는 null. 비밀값 없음 */
+export interface Ga4ProvenanceDTO {
+  property_id: string;
+  host: string;
+  collected_at: string;
+  range: { startDate: string; endDate: string };
+  time_zone: string | null;
+  completeness: 'complete' | 'partial';
+  failed_reports: { report: string; code: string }[];
+}
+
 /** 컨설팅 리포트 응답 DTO (설계 §4.1) */
 export interface ConsultingReportDTO {
   id: string;
@@ -97,6 +108,8 @@ export interface ConsultingReportDTO {
   evidence: EvidenceRef[];
   /** v2 구조화 6섹션 집계(설계 §3.3). v1 리포트·미준비는 null/undefined → 프론트가 "준비 필요"로 degrade */
   sections?: ConsultingSectionsDTO | null;
+  /** GA4 v3 수집 출처. 구버전 리포트·GA4 미수집은 null/undefined */
+  ga4Provenance?: Ga4ProvenanceDTO | null;
   range: { from: string; to: string };
   schemaVersion: string;
   promptVersion: string;

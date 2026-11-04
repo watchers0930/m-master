@@ -1,3 +1,4 @@
+import { persistGeneratedContent, type GenerationCost } from '@/lib/content/persist-generated';
 // lib/ab-test/generate-pair.ts — A/B 변형 동시 생성 + 롤백
 // GPT-4o 비스트리밍 호출
 
@@ -15,7 +16,6 @@ import { extractImagePrompts, searchMany } from '@/lib/unsplash/search';
 import { calcEmbeddingKrw } from '@/lib/openai/embedding';
 import { calcImageKrw, generateThumbnail } from '@/lib/openai/image';
 import { buildRagContext, retrieveTopK, hasIndexedDocs } from '@/lib/rag/retriever';
-import { trackCost } from '@/lib/cost/tracker';
 import { prisma } from '@/lib/prisma';
 import type {
   Channel,
@@ -159,13 +159,15 @@ async function generateOneVariant(
     console.warn(`[ab-test/generate-pair] variant ${variantKey} 본문 이미지 처리 실패 (무시):`, bodyImgsSettled.reason);
   }
 
-  // 4) embedding 비용은 RAG 호출 시 페어 단위로 계산되므로 변형별 0으로 두고
-  //    호출부에서 1회만 trackCost하도록 분리. 단순화 위해 변형별 0/0 유지.
+  // Shared RAG usage is settled once with variant A.
   const totalKrw = chatKrw + imageKrw + translateKrw;
 
   // 5) contents insert (prisma — owner_id 명시)
-  const contentData = await prisma.content.create({
-    data: {
+  const costs: GenerationCost[] = [{ kind:'chat',tokensIn:usage.prompt_tokens,tokensOut:usage.completion_tokens,krw:chatKrw }];
+  if (imageKrw > 0) costs.push({ kind:'image',tokensIn:0,tokensOut:0,krw:imageKrw });
+  if (translateKrw > 0) costs.push({ kind:'chat',tokensIn:0,tokensOut:0,krw:translateKrw });
+  if (variantKey === 'a' && embeddingTokens > 0) costs.push({ kind:'embedding',tokensIn:embeddingTokens,tokensOut:0,krw:calcEmbeddingKrw(embeddingTokens) });
+  const contentData = await persistGeneratedContent({ origin: 'manual',
       ownerId: opts.ownerId,
       channel: opts.channel,
       topic: opts.topic,
@@ -177,43 +179,7 @@ async function generateOneVariant(
       scores,
       costKrw: totalKrw,
       status: 'draft',
-    },
-    select: { id: true },
-  });
-
-  // 6) cost_ledger (변형별 chat/image)
-  await trackCost({
-    ownerId: opts.ownerId,
-    kind: 'chat',
-    tokensIn: usage.prompt_tokens,
-    tokensOut: usage.completion_tokens,
-    krw: chatKrw,
-    contentId: contentData.id,
-  });
-  if (imageKrw > 0) {
-    await trackCost({
-      ownerId: opts.ownerId,
-      kind: 'image',
-      tokensIn: 0,
-      tokensOut: 0,
-      krw: imageKrw,
-      contentId: contentData.id,
-    });
-  }
-  // 임베딩은 페어 단위로 한 번만 (호출부 처리 대신 첫 변형에 귀속)
-  if (variantKey === 'a' && embeddingTokens > 0) {
-    const embedKrw = calcEmbeddingKrw(embeddingTokens);
-    if (embedKrw > 0) {
-      await trackCost({
-        ownerId: opts.ownerId,
-        kind: 'embedding',
-        tokensIn: embeddingTokens,
-        tokensOut: 0,
-        krw: embedKrw,
-        contentId: contentData.id,
-      });
-    }
-  }
+    }, costs);
 
   return {
     contentId: contentData.id,

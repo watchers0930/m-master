@@ -1,3 +1,4 @@
+import { secureEqual } from '@/lib/publish/worker-auth';
 import { NextRequest } from 'next/server';
 
 /** Vercel Cron CRON_SECRET Bearer 토큰 검증 */
@@ -5,7 +6,7 @@ export function verifyCronSecret(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
   const authHeader = request.headers.get('authorization');
-  return authHeader === `Bearer ${secret}`;
+  return secureEqual(authHeader, `Bearer ${secret}`);
 }
 
 /** 오늘 날짜 (KST) → 'YYYY-MM-DD' */

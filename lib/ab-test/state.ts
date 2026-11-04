@@ -1,8 +1,10 @@
+import { requireGa4Data } from '@/lib/ga4/api';
 // lib/ab-test/state.ts — A/B 테스트 상태 머신 / 완료 처리 공통 로직
 // PATCH /api/ab-test/[id] (action='complete')과
 // GET  /api/ab-test/[id]/ga4 (자동 완료 부수효과)에서 모두 사용.
 
-import { fetchPathMetrics, type PathMetrics } from '@/lib/ga4/visitors';
+import { fetchMultiplePathMetrics, type PathMetrics } from '@/lib/ga4/path-metrics';
+import { resolveGa4UrlScope } from '@/lib/ga4/scope';
 import { decideWinner } from './winner';
 import type {
   AbTest,
@@ -59,21 +61,17 @@ export function isMeasureWindowElapsed(test: AbTest): boolean {
  * 호출 전제: status='running', 두 path 모두 존재.
  * GA4 API 실패 시 throw -> 호출부가 502 변환.
  */
-export async function buildCompletionFromGa4(test: AbTest): Promise<CompletionResult> {
+export async function buildCompletionFromGa4(ownerId: string, test: AbTest): Promise<CompletionResult> {
   if (!test.variant_a_path || !test.variant_b_path) {
     throw new Error('variant path 미설정 — GA4 측정 불가');
   }
   const { from, to } = computeMeasurePeriod(test);
 
-  const [aResult, bResult] = await Promise.all([
-    fetchPathMetrics(test.variant_a_path, from, to),
-    fetchPathMetrics(test.variant_b_path, from, to),
-  ]);
-  if (aResult === null || bResult === null) {
-    throw new Error('GA4 측정값 조회 실패 (null 응답)');
-  }
-  const aRaw = aResult;
-  const bRaw = bResult;
+  const scope = await resolveGa4UrlScope(ownerId, [test.variant_a_url, test.variant_b_url]);
+  if (!scope.ok) requireGa4Data({ status: 'unavailable', reason: scope.reason });
+  const metrics = requireGa4Data(await fetchMultiplePathMetrics(
+    [test.variant_a_path, test.variant_b_path], from, to, scope.ok ? scope.scope : undefined));
+  const aRaw = metrics[test.variant_a_path], bRaw = metrics[test.variant_b_path];
 
   const a = toAbMetrics(aRaw);
   const b = toAbMetrics(bRaw);

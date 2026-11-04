@@ -1,3 +1,4 @@
+import { persistGeneratedContent, type GenerationClaim } from './persist-generated';
 // lib/content/generate-headless.ts — SSE 없는 콘텐츠 생성 (cron·배치용)
 // GPT-4o 비스트리밍 생성
 
@@ -16,13 +17,15 @@ import { translateImagePrompts, calcHaikuKrw } from '@/lib/claude/translate';
 import { ensureMinimumMarkers, extractImagePrompts, searchMany } from '@/lib/unsplash/search';
 import { calcEmbeddingKrw } from '@/lib/openai/embedding';
 import { generateThumbnail, calcImageKrw } from '@/lib/openai/image';
-import { trackCost } from '@/lib/cost/tracker';
 import { buildExternalContext } from '@/lib/external/context-builder';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 export interface HeadlessGenerateOptions {
+  pipelineClaim?: GenerationClaim;
+  mode: 'auto' | 'manual';
+  strategyContext?: import('./strategy-context').StrategyContext;
   topic: string;
   channel: 'blog' | 'instagram' | 'facebook';
   ownerId: string;
@@ -89,8 +92,9 @@ export async function generateContentHeadless(
     `주제: ${topic}`,
     keywords.length ? `키워드: ${keywords.join(', ')}` : '',
     ragContext,
+    opts.strategyContext ? '전략은 방향 근거로만 사용하고 내부 GA4 수치를 본문에 노출하지 마세요. <untrusted_strategy>' + JSON.stringify(opts.strategyContext) + '</untrusted_strategy>' : '',
     externalContext,
-    `${channel} 채널에 최적화된 마케팅 콘텐츠를 ${currentYear}년 기준으로 작성해주세요. 법령·세율·정책은 ${currentYear}년 최신 기준을 반영하고, 구체적 수치·사례·실무 인사이트를 포함하여 전문가 칼럼 수준의 깊이 있는 글을 작성하세요.`,
+    `${channel} 채널에 최적화된 마케팅 콘텐츠를 ${currentYear}년 기준으로 작성해주세요. 법령·세율·정책은 ${currentYear}년 최신 기준을 반영하고, 수치·사례는 관측·외부 근거가 있는 경우에만 사용하고 실무 인사이트를 포함하여 전문가 칼럼 수준의 깊이 있는 글을 작성하세요.`,
   ].filter(Boolean).join('\n\n');
 
   // 6) GPT-4o — 비스트리밍 생성
@@ -154,8 +158,7 @@ export async function generateContentHeadless(
   const totalKrw = chatKrw + embedKrw + imageKrw + translateKrw;
 
   // 9) DB insert
-  const contentData = await prisma.content.create({
-    data: {
+  const contentData = await persistGeneratedContent({ origin: opts.mode, strategyContext: opts.strategyContext ? JSON.parse(JSON.stringify(opts.strategyContext)) : undefined,
       ownerId,
       channel,
       topic,
@@ -167,15 +170,12 @@ export async function generateContentHeadless(
       scores,
       costKrw: totalKrw,
       status: 'draft',
-    },
-    select: { id: true },
-  });
-
-  // 10) cost_ledger
-  await trackCost({ ownerId, kind: 'chat', tokensIn: usage.prompt_tokens, tokensOut: usage.completion_tokens, krw: chatKrw, contentId: contentData.id });
-  if (embeddingTokens > 0) await trackCost({ ownerId, kind: 'embedding', tokensIn: embeddingTokens, tokensOut: 0, krw: embedKrw, contentId: contentData.id });
-  if (imageKrw > 0) await trackCost({ ownerId, kind: 'image', tokensIn: 0, tokensOut: 0, krw: imageKrw, contentId: contentData.id });
-  if (externalContext) await trackCost({ ownerId, kind: 'external', tokensIn: 0, tokensOut: 0, krw: 0, contentId: contentData.id });
+    }, [
+      { kind:'chat',tokensIn:usage.prompt_tokens,tokensOut:usage.completion_tokens,krw:chatKrw+translateKrw },
+      ...(embeddingTokens>0 ? [{ kind:'embedding' as const,tokensIn:embeddingTokens,tokensOut:0,krw:embedKrw }]:[]),
+      ...(imageKrw>0 ? [{ kind:'image' as const,tokensIn:0,tokensOut:0,krw:imageKrw }]:[]),
+      ...(externalContext ? [{ kind:'external' as const,tokensIn:0,tokensOut:0,krw:0 }]:[]),
+    ],opts.pipelineClaim);
 
   return {
     contentId: contentData.id,

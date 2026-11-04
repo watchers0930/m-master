@@ -1,3 +1,4 @@
+import { ChannelRejection } from './errors';
 // lib/publish/facebook.ts — Facebook Pages API 발행
 //
 // 페이지에 게시하는 표준 endpoint:
@@ -20,7 +21,7 @@ export interface FacebookPublishResult {
 async function resolveCredentials(ownerId: string): Promise<{ token: string; pageId: string }> {
   const creds = await getFacebookCreds(ownerId);
   if (!creds) {
-    throw new Error(`페이스북 credential 없음 (ownerId=${ownerId})`);
+    throw new ChannelRejection();
   }
   return { token: creds.accessToken, pageId: creds.pageId };
 }
@@ -45,13 +46,14 @@ async function graphPost(path: string, body: Record<string, string>): Promise<un
   const url = `https://graph.facebook.com/${getGraphVersion()}/${path}`;
   const params = new URLSearchParams(body);
   const res = await fetch(url, {
-    method: 'POST',
+    method: 'POST', signal: AbortSignal.timeout(20000),
     body: params,
   });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg = (json as { error?: { message?: string } })?.error?.message ?? `HTTP ${res.status}`;
-    throw new Error(`Facebook Graph API 실패: ${msg}`);
+    if (res.status >= 400 && res.status < 500) throw new ChannelRejection();
+    throw new Error('channel_response_error');
   }
   return json;
 }

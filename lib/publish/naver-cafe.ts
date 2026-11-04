@@ -1,3 +1,4 @@
+import { ChannelRejection } from './errors';
 // lib/publish/naver-cafe.ts — 네이버 카페 API 발행
 //
 // 카페 게시글 작성 endpoint:
@@ -29,7 +30,7 @@ interface ResolvedNaverCreds {
 async function resolveCredentials(ownerId: string): Promise<ResolvedNaverCreds> {
   const creds = await getNaverCafeCreds(ownerId);
   if (!creds) {
-    throw new Error(`네이버 카페 credential 없음 (ownerId=${ownerId})`);
+    throw new ChannelRejection();
   }
   return creds;
 }
@@ -268,7 +269,7 @@ async function cafeApiPost(
 
   let token = creds.accessToken;
   let res = await fetch(url, {
-    method: 'POST',
+    method: 'POST', signal: AbortSignal.timeout(20000),
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -280,7 +281,7 @@ async function cafeApiPost(
   if (res.status === 401) {
     token = await refreshAccessToken(creds);
     res = await fetch(url, {
-      method: 'POST',
+      method: 'POST', signal: AbortSignal.timeout(20000),
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -317,7 +318,7 @@ async function cafeApiPostWithImages(
 
   let token = creds.accessToken;
   let res = await fetch(url, {
-    method: 'POST',
+    method: 'POST', signal: AbortSignal.timeout(20000),
     headers: { Authorization: `Bearer ${token}` },
     body: buildFormData(),
   });
@@ -325,7 +326,7 @@ async function cafeApiPostWithImages(
   if (res.status === 401) {
     token = await refreshAccessToken(creds);
     res = await fetch(url, {
-      method: 'POST',
+      method: 'POST', signal: AbortSignal.timeout(20000),
       headers: { Authorization: `Bearer ${token}` },
       body: buildFormData(),
     });
@@ -456,7 +457,8 @@ export async function publishNaverCafePost(opts: {
 
   if (!res.ok) {
     const msg = (json?.message as { error?: { msg?: string } })?.error?.msg ?? `HTTP ${res.status}`;
-    throw new Error(`네이버 카페 API 실패: ${msg}`);
+    if (res.status >= 400 && res.status < 500) throw new ChannelRejection();
+    throw new Error('channel_response_error');
   }
 
   const result = (json?.message as { result?: { articleId?: number; cafeUrl?: string } })?.result;
