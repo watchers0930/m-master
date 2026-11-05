@@ -28,7 +28,7 @@ export function judgeStrategy(response: Completion, snapshot: ConsultingSnapshot
     } catch (error) {
         const issue = (error as { issues?: { path?: unknown[]; code?: string; message?: string }[] })?.issues?.[0];
         const reason = issue ? `zod:${issue.code}@${(issue.path ?? []).join(".")}:${String(issue.message ?? "").slice(0, 120)}`
-            : String((error as Error)?.message ?? error).slice(0, 160);
+            : String((error as Error)?.message ?? error).slice(0, 900);
         return reject(reportId, choice.finish_reason, reason, { id: call.id, function: { name: call.function.name, arguments: call.function.arguments } });
     }
 }
