@@ -26,13 +26,16 @@ export async function pendingBlogContent(ownerId: string) {
         AND p.channel='blog' AND p.status IN ('claimed','sent','unknown'))
       AND NOT EXISTS (SELECT 1 FROM schedule_slots s WHERE s.content_id=c.id AND s.owner_id=${ownerId}
         AND s.channel='blog' AND s.status='published')
-      ORDER BY c.reviewed_at ASC NULLS LAST,c.created_at ASC,c.id ASC LIMIT 1`;
-    const row=eligible.length ? await tx.content.findFirst({where:{id:eligible[0].id,ownerId}}) : null;
+      ORDER BY c.reviewed_at ASC NULLS LAST,c.created_at ASC,c.id ASC LIMIT 20`;
+    // SQL 은 1차 필터, 최종 판정은 isPublishable(부모 승인 등). 앞 후보가 탈락해도 뒤 후보로 진행(영구 정체 방지, 상한 20)
+    let row: { id: string } | null = null;
+    for (const candidate of eligible) {
+      const target = await loadTarget(tx, { type: 'content', id: candidate.id }, ownerId);
+      const decision = isPublishable(target, { actorOwnerId: ownerId, channel: 'blog', trigger: 'worker',
+        now: new Date(), alreadySent: false, activeClaimHeldByOther: false });
+      if (decision.allowed) { row = candidate; break; }
+    }
     if (!row) return null;
-    const target = await loadTarget(tx, { type: 'content', id: row.id }, ownerId);
-    const decision = isPublishable(target, { actorOwnerId: ownerId, channel: 'blog', trigger: 'worker',
-      now: new Date(), alreadySent: false, activeClaimHeldByOther: false });
-    if (!decision.allowed) return null;
     const locked = await tx.content.findFirstOrThrow({ where:{ id:row.id,ownerId } });
     const claim = await tx.publishClaim.create({ data: { ownerId, targetType: 'content', targetId: row.id,
       channel: 'blog', trigger: 'worker', token: randomBytes(32).toString('base64url'),

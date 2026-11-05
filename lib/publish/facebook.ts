@@ -1,4 +1,6 @@
 import { ChannelRejection } from './errors';
+import { buildFacebookMessage } from './payload';
+export { buildFacebookMessage };
 // lib/publish/facebook.ts — Facebook Pages API 발행
 //
 // 페이지에 게시하는 표준 endpoint:
@@ -30,17 +32,6 @@ function getGraphVersion(): string {
   return process.env.META_GRAPH_VERSION || 'v20.0';
 }
 
-// 페북은 캡션 제한이 IG보다 훨씬 큼 (실질 63206자) — 마크다운 정리만
-export function buildFacebookMessage(markdown: string): string {
-  return markdown
-    .replace(/^\[이미지:.*\]$/gm, '')
-    .replace(/^#{1,6}\s+/gm, '')
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/^>\s+/gm, '')
-    .replace(/^-\s+/gm, '• ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
 
 async function graphPost(path: string, body: Record<string, string>): Promise<unknown> {
   const url = `https://graph.facebook.com/${getGraphVersion()}/${path}`;

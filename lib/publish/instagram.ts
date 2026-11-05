@@ -1,4 +1,6 @@
 import { ChannelRejection } from './errors';
+import { buildInstagramCaption } from './payload';
+export { buildInstagramCaption };
 // lib/publish/instagram.ts — Instagram Graph API 발행
 //
 // 흐름 (Meta Graph API 표준 2단계):
@@ -34,28 +36,7 @@ function getGraphVersion(): string {
   return process.env.META_GRAPH_VERSION || 'v20.0';
 }
 
-const IG_CAPTION_MAX = 2200;
 
-/**
- * 마크다운 본문을 IG 캡션용 plain text로 축약.
- * - 마크다운 기호 제거, [이미지: ...] 마커 제거
- * - 2200자 제한 (말줄임표로 잘림)
- */
-export function buildInstagramCaption(markdown: string): string {
-  let text = markdown
-    .replace(/^\[이미지:.*\]$/gm, '')
-    .replace(/^#{1,6}\s+/gm, '')
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/^>\s+/gm, '')
-    .replace(/^-\s+/gm, '• ')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-
-  if (text.length > IG_CAPTION_MAX) {
-    text = text.slice(0, IG_CAPTION_MAX - 1).trimEnd() + '…';
-  }
-  return text;
-}
 
 async function graphPost(path: string, body: Record<string, string>): Promise<unknown> {
   const url = `https://graph.facebook.com/${getGraphVersion()}/${path}`;

@@ -131,7 +131,9 @@ export function buildNaverCafeContent(text: string, imageUrls?: string[]): strin
     if (/^\[이미지:\s*.+\]$/.test(line)) {
       flushList();
       if (imgIdx < imgs.length) {
-        htmlParts.push(`<p><img src="${imgs[imgIdx]}" alt="" /></p>`);
+        // 속성 탈출·javascript: 차단 — http(s) URL만, 속성값 이스케이프
+        const src = imgs[imgIdx];
+        if (/^https?:\/\//i.test(src)) htmlParts.push(`<p><img src="${escapeHtml(src)}" alt="" /></p>`);
         imgIdx++;
       }
       continue;
@@ -173,7 +175,7 @@ export function buildNaverCafeContent(text: string, imageUrls?: string[]): strin
     if (bqMatch) {
       flushList();
       const plain = bqMatch[1].replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1');
-      htmlParts.push(`<blockquote>${plain}</blockquote>`);
+      htmlParts.push(`<blockquote>${escapeHtml(plain)}</blockquote>`);
       continue;
     }
 
@@ -375,7 +377,7 @@ const BRAND_TAGS = ['VESTRA', '베스트라'];
 function extractH2Keywords(text: string): string[] {
   const matches = text.match(/^##\s+(.+)$/gm) ?? [];
   return matches
-    .map(m => m.replace(/^##\s+/, '').replace(/[🔍📌✅💡🏠📊⚠️🔑📋💰🏢📈🔎✨🎯]/g, '').trim())
+    .map(m => m.replace(/^##\s+/, '').replace(/(?:🔍|📌|✅|💡|🏠|📊|⚠️|⚠|🔑|📋|💰|🏢|📈|🔎|✨|🎯)/gu, '').trim())
     .filter(h => h.length >= 2 && h.length <= 20 && !h.includes('목차'));
 }
 
