@@ -5,6 +5,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { fetchRealtime, fetchVisitorsData, type VisitorPeriod } from '@/lib/api/visitors';
+import { ga4QueryKeys } from '@/hooks/ga4QueryKeys';
 
 const TIMEOUT_MS = 15_000;
 
@@ -20,7 +21,7 @@ function withTimeout(signal: AbortSignal): AbortSignal {
 
 export function useVisitorsData(period: VisitorPeriod, domainId: string | null) {
   return useQuery({
-    queryKey: ['visitors', 'data', period, domainId ?? 'default'],
+    queryKey: ga4QueryKeys.visitors(period, domainId),
     queryFn: ({ signal }) => fetchVisitorsData(period, domainId, withTimeout(signal)),
     staleTime: 5 * 60_000,
     retry: false, // GA4 오류는 블록 상태로 오며, 요청 자체 실패는 사용자가 다시 시도
@@ -29,7 +30,7 @@ export function useVisitorsData(period: VisitorPeriod, domainId: string | null) 
 
 export function useRealtimeVisitors(domainId: string | null) {
   return useQuery({
-    queryKey: ['visitors', 'realtime', domainId ?? 'default'],
+    queryKey: ga4QueryKeys.realtime(domainId),
     queryFn: ({ signal }) => fetchRealtime(domainId, withTimeout(signal)),
     refetchInterval: 30_000,
     retry: false,

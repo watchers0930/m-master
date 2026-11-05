@@ -7,6 +7,15 @@ import { ga4FailureText } from '@/lib/analytics/ga4-block-text';
 
 // ── API 함수 ──────────────────────────────────────────────────────
 
+/** /api/schedule/slots 는 error 를 문자열로 돌려준다(기존 계약) — 객체·문자열 모두 안내 문구로 */
+export function scheduleErrorText(error: unknown, fallback: string): string {
+  if (typeof error === 'string' && error) return error;
+  if (error && typeof error === 'object' && typeof (error as { message?: unknown }).message === 'string') {
+    return (error as { message: string }).message || fallback;
+  }
+  return fallback;
+}
+
 export async function listSlots(params?: {
   year?: number;
   month?: number;
@@ -35,6 +44,8 @@ export async function createSlot(
   const json = await res.json();
   if (json.error) return { data: null, error: json.error };
   const slot = Array.isArray(json.data) ? json.data[0] : json.data;
+  // 서버 멱등 처리: 같은 콘텐츠·채널·시각의 예약 슬롯이 이미 있으면 새로 만들지 않는다(data = [])
+  if (!slot) return { data: null, error: { code: 'duplicate', message: '같은 시각에 이미 예약된 슬롯이 있습니다' } };
   return { data: { slot_id: slot.id }, error: null };
 }
 
@@ -243,7 +254,8 @@ export async function clearSlots(year: number, month: number): Promise<ApiRespon
 
 export async function applyAiProposals(
   proposals: AiProposal[],
-): Promise<ApiResponse<ScheduleSlot[]>> {
+  signal?: AbortSignal,
+): Promise<ApiResponse<ScheduleSlot[]> & { skipped?: number }> {
   const rows = proposals.map(p => ({
     content_id:   null,
     channel:      p.channel,
@@ -256,6 +268,7 @@ export async function applyAiProposals(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(rows),
+    signal,
   });
   return res.json();
 }

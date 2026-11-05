@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { notFound } from '@/lib/visibility/http';
 import { toSnakeCase } from '@/lib/utils/case';
 import { isPublishable } from '@/lib/publish/eligibility';
+import { buildPublishPreview } from '@/lib/content/publish-payload';
 import type { Channel } from '@/types/db';
 import type { z } from 'zod';
 import type { contentListSchema } from '@/schemas/content';
@@ -31,5 +32,6 @@ export async function getContentRecord(ownerId: string, id: string) {
     alreadySent: claims.some(c => c.status === 'sent'), activeClaimHeldByOther: active,
   });
   return { ...toSnakeCase({ ...row, strategyContext: row.strategyContext && typeof row.strategyContext === "object" && !Array.isArray(row.strategyContext) ? toSnakeCase(row.strategyContext) : null, reviewedBy: row.reviewedBy === ownerId ? ownerId : null }),
-    publish: { allowed: decision.allowed, reason: decision.allowed ? null : decision.reason, active_claim: active } };
+    publish: { allowed: decision.allowed, reason: decision.allowed ? null : decision.reason, active_claim: active },
+    publish_preview: buildPublishPreview(row.channel as Channel, row) };
 }

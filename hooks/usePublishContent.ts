@@ -84,13 +84,20 @@ export function usePublishContent(contentId: string | null) {
     if (!contentId || abStarting) return;
     setAbStarting(true);
     setAbError(null);
-    const res = await createAbTest({ source_content_id: contentId, measure_days: measureDays });
-    if (res.error) {
+    try {
+      const res = await createAbTest({ source_content_id: contentId, measure_days: measureDays });
+      if (res.error) {
+        setAbStarting(false);
+        setAbError(res.error.message || 'A/B 테스트 시작에 실패했습니다');
+        return;
+      }
+      // 성공 시에는 이동 완료까지 버튼을 잠근 채 둔다(중복 생성 방지)
+      router.push(`/ab-test/${res.data.id}`);
+    } catch (err) {
+      // 네트워크 오류 등 요청 자체 실패 — '시작 중' 에 멈추지 않게 해제
       setAbStarting(false);
-      setAbError(res.error.message ?? 'A/B 테스트 시작에 실패했습니다');
-      return;
+      setAbError(err instanceof Error && err.message ? `A/B 테스트 시작에 실패했습니다 — ${err.message}` : 'A/B 테스트 시작에 실패했습니다');
     }
-    router.push(`/ab-test/${res.data.id}`);
   };
 
   return { publish, publishing, convert, converting, startAbTest, abStarting, abError };

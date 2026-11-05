@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarView } from './CalendarView';
-import { listSlots, autoSchedule, applyAiProposals, clearSlots } from '@/lib/api/schedule';
+import { listSlots, autoSchedule, applyAiProposals, clearSlots, scheduleErrorText } from '@/lib/api/schedule';
 import type { AiProposal, AutoScheduleResult } from '@/lib/api/schedule';
 import type { ScheduleSlot } from '@/types/db';
 
@@ -50,8 +50,13 @@ export default function SchedulerPage() {
 
   // 모달을 닫거나 다시 연 뒤 늦게 도착한 이전 분석 결과가 화면을 덮지 않도록 실행 번호로 구분한다
   const aiRunRef = useRef(0);
+  // 편성 적용 요청 — 취소 시 중단(서버도 같은 슬롯은 멱등 skip). 진행 중엔 재분석·재적용을 막는다.
+  const applyAbortRef = useRef<AbortController | null>(null);
+  const [applyPending, setApplyPending] = useState(false);
+  const [pageError, setPageError] = useState<string | null>(null);
 
   const handleAiOpen = async () => {
+    if (applyPending) return;
     const run = ++aiRunRef.current;
     setAiOpen(true);
     setAiState('analyzing');
@@ -75,25 +80,34 @@ export default function SchedulerPage() {
   };
 
   const handleAiApply = async () => {
+    if (applyAbortRef.current) return; // 중복 클릭·재적용 차단
     const run = aiRunRef.current;
+    const controller = new AbortController();
+    applyAbortRef.current = controller;
+    setApplyPending(true);
     setAiState('applying');
     setAiError(null);
     try {
-      const res = await applyAiProposals(proposals);
-      if (res.error) throw new Error(res.error.message ?? '편성 적용에 실패했습니다');
-      if (res.data) setSlots((prev) => [...prev, ...(res.data as ScheduleSlot[])]);
+      const res = await applyAiProposals(proposals, controller.signal);
+      if (res.error) throw new Error(scheduleErrorText(res.error, '편성 적용에 실패했습니다'));
       if (run !== aiRunRef.current) return;
       setAiOpen(false);
       setAiState('idle');
       setGa4Warning(null);
     } catch (e) {
-      if (run !== aiRunRef.current) return;
+      if (run !== aiRunRef.current || controller.signal.aborted) return;
       setAiError(e instanceof Error && e.message ? e.message : '편성 적용에 실패했습니다');
       setAiState('done');
+    } finally {
+      if (applyAbortRef.current === controller) applyAbortRef.current = null;
+      setApplyPending(false);
+      // 성공·실패·취소 모두 서버 기준으로 다시 읽는다 (취소 전에 서버가 저장했을 수 있음)
+      void qc.invalidateQueries({ queryKey: ['schedule', 'slots'] });
     }
   };
 
   const handleAiClose = () => {
+    applyAbortRef.current?.abort();
     aiRunRef.current++;
     setAiOpen(false); setAiState('idle'); setProposals([]); setGa4Warning(null); setAiError(null);
   };
@@ -102,9 +116,16 @@ export default function SchedulerPage() {
   const handleClear = async () => {
     if (!window.confirm(`${year}년 ${month}월 슬롯을 모두 삭제할까요?`)) return;
     setClearing(true);
-    await clearSlots(year, month);
-    setSlots([]);
-    setClearing(false);
+    setPageError(null);
+    try {
+      const res = await clearSlots(year, month);
+      if (res?.error) throw new Error(scheduleErrorText(res.error, '초기화에 실패했습니다'));
+      setSlots([]);
+    } catch (e) {
+      setPageError(e instanceof Error && e.message ? e.message : '초기화에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setClearing(false);
+    }
   };
 
   return (
@@ -125,7 +146,7 @@ export default function SchedulerPage() {
           <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue-700)', minWidth: 90, textAlign: 'center' }}>{year}년 {month}월</span>
           <button onClick={goNext} className="btn btn-ghost" style={{ padding: '5px 10px', fontSize: 16 }}>›</button>
           <div style={{ width: 1, height: 16, background: 'var(--border)', margin: '0 4px' }} />
-          <button onClick={handleAiOpen} className="btn btn-teal" style={{ fontSize: 11, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 5 }}>
+          <button onClick={handleAiOpen} disabled={applyPending} title={applyPending ? '편성 적용 중입니다' : undefined} className="btn btn-teal" style={{ fontSize: 11, padding: '6px 12px', display: 'flex', alignItems: 'center', gap: 5, opacity: applyPending ? 0.6 : 1 }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
               <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
             </svg>
@@ -152,6 +173,8 @@ export default function SchedulerPage() {
           <span style={{ fontSize: 11, color: 'var(--sub)' }}>총 {slots.length}건</span>
         </div>
       </div>
+
+      {pageError && <p role="alert" style={{ fontSize: 12, color: '#dc2626', margin: 0 }}>{pageError}</p>}
 
       {/* 캘린더 카드 */}
       <div className="card" style={{ flex: 1, minHeight: 0 }}>

@@ -4,9 +4,9 @@
 // GA4 실패 시 지표를 0 으로 채우지 않고 상태 안내 + 지표 칸 '—' 로 둔다.
 
 import { useState } from 'react';
-import type { PathMetrics } from '@/lib/ga4/visitors';
 import { useContentPerformance } from '@/hooks/useGa4Analytics';
 import { Ga4BlockState } from '@/components/ga4/Ga4BlockState';
+import { computePerfTotals, metricsFor, type PerfTotals } from '@/lib/analytics/content-performance-totals';
 
 const CH_LABEL: Record<string, string> = {
   blog: '블로그',
@@ -48,6 +48,16 @@ interface Props {
 
 const NA = <span style={{ color: 'var(--sub)' }}>—</span>;
 
+/** 헤더 합계 문구 — 측정 가능한 행 수를 함께 표기("N건 기준"), 측정 불가면 '—' + 사유 */
+function totalsText(t: PerfTotals): string {
+  if (t.state === 'unavailable') return ' · 합계 —';
+  if (t.state === 'no_measurable') return ` · 합계 — (${t.reason})`;
+  const nv = t.naver.state === 'unknown'
+    ? '—'
+    : `${t.naver.sessions.toLocaleString()}${t.naver.ratio !== null ? ` (${(t.naver.ratio * 100).toFixed(1)}%)` : ''}${t.naver.measured !== t.measured ? ` · ${t.naver.measured}건 기준` : ''}`;
+  return ` · 합계(${t.measured}건 기준) 세션 ${t.sessions.toLocaleString()} · PV ${t.pageViews.toLocaleString()} · 네이버 유입 ${nv}`;
+}
+
 export function ContentPerformanceTable({ days, domainId }: Props) {
   const [channelFilter, setChannelFilter] = useState<'all' | 'blog' | 'naver_cafe' | 'instagram' | 'facebook'>('all');
 
@@ -55,31 +65,19 @@ export function ContentPerformanceTable({ days, domainId }: Props) {
   const rows = data?.data ?? [];
   const period = data?.period ? { from: data.period.from, to: data.period.to } : null;
   const ga4 = data?.ga4 ?? null;
-  const metricsByPath = ga4?.state === 'ok' ? ga4.data : null;
+  const naver = data?.naver ?? null;
   const error = queryError ? queryError.message : null;
-  const metricsOf = (path: string | null): PathMetrics | null => (path && metricsByPath ? metricsByPath[path] ?? null : null);
+  const metricsOf = (path: string | null) => metricsFor(ga4, path);
+  // 네이버 유입은 별도 블록 — ga4 가 ok 여도 naver 만 실패할 수 있다
+  const naverFailed = ga4?.state === 'ok' && naver !== null && naver.state !== 'ok' ? naver : null;
 
   const filtered = channelFilter === 'all' ? rows : rows.filter((r) => r.channel === channelFilter);
 
   // 정렬: 세션 내림차순(지표 없는 행은 뒤로) — 기존 서버 정렬을 GA4 블록 기준으로 유지
   const sorted = [...filtered].sort((a, b) => (metricsOf(b.page_path)?.sessions ?? -1) - (metricsOf(a.page_path)?.sessions ?? -1));
 
-  const totals = metricsByPath
-    ? filtered.reduce(
-      (acc, r) => {
-        const m = metricsOf(r.page_path);
-        return {
-          sessions: acc.sessions + (m?.sessions ?? 0),
-          pageViews: acc.pageViews + (m?.screenPageViews ?? 0),
-          naverSessions: acc.naverSessions + (r.naver_sessions ?? 0),
-        };
-      },
-      { sessions: 0, pageViews: 0, naverSessions: 0 },
-    )
-    : null;
-  const naverPctTotal = totals && totals.sessions > 0 ? (totals.naverSessions / totals.sessions) : 0;
-  // 네이버 유입은 행별 null(조회 실패·미관측) 가능 — 하나라도 모르면 합계를 0 으로 오표시하지 않는다
-  const naverKnown = filtered.every((r) => !metricsOf(r.page_path) || r.naver_sessions !== null);
+  // 합계는 측정 가능한 행만 (모르는 지표를 0 으로 합산하지 않는다)
+  const totals = computePerfTotals(filtered, ga4, naver);
 
   return (
     <div className="card" style={{ padding: 16 }}>
@@ -88,7 +86,7 @@ export function ContentPerformanceTable({ days, domainId }: Props) {
           <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>콘텐츠별 성과</h2>
           <p style={{ fontSize: 11, color: 'var(--sub)', marginTop: 2 }}>
             {period ? `${period.from} ~ ${period.to}` : '-'} · 발행 {filtered.length}건
-            {totals && ` · 합계 세션 ${totals.sessions.toLocaleString()} · PV ${totals.pageViews.toLocaleString()} · 네이버 유입 ${naverKnown ? `${totals.naverSessions.toLocaleString()} (${(naverPctTotal * 100).toFixed(1)}%)` : '—'}`}
+            {filtered.length > 0 && totalsText(totals)}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 4 }}>
@@ -122,6 +120,12 @@ export function ContentPerformanceTable({ days, domainId }: Props) {
         <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: 4, marginBottom: 8 }}>
           <Ga4BlockState block={ga4} onRetry={() => { void refetch(); }} />
           <p style={{ fontSize: 10.5, color: '#92400e', textAlign: 'center', margin: '0 0 8px' }}>발행 목록은 표시되지만 GA4 지표는 비어 있습니다(0 아님).</p>
+        </div>
+      )}
+      {naverFailed && (
+        <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: 4, marginBottom: 8 }}>
+          <Ga4BlockState block={naverFailed} onRetry={() => { void refetch(); }} />
+          <p style={{ fontSize: 10.5, color: '#92400e', textAlign: 'center', margin: '0 0 8px' }}>네이버 유입 지표를 불러오지 못했습니다 — 네이버 유입 칸은 비어 있습니다(0 아님).</p>
         </div>
       )}
 

@@ -5,10 +5,11 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { fetchContentPerformance, fetchDowPattern } from '@/lib/api/ga4-analytics';
+import { ga4QueryKeys } from '@/hooks/ga4QueryKeys';
 
 export function useDowPattern(domainId: string | null) {
   return useQuery({
-    queryKey: ['analytics', 'ga4-pattern', domainId ?? 'default'],
+    queryKey: ga4QueryKeys.dowPattern(domainId),
     queryFn: ({ signal }) => fetchDowPattern(domainId, signal),
     retry: false,
   });
@@ -16,7 +17,7 @@ export function useDowPattern(domainId: string | null) {
 
 export function useContentPerformance(days: number, domainId: string | null) {
   return useQuery({
-    queryKey: ['analytics', 'content-performance', days, domainId ?? 'default'],
+    queryKey: ga4QueryKeys.contentPerformance(days, domainId),
     queryFn: ({ signal }) => fetchContentPerformance(days, domainId, signal),
     retry: false,
   });

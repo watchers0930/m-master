@@ -5,13 +5,13 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { disconnectGa4Oauth, getGa4Settings, saveAutomationDomain } from '@/lib/api/ga4-settings';
-
-const KEY = ['settings', 'ga4'] as const;
+import { ga4QueryKeys, invalidateGa4Data } from '@/hooks/ga4QueryKeys';
 
 export function useGa4Settings() {
   const qc = useQueryClient();
-  const query = useQuery({ queryKey: KEY, queryFn: getGa4Settings, retry: false });
-  const refresh = () => qc.invalidateQueries({ queryKey: KEY });
+  const query = useQuery({ queryKey: ga4QueryKeys.settings, queryFn: getGa4Settings, retry: false });
+  // 자동화 도메인·연결이 바뀌면 'default' 도메인 키의 의미가 바뀐다 → GA4 데이터 캐시 전체 무효화
+  const refresh = () => invalidateGa4Data(qc);
 
   const disconnect = useMutation({ mutationFn: disconnectGa4Oauth, onSettled: refresh });
   const setAutomationDomain = useMutation({

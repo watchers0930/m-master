@@ -1,26 +1,12 @@
 // lib/api/ga4-analytics.ts
 // 분석 화면·스케줄러 자동편성 공용 GA4 API 래퍼 (설계 §4.7). GA4 부분은 Ga4Block — DB 지표(발행 목록)는 블록 밖에 그대로 둔다.
 import type { Ga4Block } from '@/types/ga4';
-import type { Channel } from '@/types/db';
-import type { DowChannelRow, PathMetrics } from '@/lib/ga4/visitors';
+import type { DowChannelRow } from '@/lib/ga4/visitors';
 
-export interface ContentPerformanceRow {
-  content_id: string;
-  title: string;
-  channel: Channel;
-  published_at: string | null;
-  external_url: string | null;
-  page_path: string | null;
-  /** 네이버 유입 세션 — GA4 실패·경로 없음이면 null(0 아님) */
-  naver_sessions: number | null;
-}
-
-export interface ContentPerformanceResponse {
-  data: ContentPerformanceRow[];
-  period: { from: string; to: string; days: number };
-  /** 경로별 GA4 지표 (설계 §4.7) — 행 지표는 이 블록에서만 읽는다 */
-  ga4: Ga4Block<Record<string, PathMetrics>>;
-}
+// 응답 계약 단일 출처 = lib/ga4/content-performance.ts (type-only, 런타임 import 없음).
+// ga4(경로 지표)·naver(네이버 유입) 블록은 독립 실패 — 행 지표는 각 블록에서만 읽는다.
+export type { ContentPerformanceRow, ContentPerformanceResponse } from '@/lib/ga4/content-performance';
+import type { ContentPerformanceResponse } from '@/lib/ga4/content-performance';
 
 function qs(params: Record<string, string | number | null | undefined>): string {
   const q = new URLSearchParams();

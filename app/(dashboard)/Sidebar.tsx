@@ -34,7 +34,7 @@ export function Sidebar() {
         s => s.status === 'scheduled' && s.scheduled_at.startsWith(today)
       ).length;
       setTodayCount(todayScheduled);
-    });
+    }).catch(() => setTodayCount(0)); // 조회 실패 시 미처리 거부 방지(배지 0)
   }, []);
 
   return (

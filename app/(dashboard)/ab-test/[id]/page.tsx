@@ -3,6 +3,7 @@
 import { use, useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ga4QueryKeys } from '@/hooks/ga4QueryKeys';
 import { getAbTest, updateAbTest, deleteAbTest, getAbTestGa4 } from '@/lib/api/ab-test';
 import type { AbTestDetail, AbTestGa4Response } from '@/types/api';
 import type { AbTest } from '@/types/db';
@@ -42,7 +43,7 @@ export default function AbTestDetailPage({ params }: Props) {
     error: ga4QueryError,
     refetch: refetchGa4,
   } = useQuery<AbTestGa4Response | null>({
-    queryKey: ['ab-test', 'ga4', id],
+    queryKey: ga4QueryKeys.abTest(id),
     enabled: shouldFetchGa4,
     refetchInterval: ga4Status === 'running' ? POLL_INTERVAL_MS : false,
     queryFn: async () => {

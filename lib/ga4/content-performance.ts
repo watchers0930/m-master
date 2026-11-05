@@ -4,6 +4,7 @@ import { fetchMultiplePathMetrics, fetchMultiplePathSessionsByNaver, type PathMe
 import { scopedBlock } from '@/lib/ga4/api';
 import type { ScopeResult } from '@/lib/ga4/scope';
 import type { Channel } from '@/types/db';
+import type { Ga4Block } from '@/types/ga4';
 export interface ContentPerformanceRow {
   content_id: string;
   title: string;
@@ -15,14 +16,19 @@ export interface ContentPerformanceRow {
   naver_sessions: number | null;
 }
 
+/** 응답 계약 단일 출처 — 클라이언트(lib/api/ga4-analytics.ts)가 type-only 로 재사용한다. */
 export interface ContentPerformanceResponse {
   data: ContentPerformanceRow[];
   period: { from: string; to: string; days: number };
+  /** 경로별 GA4 지표 블록 */
+  ga4: Ga4Block<Record<string, PathMetrics>>;
+  /** 경로별 네이버 유입 세션 블록 — ga4 와 독립 조회라 따로 실패할 수 있다 */
+  naver: Ga4Block<Record<string, number>>;
   ga4_fallback: boolean;
   error: string | null;
 }
 
-export async function contentPerformance(ownerId: string, days: number, scope: ScopeResult) {
+export async function contentPerformance(ownerId: string, days: number, scope: ScopeResult): Promise<ContentPerformanceResponse> {
   const now = new Date(), from = new Date(Date.now() - days * 86400000);
   const period = { from: from.toISOString().slice(0,10), to: now.toISOString().slice(0,10), days };
     // content 테이블 기준으로 published 콘텐츠 조회 + schedule_slots JOIN

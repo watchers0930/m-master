@@ -115,8 +115,13 @@ export async function getSettings(): Promise<ApiResponse<SettingsData>> {
     },
   };
 
-  if (settingsRes?.ok) {
-    const j = await settingsRes.json();
+  // 조회 실패를 기본값으로 감추지 않는다 — 기본값 폼을 저장하면 실제 설정(브랜드 가이드 등)을 덮어쓴다
+  if (!settingsRes?.ok) {
+    return { data: null, error: { code: 'load_failed', message: settingsRes ? `설정을 불러오지 못했습니다 (HTTP ${settingsRes.status})` : '네트워크 오류로 설정을 불러오지 못했습니다' } };
+  }
+  {
+    const j = await settingsRes.json().catch(() => null);
+    if (!j) return { data: null, error: { code: 'load_failed', message: '설정 응답을 읽지 못했습니다' } };
     if (j.data) {
       defaults.brand_guide = j.data.brand_guide ?? {};
       defaults.prompt_templates = j.data.prompt_templates ?? {};
@@ -137,7 +142,9 @@ export async function updateSettings(updates: Record<string, unknown>): Promise<
   });
   if (!res.ok) {
     const j = await res.json().catch(() => ({}));
-    return { data: null, error: { code: 'save_failed', message: j.error ?? '설정 저장 실패' } };
+    const e = j?.error;
+    const message = typeof e === 'string' ? e : typeof e?.message === 'string' ? e.message : '설정 저장 실패';
+    return { data: null, error: { code: 'save_failed', message } };
   }
   return { data: null, error: null };
 }

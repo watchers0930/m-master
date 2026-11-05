@@ -1,11 +1,12 @@
 // GET  /api/schedule/slots?year=2026&month=5  → 월별 슬롯 목록
-// POST /api/schedule/slots                     → 슬롯 생성 (단건 or 배열)
+// POST /api/schedule/slots                     → 슬롯 생성 (단건 or 배열, 'scheduled' 중복은 멱등 skip)
 // DELETE /api/schedule/slots?year=2026&month=5 → 월 전체 초기화
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { createSlotsIdempotent } from '@/lib/schedule/create-slots';
 
 const VALID_CHANNELS = ['blog', 'naver_cafe', 'facebook', 'instagram'] as const;
 const VALID_STATUSES = ['scheduled', 'publishing', 'published', 'failed', 'cancelled'] as const;
@@ -96,24 +97,29 @@ export async function POST(req: NextRequest) {
     }
 
     const rows = Array.isArray(parsed.data) ? parsed.data : [parsed.data];
+    const inputs = rows.map((row) => ({
+      contentId:   row.content_id ?? row.contentId ?? null,
+      channel:     row.channel,
+      scheduledAt: new Date((row.scheduled_at ?? row.scheduledAt)!),
+      status:      row.status,
+      mode:        row.mode,
+    }));
 
-    const created = await prisma.$transaction(
-      rows.map((row) =>
-        prisma.scheduleSlot.create({
-          data: {
-            ownerId,
-            contentId:   row.content_id ?? row.contentId ?? null,
-            channel:     row.channel,
-            scheduledAt: new Date((row.scheduled_at ?? row.scheduledAt)!),
-            status:      row.status,
-            mode:        row.mode,
-          },
-        }),
-      ),
-    );
+    // 참조 콘텐츠는 본인 소유만 허용 (타인 콘텐츠 id 로 슬롯 생성 차단)
+    const contentIds = [...new Set(inputs.map((r) => r.contentId).filter((id): id is string => !!id))];
+    if (contentIds.length > 0) {
+      const owned = await prisma.content.count({ where: { ownerId, id: { in: contentIds } } });
+      if (owned !== contentIds.length) {
+        return NextResponse.json({ data: null, error: '콘텐츠를 찾을 수 없습니다' }, { status: 404 });
+      }
+    }
 
+    // 멱등 생성(중복 'scheduled' 슬롯 skip + owner 단위 직렬화) — lib/schedule/create-slots.ts
+    const { created, skipped } = await createSlotsIdempotent(prisma, ownerId, inputs);
+
+    // 응답 data = 새로 만든 슬롯만 (기존 계약 유지). skipped = 중복이라 건너뛴 건수(추가 필드)
     const data = created.map((r) => toSnake(r as unknown as Record<string, unknown>));
-    return NextResponse.json({ data, error: null });
+    return NextResponse.json({ data, skipped, error: null });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json({ data: null, error: message }, { status: 500 });

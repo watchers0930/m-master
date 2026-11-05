@@ -41,7 +41,19 @@ export interface PublishStateDTO {
 /** GET /api/content/[id] (설계 §4.1) — 기존 전체 필드(검토·전략 포함) + 발행 판정 */
 export interface ContentDetail extends Content {
   publish: PublishStateDTO;
+  /** 채널 발행기가 실제로 보낼 페이로드 (lib/content/publish-payload.ts — 미리보기 = 발행 내용) */
+  publish_preview: PublishPreviewDTO;
 }
+
+/**
+ * 채널별 실제 발행 페이로드 (설계: 검토자는 발행될 내용 그대로 본다).
+ * text = 발행기 변환(캡션·메시지) 적용 후 문자열. blog 는 작업자가 [이미지] 마커 위치에 본문 이미지를 배치.
+ */
+export type PublishPreviewDTO =
+  | { channel: 'blog'; text: string; images: string[] }
+  | { channel: 'instagram'; mode: 'carousel' | 'single' | 'blocked'; text: string; images: string[]; blocked_reason: string | null }
+  | { channel: 'facebook'; mode: 'photo' | 'text'; text: string; images: string[] }
+  | { channel: 'naver_cafe'; subject: string; text: string; images: string[]; footer_appended: true };
 
 /** PATCH /api/content/[id] 요청 (설계 §4.2) — strict, 수정 필드 최소 1개 */
 export interface ContentPatchBody {

@@ -52,9 +52,19 @@ export default function SettingsPage() {
   const [serviceInput, setServiceInput] = useState('');
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadRev, setLoadRev] = useState(0); // 다시 시도
+
   useEffect(() => {
-    getSettings().then((res) => {
-      if (res.data) {
+    let alive = true;
+    (async () => {
+      try {
+        const res = await getSettings();
+        if (!alive) return;
+        if (res.error || !res.data) {
+          setLoadError(res.error?.message || '설정을 불러오지 못했습니다');
+          return;
+        }
         const bg = res.data.brand_guide;
         setSettings({
           brand_guide: {
@@ -73,10 +83,14 @@ export default function SettingsPage() {
           alert_threshold: res.data.alert_threshold,
           notifications: res.data.notifications as Record<string, boolean>,
         });
+      } catch (e) {
+        if (alive) setLoadError(e instanceof Error && e.message ? `설정을 불러오지 못했습니다 — ${e.message}` : '설정을 불러오지 못했습니다');
+      } finally {
+        if (alive) setLoading(false);
       }
-      setLoading(false);
-    });
-  }, []);
+    })();
+    return () => { alive = false; };
+  }, [loadRev]);
 
   const handleSave = async () => {
     if (!settings) return;
@@ -84,14 +98,20 @@ export default function SettingsPage() {
     setSaveError(null);
     // PUT /api/settings 는 strict 스키마 — 허용 필드만 보낸다(GA4 연결은 Ga4ConnectionCard 가 별도 저장)
     const { brand_guide, prompt_templates, budget_monthly, alert_threshold, notifications } = settings;
-    const res = await updateSettings({ brand_guide, prompt_templates, budget_monthly, alert_threshold, notifications });
-    setSaving(false);
-    if (res.error) {
-      setSaveError(typeof res.error.message === 'string' ? res.error.message : '설정 저장 실패');
-      return;
+    try {
+      const res = await updateSettings({ brand_guide, prompt_templates, budget_monthly, alert_threshold, notifications });
+      if (res.error) {
+        setSaveError(typeof res.error.message === 'string' && res.error.message ? res.error.message : '설정 저장 실패');
+        return;
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      // 네트워크 오류 등 요청 자체 실패 — '저장 중…' 에 멈추지 않게 finally 에서 해제
+      setSaveError('네트워크 오류로 저장하지 못했습니다. 연결을 확인한 뒤 다시 시도해 주세요.');
+    } finally {
+      setSaving(false);
     }
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
   };
 
   const addForbiddenWord = () => {
@@ -128,7 +148,16 @@ export default function SettingsPage() {
     );
   }
 
-  if (!settings) return null;
+  if (!settings) {
+    // 조회 실패 시 기본값 폼을 띄우지 않는다(저장하면 실제 설정을 덮어씀) — 안내 + 다시 시도
+    return (
+      <div role="alert" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '60px 16px', fontSize: 12.5, color: '#b91c1c', textAlign: 'center' }}>
+        <span>{loadError ?? '설정을 불러오지 못했습니다'}</span>
+        <button type="button" className="btn btn-ghost" style={{ fontSize: 12, padding: '6px 12px' }}
+          onClick={() => { setLoadError(null); setLoading(true); setLoadRev((r) => r + 1); }}>다시 시도</button>
+      </div>
+    );
+  }
 
   const budgetPct = Math.round((settings.alert_threshold ?? 0.8) * 100);
 
