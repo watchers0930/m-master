@@ -21,7 +21,11 @@ export async function generateDailyContent(deadline=Date.now()+240000) {
         try { await checkCostLimit(owner.ownerId,plan); await checkContentLimit(owner.ownerId,plan); }
         catch { result.skipped.push({ owner_id:owner.ownerId,reason:'plan_limit' });break; }
         const run=await claimPipelineRun({ kind:'content_item',ownerId:owner.ownerId,scopeKey:item.id,periodKey:today });
-        if (!run.acquired) { result.skipped.push({ owner_id:owner.ownerId,reason:run.status==='succeeded'?'already_succeeded':'in_progress' });continue; }
+        if (!run.acquired) {
+          // 시도 상한 소진(failed) → 항목도 failed로 확정해 'generating'에 영구히 남지 않게 한다.
+          if (run.status==='failed') await prisma.contentPlanItem.updateMany({ where:{ id:item.id,plan:{ ownerId:owner.ownerId },contentJobId:null },data:{ status:'failed' } });
+          result.skipped.push({ owner_id:owner.ownerId,reason:run.status==='succeeded'?'already_succeeded':run.status==='failed'?'retry_exhausted':'in_progress' });continue;
+        }
         const changed=await prisma.contentPlanItem.updateMany({ where:{ id:item.id,plan:{ ownerId:owner.ownerId },contentJobId:null,
           status:{ in:['planned','generating','failed'] } },data:{ status:'generating' } });
         if (!changed.count) { await finishPipelineRun(run,'skipped');continue; }

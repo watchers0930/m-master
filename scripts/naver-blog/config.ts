@@ -5,12 +5,14 @@
 //   NAVER_ID             — 네이버 아이디 (쿠키 만료 폴백)
 //   NAVER_PW             — 네이버 비밀번호
 //   BLOG_PUBLISH_API_KEY — M-Master 작업자 인증 키 (서버 env BLOG_PUBLISH_API_KEY와 동일 값)
+//   BLOG_PUBLISH_OWNER_ID — 이 작업자가 게시할 유일한 소유자 ID(네이버 계정 1개 = 소유자 1명). 서버 BLOG_PUBLISH_OWNER_IDS에 포함돼야 함
 //   APP_URL              — https://m-master.vercel.app
 import * as os from 'os';
 import * as path from 'path';
 
 export const APP_URL = process.env.APP_URL ?? 'https://m-master.vercel.app';
 export const API_KEY = process.env.BLOG_PUBLISH_API_KEY ?? '';
+export const OWNER_ID = (process.env.BLOG_PUBLISH_OWNER_ID ?? '').trim();
 export const DRY_RUN = process.argv.includes('--dry-run');
 // 스크린샷은 공개 저장소 artifact로 올리지 않는다(계정·미승인 원고 노출 방지). 러너 로컬에만 보관.
 export const SCREENSHOT_DIR = process.env.NAVER_SCREENSHOT_DIR || path.join(process.cwd(), 'screenshots');

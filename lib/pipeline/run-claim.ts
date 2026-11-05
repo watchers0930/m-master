@@ -3,7 +3,11 @@ import { prisma } from '@/lib/prisma';
 type Key = { kind: string; ownerId: string; scopeKey: string; periodKey: string };
 export const RESUMABLE_SKIPS = new Set(['deadline_hit']);
 export type RunClaim = { acquired: boolean; id: string; attempts: number; status: string; errorCode?: string | null; resultRef: Prisma.JsonValue | null };
-/** Automatic re-claims of `failed` rows stop at this many attempts per period (repeated crons must not loop on paid calls). */
+/**
+ * Automatic re-claims stop at this many attempts per period (repeated crons must not loop on paid calls).
+ * Applies to `failed` rows and to expired `running` rows (platform timeout after a paid call, before persist):
+ * every re-claim increments `attempts`, so both paths share one cap.
+ */
 export const MAX_AUTO_ATTEMPTS = 4;
 export async function claimPipelineRun(key: Key, regenerate = false, maxAttempts = MAX_AUTO_ATTEMPTS): Promise<RunClaim> {
   return prisma.$transaction(async tx => {
@@ -16,6 +20,12 @@ export async function claimPipelineRun(key: Key, regenerate = false, maxAttempts
     if (row.status === 'running' && row.leaseUntil > now) return { ...row, acquired: false };
     if (row.status === 'succeeded' && !regenerate) return { ...row, acquired: false };
     if (row.status === 'failed' && !regenerate && row.attempts >= maxAttempts) return { ...row, acquired: false };
+    if (row.status === 'running' && !regenerate && row.attempts >= maxAttempts) {
+      // 만료된 running이 상한에 닿음 → 더 이상 자동 재시도하지 않고 failed로 확정(관측 가능하게 사유 기록).
+      await tx.pipelineRun.updateMany({ where: { id: row.id, attempts: row.attempts, status: 'running' }, data: {
+        status: 'failed', errorCode: 'lease_expired', finishedAt: now } });
+      return { ...row, status: 'failed', errorCode: 'lease_expired', acquired: false };
+    }
     // `deadline_hit` is a deferral, not a verdict: the next invocation may resume it (M10/N2).
     if (row.status === 'skipped' && !regenerate && !RESUMABLE_SKIPS.has(row.errorCode ?? '')) return { ...row, acquired: false };
     const claimed = await tx.pipelineRun.updateMany({ where: { id: row.id, attempts: row.attempts }, data: {

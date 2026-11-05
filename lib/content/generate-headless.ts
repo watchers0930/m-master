@@ -1,5 +1,5 @@
 import { strategyPromptBlock, type StrategyContext } from './strategy-context';
-import { persistGeneratedContent, type GenerationClaim } from './persist-generated';
+import { persistGeneratedContent, recordGenerationCosts, type GenerationClaim } from './persist-generated';
 // lib/content/generate-headless.ts — SSE 없는 콘텐츠 생성 (cron·배치용)
 // GPT-4o 비스트리밍 생성
 
@@ -113,6 +113,12 @@ export async function generateContentHeadless(
 
   const usage = toChatUsage(response.usage);
   const chatKrw = calcChatKrw(usage);
+  const embedKrw = calcEmbeddingKrw(embeddingTokens);
+  // 유료 응답 직후 즉시 원장 기록 — 이후 단계(이미지·persist) 전에 플랫폼 시간초과로 죽어도 비용이 남는다.
+  const recordedCosts = await recordGenerationCosts(ownerId, [
+    { kind:'chat',tokensIn:usage.prompt_tokens,tokensOut:usage.completion_tokens,krw:chatKrw },
+    ...(embeddingTokens>0 ? [{ kind:'embedding' as const,tokensIn:embeddingTokens,tokensOut:0,krw:embedKrw }]:[]),
+  ]);
 
   // 본문 마커 폴백
   text = ensureMinimumMarkers(text, channel === 'blog' ? 6 : 5);
@@ -154,9 +160,12 @@ export async function generateContentHeadless(
     translateKrw = bodyImgsSettled.value.krw;
   }
 
-  // 8) 비용 집계
-  const embedKrw = calcEmbeddingKrw(embeddingTokens);
+  // 8) 비용 집계 — 이미지·번역 비용도 persist 전에 기록
   const totalKrw = chatKrw + embedKrw + imageKrw + translateKrw;
+  recordedCosts.push(...await recordGenerationCosts(ownerId, [
+    ...(translateKrw>0 ? [{ kind:'chat' as const,tokensIn:0,tokensOut:0,krw:translateKrw }]:[]),
+    ...(imageKrw>0 ? [{ kind:'image' as const,tokensIn:0,tokensOut:0,krw:imageKrw }]:[]),
+  ]));
 
   // 9) DB insert
   const contentData = await persistGeneratedContent({ origin: opts.mode, strategyContext: opts.strategyContext ? JSON.parse(JSON.stringify(opts.strategyContext)) : undefined,
@@ -172,9 +181,7 @@ export async function generateContentHeadless(
       costKrw: totalKrw,
       status: 'draft',
     }, [
-      { kind:'chat',tokensIn:usage.prompt_tokens,tokensOut:usage.completion_tokens,krw:chatKrw+translateKrw },
-      ...(embeddingTokens>0 ? [{ kind:'embedding' as const,tokensIn:embeddingTokens,tokensOut:0,krw:embedKrw }]:[]),
-      ...(imageKrw>0 ? [{ kind:'image' as const,tokensIn:0,tokensOut:0,krw:imageKrw }]:[]),
+      ...recordedCosts,
       ...(externalContext ? [{ kind:'external' as const,tokensIn:0,tokensOut:0,krw:0 }]:[]),
     ],opts.pipelineClaim);
 

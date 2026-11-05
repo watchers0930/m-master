@@ -4,7 +4,7 @@ on:
   workflow_dispatch: # 수동 트리거만 (G11)
   # 자동 주기 실행은 아래 조건을 모두 확인한 뒤에만 주석 해제한다.
   #  1) claim-v1 작업자로 운영 1건 E2E(pending→verify→게시→complete) 실화면 확인
-  #  2) 서버 env BLOG_PUBLISH_OWNER_IDS 설정(대장 승인)
+  #  2) 서버 env BLOG_PUBLISH_OWNER_IDS 설정 + 저장소 변수 BLOG_PUBLISH_OWNER_ID(이 네이버 계정의 소유자 1명) 설정(대장 승인)
   #  3) self-hosted 러너(mac-local)가 해당 시각에 깨어 있음 — 아니면 큐에서 수 시간 대기한다
   # schedule:
   #   - cron: '0 0 * * *' # 매일 00:00 UTC = 09:00 KST
@@ -22,6 +22,9 @@ env:
   NAVER_PW: ${{ secrets.NAVER_PW }}
   # 서버 env BLOG_PUBLISH_API_KEY와 같은 값이어야 한다(x-api-key 헤더로 전송)
   BLOG_PUBLISH_API_KEY: ${{ secrets.BLOG_PUBLISH_API_KEY }}
+  # 이 러너의 네이버 계정 1개가 게시할 유일한 소유자 ID(저장소 변수). 서버 env BLOG_PUBLISH_OWNER_IDS에 포함돼야 한다.
+  # 작업자 1개 배포 = 소유자 1명: 서버는 이 소유자의 콘텐츠만 돌려주고, 작업자도 다른 소유자 claim은 게시하지 않는다.
+  BLOG_PUBLISH_OWNER_ID: ${{ vars.BLOG_PUBLISH_OWNER_ID }}
   APP_URL: https://m-master.vercel.app
 
 jobs:
@@ -46,6 +49,10 @@ jobs:
       - name: Install Playwright Chromium
         timeout-minutes: 5
         run: npx playwright install chromium
+
+      - name: Check worker owner
+        # 소유자 미지정 상태로는 실행하지 않는다(서버도 400으로 거절)
+        run: test -n "$BLOG_PUBLISH_OWNER_ID" || { echo "::error::저장소 변수 BLOG_PUBLISH_OWNER_ID가 없습니다."; exit 1; }
 
       - name: Run blog publish worker (claim-v1)
         timeout-minutes: 15

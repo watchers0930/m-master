@@ -1,4 +1,4 @@
-import { persistGeneratedContent } from '@/lib/content/persist-generated';
+import { persistGeneratedContent, recordGenerationCosts } from '@/lib/content/persist-generated';
 // POST /api/content/[id]/convert
 // 블로그 콘텐츠를 인스타/페이스북 형식으로 변환 + 새 contents row insert
 import { z } from 'zod';
@@ -10,6 +10,8 @@ import { checkContentLimit, checkCostLimit, getUserPlan } from '@/lib/billing/li
 import { convertBlogToChannel } from '@/lib/claude/convert';
 import { generateInstagramCard, type CardData } from '@/lib/imagen/instagram-card';
 import { upload, getPublicUrl } from '@/lib/storage';
+import { randomUUID } from 'node:crypto';
+import { derivedOrigin } from '@/lib/content/writer';
 
 const RequestSchema = z.object({
   channel: z.enum(['instagram', 'facebook', 'naver_cafe']),
@@ -35,6 +37,8 @@ export async function convertContent(ownerId: string, id: string, body: unknown)
       imageUrl: true,
       bodyImageUrls: true,
       scores: true,
+      origin: true,
+      reviewStatus: true,
     },
   });
 
@@ -63,6 +67,10 @@ export async function convertContent(ownerId: string, id: string, body: unknown)
     return fail('convert_failed', '변환 실패. 다시 시도해주세요.', 502);
   }
 
+  // 유료 응답 직후 원장 기록(카드 생성·persist 전에 죽어도 비용이 남는다). persist 시 자식 콘텐츠에 연결된다.
+  const recordedCosts = await recordGenerationCosts(ownerId, [{ kind:'chat', tokensIn:convertResult.usage.prompt_tokens,
+    tokensOut:convertResult.usage.completion_tokens, krw:convertResult.krw }]);
+
   // 4) 인스타그램 카드 이미지 파이프라인
   const bodyImageUrls: string[] = [];
   let captionText = convertResult.text;
@@ -87,6 +95,8 @@ export async function convertContent(ownerId: string, id: string, body: unknown)
         const totalCards = cards.length;
 
         // 각 카드 → PNG → storage 업로드
+        // 파일명은 변환 1회마다 고유(generation id). 원본 id만 쓰면 재변환이 이미 승인된 자식의 카드 이미지를 덮어쓴다.
+        const generationId = randomUUID();
         for (let i = 0; i < totalCards; i++) {
           const cardData: CardData = {
             title: cards[i].title,
@@ -96,7 +106,7 @@ export async function convertContent(ownerId: string, id: string, body: unknown)
             totalCards,
           };
           const pngBuffer = await generateInstagramCard(cardData);
-          const fileName = `${id}_card_${i}.png`;
+          const fileName = `${id}/${generationId}_card_${i}.png`;
           await upload('card-images', fileName, pngBuffer);
           bodyImageUrls.push(getPublicUrl('card-images', fileName));
         }
@@ -111,7 +121,8 @@ export async function convertContent(ownerId: string, id: string, body: unknown)
   }
 
   // 5) DB insert — 새 채널의 contents row
-  const newRow = await persistGeneratedContent({ origin: 'manual', parentContentId: id,
+  // 자동 생성(또는 미승인) 원본의 파생물은 auto(pending_review)로 남는다 — 변환으로 검토를 우회하지 못하게.
+  const newRow = await persistGeneratedContent({ origin: derivedOrigin(source), parentContentId: id,
       ownerId,
       channel,
       topic: source.topic,
@@ -123,8 +134,7 @@ export async function convertContent(ownerId: string, id: string, body: unknown)
       scores: source.scores ?? Prisma.DbNull,
       costKrw: convertResult.krw,
       status: 'draft',
-    }, [{ kind:'chat', tokensIn:convertResult.usage.prompt_tokens,
-      tokensOut:convertResult.usage.completion_tokens, krw:convertResult.krw }], undefined,
+    }, recordedCosts, undefined,
       { action:'content.generate',payload:{ source_id:id,channel,cost_krw:convertResult.krw } });
 
   return {

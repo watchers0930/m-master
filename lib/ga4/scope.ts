@@ -1,13 +1,16 @@
 import { prisma } from '@/lib/prisma';
 import type { Ga4Scope, Ga4UnavailableReason, Ga4CredentialSource } from '@/types/ga4';
 import { ga4HostVariants, normalizeGa4Host } from './host';
+import { ga4PropertyHeldByOther } from './exclusivity';
 export type ScopeResult = { ok: true; scope: Ga4Scope } | { ok: false; reason: Ga4UnavailableReason };
 const select = { streamId:true,id:true,domainId:true,propertyId:true,host:true,allowedSources:true,conversionEvents:true,status:true } as const;
 type Binding = { streamId?:string|null; id:string;domainId:string;propertyId:string;host:string;allowedSources:string[];conversionEvents:string[];status:string };
-function result(ownerId:string,binding:Binding):ScopeResult {
+async function result(ownerId:string,binding:Binding):Promise<ScopeResult> {
   if (binding.status==='disabled') return {ok:false,reason:'binding_disabled'};
+  // 배타성 도입 전 레거시 행: 같은 속성·스트림을 다른 소유자도 묶었다면 실시간(스트림 단위, hostName 필터 없음)을 거부한다.
+  const streamId=binding.streamId && !await ga4PropertyHeldByOther(prisma,ownerId,binding.propertyId,binding.streamId) ? binding.streamId : null;
   return {ok:true,scope:{ownerId,domainId:binding.domainId,bindingId:binding.id,propertyId:binding.propertyId,
-    host:binding.host,streamId:binding.streamId,allowedSources:binding.allowedSources as Ga4CredentialSource[],conversionEvents:binding.conversionEvents}};
+    host:binding.host,streamId,allowedSources:binding.allowedSources as Ga4CredentialSource[],conversionEvents:binding.conversionEvents}};
 }
 export async function resolveGa4Scope(ownerId: string, domainId?: string): Promise<ScopeResult> {
   if (domainId) {

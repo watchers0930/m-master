@@ -118,7 +118,7 @@ test('dry-run → 게시·complete 없이 claim 반납(fail not_posted dry_run)'
   assert.deepEqual(api.calls.at(-1), ['fail', 'not_posted', 'dry_run']);
 });
 
-test('API 클라이언트: 4개 호출 모두 인증·프로토콜 헤더, fail 본문은 사유 코드만', async () => {
+test('API 클라이언트: 4개 호출 모두 인증·프로토콜·소유자 헤더, fail 본문은 사유 코드만', async () => {
   const seen = [];
   const fetchImpl = async (url, init) => {
     seen.push({ url, init });
@@ -126,7 +126,7 @@ test('API 클라이언트: 4개 호출 모두 인증·프로토콜 헤더, fail 
     if (url.endsWith('/verify')) return new Response(JSON.stringify({ error: { code: 'claim_expired' } }), { status: 409 });
     return new Response(JSON.stringify({ ok: true }));
   };
-  const api = createWorkerApi({ appUrl: 'https://app.test', apiKey: 'k'.repeat(40), fetchImpl });
+  const api = createWorkerApi({ appUrl: 'https://app.test', apiKey: 'k'.repeat(40), ownerId: 'u1', fetchImpl });
   const pending = await api.pending();
   assert.deepEqual(pending.items.map(i => i.id), ['c1']); // claim 없는 항목은 버림
   await assert.rejects(api.verify(item), e => e instanceof WorkerApiError && e.status === 409 && e.code === 'claim_expired');
@@ -136,6 +136,7 @@ test('API 클라이언트: 4개 호출 모두 인증·프로토콜 헤더, fail 
   for (const { init } of seen) {
     assert.equal(init.headers['x-api-key'], 'k'.repeat(40));
     assert.equal(init.headers['x-blog-worker-protocol'], 'claim-v1');
+    assert.equal(init.headers['x-blog-worker-owner'], 'u1');
   }
   assert.deepEqual(JSON.parse(seen[3].init.body), { contentId: 'c1', claimToken: TOKEN, outcome: 'not_posted', error: 'session_expired' });
   assert.deepEqual(Object.keys(JSON.parse(seen[2].init.body)).sort(), ['claimToken', 'contentId', 'externalUrl']);
