@@ -1,6 +1,5 @@
 import type { Content } from '@prisma/client';
-import { prisma } from '@/lib/prisma';
-import { notFound, VisibilityError } from '@/lib/visibility/http';
+import { VisibilityError } from '@/lib/visibility/http';
 import { publishFacebookPost } from './facebook';
 import { publishInstagramImage, publishInstagramCarousel } from './instagram';
 import { publishNaverCafePost } from './naver-cafe';
@@ -29,9 +28,10 @@ export async function sendChannel(channel: Channel, content: ChannelPayload, des
   }
   if (plan.channel === 'naver_cafe') {
     const imageUrl = content.imageUrl || content.bodyImageUrls.find(Boolean);
-    const target = destinationKey === 'default' ? null : await prisma.cafeTarget.findFirst({
-      where: { id: destinationKey, ownerId }, select: { clubId: true, menuId: true } });
-    if (destinationKey !== 'default' && !target) notFound();
+    // destinationKey = claim 에 고정된 정규 목적지('cafe:<clubId>:<menuId>' 또는 'default'=자격증명 기본 게시판)
+    const fixed = /^cafe:([^:]+):([^:]+)$/.exec(destinationKey);
+    if (destinationKey !== 'default' && !fixed) throw new VisibilityError('bad_request', '알 수 없는 카페 목적지입니다.', 400);
+    const target = fixed ? { clubId: fixed[1], menuId: fixed[2] } : null;
     const result = await publishNaverCafePost({ ownerId, subject: content.topic, content: text, keywords: content.keywords,
       imageUrl, imageUrls: content.bodyImageUrls.filter(Boolean), ...(target ?? {}) });
     return { externalId: result.articleId, externalUrl: result.cafeUrl };

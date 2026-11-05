@@ -7,7 +7,8 @@ import { isPublishable, type PublishTarget, type PublishContext } from './eligib
 import type { Channel } from '@/types/db';
 import { getNaverCafeCreds } from '@/lib/channel-credentials';
 export type TargetRef = { type: 'content' | 'idea_job'; id: string };
-export type ClaimInput = { ownerId: string; channel: Channel; destinationKey?: string; trigger: 'manual' | 'schedule' | 'worker'; dailyLimit?: boolean };
+export type ClaimInput = { ownerId: string; channel: Channel; destinationKey?: string; trigger: 'manual' | 'schedule' | 'worker'; dailyLimit?: boolean;
+  /** 예약 슬롯 발행: 같은 트랜잭션에서 슬롯을 잠그고 scheduled·도래를 재확인(slot-mutation 과 직렬화) */ slotId?: string };
 export async function loadTarget(tx: Prisma.TransactionClient, ref: TargetRef, ownerId: string): Promise<PublishTarget> {
   if (ref.type === 'idea_job') {
     await tx.$queryRaw`SELECT id FROM idea_publish_jobs WHERE id = ${ref.id} AND owner_id = ${ownerId} FOR UPDATE`;
@@ -53,6 +54,11 @@ export async function claimPublish(ref: TargetRef, input: ClaimInput) {
           { status:'sent',finishedAt:{ gte:since } },{ status:{ in:['claimed','unknown'] },claimedAt:{ gte:since } },
         ] } });
         if (sent) return { ok:false as const,reason:'not_due' as const };
+      }
+      if (ctx.slotId) {
+        const due = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM schedule_slots WHERE id = ${ctx.slotId} AND owner_id = ${ctx.ownerId}
+          AND content_id = ${ref.id} AND channel = ${ctx.channel} AND status = 'scheduled' AND scheduled_at <= now() FOR UPDATE`;
+        if (!due.length) return { ok: false as const, reason: 'not_due' as const };
       }
       const target = await loadTarget(tx, ref, ctx.ownerId);
       const claims = await tx.publishClaim.findMany({ where: { targetType: ref.type, targetId: ref.id,

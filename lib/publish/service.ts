@@ -35,7 +35,7 @@ export async function recordSent(claimId: string, result: SendResult, options?: 
     if (claim.targetType === 'content') {
       if (options?.markPublished !== false) await tx.content.updateMany({ where: { id: claim.targetId, ownerId: claim.ownerId }, data: { status: 'published' } });
       const slot = options?.slotId ? await tx.scheduleSlot.findFirst({ where: { id: options.slotId, ownerId: claim.ownerId, contentId: claim.targetId }, select: { id: true } }) : claim.trigger === 'worker' ? await tx.scheduleSlot.findFirst({ where: { ownerId: claim.ownerId, contentId: claim.targetId, channel: claim.channel, status: 'scheduled' }, orderBy: { scheduledAt: 'asc' }, select: { id: true } }) : null;
-      if (slot) await tx.scheduleSlot.updateMany({ where: { id: slot.id, ownerId: claim.ownerId }, data: { status: 'published', publishedAt: new Date(), ...result } });
+      if (slot) await tx.scheduleSlot.updateMany({ where: { id: slot.id, ownerId: claim.ownerId, status: { in: ['scheduled', 'failed'] } }, data: { status: 'published', publishedAt: new Date(), ...result } });
       else await tx.scheduleSlot.create({ data: { ownerId: claim.ownerId, contentId: claim.targetId, channel: claim.channel,
         scheduledAt: new Date(), publishedAt: new Date(), status: 'published', mode: claim.trigger === 'manual' ? 'manual' : 'ai_auto', ...result } });
     } else {
@@ -69,13 +69,14 @@ export async function executeClaim(claimId: string, send: () => Promise<SendResu
 export async function publishContentNow(input: ClaimInput & { contentId: string; destination?: string; scheduleSlotId?: string }) {
   const destinationKey = input.destination ?? input.destinationKey ?? 'default';
   if (destinationKey !== 'default' && !await prisma.cafeTarget.findFirst({ where: { id: destinationKey, ownerId: input.ownerId }, select: { id: true } })) notFound();
-  if (input.scheduleSlotId && !await prisma.scheduleSlot.findFirst({ where: { id: input.scheduleSlotId, ownerId: input.ownerId, contentId: input.contentId, channel: input.channel, status: 'scheduled', scheduledAt: { lte: new Date() } }, select: { id: true } })) notFound();
-  const result = await claimPublish({ type: 'content', id: input.contentId }, { ...input, destinationKey });
+  // 슬롯 재확인은 claimPublish 트랜잭션 안(행 잠금)에서 — 취소·시간변경과 직렬화
+  const result = await claimPublish({ type: 'content', id: input.contentId }, { ...input, destinationKey, slotId: input.scheduleSlotId });
   if (!result.ok) publishError(result.reason);
   return executeClaim(result.claim.id, async () => {
     const row = await prisma.content.findFirst({ where: { id: input.contentId, ownerId: input.ownerId } });
     if (!row) notFound();
-    return sendChannel(input.channel, row, destinationKey);
+    // claim 시점에 고정한 실제 목적지(cafe:club:menu)로 전송 — 이후 대상 수정이 전송 목적지를 바꾸지 못함
+    return sendChannel(input.channel, row, result.claim.destinationKey);
   }, { slotId: input.scheduleSlotId });
 }
 export async function publishIdeaJob(ownerId: string, id: string) {
@@ -85,17 +86,17 @@ export async function publishIdeaJob(ownerId: string, id: string) {
   if (!result.ok) publishError(result.reason);
   return executeClaim(result.claim.id, () => sendChannel(job.channel as Channel, {
     ownerId, topic: job.title, textBody: job.bodyHtml, imageUrl: null, bodyImageUrls: [], keywords: [],
-  }, 'default'));
+  }, result.claim.destinationKey));
 }
 
 /** Acquire all destination claims before the first send; a batch shares one immutable content version. */
 export async function publishContentBatch(ownerId: string, contentId: string, destinations: { id:string; name:string }[]) {
-  const claims: { id:string; destination:{ id:string; name:string } }[]=[];
+  const claims: { id:string; destination:{ id:string; name:string }; key:string }[]=[];
   try {
     for (const destination of destinations) {
       const claimed=await claimPublish({ type:'content',id:contentId },{ ownerId,channel:'naver_cafe',trigger:'manual',destinationKey:destination.id });
       if (!claimed.ok) publishError(claimed.reason);
-      claims.push({ id:claimed.claim.id,destination });
+      claims.push({ id:claimed.claim.id,destination,key:claimed.claim.destinationKey });
     }
   } catch(error) {
     await prisma.publishClaim.updateMany({ where:{ id:{ in:claims.map(c=>c.id) },ownerId,status:'claimed' },data:{ status:'released',finishedAt:new Date() } });
@@ -109,7 +110,7 @@ export async function publishContentBatch(ownerId: string, contentId: string, de
         const result=await executeClaim(claim.id,async()=>{
           const content=await prisma.content.findFirst({ where:{ id:contentId,ownerId } });
           if (!content) notFound();
-          return sendChannel('naver_cafe',content,claim.destination.id);
+          return sendChannel('naver_cafe',content,claim.key);
         },{ markPublished:false });
         published=true;
         results.push({ targetId:claim.destination.id,name:claim.destination.name,articleId:result.externalId,url:result.externalUrl });

@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireSession } from '@/lib/auth';
+import { mutateIdleSlot } from '@/lib/schedule/slot-mutation';
 import { prisma } from '@/lib/prisma';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
 import { isEntityId } from '@/schemas/id';
@@ -91,16 +92,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   try {
-    // 조회~갱신 사이 워커가 발행을 시작했을 수 있으므로 status 조건부 갱신(CAS)
-    const { count } = await prisma.scheduleSlot.updateMany({
-      where: { id: slotId, ownerId, status: 'scheduled' },
-      data: update,
-    });
-    if (count === 0) {
-      return NextResponse.json(
-        { error: { code: 'conflict', message: '슬롯 상태가 변경되어 수정할 수 없습니다. 새로고침 후 다시 시도하세요' } },
-        { status: 409 },
-      );
+    // 발행 claim 과 같은 행 잠금으로 직렬화 — 발행 진행 중(활성 claim)이면 409 (lib/schedule/slot-mutation.ts)
+    const res = await mutateIdleSlot(ownerId, slotId, ['scheduled'], update);
+    if (!res.ok) {
+      const message = res.reason === 'publishing' ? '발행 진행 중인 슬롯은 수정할 수 없습니다' : '슬롯 상태가 변경되어 수정할 수 없습니다. 새로고침 후 다시 시도하세요';
+      return NextResponse.json({ error: { code: 'conflict', message } }, { status: res.reason === 'not_found' ? 404 : 409 });
     }
   } catch (error) {
     console.error('[schedule/slot] patch error:', error);
@@ -147,16 +143,11 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   }
 
   try {
-    // 조회~갱신 사이 상태 변경(워커 발행 시작 등) 방지 — 조건부 갱신
-    const { count } = await prisma.scheduleSlot.updateMany({
-      where: { id: slotId, ownerId, status: { in: CANCELLABLE_STATUSES } },
-      data: { status: 'cancelled' },
-    });
-    if (count === 0) {
-      return NextResponse.json(
-        { error: { code: 'conflict', message: '슬롯 상태가 변경되어 삭제할 수 없습니다. 새로고침 후 다시 시도하세요' } },
-        { status: 409 },
-      );
+    // 발행 claim 과 같은 행 잠금으로 직렬화 — 발행 진행 중(활성 claim)이면 409 (lib/schedule/slot-mutation.ts)
+    const res = await mutateIdleSlot(ownerId, slotId, CANCELLABLE_STATUSES, { status: 'cancelled' });
+    if (!res.ok) {
+      const message = res.reason === 'publishing' ? '발행 진행 중인 슬롯은 삭제할 수 없습니다' : '슬롯 상태가 변경되어 삭제할 수 없습니다. 새로고침 후 다시 시도하세요';
+      return NextResponse.json({ error: { code: 'conflict', message } }, { status: res.reason === 'not_found' ? 404 : 409 });
     }
   } catch (error) {
     console.error('[schedule/slot] delete error:', error);
