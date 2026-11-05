@@ -1,7 +1,7 @@
 // scripts/naver-blog/api-client.ts — M-Master 블로그 작업자 API 클라이언트 (claim-v1)
 //
 // 흐름: pending(claim 발급) → verify(게시 직전) → complete | fail
-// 모든 요청에 작업자 인증(x-api-key)과 프로토콜 헤더(x-blog-worker-protocol: claim-v1)를 보낸다.
+// 모든 요청에 작업자 인증(x-api-key)·프로토콜 헤더(x-blog-worker-protocol: claim-v1)·소유자 헤더(x-blog-worker-owner)를 보낸다.
 // 쿠키·비밀번호·HTML 원문은 어떤 요청에도 싣지 않는다(fail에는 사유 코드만).
 import { API_TIMEOUT_MS } from './config';
 
@@ -37,7 +37,7 @@ export type FailOutcome = 'not_posted' | 'unknown';
 export type FailReason =
   | 'session_expired' | 'captcha_required' | 'two_factor_required' | 'login_failed' | 'credentials_missing'
   | 'not_publishable' | 'verify_failed' | 'editor_error' | 'publish_url_missing' | 'publish_error'
-  | 'timeout' | 'dry_run' | 'worker_crashed';
+  | 'timeout' | 'dry_run' | 'worker_crashed' | 'owner_mismatch';
 
 export class WorkerApiError extends Error {
   constructor(readonly status: number, readonly code: string) {
@@ -57,12 +57,14 @@ export interface WorkerApi {
   fail(item: PendingItem, outcome: FailOutcome, reason: FailReason): Promise<void>;
 }
 
-export function createWorkerApi(opts: { appUrl: string; apiKey: string; fetchImpl?: FetchLike; timeoutMs?: number }): WorkerApi {
+export function createWorkerApi(opts: { appUrl: string; apiKey: string; ownerId: string; fetchImpl?: FetchLike; timeoutMs?: number }): WorkerApi {
   const doFetch = opts.fetchImpl ?? ((input, init) => fetch(input, init));
   const timeoutMs = opts.timeoutMs ?? API_TIMEOUT_MS;
   const headers = (json: boolean): Record<string, string> => ({
     'x-api-key': opts.apiKey,
     'x-blog-worker-protocol': WORKER_PROTOCOL,
+    // 작업자 1개 배포 = 소유자 1명. 서버는 이 소유자의 claim만 발급·검증·기록한다.
+    'x-blog-worker-owner': opts.ownerId,
     ...(json ? { 'Content-Type': 'application/json' } : {}),
   });
 

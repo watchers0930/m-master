@@ -44,7 +44,27 @@ async function verifyOrThrow(api: WorkerApi, item: PendingItem, retryDelayMs: nu
   catch (error) { throw new VerifyRejected(error instanceof WorkerApiError ? error.code : 'unknown_error'); }
 }
 
+/**
+ * claim 1건 실행 단위. progress는 흐름이 만들고 소유하는 단 하나의 객체다 —
+ * 게시 함수(publishOne)·시간초과 판정·종료 신호 처리(abort)가 모두 이 객체를 공유해야
+ * "클릭 후 시간초과 → unknown"과 "중단 후 늦은 클릭 차단"이 실제로 성립한다.
+ */
+export interface ClaimRun {
+  item: PendingItem;
+  progress: PublishProgress;
+  run: () => Promise<ItemResult>;
+}
+
+export function createClaimRun(item: PendingItem, deps: FlowDeps): ClaimRun {
+  const progress: PublishProgress = { publishClicked: false };
+  return { item, progress, run: () => executeClaim(item, deps, progress) };
+}
+
 export async function runClaimedItem(item: PendingItem, deps: FlowDeps): Promise<ItemResult> {
+  return createClaimRun(item, deps).run();
+}
+
+async function executeClaim(item: PendingItem, deps: FlowDeps, progress: PublishProgress): Promise<ItemResult> {
   const delay = deps.retryDelayMs ?? 2000;
   const notPosted = async (reason: FailReason): Promise<ItemResult> => {
     await reportFail(deps.api, item, 'not_posted', reason, delay);
@@ -63,7 +83,6 @@ export async function runClaimedItem(item: PendingItem, deps: FlowDeps): Promise
   }
 
   // 2) 게시 — 발행 버튼 직전에 다시 verify, 전체 시간 상한
-  const progress: PublishProgress = { publishClicked: false };
   const hooks: PublishHooks = {
     beforePublish: async () => {
       if (progress.cancelled) throw new VerifyRejected('cancelled');
