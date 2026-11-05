@@ -1,3 +1,21 @@
+-- 1회성 백필 (컬럼을 처음 추가하는 실행에서만 — 재실행 시 이후 데이터를 덮어쓰지 않음)
+-- 기본값 approved 를 그대로 두면 과거 미발행 draft 전부가 승인 없이 블로그 워커 대상이 된다
+-- (worker 는 날짜 조건 없이 approved draft 를 고름). 그래서:
+--  · 과거 자동 계획(content_plans.auto_generate)이 만든 글 → origin=auto, pending_review
+--  · 그 밖의 미발행 draft → pending_review, 단 사용자가 직접 예약(scheduled 슬롯)한 수동 글은 approved 유지(회귀 없음)
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'contents' AND column_name = 'review_status') THEN
+    ALTER TABLE "contents" ADD COLUMN "origin" TEXT NOT NULL DEFAULT 'manual',
+      ADD COLUMN "review_status" TEXT NOT NULL DEFAULT 'approved';
+    UPDATE "contents" c SET "origin" = 'auto'
+      WHERE c."id" IN (SELECT i."content_job_id" FROM "content_plan_items" i JOIN "content_plans" p ON p."id" = i."content_plan_id"
+                       WHERE p."auto_generate" AND i."content_job_id" IS NOT NULL);
+    UPDATE "contents" c SET "review_status" = 'pending_review'
+      WHERE c."status" = 'draft' AND (c."origin" = 'auto' OR NOT EXISTS (
+        SELECT 1 FROM "schedule_slots" s WHERE s."content_id" = c."id" AND s."status" = 'scheduled'));
+  END IF;
+END $$;
+
 -- AlterTable
 ALTER TABLE "contents" ADD COLUMN IF NOT EXISTS "origin" TEXT NOT NULL DEFAULT 'manual',
 ADD COLUMN IF NOT EXISTS "parent_content_id" TEXT,
