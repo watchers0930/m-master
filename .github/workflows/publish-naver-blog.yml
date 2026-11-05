@@ -1,7 +1,13 @@
 name: Publish Naver Blog
 
 on:
-  workflow_dispatch: # 수동 트리거
+  workflow_dispatch: # 수동 트리거만 (G11)
+  # 자동 주기 실행은 아래 조건을 모두 확인한 뒤에만 주석 해제한다.
+  #  1) claim-v1 작업자로 운영 1건 E2E(pending→verify→게시→complete) 실화면 확인
+  #  2) 서버 env BLOG_PUBLISH_OWNER_IDS 설정(대장 승인)
+  #  3) self-hosted 러너(mac-local)가 해당 시각에 깨어 있음 — 아니면 큐에서 수 시간 대기한다
+  # schedule:
+  #   - cron: '0 0 * * *' # 매일 00:00 UTC = 09:00 KST
 
 permissions:
   contents: read
@@ -14,13 +20,15 @@ env:
   NAVER_COOKIES: ${{ secrets.NAVER_COOKIES }}
   NAVER_ID: ${{ secrets.NAVER_ID }}
   NAVER_PW: ${{ secrets.NAVER_PW }}
+  # 서버 env BLOG_PUBLISH_API_KEY와 같은 값이어야 한다(x-api-key 헤더로 전송)
   BLOG_PUBLISH_API_KEY: ${{ secrets.BLOG_PUBLISH_API_KEY }}
   APP_URL: https://m-master.vercel.app
 
 jobs:
   publish:
     runs-on: self-hosted
-    timeout-minutes: 15
+    # 실행 시간 상한(큐 대기 시간은 포함되지 않음). 스크립트 자체 상한: 글 1건 10분 + 로그인 단계 Playwright 시간 상한.
+    timeout-minutes: 20
 
     steps:
       - name: Check out code
@@ -32,28 +40,15 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm install playwright tsx
+        timeout-minutes: 5
+        run: npm install --no-save playwright tsx
 
       - name: Install Playwright Chromium
+        timeout-minutes: 5
         run: npx playwright install chromium
 
-      - name: Run blog publish script
-        run: npx tsx scripts/publish-naver-blog.ts
-
-      - name: Upload cookies artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: naver-cookies
-          path: naver-cookies.json
-          retention-days: 7
-          if-no-files-found: ignore
-
-      - name: Upload screenshots
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: screenshots
-          path: screenshots/
-          retention-days: 3
-          if-no-files-found: ignore
+      - name: Run blog publish worker (claim-v1)
+        timeout-minutes: 15
+        # 스크린샷은 공개 저장소 artifact로 올리지 않고 러너 로컬에만 7일 보관한다
+        # (네이버 계정·미승인 원고 노출 방지). 쿠키 파일 artifact 업로드도 제거했다.
+        run: NAVER_SCREENSHOT_DIR="$HOME/.naver-blog-screenshots" npx tsx scripts/naver-blog/main.ts
