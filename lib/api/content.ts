@@ -53,6 +53,7 @@ export async function listContents(q: ReviewListQuery = {}): Promise<ContentList
   if (q.channel) qs.set('channel', q.channel);
   if (q.review_status) qs.set('review_status', q.review_status);
   if (q.origin) qs.set('origin', q.origin);
+  if (q.parent_content_id) qs.set('parent_content_id', q.parent_content_id);
   if (q.page) qs.set('page', String(q.page));
   if (q.per_page) qs.set('per_page', String(q.per_page));
   return request<ContentListResponse>(`${BASE}?${qs}`);
@@ -89,8 +90,15 @@ export interface PublishResult {
   partial?: boolean;
 }
 
-export async function publishContent(channel: PublishChannel, contentId: string): Promise<PublishResult> {
-  const res = await fetch(`/api/publish/${PUBLISH_PATH[channel]}`, jsonInit('POST', { content_id: contentId }));
+export async function publishContent(
+  channel: PublishChannel,
+  contentId: string,
+  opts?: { cafeTargetIds?: string[] },
+): Promise<PublishResult> {
+  // 카페 대상 선택은 naver_cafe 발행 API 만 받는다(다른 채널 스키마는 strict)
+  const payload: Record<string, unknown> = { content_id: contentId };
+  if (channel === 'naver_cafe' && opts?.cafeTargetIds?.length) payload.cafe_target_ids = opts.cafeTargetIds;
+  const res = await fetch(`/api/publish/${PUBLISH_PATH[channel]}`, jsonInit('POST', payload));
   const j = await res.json().catch(() => null) as { data?: PublishResult; error?: { code?: string; message?: string } | null } | null;
   // 200 + partial_failure 는 일부 게시 성공 — 실패로 던지면 성공분을 '실패'로 오안내한다
   if (res.ok && j?.data && j.error?.code === 'partial_failure') return { ...j.data, partial: true };
@@ -101,7 +109,8 @@ export async function publishContent(channel: PublishChannel, contentId: string)
 }
 
 // ── 채널 변환 (POST /api/content/[id]/convert) — 기존 계약 ───────────
-export async function convertContent(id: string, channel: ConvertChannel): Promise<{ id?: string }> {
+// 서버는 instagram·facebook·naver_cafe 를 받는다(lib/content/convert.ts RequestSchema).
+export async function convertContent(id: string, channel: ConvertChannel | PublishChannel): Promise<{ id?: string }> {
   return request<{ id?: string }>(`${BASE}/${encodeURIComponent(id)}/convert`, jsonInit('POST', { channel }));
 }
 

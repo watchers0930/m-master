@@ -50,8 +50,16 @@ export async function createSlot(
 }
 
 export async function deleteSlot(id: string): Promise<ApiResponse<null>> {
-  const res = await fetch(`/api/schedule/slot/${id}`, { method: 'DELETE' });
-  return res.json();
+  const res = await fetch(`/api/schedule/slot/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  // 비JSON 응답(게이트웨이 오류 등)이나 4xx/5xx 도 호출부가 오류로 처리하도록 정규화
+  const json = (await res.json().catch(() => null)) as { error?: unknown } | null;
+  if (!res.ok || json?.error) {
+    return {
+      data: null,
+      error: { code: 'delete_failed', message: scheduleErrorText(json?.error, '슬롯 삭제에 실패했습니다') },
+    };
+  }
+  return { data: null, error: null };
 }
 
 export interface AiProposal {

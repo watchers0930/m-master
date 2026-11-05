@@ -11,6 +11,7 @@ import { nextMonthInfo } from '@/lib/dashboard/grades';
 import { kstNow } from '@/lib/ga4/_internal';
 import { resolveGa4Scope } from '@/lib/ga4/scope';
 import { getMondayOfWeekKST } from '@/lib/topics/week-utils';
+import { isEntityId } from '@/schemas/id';
 import { toGa4Block, type Ga4Block, type Ga4UnavailableReason } from '@/types/ga4';
 
 interface TopicFactors {
@@ -45,11 +46,9 @@ export interface HomeData {
   ga4Reason: Ga4UnavailableReason | null;
 }
 
-const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
-
 /** ?domainId= 쿼리 검증 — 형식만 확인하고 소유 여부는 resolveGa4Scope 가 ownerId 로 검증(타인 도메인 = unmapped) */
 export function parseDomainId(v: string | string[] | undefined): string | null {
-  return typeof v === 'string' && ID_RE.test(v) ? v : null;
+  return isEntityId(v) ? v : null;
 }
 
 function scoreAvgOf(scores: unknown): number | null {

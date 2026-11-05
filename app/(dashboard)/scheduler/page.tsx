@@ -185,7 +185,14 @@ export default function SchedulerPage() {
             </svg>
           </div>
         ) : (
-          <CalendarView year={year} month={month} slots={slots} onSlotsChange={setSlots} />
+          <CalendarView
+            year={year}
+            month={month}
+            slots={slots}
+            onSlotsChange={setSlots}
+            onRefresh={() => void qc.invalidateQueries({ queryKey: ['schedule', 'slots'] })}
+            onError={setPageError}
+          />
         )}
       </div>
 

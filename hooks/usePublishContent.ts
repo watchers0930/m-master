@@ -1,5 +1,5 @@
 // hooks/usePublishContent.ts
-// 상세 패널의 발행·변환·A/B 시작 핸들러 (기존 ContentDetailPanel 에서 이전, 설계 §6).
+// 상세 패널·콘텐츠 생성 화면 공용 발행·변환·A/B 시작 핸들러 (기존 ContentDetailPanel 에서 이전, 설계 §6).
 // 발행 가능 여부는 서버(isPublishable)가 최종 판정 — 409 사유를 안내하고 상세를 재조회한다.
 'use client';
 
@@ -9,21 +9,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createAbTest } from '@/lib/api/ab-test';
 import type { AbTestMeasureDays } from '@/types/db';
 import { publishContent, convertContent, ContentApiError } from '@/lib/api/content';
+import {
+  publishViaChildContent, CHANNEL_PUBLISH_LABEL as CHANNEL_LABEL, PUBLISH_ERROR_TEXT,
+  type ChannelPublishOutcome,
+} from '@/lib/api/content-channel-publish';
 import type { ConvertChannel, PublishChannel } from '@/types/content-review';
 import { contentKeys, refreshContent } from './useContentDetail';
-
-const CHANNEL_LABEL: Record<PublishChannel, string> = {
-  naver_cafe: '네이버 카페', instagram: '인스타그램', facebook: '페이스북',
-};
-
-/** 발행 API 실패 코드 → 안내 (설계 §4.4) */
-const PUBLISH_ERROR_TEXT: Record<string, string> = {
-  not_approved: '승인되지 않은 콘텐츠입니다. 먼저 승인해 주세요.',
-  rejected: '반려된 콘텐츠는 발행할 수 없습니다.',
-  already_published: '이미 발행된 콘텐츠입니다.',
-  publish_in_progress: '이미 발행이 진행 중입니다.',
-  channel_error: '채널 연동 오류로 발행하지 못했습니다. 잠시 후 다시 시도해 주세요.',
-};
 
 function errText(err: unknown, fallback: string): string {
   if (err instanceof ContentApiError) return PUBLISH_ERROR_TEXT[err.code] ?? err.message;
@@ -80,6 +71,25 @@ export function usePublishContent(contentId: string | null) {
     }
   };
 
+  /**
+   * 원본(블로그) → 채널 자식 콘텐츠로 발행 (lib/api/content-channel-publish). 결과 안내는 호출부가 한다.
+   * 동시에 한 채널씩만 진행 — 진행 중이면 null.
+   */
+  const publishToChannel = async (
+    channel: PublishChannel,
+    opts?: { cafeTargetIds?: string[] },
+  ): Promise<ChannelPublishOutcome | null> => {
+    if (!contentId || publishing) return null;
+    setPublishing(channel);
+    try {
+      return await publishViaChildContent(contentId, channel, opts);
+    } finally {
+      setPublishing(undefined);
+      // 새 자식 콘텐츠·발행 상태가 목록/상세에 바로 보이도록
+      await qc.invalidateQueries({ queryKey: contentKeys.listRoot });
+    }
+  };
+
   const startAbTest = async (measureDays: AbTestMeasureDays) => {
     if (!contentId || abStarting) return;
     setAbStarting(true);
@@ -100,5 +110,7 @@ export function usePublishContent(contentId: string | null) {
     }
   };
 
-  return { publish, publishing, convert, converting, startAbTest, abStarting, abError };
+  const clearAbError = () => setAbError(null);
+
+  return { publish, publishing, publishToChannel, convert, converting, startAbTest, abStarting, abError, clearAbError };
 }

@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { entityId } from '@/schemas/id';
 import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { createSlotsIdempotent } from '@/lib/schedule/create-slots';
@@ -12,8 +13,8 @@ const VALID_CHANNELS = ['blog', 'naver_cafe', 'facebook', 'instagram'] as const;
 const VALID_MODES = ['manual', 'ai_auto'] as const;
 
 const SlotSchema = z.object({
-  content_id: z.string().nullish(),
-  contentId: z.string().nullish(),
+  content_id: entityId.nullish(),
+  contentId: entityId.nullish(),
   channel: z.enum(VALID_CHANNELS),
   scheduled_at: z.string().datetime({ offset: true }).optional(),
   scheduledAt: z.string().datetime({ offset: true }).optional(),

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { entityId } from '@/schemas/id';
 import { authenticated } from '@/lib/visibility/http';
 import { publishContentNow } from '@/lib/publish/service';
-const schema = z.object({ content_id: z.string().min(1).max(200),  }).strict();
+const schema = z.object({ content_id: entityId,  }).strict();
 export async function POST(request: Request) {
   return authenticated(async ownerId => {
     const input = schema.parse(await request.json());

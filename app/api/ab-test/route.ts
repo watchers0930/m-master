@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireSession } from '@/lib/auth';
+import { entityId } from '@/schemas/id';
 import { prisma } from '@/lib/prisma';
 import { isBudgetExceeded } from '@/lib/cost/budget';
 import { checkCostLimit, checkFeatureAccess, getUserPlan } from '@/lib/billing/limits';
@@ -18,7 +19,7 @@ import type { Content } from '@/types/db';
 
 // 단일 → AB 승격 시그니처
 const CreateRequestSchema = z.object({
-  source_content_id: z.string().uuid(),
+  source_content_id: entityId,
   measure_days: z
     .union([z.literal(7), z.literal(14), z.literal(30)])
     .optional()
