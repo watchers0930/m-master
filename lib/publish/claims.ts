@@ -5,6 +5,7 @@ import { lockContent } from '@/lib/content/review';
 import { notFound, VisibilityError } from '@/lib/visibility/http';
 import { isPublishable, type PublishTarget, type PublishContext } from './eligibility';
 import type { Channel } from '@/types/db';
+import { getNaverCafeCreds } from '@/lib/channel-credentials';
 export type TargetRef = { type: 'content' | 'idea_job'; id: string };
 export type ClaimInput = { ownerId: string; channel: Channel; destinationKey?: string; trigger: 'manual' | 'schedule' | 'worker'; dailyLimit?: boolean };
 export async function loadTarget(tx: Prisma.TransactionClient, ref: TargetRef, ownerId: string): Promise<PublishTarget> {
@@ -28,7 +29,20 @@ export async function expireClaims() {
 export async function decide(tx: Prisma.TransactionClient, target: PublishTarget, ctx: PublishContext) {
   return isPublishable(target, ctx);
 }
-export async function claimPublish(ref: TargetRef, ctx: ClaimInput) {
+/**
+ * 멱등 키 = 실제 목적지. 카페는 '기본' 게시판과 등록 대상(CafeTarget)이 같은 게시판일 수 있어, 진입점마다
+ * 키가 다르면 unknown(타임아웃) 후 재시도가 같은 게시판에 중복 게시된다 → clubId:menuId 로 정규화.
+ * publish_claims_active_uq 부분 유일 인덱스도 이 키로 걸리므로 DB 수준에서도 한 목적지 1건만 활성.
+ */
+export async function canonicalDestinationKey(ownerId: string, channel: Channel, key = 'default'): Promise<string> {
+  if (channel !== 'naver_cafe') return 'default';
+  const dest = key === 'default' ? await getNaverCafeCreds(ownerId)
+    : await prisma.cafeTarget.findFirst({ where: { id: key, ownerId }, select: { clubId: true, menuId: true } });
+  if (key !== 'default' && !dest) notFound();
+  return dest?.clubId && dest.menuId ? `cafe:${dest.clubId}:${dest.menuId}` : 'default';
+}
+export async function claimPublish(ref: TargetRef, input: ClaimInput) {
+  const ctx = { ...input, destinationKey: await canonicalDestinationKey(input.ownerId, input.channel, input.destinationKey) };
   try {
     return await prisma.$transaction(async tx => {
       if (ctx.dailyLimit) {
@@ -42,7 +56,7 @@ export async function claimPublish(ref: TargetRef, ctx: ClaimInput) {
       }
       const target = await loadTarget(tx, ref, ctx.ownerId);
       const claims = await tx.publishClaim.findMany({ where: { targetType: ref.type, targetId: ref.id,
-        channel: ctx.channel, destinationKey: ctx.destinationKey ?? 'default', status: { in: ['claimed', 'sent', 'unknown'] } }, select: { status: true } });
+        channel: ctx.channel, destinationKey: ctx.destinationKey, status: { in: ['claimed', 'sent', 'unknown'] } }, select: { status: true } });
       const decision = isPublishable(target, { actorOwnerId: ctx.ownerId, channel: ctx.channel, trigger: ctx.trigger,
         now: new Date(), alreadySent: claims.some(c => c.status === 'sent'), activeClaimHeldByOther: claims.some(c => c.status !== 'sent') });
       if (!decision.allowed) {
@@ -51,7 +65,7 @@ export async function claimPublish(ref: TargetRef, ctx: ClaimInput) {
         return { ok: false as const, reason: decision.reason };
       }
       const claim = await tx.publishClaim.create({ data: { ownerId: ctx.ownerId, targetType: ref.type,
-        targetId: ref.id, channel: ctx.channel, destinationKey: ctx.destinationKey ?? 'default',
+        targetId: ref.id, channel: ctx.channel, destinationKey: ctx.destinationKey,
         trigger: ctx.trigger, token: randomBytes(32).toString('base64url'), leaseUntil: new Date(Date.now() + 30 * 60000),
         contentVersion: target.type === 'content' ? target.content.updatedAt : null } });
       return { ok: true as const, claim };

@@ -1,21 +1,3 @@
--- 1회성 백필 (컬럼을 처음 추가하는 실행에서만 — 재실행 시 이후 데이터를 덮어쓰지 않음)
--- 기본값 approved 를 그대로 두면 과거 미발행 draft 전부가 승인 없이 블로그 워커 대상이 된다
--- (worker 는 날짜 조건 없이 approved draft 를 고름). 그래서:
---  · 과거 자동 계획(content_plans.auto_generate)이 만든 글 → origin=auto, pending_review
---  · 그 밖의 미발행 draft → pending_review, 단 사용자가 직접 예약(scheduled 슬롯)한 수동 글은 approved 유지(회귀 없음)
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'contents' AND column_name = 'review_status') THEN
-    ALTER TABLE "contents" ADD COLUMN "origin" TEXT NOT NULL DEFAULT 'manual',
-      ADD COLUMN "review_status" TEXT NOT NULL DEFAULT 'approved';
-    UPDATE "contents" c SET "origin" = 'auto'
-      WHERE c."id" IN (SELECT i."content_job_id" FROM "content_plan_items" i JOIN "content_plans" p ON p."id" = i."content_plan_id"
-                       WHERE p."auto_generate" AND i."content_job_id" IS NOT NULL);
-    UPDATE "contents" c SET "review_status" = 'pending_review'
-      WHERE c."status" = 'draft' AND (c."origin" = 'auto' OR NOT EXISTS (
-        SELECT 1 FROM "schedule_slots" s WHERE s."content_id" = c."id" AND s."status" = 'scheduled'));
-  END IF;
-END $$;
-
 -- AlterTable
 ALTER TABLE "contents" ADD COLUMN IF NOT EXISTS "origin" TEXT NOT NULL DEFAULT 'manual',
 ADD COLUMN IF NOT EXISTS "parent_content_id" TEXT,
@@ -23,6 +5,26 @@ ADD COLUMN IF NOT EXISTS "review_status" TEXT NOT NULL DEFAULT 'approved',
 ADD COLUMN IF NOT EXISTS "reviewed_at" TIMESTAMP(3),
 ADD COLUMN IF NOT EXISTS "reviewed_by" TEXT,
 ADD COLUMN IF NOT EXISTS "strategy_context" JSONB;
+
+-- 1회성 검토 백필 — 실행 여부는 원장(manual_migration_log)으로 판정(컬럼 존재 여부 X):
+-- 구버전 SQL(백필 없음)이 이미 적용된 DB에서도 정확히 1회 실행되고, 재실행 시 이후 데이터를 덮어쓰지 않는다.
+-- 기본값 approved 를 그대로 두면 과거 미발행 draft 가 승인 없이 블로그 워커 대상이 된다(날짜 조건 없이 approved draft 선택).
+--  · 과거 자동 계획(content_plans.auto_generate)이 만든 글 → origin=auto
+--  · 사람이 명시 승인하지 않은(reviewed_at NULL) 미발행 draft → pending_review
+--    단 사용자가 직접 예약(scheduled 슬롯)한 수동 글은 approved 유지(회귀 없음)
+CREATE TABLE IF NOT EXISTS "manual_migration_log" ("name" TEXT PRIMARY KEY, "applied_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM "manual_migration_log" WHERE "name" = '20261104_review_backfill') THEN
+    UPDATE "contents" c SET "origin" = 'auto'
+      WHERE c."origin" = 'manual' AND c."id" IN (SELECT i."content_job_id" FROM "content_plan_items" i JOIN "content_plans" p ON p."id" = i."content_plan_id"
+                       WHERE p."auto_generate" AND i."content_job_id" IS NOT NULL);
+    UPDATE "contents" c SET "review_status" = 'pending_review'
+      WHERE c."status" = 'draft' AND c."review_status" = 'approved' AND c."reviewed_at" IS NULL
+        AND (c."origin" = 'auto' OR NOT EXISTS (
+          SELECT 1 FROM "schedule_slots" s WHERE s."content_id" = c."id" AND s."status" = 'scheduled'));
+    INSERT INTO "manual_migration_log" ("name") VALUES ('20261104_review_backfill');
+  END IF;
+END $$;
 
 -- AlterTable
 ALTER TABLE "settings" ADD COLUMN IF NOT EXISTS "automation_domain_id" TEXT;
