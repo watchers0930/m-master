@@ -1,11 +1,23 @@
+import type { Prisma } from '@prisma/client';
 import { VisibilityError } from '@/lib/visibility/errors';
 import { prisma } from '@/lib/prisma';
+/** Paid plans that may run the automatic pipeline (same entitlement source as lib/billing/limits.ts: users.plan). */
+export const PIPELINE_PLANS = ['starter', 'pro'] as const;
+/**
+ * The single pipeline entitlement rule, shared by the cron sweep and the per-owner check.
+ * `users.plan` is the entitlement (the billing webhook drops it to `free` on cancel/delete);
+ * a `past_due` subscription keeps the plan, so it is excluded here to stop paid automation while unpaid.
+ * Owners with a paid plan and no subscription row (operator-granted plan) are eligible.
+ */
+export const pipelineEntitlement: Prisma.UserWhereInput = {
+  plan: { in: [...PIPELINE_PLANS] }, subscriptions: { none: { status: 'past_due' } },
+};
 export async function* pipelineOwners(ownerId?: string) {
   let cursor: string | undefined;
   while (true) {
     const rows = await prisma.setting.findMany({ where: {
       automationDomainId:{ not:null }, ...(ownerId ? { ownerId }:{}),
-      owner:{ plan:{ in:['starter','pro'] },subscriptions:{ some:{ status:'active' } } },
+      owner: pipelineEntitlement,
       ...(cursor ? { id:{ gt:cursor } }:{}),
     },select:{ id:true,ownerId:true,automationDomainId:true },orderBy:{ id:'asc' },take:20 });
     for (const row of rows) yield { ownerId:row.ownerId,domainId:row.automationDomainId! };
@@ -15,10 +27,10 @@ export async function* pipelineOwners(ownerId?: string) {
 }
 
 export async function pipelineOwnerReason(ownerId:string):Promise<'no_automation_domain'|'plan_limit'|null> {
-  const owner=await prisma.user.findFirst({where:{id:ownerId},select:{plan:true,
-    settings:{select:{automationDomainId:true},take:1},subscriptions:{where:{status:'active'},select:{id:true},take:1}}});
+  const owner=await prisma.user.findFirst({where:{id:ownerId},select:{
+    settings:{select:{automationDomainId:true},take:1}}});
   if (!owner?.settings[0]?.automationDomainId) return 'no_automation_domain';
-  if (!['starter','pro'].includes(owner.plan) || !owner.subscriptions.length) return 'plan_limit';
+  if (!await prisma.user.findFirst({ where:{ id:ownerId, ...pipelineEntitlement }, select:{ id:true } })) return 'plan_limit';
   return null;
 }
 
