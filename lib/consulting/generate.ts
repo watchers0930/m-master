@@ -75,7 +75,14 @@ export async function generateReport(ownerId: string, input: z.infer<typeof cons
                 throw new Error("invalid tool");
             strategy = validateStrategy(JSON.parse(calls[0].function.arguments), snapshot.llmInput ?? snapshot);
         }
-        catch { /* Rejected outputs still settle their actual token cost. */ }
+        catch (error) {
+            // Rejected outputs still settle their actual token cost. Log the validator reason (short codes / zod path only,
+            // never model output) so an llm_failed report is diagnosable.
+            const issue = (error as { issues?: { path?: unknown[]; code?: string; message?: string }[] })?.issues?.[0];
+            console.error("[consulting] strategy rejected", { reportId: id, finishReason: response.choices[0]?.finish_reason ?? null,
+                reason: issue ? `zod:${issue.code}@${(issue.path ?? []).join(".")}:${String(issue.message ?? "").slice(0, 120)}`
+                    : String((error as Error)?.message ?? error).slice(0, 160) });
+        }
         const saved = await settleReport(ownerId, id, attemptId, usage, calcChatKrw(usage), strategy);
         if (!strategy)
             throw new VisibilityError("llm_failed", "생성 결과의 근거를 검증하지 못했습니다.", 502);
