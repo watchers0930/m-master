@@ -9,7 +9,6 @@ import { prisma } from '@/lib/prisma';
 import { createSlotsIdempotent } from '@/lib/schedule/create-slots';
 
 const VALID_CHANNELS = ['blog', 'naver_cafe', 'facebook', 'instagram'] as const;
-const VALID_STATUSES = ['scheduled', 'publishing', 'published', 'failed', 'cancelled'] as const;
 const VALID_MODES = ['manual', 'ai_auto'] as const;
 
 const SlotSchema = z.object({
@@ -18,7 +17,8 @@ const SlotSchema = z.object({
   channel: z.enum(VALID_CHANNELS),
   scheduled_at: z.string().datetime({ offset: true }).optional(),
   scheduledAt: z.string().datetime({ offset: true }).optional(),
-  status: z.enum(VALID_STATUSES).default('scheduled'),
+  // 클라이언트는 'scheduled' 로만 생성 — publishing/published/failed 는 서버 발행 경로만 전이(상태 위조 차단)
+  status: z.literal('scheduled').default('scheduled'),
   mode: z.enum(VALID_MODES).default('manual'),
 }).refine(
   (d) => d.scheduled_at || d.scheduledAt,

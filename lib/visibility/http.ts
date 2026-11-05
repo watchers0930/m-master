@@ -1,3 +1,4 @@
+import { hasSameOriginProof, isCrossSiteMutation } from "@/lib/security/origin";
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
@@ -53,20 +54,11 @@ export async function authenticated(
   try {
     const session = await requireSession();
     if (request && !["GET", "HEAD"].includes(request.method)) {
-      const origin = request.headers.get("origin");
-      if (opts?.requireOrigin && (request.headers.get("sec-fetch-site") === "cross-site" || !(origin === new URL(request.url).origin ||
-          (!origin && request.headers.get("sec-fetch-site") === "same-origin")))) {
+      if (opts?.requireOrigin && !hasSameOriginProof(request)) {
         throw new VisibilityError("forbidden_origin", "허용되지 않은 요청 출처입니다.", 403);
       }
-      if (
-        request.headers.get("sec-fetch-site") === "cross-site" ||
-        (origin && origin !== new URL(request.url).origin)
-      ) {
-        throw new VisibilityError(
-          "bad_request",
-          "허용되지 않은 요청 출처입니다.",
-          400,
-        );
+      if (isCrossSiteMutation(request)) {
+        throw new VisibilityError("bad_request", "허용되지 않은 요청 출처입니다.", 400);
       }
     }
     return await work(session.user.id);
