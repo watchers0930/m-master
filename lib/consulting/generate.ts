@@ -5,12 +5,13 @@ import { isDefinitiveRejection } from "./rejection";
 import { randomUUID } from "node:crypto";
 import type { z } from "zod";
 import type { consultingCreateSchema } from "@/schemas/consulting";
-import { getClient, toChatUsage, calcChatKrw } from "@/lib/claude/chat";
+import { getClient, calcChatKrw } from "@/lib/claude/chat";
 import { VisibilityError } from "@/lib/visibility/http";
 import { collectInput } from "./input";
 import { snapshotHash } from "./hash";
-import { VERSIONS, RESERVE_KRW, MAX_OUTPUT_TOKENS, strategyTool, buildPrompt } from "./prompt";
-import { MARKET_CURRENCY, validateStrategy } from "./validate";
+import { VERSIONS, RESERVE_KRW, MAX_OUTPUT_TOKENS, strategyTool, buildPrompt, repairPrompt } from "./prompt";
+import { judgeStrategy, usageOf } from "./judge";
+import { MARKET_CURRENCY } from "./validate";
 import { canRetry, ownedDomain, findExisting, existingResult, claimReport, beginAttempt, reportDto } from "./data";
 import { markRejected, markUncertain, settleReport } from "./budget";
 export async function generateReport(ownerId: string, input: z.infer<typeof consultingCreateSchema>, deadline = Infinity) {
@@ -55,36 +56,35 @@ export async function generateReport(ownerId: string, input: z.infer<typeof cons
     const id = claim.row.id;
     await beginAttempt(ownerId, id, attemptId);
     let rejected = false;
+    const ask = (body: typeof messages | ReturnType<typeof repairPrompt>) => client.chat.completions.create({ model: VERSIONS.model, messages: body,
+        max_tokens: MAX_OUTPUT_TOKENS, tools: [strategyTool], parallel_tool_calls: false,
+        tool_choice: { type: "function", function: { name: "submit_strategy" } },
+    }, { maxRetries: 0, timeout: 60000 });
     try {
-        const response = await client.chat.completions.create({ model: VERSIONS.model, messages,
-            max_tokens: MAX_OUTPUT_TOKENS, tools: [strategyTool], parallel_tool_calls: false,
-            tool_choice: { type: "function", function: { name: "submit_strategy" } },
-        }, { maxRetries: 0, timeout: 60000 }).catch(error => {
+        const first = await ask(messages).catch(error => {
             rejected = isDefinitiveRejection(error);
             throw error;
         });
-        if (!response.usage || ![response.usage.prompt_tokens, response.usage.completion_tokens].every(x => Number.isSafeInteger(x) && x >= 0))
-            throw new Error("usage_missing");
-        const usage = toChatUsage(response.usage);
-        let strategy = null;
-        try {
-            const choice = response.choices[0], calls = choice?.message.tool_calls;
-            // Forced tool_choice returns finish_reason "stop" (not "tool_calls") with a complete call;
-            // reject only truncation/filtering ("length"/"content_filter"), not the normal forced case.
-            if (!choice || !["stop", "tool_calls"].includes(choice.finish_reason) || choice.message.refusal || calls?.length !== 1 || calls[0].type !== "function" || calls[0].function.name !== "submit_strategy")
-                throw new Error("invalid tool");
-            strategy = validateStrategy(JSON.parse(calls[0].function.arguments), snapshot.llmInput ?? snapshot);
+        let usage = usageOf(first);
+        let verdict = judgeStrategy(first, snapshot, id);
+        // One repair: the validator's reason goes back to the model (prompt.ts repairPrompt). Only when a well-formed
+        // tool call was rejected and the deadline allows another call; the reservation covers both (RESERVE_KRW).
+        if (!verdict.strategy && verdict.call && Date.now() + 65000 < deadline) {
+            const second = await ask(repairPrompt(messages, verdict.call, verdict.reason)).catch(error => {
+                // A definitive rejection proves the repair never ran: settle the first call's known cost.
+                // Anything else may have executed: fall through to the uncertain path (reservation kept).
+                if (isDefinitiveRejection(error)) return null;
+                throw error;
+            });
+            if (second) {
+                const extra = usageOf(second);
+                usage = { prompt_tokens: usage.prompt_tokens + extra.prompt_tokens, completion_tokens: usage.completion_tokens + extra.completion_tokens,
+                    total_tokens: usage.total_tokens + extra.total_tokens };
+                verdict = judgeStrategy(second, snapshot, id);
+            }
         }
-        catch (error) {
-            // Rejected outputs still settle their actual token cost. Log the validator reason (short codes / zod path only,
-            // never model output) so an llm_failed report is diagnosable.
-            const issue = (error as { issues?: { path?: unknown[]; code?: string; message?: string }[] })?.issues?.[0];
-            console.error("[consulting] strategy rejected", { reportId: id, finishReason: response.choices[0]?.finish_reason ?? null,
-                reason: issue ? `zod:${issue.code}@${(issue.path ?? []).join(".")}:${String(issue.message ?? "").slice(0, 120)}`
-                    : String((error as Error)?.message ?? error).slice(0, 160) });
-        }
-        const saved = await settleReport(ownerId, id, attemptId, usage, calcChatKrw(usage), strategy);
-        if (!strategy)
+        const saved = await settleReport(ownerId, id, attemptId, usage, calcChatKrw(usage), verdict.strategy);
+        if (!verdict.strategy)
             throw new VisibilityError("llm_failed", "생성 결과의 근거를 검증하지 못했습니다.", 502);
         return { data: reportDto(saved), reused: false };
     }

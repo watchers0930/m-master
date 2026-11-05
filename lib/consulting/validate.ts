@@ -11,14 +11,17 @@ export function actionUrl(destination: keyof typeof ACTION_DESTINATIONS, domainI
     return `${ACTION_DESTINATIONS[destination]}?domainId=${encodeURIComponent(domainId)}`;
 }
 /** Retain verified tokens for the shared DTO renderer; reject unknown/malformed tokens and literal quantities. */
-function narrative(value: string, evidence: Set<string>) {
+/** Validator failures name the field and the offending fragment (≤24 chars) so a rejected report is diagnosable. */
+function narrative(value: string, evidence: Set<string>, where = "text") {
     const rest = value.replace(/\{\{ev:([a-zA-Z0-9_-]+)\}\}/g, (_, id) => {
         if (!evidence.has(id))
-            throw new Error("unknown evidence");
+            throw new Error(`unknown evidence@${where}:${String(id).slice(0, 40)}`);
         return "";
     }).replace(/\bGA4\b/g, "");
-    if (/[\p{N}]|\{\{|https?:\/\//u.test(rest) || /(?:매출|수익|전환|노출).{0,12}보장|guarantee.{0,20}(?:revenue|profit|conversion|ranking)/i.test(rest))
-        throw new Error("unverified narrative");
+    const hit = /.{0,8}(?:[\p{N}]|\{\{|https?:\/\/).{0,8}/u.exec(rest)
+        ?? /(?:매출|수익|전환|노출).{0,12}보장|guarantee.{0,20}(?:revenue|profit|conversion|ranking)/i.exec(rest);
+    if (hit)
+        throw new Error(`unverified narrative@${where}:${hit[0].slice(0, 24)}`);
 }
 export function validateStrategy(raw: unknown, snapshot: ConsultingLlmSnapshot): ConsultingStrategy {
     const result = consultingStrategySchema.parse(raw);
@@ -26,20 +29,20 @@ export function validateStrategy(raw: unknown, snapshot: ConsultingLlmSnapshot):
     const refs = (ids: string[]) => { if (ids.some(id => !known.has(id)))
         throw new Error("unknown evidence"); };
     const findings = [...result.diagnosis.strengths, ...result.diagnosis.issues];
-    narrative(result.diagnosis.summary, known);
+    narrative(result.diagnosis.summary, known, "diagnosis.summary");
     for (const x of findings) {
-        narrative(x.text, known);
+        narrative(x.text, known, "diagnosis.finding");
         refs(x.evidenceIds);
     }
     for (const x of [...result.diagnosis.uncertainties, ...result.budgetProposal.assumptions])
-        narrative(x, known);
+        narrative(x, known, "diagnosis.uncertainty|budget.assumption");
     if (new Set(result.channelMix.map(x => x.channel)).size !== 3)
         throw new Error("duplicate channels");
     if (result.channelMix.reduce((s, x) => s + x.recommendedRatio, 0) !== 100)
         throw new Error("ratio sum");
     for (const x of result.channelMix) {
         refs(x.evidenceIds);
-        narrative(x.reason, known);
+        narrative(x.reason, known, `channelMix.${x.channel}.reason`);
         if (x.applicability === "not_applicable" && x.recommendedRatio !== 0)
             throw new Error("inapplicable ratio");
         if (x.channel === "naver_paid" && snapshot.market !== "ko-KR" && x.applicability !== "not_applicable")
@@ -49,8 +52,8 @@ export function validateStrategy(raw: unknown, snapshot: ConsultingLlmSnapshot):
         throw new Error("duplicate actions");
     for (const x of result.priorityActions) {
         refs(x.evidenceIds);
-        for (const t of [x.title, x.description, x.metric])
-            narrative(t, known);
+        for (const [field, t] of [["title", x.title], ["description", x.description], ["metric", x.metric]] as const)
+            narrative(t, known, `priorityActions.${x.id}.${field}`);
         if (snapshot.market !== "ko-KR" && x.channel === "naver_paid")
             throw new Error("market action");
     }

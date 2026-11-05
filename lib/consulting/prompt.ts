@@ -4,11 +4,16 @@ import { CLAUDE_MODEL, calcChatKrw } from "@/lib/claude/chat";
 import type { ConsultingLlmSnapshot } from "@/types/consulting";
 /** A full snapshot (sends its llmInput) or an LLM projection being fitted. */
 type PromptInput = ConsultingLlmSnapshot & { llmInput?: ConsultingLlmSnapshot };
-export const VERSIONS = { schemaVersion: "v3", promptVersion: "consulting-v3", model: CLAUDE_MODEL };
+// v3.1: one validator-feedback repair call (generation procedure changed → new input hash, see ./hash).
+export const VERSIONS = { schemaVersion: "v3", promptVersion: "consulting-v3.1", model: CLAUDE_MODEL };
 export const MAX_OUTPUT_TOKENS = 4096;
 export const MAX_INPUT_BYTES = 80000;
-// A byte per token plus tool/message overhead is a conservative upper bound for UTF-8 input.
-export const RESERVE_KRW = calcChatKrw({ prompt_tokens: MAX_INPUT_BYTES + 8192, completion_tokens: MAX_OUTPUT_TOKENS, total_tokens: MAX_INPUT_BYTES + 8192 + MAX_OUTPUT_TOKENS });
+/** At most one repair call follows a rejected first answer. */
+export const MAX_REPAIR_CALLS = 1;
+// A byte per token plus tool/message overhead is a conservative upper bound for UTF-8 input; a repair call
+// re-sends the input plus the rejected answer, so it is bounded by the same input ceiling plus one output.
+const CALL_RESERVE_KRW = calcChatKrw({ prompt_tokens: MAX_INPUT_BYTES + 8192 + MAX_OUTPUT_TOKENS, completion_tokens: MAX_OUTPUT_TOKENS, total_tokens: MAX_INPUT_BYTES + 8192 + 2 * MAX_OUTPUT_TOKENS });
+export const RESERVE_KRW = CALL_RESERVE_KRW * (1 + MAX_REPAIR_CALLS);
 export const strategyTool = {
     type: "function" as const,
     function: { name: "submit_strategy", description: "Submit an evidence-grounded marketing strategy",
@@ -34,6 +39,16 @@ export function promptBytes(snapshot: PromptInput) {
 export function buildPrompt(snapshot: PromptInput) {
     if (promptBytes(snapshot) > MAX_INPUT_BYTES) throw new Error("input token ceiling");
     return promptMessages(snapshot);
+}
+/**
+ * Validator feedback for the single repair call: the rejected tool call is returned to the model with the
+ * server's reason (field + rule + the offending fragment, never other data) and a resubmission is forced.
+ */
+export function repairPrompt(messages: ReturnType<typeof buildPrompt>, call: { id: string; function: { name: string; arguments: string } }, reason: string) {
+    return [...messages,
+        { role: "assistant" as const, content: null, tool_calls: [{ id: call.id, type: "function" as const, function: call.function }] },
+        { role: "tool" as const, tool_call_id: call.id, content: `Rejected by server validation: ${reason.slice(0, 300)}. ` +
+            "Resubmit the complete strategy with submit_strategy, changing only what violates the rules. Every quantity must be a {{ev:id}} token from the supplied evidence — no literal digits, percentages or dates in any text." }];
 }
 /** Freeze exactly what is sent before hashing/reserving. Prefer aggregate observations, then round-robin sources. */
 export function fitSnapshot<S extends PromptInput>(input: S): S {
