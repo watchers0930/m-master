@@ -89,6 +89,11 @@ export async function runGa4<T>(scope: Ga4Scope | undefined, queryKey: string,
       } catch (error) {
         last = classifyGa4Error(error);
         attempts.push({ source: candidate.source, code: last.code });
+        // Diagnostic only: error class/status and a bounded message (Google errors carry no credentials).
+        const raw = error as { name?: unknown; code?: unknown; status?: unknown; message?: unknown };
+        console.error('[ga4] query failed', { queryKey, source: candidate.source, code: last.code,
+          name: String(raw?.name ?? typeof error), status: String(raw?.code ?? raw?.status ?? ''),
+          message: String(raw?.message ?? '').slice(0, 200) });
         if (last.code === 'invalid_credentials' || last.code === 'permission_denied') {
           if (suppressed.size >= 500) suppressed.delete(suppressed.keys().next().value!);
           suppressed.set(suppressionKey, { until: Date.now() + 300000, code: last.code });
