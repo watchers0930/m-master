@@ -9,7 +9,8 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: currentDirectory,
   },
-  serverExternalPackages: ['mammoth'],
+  // GA4 SDK must not be bundled: bundling breaks google-gax's proto3 JSON serializer (int64 `limit` → "toProto3JSON: don't know how to convert value").
+  serverExternalPackages: ['mammoth', '@google-analytics/data', 'google-gax'],
 };
 
 export default nextConfig;
