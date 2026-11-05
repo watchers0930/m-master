@@ -1,6 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
+import {
+  channelOutcomeText, contentManageHref, type ChannelPublishOutcome,
+} from '@/lib/api/content-channel-publish';
+import type { PublishChannel } from '@/types/content-review';
 
 // ── 공유 타입 ─────────────────────────────────────────────────────
 export interface ImageState {
@@ -12,8 +17,10 @@ export interface ImageState {
   onRegenImg?: (imgIdx: number, description: string) => void;
   convertingChannel?: 'instagram' | 'facebook';
   onConvert?: (channel: 'instagram' | 'facebook', contentId: string) => void;
-  publishingChannel?: 'instagram' | 'facebook';
+  publishingChannel?: PublishChannel;
   onPublish?: (channel: 'instagram' | 'facebook', contentId: string) => void;
+  /** 원본 → 채널 자식 콘텐츠로 발행 (전체 채널 발행용) — 진행 중이면 null */
+  onPublishChannel?: (channel: PublishChannel, opts?: { cafeTargetIds?: string[] }) => Promise<ChannelPublishOutcome | null>;
 }
 
 // ── 변환 버튼 (인스타/페이스북) ───────────────────────────────────
@@ -85,7 +92,7 @@ export function PublishBtn({
   const baseBg = channel === 'instagram'
     ? 'linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888)'
     : '#1877f2';
-  const confirmMsg = `${channel === 'instagram' ? '인스타그램' : '페이스북'}에 즉시 발행하시겠습니까?\n\n발행은 취소할 수 없습니다.`;
+  const confirmMsg = `${channel === 'instagram' ? '인스타그램' : '페이스북'}에 즉시 발행하시겠습니까?\n채널용 콘텐츠가 없으면 먼저 변환(비용 발생)한 뒤 발행합니다.\n\n발행은 취소할 수 없습니다.`;
   return (
     <button
       onClick={() => {
@@ -126,28 +133,23 @@ export function PublishBtn({
 interface CafeTarget { id: string; name: string; isDefault: boolean }
 
 // ── 모든 채널 일괄 발행 버튼 ─────────────────────────────────────
-type PublishAllChannel = 'naver_cafe' | 'facebook' | 'instagram';
+// 블로그 id 를 다른 채널 발행 API 에 보내지 않는다 — 채널별 자식 콘텐츠를 만들거나 재사용해 발행(onPublishChannel).
+const PUBLISH_ALL_CHANNELS: readonly PublishChannel[] = ['naver_cafe', 'facebook', 'instagram'];
+
+interface ChannelResultRow { channel: PublishChannel; outcome: ChannelPublishOutcome }
 
 export function PublishAllBtn({
-  contentId,
   disabled,
-  onPublish,
+  onPublishChannel,
 }: {
-  contentId: string;
   disabled?: boolean;
-  onPublish?: (channel: 'instagram' | 'facebook', contentId: string) => void;
+  onPublishChannel?: ImageState['onPublishChannel'];
 }) {
   const [publishing, setPublishing] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
+  const [rows, setRows] = useState<ChannelResultRow[]>([]);
   const [cafeTargets, setCafeTargets] = useState<CafeTarget[]>([]);
   const [selectedTargets, setSelectedTargets] = useState<Set<string>>(new Set());
   const [showCafeSelect, setShowCafeSelect] = useState(false);
-
-  const CHANNEL_ROUTES: Record<PublishAllChannel, string> = {
-    naver_cafe: '/api/publish/naver-cafe',
-    facebook: '/api/publish/facebook',
-    instagram: '/api/publish/instagram',
-  };
 
   // 카페 타겟 목록 로드
   const loadCafeTargets = async () => {
@@ -163,55 +165,36 @@ export function PublishAllBtn({
   };
 
   const handlePublishAll = async () => {
+    if (!onPublishChannel || publishing) return;
     // 카페 타겟이 로드되지 않았으면 먼저 로드
     if (cafeTargets.length === 0) {
       await loadCafeTargets();
     }
 
-    if (!window.confirm('모든 활성 채널에 순차 발행합니다.\n\n발행은 취소할 수 없습니다. 계속하시겠습니까?')) {
+    if (!window.confirm('모든 활성 채널에 순차 발행합니다.\n채널별 콘텐츠가 없으면 먼저 변환(비용 발생)한 뒤 발행합니다.\n\n발행은 취소할 수 없습니다. 계속하시겠습니까?')) {
       return;
     }
 
     setPublishing(true);
-    setResult(null);
-
-    const channels: PublishAllChannel[] = ['naver_cafe', 'facebook', 'instagram'];
-    let successCount = 0;
-    let failedCount = 0;
-    const errors: string[] = [];
-
-    for (const channel of channels) {
-      try {
-        const bodyPayload: Record<string, unknown> = { content_id: contentId };
-        // 네이버 카페: 선택된 타겟 전달
-        if (channel === 'naver_cafe' && selectedTargets.size > 0) {
-          bodyPayload.cafe_target_ids = Array.from(selectedTargets);
+    setRows([]);
+    try {
+      const next: ChannelResultRow[] = [];
+      for (const channel of PUBLISH_ALL_CHANNELS) {
+        const opts = channel === 'naver_cafe' && selectedTargets.size > 0
+          ? { cafeTargetIds: Array.from(selectedTargets) }
+          : undefined;
+        let outcome: ChannelPublishOutcome | null;
+        try {
+          outcome = await onPublishChannel(channel, opts);
+        } catch (err) {
+          outcome = { kind: 'failed', childId: null, code: 'unknown', message: err instanceof Error && err.message ? err.message : '발행 오류' };
         }
-
-        const res = await fetch(CHANNEL_ROUTES[channel], {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(bodyPayload),
-        });
-        const json = await res.json();
-        if (res.ok && !json.error) {
-          successCount++;
-        } else {
-          failedCount++;
-          errors.push(`${channel}: ${json.error?.message ?? `HTTP ${res.status}`}`);
-        }
-      } catch (err) {
-        failedCount++;
-        errors.push(`${channel}: ${err instanceof Error ? err.message : String(err)}`);
+        if (!outcome) outcome = { kind: 'failed', childId: null, code: 'busy', message: '다른 발행이 진행 중입니다' };
+        next.push({ channel, outcome });
+        setRows([...next]);
       }
-    }
-
-    const msg = `${channels.length}채널 발행 완료 (성공 ${successCount} / 실패 ${failedCount})`;
-    setResult(msg);
-    setPublishing(false);
-
-    if (errors.length > 0) {
-      console.error('[PublishAll] 실패 상세:', errors);
+    } finally {
+      setPublishing(false);
     }
   };
 
@@ -236,7 +219,7 @@ export function PublishAllBtn({
       <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
         <button
           onClick={handlePublishAll}
-          disabled={disabled || publishing}
+          disabled={disabled || publishing || !onPublishChannel}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '7px 13px', borderRadius: 7,
@@ -278,12 +261,23 @@ export function PublishAllBtn({
           </svg>
           카페 선택
         </button>
-        {result && (
-          <span style={{ fontSize: 10, color: result.includes('실패 0') ? '#22c55e' : 'var(--amber-600)', fontWeight: 600 }}>
-            {result}
-          </span>
-        )}
       </div>
+
+      {/* 채널별 결과 — 검토 대기는 콘텐츠 관리로 연결 */}
+      {rows.length > 0 && (
+        <ul style={{ listStyle: 'none', margin: 0, padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: 4, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11 }}>
+          {rows.map(({ channel, outcome }) => (
+            <li key={channel} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', color: outcome.kind === 'published' || outcome.kind === 'already_published' ? '#16a34a' : outcome.kind === 'pending_review' ? 'var(--amber-700)' : '#dc2626', fontWeight: 600 }}>
+              <span>{channelOutcomeText(channel, outcome)}</span>
+              {outcome.kind !== 'published' && outcome.childId && (
+                <Link href={contentManageHref(outcome.childId)} style={{ color: 'var(--blue-600)', fontWeight: 600 }}>
+                  콘텐츠 관리에서 보기
+                </Link>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {/* 카페 타겟 선택 패널 */}
       {showCafeSelect && cafeTargets.length > 0 && (

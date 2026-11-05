@@ -4,8 +4,10 @@ import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { GenerateForm } from './components/GenerateForm';
 import { ContentBody, ContentImages, parseMarkdown } from './components/ContentPreview';
-import { createAbTest } from '@/lib/api/ab-test';
+import { usePublishContent } from '@/hooks/usePublishContent';
+import { channelOutcomeText, contentManageHref, PENDING_REVIEW_TEXT } from '@/lib/api/content-channel-publish';
 import type { ContentGenerateResponse } from '@/types/api';
+import type { PublishChannel } from '@/types/content-review';
 import type { AbTestMeasureDays } from '@/types/db';
 
 export default function ContentCreatePage() {
@@ -27,12 +29,13 @@ function ContentCreatePageInner() {
   const [deletedImgIdx, setDeletedImgIdx] = useState<Set<number>>(new Set());
   const [regeneratingIdx, setRegeneratingIdx] = useState<Set<number>>(new Set());
   const [thumbnailDeleted, setThumbnailDeleted] = useState(false);
-  const [convertingChannel, setConvertingChannel] = useState<'instagram' | 'facebook' | undefined>(undefined);
-  const [publishingChannel, setPublishingChannel] = useState<'instagram' | 'facebook' | undefined>(undefined);
-
   const [abMeasureDays, setAbMeasureDays] = useState<AbTestMeasureDays>(14);
-  const [abStarting, setAbStarting] = useState(false);
-  const [abError, setAbError] = useState<string | null>(null);
+  // 발행·변환·A/B 시작은 콘텐츠 관리 화면과 같은 훅을 쓴다(중복 구현 금지)
+  const {
+    publishing: publishingChannel, publishToChannel,
+    convert, converting: convertingChannel,
+    startAbTest, abStarting, abError, clearAbError,
+  } = usePublishContent(result?.id ?? null);
 
   const handleReset = () => {
     setResult(null);
@@ -41,23 +44,12 @@ function ContentCreatePageInner() {
     setDeletedImgIdx(new Set());
     setRegeneratingIdx(new Set());
     setThumbnailDeleted(false);
-    setAbError(null);
+    clearAbError();
   };
 
-  const handleStartAbTest = async () => {
+  const handleStartAbTest = () => {
     if (!result) return;
-    setAbStarting(true);
-    setAbError(null);
-    const res = await createAbTest({
-      source_content_id: result.id,
-      measure_days: abMeasureDays,
-    });
-    if (res.error) {
-      setAbStarting(false);
-      setAbError(res.error.message ?? 'A/B 테스트 시작에 실패했습니다');
-      return;
-    }
-    router.push(`/ab-test/${res.data.id}`);
+    void startAbTest(abMeasureDays);
   };
 
   const handleRegenImg = async (imgIdx: number, description: string) => {
@@ -94,57 +86,22 @@ function ContentCreatePageInner() {
     }
   };
 
-  const handleConvert = async (channel: 'instagram' | 'facebook', contentId: string) => {
-    if (convertingChannel) return;
-    setConvertingChannel(channel);
-    try {
-      const res = await fetch(`/api/content/${contentId}/convert`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel }),
-      });
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        alert(`${channel === 'instagram' ? '인스타' : '페이스북'} 변환 실패: ${j?.error?.message ?? res.status}`);
-        return;
-      }
-      const newId = j?.data?.id;
-      if (newId) {
-        // 콘텐츠 관리 페이지로 이동 + 해당 채널 필터
-        router.push(`/content/manage?id=${newId}`);
-      } else {
-        alert('변환은 성공했지만 ID를 받지 못했습니다');
-      }
-    } catch (err) {
-      alert(`변환 오류: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setConvertingChannel(undefined);
+  // 단일 채널 즉시 발행 — 블로그 → 채널 자식 콘텐츠 → 자식 발행 (lib/api/content-channel-publish)
+  const handlePublish = async (channel: PublishChannel) => {
+    const outcome = await publishToChannel(channel);
+    if (!outcome) return;
+    if (outcome.kind === 'pending_review') {
+      if (window.confirm(`${PENDING_REVIEW_TEXT}\n\n콘텐츠 관리로 이동할까요?`)) router.push(contentManageHref(outcome.childId));
+      return;
     }
-  };
-
-  const handlePublish = async (channel: 'instagram' | 'facebook', contentId: string) => {
-    if (publishingChannel) return;
-    setPublishingChannel(channel);
-    try {
-      const res = await fetch(`/api/publish/${channel}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content_id: contentId }),
-      });
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        alert(`${channel === 'instagram' ? '인스타' : '페이스북'} 발행 실패: ${j?.error?.message ?? res.status}`);
-        return;
-      }
-      const url = j?.data?.url;
-      if (url && window.confirm(`발행 완료. 게시물을 열어볼까요?\n${url}`)) {
+    const url = outcome.kind === 'published' ? outcome.result.url ?? outcome.result.download_url : undefined;
+    if (url) {
+      if (window.confirm(`${channelOutcomeText(channel, outcome)}\n${url}\n\n게시물을 열어볼까요?`)) {
         window.open(url, '_blank', 'noopener,noreferrer');
       }
-    } catch (err) {
-      alert(`발행 오류: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setPublishingChannel(undefined);
+      return;
     }
+    alert(channelOutcomeText(channel, outcome));
   };
 
   const imageState = {
@@ -155,9 +112,10 @@ function ContentCreatePageInner() {
     regeneratingIdx,
     onRegenImg: handleRegenImg,
     convertingChannel,
-    onConvert: handleConvert,
+    onConvert: (channel: 'instagram' | 'facebook', contentId: string) => { void convert(channel, contentId); },
     publishingChannel,
-    onPublish: handlePublish,
+    onPublish: (channel: 'instagram' | 'facebook') => { void handlePublish(channel); },
+    onPublishChannel: publishToChannel,
   };
 
   const emptyState = (

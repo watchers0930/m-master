@@ -18,6 +18,8 @@ export interface ReviewListQuery {
   channel?: Channel;
   review_status?: ReviewStatus;
   origin?: ContentOrigin;
+  /** 특정 원본의 파생(자식) 콘텐츠만 */
+  parent_content_id?: string;
   page?: number;
   per_page?: number;
 }

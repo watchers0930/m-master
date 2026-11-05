@@ -2,13 +2,17 @@
 
 import { useState } from 'react';
 import type { ScheduleSlot } from '@/types/db';
-import { createSlot, deleteSlot } from '@/lib/api/schedule';
+import { createSlot, deleteSlot, scheduleErrorText } from '@/lib/api/schedule';
 
 interface CalendarViewProps {
   year: number;
   month: number;
   slots: ScheduleSlot[];
   onSlotsChange: (slots: ScheduleSlot[]) => void;
+  /** 서버 기준 재조회 (성공·실패 모두 호출) */
+  onRefresh: () => void;
+  /** 페이지 상단 오류 안내 (null = 지우기) */
+  onError: (message: string | null) => void;
 }
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -33,12 +37,16 @@ const fieldStyle: React.CSSProperties = {
   color: 'var(--text)', outline: 'none', fontFamily: 'inherit',
 };
 
-export function CalendarView({ year, month, slots, onSlotsChange }: CalendarViewProps) {
+// 삭제(취소) 버튼을 보여줄 상태 — 서버 CANCELLABLE_STATUSES 와 동일
+const DELETABLE = new Set(['scheduled', 'failed']);
+
+export function CalendarView({ year, month, slots, onSlotsChange, onRefresh, onError }: CalendarViewProps) {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [contentId, setContentId] = useState('');
   const [timeStr, setTimeStr] = useState('09:00');
   const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const firstDay = new Date(year, month - 1, 1).getDay();
@@ -65,12 +73,13 @@ export function CalendarView({ year, month, slots, onSlotsChange }: CalendarView
   };
 
   const handleAdd = async () => {
-    if (!selectedDate || !contentId.trim()) return;
+    if (!selectedDate || !contentId.trim() || adding) return;
     setAdding(true);
+    setAddError(null);
     const scheduledAt = `${selectedDate}T${timeStr}:00Z`;
-    const res = await createSlot({ content_id: contentId.trim(), channel: 'blog', scheduled_at: scheduledAt });
-    setAdding(false);
-    if (res.data) {
+    try {
+      const res = await createSlot({ content_id: contentId.trim(), channel: 'blog', scheduled_at: scheduledAt });
+      if (!res.data) throw new Error(scheduleErrorText(res.error, '편성 추가에 실패했습니다'));
       const newSlot: ScheduleSlot = {
         id: res.data.slot_id, content_id: contentId.trim(), channel: 'blog',
         scheduled_at: scheduledAt, published_at: null, status: 'scheduled',
@@ -81,14 +90,30 @@ export function CalendarView({ year, month, slots, onSlotsChange }: CalendarView
       setAddOpen(false);
       setContentId('');
       setTimeStr('09:00');
+    } catch (e) {
+      setAddError(e instanceof Error && e.message ? e.message : '편성 추가에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setAdding(false);
+      onRefresh();
     }
   };
 
   const handleDelete = async (slotId: string) => {
+    if (deletingId) return;
     setDeletingId(slotId);
-    await deleteSlot(slotId);
-    onSlotsChange(slots.filter((s) => s.id !== slotId));
-    setDeletingId(null);
+    onError(null);
+    try {
+      const res = await deleteSlot(slotId);
+      if (res.error) throw new Error(scheduleErrorText(res.error, '슬롯 삭제에 실패했습니다'));
+      // 서버는 논리 삭제(status=cancelled) — 성공이 확인된 뒤에만 화면 반영
+      onSlotsChange(slots.map((s) => (s.id === slotId ? { ...s, status: 'cancelled' } : s)));
+    } catch (e) {
+      // 실패 시 슬롯은 그대로 두고 안내
+      onError(e instanceof Error && e.message ? e.message : '슬롯 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setDeletingId(null);
+      onRefresh();
+    }
   };
 
   return (
@@ -129,7 +154,9 @@ export function CalendarView({ year, month, slots, onSlotsChange }: CalendarView
                 return (
                   <div key={s.id} onClick={(e) => e.stopPropagation()} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, borderRadius: 3, border: `1px solid ${st.border}`, background: st.bg, color: st.color, fontSize: 11, fontWeight: 600, padding: '3px 6px', marginBottom: 2 }}>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{CH_LABEL[s.channel] ?? s.channel} · {STATUS_LABEL[s.status]}</span>
-                    <button onClick={(e) => { e.stopPropagation(); handleDelete(s.id); }} disabled={deletingId === s.id} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', padding: 0, fontSize: 12, lineHeight: 1, opacity: 0.7 }}>×</button>
+                    {DELETABLE.has(s.status) && (
+                      <button onClick={(e) => { e.stopPropagation(); void handleDelete(s.id); }} disabled={deletingId !== null} aria-label="슬롯 삭제" style={{ background: 'none', border: 'none', cursor: deletingId ? 'default' : 'pointer', color: 'inherit', padding: 0, fontSize: 12, lineHeight: 1, opacity: deletingId === s.id ? 0.3 : 0.7 }}>×</button>
+                    )}
                   </div>
                 );
               })}
@@ -158,6 +185,7 @@ export function CalendarView({ year, month, slots, onSlotsChange }: CalendarView
                 <input type="time" style={fieldStyle} value={timeStr} onChange={(e) => setTimeStr(e.target.value)} />
               </div>
               <p style={{ fontSize: 11, color: 'var(--sub)' }}>채널: 블로그 (Phase 1 고정) · 수동 편성</p>
+              {addError && <p role="alert" style={{ fontSize: 12, color: '#dc2626', margin: 0 }}>{addError}</p>}
             </div>
             <div style={{ padding: '12px 18px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button onClick={() => setAddOpen(false)} className="btn btn-ghost" style={{ fontSize: 12 }}>취소</button>

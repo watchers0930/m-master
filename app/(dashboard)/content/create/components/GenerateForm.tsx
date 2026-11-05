@@ -37,18 +37,23 @@ export function GenerateForm({ initialTopic, onResult, onStreamStart, onStreamDe
   const [autoPublish, setAutoPublish] = useState<Record<string, AutoPublishChannelStatus>>({});
   const [autoPublishDone, setAutoPublishDone] = useState(false);
 
-  const applySuggestedTopic = async (t: string) => {
-    setTopic(t);
-    setError('');
+  // 토픽 → 추천 키워드 병합 (실패해도 로딩 표시가 남지 않게 finally 로 해제)
+  const mergeKeywordsFor = async (t: string) => {
     setKwLoading(true);
     try {
       const res = await generateKeywords(t);
-      if (res.data) {
-        setKeywords(prev => Array.from(new Set([...prev, ...res.data!])));
-      }
+      if (res.data) setKeywords(prev => Array.from(new Set([...prev, ...res.data])));
+    } catch {
+      /* 추천 실패는 무시 — 사용자가 직접 입력 가능 */
     } finally {
       setKwLoading(false);
     }
+  };
+
+  const applySuggestedTopic = async (t: string) => {
+    setTopic(t);
+    setError('');
+    await mergeKeywordsFor(t);
   };
 
   const addKeyword = () => {
@@ -65,13 +70,7 @@ export function GenerateForm({ initialTopic, onResult, onStreamStart, onStreamDe
 
   const autoGenerateKeywords = async () => {
     if (!topic.trim()) { setError('토픽을 먼저 입력해주세요'); return; }
-    setKwLoading(true);
-    const res = await generateKeywords(topic.trim());
-    setKwLoading(false);
-    if (res.data) {
-      const merged = Array.from(new Set([...keywords, ...res.data]));
-      setKeywords(merged);
-    }
+    await mergeKeywordsFor(topic.trim());
   };
 
   // initialTopic이 주어지면 mount 시 1회 자동 키워드 생성 (UX 편의)
@@ -81,17 +80,7 @@ export function GenerateForm({ initialTopic, onResult, onStreamStart, onStreamDe
     const t = (initialTopic ?? '').trim();
     if (!t) return;
     initialTopicTriggered.current = true;
-    (async () => {
-      setKwLoading(true);
-      try {
-        const res = await generateKeywords(t);
-        if (res.data) {
-          setKeywords(prev => Array.from(new Set([...prev, ...res.data!])));
-        }
-      } finally {
-        setKwLoading(false);
-      }
-    })();
+    void mergeKeywordsFor(t);
   }, [initialTopic]);
 
   const startEdit = (kw: string) => { setEditingKw(kw); setEditingValue(kw); };
@@ -153,7 +142,9 @@ export function GenerateForm({ initialTopic, onResult, onStreamStart, onStreamDe
           } else if (json.type === 'done' && json.data) {
             onResult(json.data);
             if (scheduledDate) {
-              await createSlot({ content_id: json.data.id, channel: 'blog', scheduled_at: `${scheduledDate}T09:00:00Z` });
+              // 예약 실패를 삼키지 않는다 — 콘텐츠는 저장됐으므로 스케줄러에서 다시 편성하도록 안내
+              const slot = await createSlot({ content_id: json.data.id, channel: 'blog', scheduled_at: `${scheduledDate}T09:00:00Z` }).catch(() => null);
+              if (!slot?.data) setError(`콘텐츠는 생성됐지만 예약 등록에 실패했습니다${slot?.error ? ` — ${slot.error.message}` : ''}. 스케줄러에서 다시 편성해 주세요.`);
             }
           } else if (json.type === 'auto_publish') {
             if (json.status === 'completed') {
@@ -220,13 +211,7 @@ export function GenerateForm({ initialTopic, onResult, onStreamStart, onStreamDe
           onChange={(e) => setTopic(e.target.value)}
           onBlur={async (e) => {
             const t = e.target.value.trim();
-            if (!t) return;
-            setKwLoading(true);
-            const res = await generateKeywords(t);
-            setKwLoading(false);
-            if (res.data) {
-              setKeywords(prev => Array.from(new Set([...prev, ...res.data!])));
-            }
+            if (t) await mergeKeywordsFor(t);
           }}
         />
         {error && <p style={{ fontSize: 11, color: '#ef4444', marginTop: 3 }}>{error}</p>}

@@ -265,7 +265,7 @@ ${bodyHtml}
           <ConvertBtn channel="facebook" contentId={result.id} disabled={imageState.convertingChannel !== undefined} loading={imageState.convertingChannel === 'facebook'} onClick={imageState.onConvert} />
           <PublishBtn channel="instagram" contentId={result.id} disabled={imageState.publishingChannel !== undefined} loading={imageState.publishingChannel === 'instagram'} onClick={imageState.onPublish} />
           <PublishBtn channel="facebook" contentId={result.id} disabled={imageState.publishingChannel !== undefined} loading={imageState.publishingChannel === 'facebook'} onClick={imageState.onPublish} />
-          <PublishAllBtn contentId={result.id} disabled={imageState.publishingChannel !== undefined || imageState.convertingChannel !== undefined} onPublish={imageState.onPublish} />
+          <PublishAllBtn disabled={imageState.publishingChannel !== undefined || imageState.convertingChannel !== undefined} onPublishChannel={imageState.onPublishChannel} />
           <button onClick={onReset} className="btn btn-ghost" style={{ fontSize: 12, gap: 6 }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
               <polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>

@@ -8,8 +8,7 @@ import { z } from 'zod';
 import { requireSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { logAudit, AUDIT_ACTIONS } from '@/lib/audit/logger';
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isEntityId } from '@/schemas/id';
 
 const PatchSchema = z.object({
   scheduled_at: z
@@ -22,6 +21,9 @@ const PatchSchema = z.object({
     .optional(),
 });
 
+// 취소 가능한 상태 — publishing(발행 중)·published 는 제외
+const CANCELLABLE_STATUSES = ['scheduled', 'failed'];
+
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
@@ -32,24 +34,13 @@ interface RouteParams {
 async function findSlotByOwner(
   slotId: string,
   ownerId: string,
-): Promise<{ id: string; status: string; contentId: string } | null> {
-  const slot = await prisma.scheduleSlot.findUnique({
-    where: { id: slotId },
+): Promise<{ id: string; status: string; contentId: string | null } | null> {
+  // 슬롯 자체의 ownerId 로 소유권 확인 — 콘텐츠가 없는(contentId=null) 슬롯도 본인 것이면 조회 가능
+  const slot = await prisma.scheduleSlot.findFirst({
+    where: { id: slotId, ownerId },
     select: { id: true, status: true, contentId: true },
   });
-
-  if (!slot) return null;
-  const contentId = slot.contentId;
-  if (!contentId) return null;
-
-  // content를 통해 owner 확인
-  const content = await prisma.content.findFirst({
-    where: { id: contentId, ownerId },
-    select: { id: true },
-  });
-
-  if (!content) return null;
-  return { id: slot.id, status: slot.status, contentId };
+  return slot ?? null;
 }
 
 // ----------------------------------------------------------------
@@ -60,7 +51,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const ownerId = session.user.id;
 
   const { id: slotId } = await params;
-  if (!UUID_RE.test(slotId)) {
+  if (!isEntityId(slotId)) {
     return NextResponse.json({ error: { code: 'validation', message: '유효하지 않은 id' } }, { status: 400 });
   }
 
@@ -100,10 +91,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   try {
-    await prisma.scheduleSlot.update({
-      where: { id: slotId },
+    // 조회~갱신 사이 워커가 발행을 시작했을 수 있으므로 status 조건부 갱신(CAS)
+    const { count } = await prisma.scheduleSlot.updateMany({
+      where: { id: slotId, ownerId, status: 'scheduled' },
       data: update,
     });
+    if (count === 0) {
+      return NextResponse.json(
+        { error: { code: 'conflict', message: '슬롯 상태가 변경되어 수정할 수 없습니다. 새로고침 후 다시 시도하세요' } },
+        { status: 409 },
+      );
+    }
   } catch (error) {
     console.error('[schedule/slot] patch error:', error);
     return NextResponse.json({ error: { code: 'internal', message: 'DB 업데이트 실패' } }, { status: 500 });
@@ -128,7 +126,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const ownerId = session.user.id;
 
   const { id: slotId } = await params;
-  if (!UUID_RE.test(slotId)) {
+  if (!isEntityId(slotId)) {
     return NextResponse.json({ error: { code: 'validation', message: '유효하지 않은 id' } }, { status: 400 });
   }
 
@@ -137,28 +135,46 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: { code: 'not_found', message: '슬롯을 찾을 수 없습니다' } }, { status: 404 });
   }
 
-  if (slot.status === 'published') {
-    return NextResponse.json(
-      { error: { code: 'conflict', message: '이미 발행된 슬롯은 삭제할 수 없습니다' } },
-      { status: 409 },
-    );
+  if (slot.status === 'cancelled') {
+    // 이미 취소된 슬롯 — 멱등 처리
+    return NextResponse.json({ data: { cancelled: true }, error: null });
+  }
+  if (!CANCELLABLE_STATUSES.includes(slot.status)) {
+    const message = slot.status === 'published'
+      ? '이미 발행된 슬롯은 삭제할 수 없습니다'
+      : '발행 진행 중인 슬롯은 삭제할 수 없습니다';
+    return NextResponse.json({ error: { code: 'conflict', message } }, { status: 409 });
   }
 
   try {
-    await prisma.scheduleSlot.update({
-      where: { id: slotId },
+    // 조회~갱신 사이 상태 변경(워커 발행 시작 등) 방지 — 조건부 갱신
+    const { count } = await prisma.scheduleSlot.updateMany({
+      where: { id: slotId, ownerId, status: { in: CANCELLABLE_STATUSES } },
       data: { status: 'cancelled' },
     });
+    if (count === 0) {
+      return NextResponse.json(
+        { error: { code: 'conflict', message: '슬롯 상태가 변경되어 삭제할 수 없습니다. 새로고침 후 다시 시도하세요' } },
+        { status: 409 },
+      );
+    }
   } catch (error) {
     console.error('[schedule/slot] delete error:', error);
     return NextResponse.json({ error: { code: 'internal', message: 'DB 업데이트 실패' } }, { status: 500 });
   }
 
-  // content status를 draft로 복원
-  await prisma.content.updateMany({
-    where: { id: slot.contentId, status: 'scheduled' },
-    data: { status: 'draft' },
-  });
+  // content status를 draft로 복원 — 콘텐츠가 연결돼 있고, 남은 예약 슬롯이 없을 때만
+  if (slot.contentId) {
+    const remaining = await prisma.scheduleSlot.count({
+      where: { contentId: slot.contentId, ownerId, status: { in: ['scheduled', 'publishing'] } },
+    });
+    if (remaining === 0) {
+      await prisma.content.updateMany({
+        where: { id: slot.contentId, ownerId, status: 'scheduled' },
+        data: { status: 'draft' },
+      });
+    }
+  }
 
   await logAudit({
     actor: ownerId,

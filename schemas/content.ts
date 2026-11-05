@@ -1,11 +1,14 @@
 import { z } from 'zod';
-const id = z.string().min(1).max(200);
+import { entityId } from './id';
+const id = entityId;
 export const contentIdSchema = id;
 export const contentListSchema = z.object({
   status: z.enum(['draft', 'scheduled', 'published', 'failed']).optional(),
   channel: z.enum(['blog', 'instagram', 'facebook', 'naver_cafe']).optional(),
   review_status: z.enum(['pending_review', 'approved', 'rejected']).optional(),
   origin: z.enum(['manual', 'auto']).optional(),
+  /** 파생 콘텐츠 조회 — 특정 원본(블로그)의 채널별 자식 */
+  parent_content_id: entityId.optional(),
   page: z.coerce.number().int().min(1).max(1000000).default(1),
   per_page: z.coerce.number().int().min(1).max(100).default(50),
 }).strict();

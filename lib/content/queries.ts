@@ -7,8 +7,8 @@ import type { Channel } from '@/types/db';
 import type { z } from 'zod';
 import type { contentListSchema } from '@/schemas/content';
 export async function listContentRecords(ownerId: string, filters: z.infer<typeof contentListSchema>) {
-  const { review_status, per_page, page, ...rest } = filters;
-  const where = { ownerId, ...rest, reviewStatus: review_status };
+  const { review_status, parent_content_id, per_page, page, ...rest } = filters;
+  const where = { ownerId, ...rest, reviewStatus: review_status, parentContentId: parent_content_id };
   const [rows, total] = await Promise.all([
     prisma.content.findMany({ where, select: { id: true, channel: true, topic: true, status: true,
       origin: true, reviewStatus: true, reviewedAt: true, parentContentId: true, strategyContext: true,

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { entityId } from '@/schemas/id';
 import { authenticated } from '@/lib/visibility/http';
 import { publishCafeTargets } from '@/lib/publish/manual';
-const schema = z.object({ content_id: z.string().min(1).max(200), cafe_target_ids: z.array(z.string().min(1).max(200)).max(20).optional(), }).strict();
+const schema = z.object({ content_id: entityId, cafe_target_ids: z.array(entityId).max(20).optional(), }).strict();
 export async function POST(request: Request) {
   return authenticated(async ownerId => {
     const input = schema.parse(await request.json());
