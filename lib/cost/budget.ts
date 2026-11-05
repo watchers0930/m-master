@@ -24,7 +24,7 @@ async function getBudgetStatus(ownerId?: string): Promise<BudgetStatus> {
       });
     }
 
-    if (!settingsData) {
+    if (!ownerId || !settingsData) {
       return buildStatus(500_000, 0.8, 0);
     }
 

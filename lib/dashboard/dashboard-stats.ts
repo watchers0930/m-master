@@ -49,6 +49,7 @@ function monthRange(monthStr: string): { gte: Date; lt: Date } {
  * DB 오류 -> 동일하게 null 반환 (throw 금지)
  */
 export async function fetchAvgScorePair(
+  ownerId: string,
   monthStr: string,
 ): Promise<AvgScorePair> {
   try {
@@ -66,6 +67,7 @@ export async function fetchAvgScorePair(
     const [thisRows, prevRows] = await Promise.all([
       prisma.content.findMany({
         where: {
+          ownerId,
           scores: { not: Prisma.AnyNull },
           createdAt: { gte: thisRange.gte, lt: thisRange.lt },
         },
@@ -73,6 +75,7 @@ export async function fetchAvgScorePair(
       }),
       prisma.content.findMany({
         where: {
+          ownerId,
           scores: { not: Prisma.AnyNull },
           createdAt: { gte: prevRange.gte, lt: prevRange.lt },
         },
@@ -131,7 +134,7 @@ export async function fetchSchedulePublishedCount(
  * 다음달 schedule_slots 수를 반환 (배너 표시 여부 판단용).
  * 0이면 배너 렌더 스킵.
  */
-export async function fetchUpcomingMonthScheduleCount(): Promise<number> {
+export async function fetchUpcomingMonthScheduleCount(ownerId: string): Promise<number> {
   try {
     const now = kstNow();
     const m = now.getMonth() + 1; // 1-12
@@ -142,6 +145,7 @@ export async function fetchUpcomingMonthScheduleCount(): Promise<number> {
     const { gte, lt } = monthRange(nextMonthStr);
     const count = await prisma.scheduleSlot.count({
       where: {
+        ownerId,
         scheduledAt: { gte, lt },
       },
     });

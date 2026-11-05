@@ -36,7 +36,7 @@ export async function trackCost(options: TrackCostOptions, config?: { strict?: b
 // ----------------------------------------------------------------
 // 이번 달 누적 비용 조회 (budget.ts에서 사용)
 // ----------------------------------------------------------------
-export async function getMonthlySpendKrw(ownerId?: string): Promise<number> {
+export async function getMonthlySpendKrw(ownerId: string): Promise<number> {
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
@@ -45,7 +45,7 @@ export async function getMonthlySpendKrw(ownerId?: string): Promise<number> {
     const where: Record<string, unknown> = {
       occurredAt: { gte: startOfMonth },
     };
-    if (ownerId) where.ownerId = ownerId;
+    where.ownerId = ownerId; // 테넌트 범위 필수 — 전체 합계 경로 제거
 
     const rows = await prisma.costLedger.findMany({
       where,

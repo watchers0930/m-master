@@ -3,6 +3,7 @@
 // GA4 범위: 로그인 소유자의 바인딩만 (설계 §2.3). 미연결·미매핑·도메인 미선택은 블록 상태로 — 0 표시 금지(§2.4).
 // 최근 콘텐츠 지표는 발행 URL host 가 GA4 scope.host 와 정확히 같을 때만 조회·매핑한다(다른 사이트 지표 혼입 차단).
 import { prisma } from '@/lib/prisma';
+import { normalizeGa4Host } from '@/lib/ga4/host';
 import { getMonthlySpendKrw } from '@/lib/cost/tracker';
 import { fetchMonthlyVisitorsPair, fetchMultiplePathMetrics, type PathMetrics } from '@/lib/ga4/visitors';
 import { fetchAvgScorePair, fetchUpcomingMonthScheduleCount, fetchRecentContentPaths } from '@/lib/dashboard/dashboard-stats';
@@ -83,12 +84,13 @@ export async function loadHomeData(ownerId: string | null, domainId: string | nu
         take: 3,
       }),
       prisma.scheduleSlot.count({
-        where: { status: 'published', scheduledAt: { gte: monthStartDate, lt: monthEndDate } },
+        where: { ownerId: ownerId ?? '', status: 'published', scheduledAt: { gte: monthStartDate, lt: monthEndDate } },
       }),
-      getMonthlySpendKrw().catch(() => 0),
+      // 홈 KPI 는 전부 본인 범위 — ownerId 없으면 빈 문자열로 0건 매칭(전체 집계 금지)
+      ownerId ? getMonthlySpendKrw(ownerId).catch(() => 0) : Promise.resolve(0),
       scope ? fetchMonthlyVisitorsPair(scope).then(toGa4Block, () => GA4_THROWN) : Promise.resolve(scopeFail),
-      fetchAvgScorePair(monthStr),
-      fetchUpcomingMonthScheduleCount(),
+      fetchAvgScorePair(ownerId ?? '', monthStr),
+      fetchUpcomingMonthScheduleCount(ownerId ?? ''),
       // 본인 추천만 (N4 — ownerId 조건 없으면 다른 테넌트의 추천 토픽이 노출된다)
       prisma.topicRecommendation.findMany({
         where: { ownerId: ownerId ?? '', weekStart: getMondayOfWeekKST(), channel: 'blog' },
@@ -114,7 +116,7 @@ export async function loadHomeData(ownerId: string | null, domainId: string | nu
     return {
       id: c.id, topic: c.topic, channel: c.channel, createdAt: c.createdAt, scoreAvg: scoreAvgOf(c.scores),
       path,
-      otherHost: !!scope && path !== null && p?.host !== scope.host,
+      otherHost: !!scope && path !== null && normalizeGa4Host(p?.host ?? '') !== normalizeGa4Host(scope.host),
     };
   });
   const queryPaths = [...new Set(recent.filter(r => r.path !== null && !r.otherHost).map(r => r.path as string))];
