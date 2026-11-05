@@ -4,8 +4,10 @@ import { CLAUDE_MODEL, calcChatKrw } from "@/lib/claude/chat";
 import type { ConsultingLlmSnapshot } from "@/types/consulting";
 /** A full snapshot (sends its llmInput) or an LLM projection being fitted. */
 type PromptInput = ConsultingLlmSnapshot & { llmInput?: ConsultingLlmSnapshot };
-// v3.1: one validator-feedback repair call (generation procedure changed → new input hash, see ./hash).
-export const VERSIONS = { schemaVersion: "v3", promptVersion: "consulting-v3.1", model: CLAUDE_MODEL };
+// v3.1: one validator-feedback repair call. v3.2: strict tool schema + all-violation feedback + token prefix normalization.
+// Any procedure change must bump promptVersion (new input hash → no reuse of reports made by an older procedure);
+// __tests__/procedure-version.test.cjs fails when the procedure fingerprint changes without a bump.
+export const VERSIONS = { schemaVersion: "v3", promptVersion: "consulting-v3.2", model: CLAUDE_MODEL };
 export const MAX_OUTPUT_TOKENS = 4096;
 export const MAX_INPUT_BYTES = 80000;
 /** At most one repair call follows a rejected first answer. */
