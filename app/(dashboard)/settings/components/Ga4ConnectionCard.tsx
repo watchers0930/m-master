@@ -6,7 +6,7 @@
 import { useEffect } from 'react';
 import { useGa4Settings } from '@/hooks/useGa4Settings';
 import { useOwnedDomains } from '@/hooks/useOwnedDomains';
-import type { Ga4BindingStatus } from '../ga4-api';
+import type { Ga4BindingStatus } from '@/lib/api/ga4-settings';
 
 const STATUS_META: Record<Ga4BindingStatus, { label: string; color: string }> = {
   verified: { label: '연결됨', color: 'var(--green-700)' },

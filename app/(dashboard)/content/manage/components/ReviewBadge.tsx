@@ -1,7 +1,7 @@
 // 콘텐츠 상태 배지 — 자동 생성(origin)·검토 상태·발행 상태를 서로 다른 배지로 (설계 §6).
 // 발행 상태(status)와 검토 상태(review_status)는 독립이다(부록 A).
 import type { ContentStatus } from '@/types/db';
-import type { ContentOrigin, ReviewStatus } from '../types';
+import type { ContentOrigin, ReviewStatus } from '@/types/content-review';
 
 type Tone = { bg: string; color: string };
 

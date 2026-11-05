@@ -1,120 +1,31 @@
-// app/(dashboard)/page.tsx — marketing/app 대시보드 (Prisma 변환)
+// app/(dashboard)/home/page.tsx — marketing/app 대시보드 (렌더 전용).
+// 데이터 로딩·GA4 범위 해석·host 격리는 lib/dashboard/home-data.ts. ?domainId= 로 GA4 조회 도메인을 고른다.
 
 export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
-import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
-import { getMonthlySpendKrw } from '@/lib/cost/tracker';
-import { fetchMonthlyVisitorsPair, fetchMultiplePathMetrics } from '@/lib/ga4/visitors';
 import { DashboardCalendar } from '../DashboardCalendar';
 import { RefreshTopicsButton } from '../components/RefreshTopicsButton';
-import {
-  fetchAvgScorePair,
-  fetchUpcomingMonthScheduleCount,
-  fetchRecentContentPaths,
-} from '@/lib/dashboard/dashboard-stats';
-import { gradeFromScore, calcMonthDelta, calcScoreDelta, nextMonthInfo } from '@/lib/dashboard/grades';
-import { kstNow } from '@/lib/ga4/_internal';
-import { resolveGa4Scope } from '@/lib/ga4/scope';
-import { toGa4Block, type Ga4Block } from '@/types/ga4';
-import type { PathMetrics } from '@/lib/ga4/visitors';
+import { gradeFromScore, calcMonthDelta, calcScoreDelta } from '@/lib/dashboard/grades';
+import { loadHomeData, parseDomainId } from '@/lib/dashboard/home-data';
 import { Ga4BlockState } from '@/components/ga4/Ga4BlockState';
+import { HomeDomainBar } from './HomeDomainBar';
 
 // ── 페이지 ──────────────────────────────────────────────────────────
 
 const BUDGET_MONTHLY = 500000;
 
-interface TopicFactors {
-  tags?: { label: string; type: 's' | 'e' | 't' }[];
-  reason?: string;
-  ga4_unavailable?: boolean;
-}
-
-export default async function DashboardPage() {
-  const now = kstNow();
-  const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const monthYmd = `${monthStr}-01`;
-  const monthStart = monthYmd;
-  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-  const nextInfo = nextMonthInfo(now);
-  const nextMonthName = nextInfo.month;
-
-  // 월 시작/종료 날짜 계산
-  const monthStartDate = new Date(`${monthStr}-01T00:00:00Z`);
-  const nextMonth = monthStartDate.getMonth() + 1;
-  const monthEndDate = new Date(monthStartDate.getFullYear(), nextMonth, 1);
-
-  // GA4 범위: 로그인 소유자의 바인딩만 (설계 §2.3). 미연결·미매핑은 블록 상태로 표시 — 0 표시 금지(§2.4)
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const domainId = parseDomainId((await searchParams).domainId);
   const session = await auth();
   const ownerId = session?.user?.id ?? null;
-  // 조회 예외는 페이지 전체 500 대신 해당 KPI 만 '연결 오류'로 (기존 .catch 동작 유지, 단 0 표시 없음)
-  const GA4_THROWN: Ga4Block<never> = { state: 'error', code: 'upstream_error', retryable: true };
-  const ga4Scope = ownerId ? await resolveGa4Scope(ownerId).catch(() => null) : null;
-  const scopeFail: Ga4Block<never> = ownerId && !ga4Scope ? GA4_THROWN
-    : { state: ga4Scope && !ga4Scope.ok ? ga4Scope.reason : 'not_configured' };
-  const scope = ga4Scope?.ok ? ga4Scope.scope : null;
-
-  // ── 1차 데이터 로딩 ──────────────────────────────────────────────
-  const [recent, publishedCount, costMtd, ga4VisitorsPair, avgScorePair, nextMonthScheduleCount, topicRows] =
-    await Promise.all([
-      // 본인 콘텐츠만 — 이 목록의 경로를 본인 GA4 속성으로 조회하므로 타 소유자 글이 섞이면 안 된다
-      prisma.content.findMany({
-        where: { ownerId: ownerId ?? '' },
-        select: { id: true, channel: true, topic: true, status: true, scores: true, costKrw: true, createdAt: true, updatedAt: true },
-        orderBy: { createdAt: 'desc' },
-        take: 3,
-      }),
-      prisma.scheduleSlot.count({
-        where: {
-          status: 'published',
-          scheduledAt: { gte: monthStartDate, lt: monthEndDate },
-        },
-      }),
-      getMonthlySpendKrw().catch(() => 0),
-      scope ? fetchMonthlyVisitorsPair(scope).then(toGa4Block, () => GA4_THROWN) : Promise.resolve(scopeFail),
-      fetchAvgScorePair(monthStr),
-      fetchUpcomingMonthScheduleCount(),
-      (async () => {
-        const { getMondayOfWeekKST } = await import('@/lib/topics/week-utils');
-        const weekStart = getMondayOfWeekKST();
-        return prisma.topicRecommendation.findMany({
-          where: { ownerId: ownerId ?? '', weekStart, channel: 'blog' },
-          orderBy: { score: 'desc' },
-          take: 5,
-          select: { id: true, topic: true, score: true, factors: true },
-        });
-      })(),
-    ]);
+  const {
+    publishedCount, costMtd, ga4VisitorsPair, avgScorePair, nextMonthScheduleCount, nextMonthName,
+    recommendations, recent, recentMetrics, ga4Reason,
+  } = await loadHomeData(ownerId, domainId);
 
   const budgetPct = ((costMtd / BUDGET_MONTHLY) * 100).toFixed(1);
-
-  const recommendations = topicRows.map((row, idx) => {
-    const factors = (row.factors ?? {}) as TopicFactors;
-    return {
-      rank: idx + 1,
-      title: row.topic,
-      tags: factors.tags ?? [],
-      score: Math.round(row.score),
-    };
-  });
-
-  // ── 2차: 최근 콘텐츠 GA4 path 조회 ──────────────────────────────
-  const recentIds = recent.map(c => c.id);
-  const recentPaths = await fetchRecentContentPaths(recentIds);
-
-  const validPaths = recentPaths
-    .map(r => r.path)
-    .filter((p): p is string => p !== null);
-
-  const recentMetrics: Ga4Block<Record<string, PathMetrics>> = !scope
-    ? scopeFail
-    : validPaths.length > 0
-      ? await fetchMultiplePathMetrics(validPaths, monthStart, today, scope).then(toGa4Block, () => GA4_THROWN)
-      : { state: 'ok', data: {}, collected_at: '', host: scope.host, property_id: scope.propertyId };
-
-  const pathMap = new Map(recentPaths.map(r => [r.contentId, r.path]));
 
   // ── 변화율 계산 ──────────────────────────────────────────────────
   const visitorsOk = ga4VisitorsPair.state === 'ok' ? ga4VisitorsPair.data : null;
@@ -128,6 +39,10 @@ export default async function DashboardPage() {
 
   return (
     <>
+      {ownerId && (ga4Reason === 'domain_required' || domainId) && (
+        <HomeDomainBar selectedId={domainId} domainRequired={ga4Reason === 'domain_required'} />
+      )}
+
       {/* ── KPI ── */}
       <div className="kpi-row">
 
@@ -344,35 +259,25 @@ export default async function DashboardPage() {
             {recent.length === 0 ? (
               <div style={{padding:'24px',textAlign:'center',color:'var(--sub)',fontSize:12}}>발행된 콘텐츠가 없습니다</div>
             ) : recent.map((c, i) => {
-              const scoreAvg =
-                c.scores &&
-                typeof c.scores === 'object' &&
-                !Array.isArray(c.scores) &&
-                'avg' in c.scores &&
-                typeof (c.scores as Record<string, unknown>).avg === 'number'
-                  ? (c.scores as Record<string, unknown>).avg as number
-                  : null;
-              const { letter: gl, cls: gc } = gradeFromScore(scoreAvg);
+              const { letter: gl, cls: gc } = gradeFromScore(c.scoreAvg);
               const ch = c.channel === 'blog' ? '블로그' : c.channel === 'instagram' ? '인스타그램' : '페이스북';
 
-              const path = pathMap.get(c.id) ?? null;
-              const metrics = path && recentMetrics.state === 'ok' ? recentMetrics.data[path] ?? null : null;
+              const path = c.path;
+              const metrics = path && !c.otherHost && recentMetrics.state === 'ok' ? recentMetrics.data[path] ?? null : null;
               // GA4 실패는 0·'—'(미수집)과 구분해 상태 문구로 표시 (설계 §2.4)
-              const ga4Fail = path !== null && recentMetrics.state !== 'ok'
+              const ga4Fail = path !== null && !c.otherHost && recentMetrics.state !== 'ok'
                 ? <Ga4BlockState block={recentMetrics} compact />
                 : null;
+              const na = (title: string) => <span title={title} style={{color:'var(--sub)'}}>—</span>;
 
-              const viewsDisplay = path === null
-                ? <span title="발행 URL 없음" style={{color:'var(--sub)'}}>—</span>
-                : ga4Fail ?? (metrics === null
-                  ? <span title="GA4 미수집" style={{color:'var(--sub)'}}>—</span>
-                  : metrics.screenPageViews.toLocaleString());
+              // 다른 도메인에 발행된 글은 현재 GA4 범위 지표를 붙이지 않는다 (설계 §2.3 host 격리)
+              const viewsDisplay = path === null ? na('발행 URL 없음')
+                : c.otherHost ? na('다른 도메인에 발행된 글 — 해당 도메인을 선택하면 지표를 볼 수 있습니다')
+                : ga4Fail ?? (metrics === null ? na('GA4 미수집') : metrics.screenPageViews.toLocaleString());
 
-              const clicksDisplay = path === null
-                ? <span title="발행 URL 없음" style={{color:'var(--sub)'}}>—</span>
-                : ga4Fail ?? (metrics === null
-                  ? <span title="GA4 미수집" style={{color:'var(--sub)'}}>—</span>
-                  : metrics.sessions.toLocaleString());
+              const clicksDisplay = path === null ? na('발행 URL 없음')
+                : c.otherHost ? na('다른 도메인에 발행된 글 — 해당 도메인을 선택하면 지표를 볼 수 있습니다')
+                : ga4Fail ?? (metrics === null ? na('GA4 미수집') : metrics.sessions.toLocaleString());
 
               return (
                 <div key={c.id} className="perf-item">

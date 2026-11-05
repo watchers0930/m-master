@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarView } from './CalendarView';
 import { listSlots, autoSchedule, applyAiProposals, clearSlots } from '@/lib/api/schedule';
@@ -34,6 +34,7 @@ export default function SchedulerPage() {
   const [aiState, setAiState] = useState<'idle' | 'analyzing' | 'done' | 'applying'>('idle');
   const [proposals, setProposals] = useState<AiProposal[]>([]);
   const [ga4Warning, setGa4Warning] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const goPrev = () => {
     if (month === 1) { setYear((y) => y - 1); setMonth(12); }
@@ -47,30 +48,55 @@ export default function SchedulerPage() {
   const scheduledCount = slots.filter((s) => s.status === 'scheduled').length;
   const publishedCount = slots.filter((s) => s.status === 'published').length;
 
+  // 모달을 닫거나 다시 연 뒤 늦게 도착한 이전 분석 결과가 화면을 덮지 않도록 실행 번호로 구분한다
+  const aiRunRef = useRef(0);
+
   const handleAiOpen = async () => {
+    const run = ++aiRunRef.current;
     setAiOpen(true);
     setAiState('analyzing');
     setProposals([]);
     setGa4Warning(null);
-    const res = await autoSchedule(year, month, slots);
-    const result = res.data as AutoScheduleResult | null;
-    setProposals(result?.proposals ?? []);
-    if (result?.ga4Fallback) {
-      setGa4Warning(result.ga4Error ?? 'GA4 데이터를 가져올 수 없습니다');
+    setAiError(null);
+    try {
+      const res = await autoSchedule(year, month, slots);
+      if (run !== aiRunRef.current) return;
+      const result = res.data as AutoScheduleResult | null;
+      setProposals(result?.proposals ?? []);
+      if (result?.ga4Fallback) setGa4Warning(result.ga4Error ?? 'GA4 데이터를 가져올 수 없습니다');
+    } catch (e) {
+      if (run !== aiRunRef.current) return;
+      setProposals([]);
+      setAiError(e instanceof Error && e.message ? e.message : '자동편성 분석에 실패했습니다');
+    } finally {
+      // 성공·실패 모두 분석 상태를 끝낸다 (예외 시 'analyzing' 에 멈추지 않게)
+      if (run === aiRunRef.current) setAiState('done');
     }
-    setAiState('done');
   };
 
   const handleAiApply = async () => {
+    const run = aiRunRef.current;
     setAiState('applying');
-    const res = await applyAiProposals(proposals);
-    if (res.data) setSlots((prev) => [...prev, ...(res.data as ScheduleSlot[])]);
-    setAiOpen(false);
-    setAiState('idle');
-    setGa4Warning(null);
+    setAiError(null);
+    try {
+      const res = await applyAiProposals(proposals);
+      if (res.error) throw new Error(res.error.message ?? '편성 적용에 실패했습니다');
+      if (res.data) setSlots((prev) => [...prev, ...(res.data as ScheduleSlot[])]);
+      if (run !== aiRunRef.current) return;
+      setAiOpen(false);
+      setAiState('idle');
+      setGa4Warning(null);
+    } catch (e) {
+      if (run !== aiRunRef.current) return;
+      setAiError(e instanceof Error && e.message ? e.message : '편성 적용에 실패했습니다');
+      setAiState('done');
+    }
   };
 
-  const handleAiClose = () => { setAiOpen(false); setAiState('idle'); setProposals([]); setGa4Warning(null); };
+  const handleAiClose = () => {
+    aiRunRef.current++;
+    setAiOpen(false); setAiState('idle'); setProposals([]); setGa4Warning(null); setAiError(null);
+  };
 
   const [clearing, setClearing] = useState(false);
   const handleClear = async () => {
@@ -164,9 +190,9 @@ export default function SchedulerPage() {
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b45309" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0, marginTop: 1 }}>
                     <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                   </svg>
-                  <div>
-                    <p style={{ fontSize: 12, fontWeight: 600, color: '#92400e', marginBottom: 2 }}>GA4 데이터 조회 실패 — 폴백 패턴 사용</p>
-                    <p style={{ fontSize: 11, color: '#b45309' }}>GA4에 연결할 수 없어 평일 균등 배분으로 대체됩니다. 실제 방문자 패턴이 반영되지 않았습니다.</p>
+                  <div role="status">
+                    <p style={{ fontSize: 12, fontWeight: 600, color: '#92400e', marginBottom: 2 }}>GA4 방문자 패턴을 사용할 수 없습니다</p>
+                    <p style={{ fontSize: 11, color: '#b45309' }}>{ga4Warning}</p>
                   </div>
                 </div>
               )}
@@ -180,7 +206,11 @@ export default function SchedulerPage() {
                 </div>
               )}
 
-              {aiState === 'done' && proposals.length === 0 && (
+              {aiError && (
+                <p role="alert" style={{ fontSize: 12, color: '#dc2626', textAlign: 'center', padding: '12px 0' }}>{aiError}</p>
+              )}
+
+              {aiState === 'done' && proposals.length === 0 && !aiError && (
                 <p style={{ fontSize: 13, color: 'var(--sub)', textAlign: 'center', padding: '24px 0' }}>
                   {ga4Warning
                     ? 'GA4 데이터 미수집으로 자동편성을 건너뜁니다. GA4 연결 확인 후 재시도하세요.'

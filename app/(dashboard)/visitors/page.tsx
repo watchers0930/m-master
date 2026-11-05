@@ -10,7 +10,7 @@ import {
   ReferralTables, DemographicsBlock, DevicesBlock, EntryExitBlock,
   nfmt, pct100, dur,
 } from './components';
-import type { VisitorPeriod } from './api';
+import type { VisitorPeriod } from '@/lib/api/visitors';
 import { useVisitorsData } from '@/hooks/useVisitorsData';
 import { Ga4BlockState, Ga4BlockView } from '@/components/ga4/Ga4BlockState';
 import { Ga4DomainSelect } from '@/components/ga4/Ga4DomainSelect';

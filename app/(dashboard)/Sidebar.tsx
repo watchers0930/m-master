@@ -23,9 +23,10 @@ export function Sidebar() {
   useEffect(() => {
     const today = new Date().toISOString().slice(0, 10);
 
-    listContents({ status: 'draft' }).then(res => {
-      setDraftCount(res.data?.items.length ?? 0);
-    });
+    // 개수만 필요 — 1건만 받고 서버 total 을 쓴다(목록 상한 50건에 묶이지 않음)
+    listContents({ status: 'draft', per_page: 1 })
+      .then(res => setDraftCount(res.total))
+      .catch(() => setDraftCount(0));
 
     const now = new Date();
     listSlots({ year: now.getFullYear(), month: now.getMonth() + 1 }).then(res => {

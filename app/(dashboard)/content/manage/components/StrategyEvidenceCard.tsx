@@ -1,13 +1,24 @@
 // 전략 근거 카드 — 이 글이 근거로 삼은 컨설팅 리포트 액션·관측 근거·기간·한계 (설계 §3.5·§6).
 // GA4 내부 수치는 이 카드에만 표시한다(본문 미리보기에 주입 금지). 값은 서버가 만든 표시용 문자열 그대로.
 import Link from 'next/link';
-import type { StrategyContextDTO } from '../types';
+import type { StrategyContextDTO } from '@/types/content-review';
 
 const PRIORITY_TONE: Record<StrategyContextDTO['priority'], { bg: string; color: string }> = {
   P0: { bg: '#fee2e2', color: '#b91c1c' },
   P1: { bg: 'var(--amber-100)', color: 'var(--amber-700)' },
   P2: { bg: 'var(--n100)', color: 'var(--sub)' },
 };
+
+/**
+ * 컨설팅 화면은 (domainId, reportId) 쌍으로 리포트를 조회한다 — reportId 만 넘기면 마지막 선택 도메인 기준으로
+ * 조회돼 다른 도메인의 리포트가 404 가 된다. 도메인을 알면 함께 넘긴다(consulting/page.tsx 딥링크 형식).
+ */
+function reportHref(ctx: StrategyContextDTO): string {
+  const qs = new URLSearchParams();
+  if (ctx.domain_id) qs.set('domainId', ctx.domain_id);
+  qs.set('reportId', ctx.report_id);
+  return `/consulting?${qs}`;
+}
 
 export default function StrategyEvidenceCard({ ctx }: { ctx: StrategyContextDTO }) {
   const tone = PRIORITY_TONE[ctx.priority] ?? PRIORITY_TONE.P2;
@@ -17,7 +28,7 @@ export default function StrategyEvidenceCard({ ctx }: { ctx: StrategyContextDTO 
         <span style={{ fontSize: 11.5, fontWeight: 700, color: '#6d28d9' }}>전략 근거</span>
         <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 3, background: tone.bg, color: tone.color }}>{ctx.priority}</span>
         <Link
-          href={`/consulting?reportId=${encodeURIComponent(ctx.report_id)}`}
+          href={reportHref(ctx)}
           style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, color: 'var(--blue-600)' }}
         >
           리포트 보기 →

@@ -8,7 +8,7 @@
 import { useState } from 'react';
 import { MARKETS, type DomainDTO, type Market } from '@/types/visibility';
 import { useCreateDomain } from './use-create-domain';
-import { DomainApiError } from './api';
+import { DomainApiError } from '@/lib/api/domains';
 
 const MARKET_LABELS: Record<Market, string> = {
   'ko-KR': '한국 · ko-KR',

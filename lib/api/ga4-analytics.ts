@@ -1,6 +1,6 @@
-// app/(dashboard)/analytics/api.ts
-// 분석 화면 API 래퍼 (설계 §4.7). GA4 부분은 Ga4Block — DB 지표(발행 목록)는 블록 밖에 그대로 둔다.
-import type { Ga4Block } from '@/components/ga4/types';
+// lib/api/ga4-analytics.ts
+// 분석 화면·스케줄러 자동편성 공용 GA4 API 래퍼 (설계 §4.7). GA4 부분은 Ga4Block — DB 지표(발행 목록)는 블록 밖에 그대로 둔다.
+import type { Ga4Block } from '@/types/ga4';
 import type { Channel } from '@/types/db';
 import type { DowChannelRow, PathMetrics } from '@/lib/ga4/visitors';
 

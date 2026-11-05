@@ -5,8 +5,8 @@
 
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { updateContent, ContentApiError } from '@/app/(dashboard)/content/manage/api';
-import type { ContentDetail, ContentPatchBody } from '@/app/(dashboard)/content/manage/types';
+import { updateContent, ContentApiError } from '@/lib/api/content';
+import type { ContentDetail, ContentPatchBody } from '@/types/content-review';
 import { contentKeys, refreshContent } from './useContentDetail';
 import type { ReviewNotice } from './useContentReview';
 

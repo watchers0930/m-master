@@ -4,7 +4,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { fetchRealtime, fetchVisitorsData, type VisitorPeriod } from '@/app/(dashboard)/visitors/api';
+import { fetchRealtime, fetchVisitorsData, type VisitorPeriod } from '@/lib/api/visitors';
 
 const TIMEOUT_MS = 15_000;
 

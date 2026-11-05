@@ -4,8 +4,8 @@
 'use client';
 
 import { useQuery, type QueryClient } from '@tanstack/react-query';
-import { getContentDetail } from '@/app/(dashboard)/content/manage/api';
-import type { ContentDetail } from '@/app/(dashboard)/content/manage/types';
+import { getContentDetail } from '@/lib/api/content';
+import type { ContentDetail } from '@/types/content-review';
 
 export const contentKeys = {
   listRoot: ['contents', 'list'] as const,

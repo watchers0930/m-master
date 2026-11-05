@@ -6,8 +6,8 @@
 
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { reviewContent, ContentApiError } from '@/app/(dashboard)/content/manage/api';
-import type { ReviewDecision, ReviewResult } from '@/app/(dashboard)/content/manage/types';
+import { reviewContent, ContentApiError } from '@/lib/api/content';
+import type { ReviewDecision, ReviewResult } from '@/types/content-review';
 import { refreshContent } from './useContentDetail';
 
 export type ReviewNotice = { tone: 'ok' | 'warn' | 'error'; text: string };

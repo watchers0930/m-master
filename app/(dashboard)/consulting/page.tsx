@@ -126,6 +126,15 @@ function ConsultingContent() {
     setSelectedDomainId(null);
     setActiveReportId(null);
   }, [requestedId]);
+  // 같은 화면에서 다른 리포트 딥링크로 이동해도 반영한다(useState 초기값은 최초 1회만 읽힘).
+  // 도메인 변경 effect 뒤에 선언 — 둘이 함께 바뀌면 도메인 초기화 후 요청 리포트로 맞춘다.
+  const requestedReportId = searchParams.get('reportId');
+  const previousReportParam = useRef(requestedReportId);
+  useEffect(() => {
+    if (previousReportParam.current === requestedReportId) return;
+    previousReportParam.current = requestedReportId;
+    if (requestedReportId) setActiveReportId(requestedReportId);
+  }, [requestedReportId]);
   const [search, setSearch] = useState('');
   const domainsQuery = useDomains(search);
   // Direct links are resolved by an owner-scoped server query even outside loaded pages.
@@ -212,6 +221,9 @@ function ConsultingContent() {
             <div className="card" style={{ textAlign: 'center', padding: '28px 20px' }}>
               <p role="alert" style={{ fontSize: 12.5, color: '#dc2626' }}>리포트를 불러오지 못했습니다.</p>
               <p style={{ fontSize: 11.5, color: 'var(--sub)', marginTop: 4 }}>{errMsg(detailQuery.error)}</p>
+              {detailQuery.error instanceof ConsultingApiError && detailQuery.error.status === 404 && activeReportId === requestedReportId && !requestedId && (
+                <p style={{ fontSize: 11.5, color: 'var(--sub)', marginTop: 4 }}>다른 도메인의 리포트일 수 있습니다. 상단에서 도메인을 바꿔 확인해 주세요.</p>
+              )}
               <button type="button" className="btn btn-ghost" style={{ marginTop: 12 }} onClick={() => detailQuery.refetch()}>다시 조회</button>
             </div>
           )}

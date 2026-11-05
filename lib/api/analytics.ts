@@ -94,14 +94,12 @@ export interface SettingsData {
   budget_monthly: number;
   alert_threshold: number;
   notifications: Record<string, boolean>;
-  analytics_keys: { ga4_property_id?: string };
 }
 
+// 일반 설정만 읽는다. GA4 연결 상태는 useGa4Settings(React Query 단일 쿼리)가 단독 소유 —
+// 여기서 /api/settings/ga4 를 다시 부르면 설정 진입마다 중복 요청이 생긴다(설계 §4.6, 성능 원칙).
 export async function getSettings(): Promise<ApiResponse<SettingsData>> {
-  const [settingsRes, ga4Res] = await Promise.all([
-    fetch('/api/settings', { cache: 'no-store' }).catch(() => null),
-    fetch('/api/settings/ga4', { cache: 'no-store' }).catch(() => null),
-  ]);
+  const settingsRes = await fetch('/api/settings', { cache: 'no-store' }).catch(() => null);
 
   const defaults: SettingsData = {
     brand_guide: {},
@@ -115,7 +113,6 @@ export async function getSettings(): Promise<ApiResponse<SettingsData>> {
       performance_spike: false,
       budget_80pct: true,
     },
-    analytics_keys: { ga4_property_id: '' },
   };
 
   if (settingsRes?.ok) {
@@ -127,11 +124,6 @@ export async function getSettings(): Promise<ApiResponse<SettingsData>> {
       defaults.alert_threshold = j.data.alert_threshold ?? 0.8;
       defaults.notifications = j.data.notifications ?? defaults.notifications;
     }
-  }
-
-  if (ga4Res?.ok) {
-    const g = await ga4Res.json();
-    defaults.analytics_keys = { ga4_property_id: g.ga4_property_id ?? '' };
   }
 
   return { data: defaults, error: null };

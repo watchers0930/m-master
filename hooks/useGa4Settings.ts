@@ -4,7 +4,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { disconnectGa4Oauth, getGa4Settings, saveAutomationDomain } from '@/app/(dashboard)/settings/ga4-api';
+import { disconnectGa4Oauth, getGa4Settings, saveAutomationDomain } from '@/lib/api/ga4-settings';
 
 const KEY = ['settings', 'ga4'] as const;
 

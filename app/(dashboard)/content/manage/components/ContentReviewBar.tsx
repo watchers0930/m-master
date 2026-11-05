@@ -4,7 +4,7 @@
 
 import { useState } from 'react';
 import { useContentReview, type ReviewNotice } from '@/hooks/useContentReview';
-import type { ContentDetail, ReviewDecision } from '../types';
+import type { ContentDetail, ReviewDecision } from '@/types/content-review';
 import { REVIEW_LABEL } from './ReviewBadge';
 
 const REASON_MAX = 500;

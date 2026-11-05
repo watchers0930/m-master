@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { useContentEdit } from '@/hooks/useContentEdit';
 import type { ReviewNotice } from '@/hooks/useContentReview';
-import type { ContentDetail } from '../types';
+import type { ContentDetail } from '@/types/content-review';
 import { NoticeLine } from './ContentReviewBar';
 
 const TOPIC_MAX = 500;

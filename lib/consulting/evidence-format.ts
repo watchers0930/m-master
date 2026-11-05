@@ -11,5 +11,6 @@ export function formatEvidenceValue(ev: EvidenceRef | undefined): string {
   return `${base}${unit}`;
 }
 export function renderEvidenceTokens(text: string, evidence: Map<string,EvidenceRef>) {
+  if (!text) return ''; // 저장 JSON 의 누락 필드 방어 (화면·서버 공용)
   return text.replace(/\{\{ev:([a-zA-Z0-9_.-]+)\}\}/g, (_,id) => formatEvidenceValue(evidence.get(id)));
 }

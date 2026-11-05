@@ -67,6 +67,8 @@ export interface Content {
   parent_content_id: string | null;
   strategy_context: {
     v?: 1; report_id: string; action_id: string; priority: 'P0' | 'P1' | 'P2';
+    /** 리포트 소속 도메인 — 컨설팅 딥링크(?domainId=&reportId=)용. 서버가 채우기 전 행은 없음 */
+    domain_id?: string;
     action_title: string; action_description?: string;
     evidence: { id: string; label: string; value: string }[];
     range: { from: string; to: string }; limitations: string[]; truncated?: boolean;
