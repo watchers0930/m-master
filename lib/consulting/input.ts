@@ -1,5 +1,6 @@
 import { readStructuredInput } from "./structured-input";
 import { businessContext } from "./business";
+import { consultingBusinessSchema } from "@/schemas/consulting";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { visibilityData } from "@/lib/visibility/data";
@@ -186,8 +187,10 @@ export async function collectInput(ownerId: string, domain: {
         snapshot.evidence = [...new Map(snapshot.evidence.map(e => [e.id, e])).values()];
         for (const s of snapshot.sourceStatus)
             add(`status_${s.source}`, "status", `${SOURCE_KO[s.source] ?? s.source} 데이터 준비 상태`, s.status, null);
-        const {structuredMetrics, ga4, ...legacy} = snapshot;
-        return {...consultingSnapshotSchema.parse({...legacy, evidence: legacy.evidence.slice(0,700)}), evidence: legacy.evidence, ...(structuredMetrics ? {structuredMetrics} : {}), ...(ga4 ? {ga4} : {})};
+        // v1-shaped base is validated strictly; v3-only fields (ga4, business) are carried alongside, like ga4 always was.
+        const {structuredMetrics, ga4, business: brand, ...legacy} = snapshot;
+        return {...consultingSnapshotSchema.parse({...legacy, evidence: legacy.evidence.slice(0,700)}), evidence: legacy.evidence, ...(structuredMetrics ? {structuredMetrics} : {}), ...(ga4 ? {ga4} : {}),
+            ...(brand ? {business: consultingBusinessSchema.parse(brand)} : {})};
         }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 20000 });
       } catch (error) {
         if (!(error instanceof SourceReadFailure)) throw error;
