@@ -4,13 +4,15 @@ import { prisma } from '@/lib/prisma';
 /** Paid plans that may run the automatic pipeline (same entitlement source as lib/billing/limits.ts: users.plan). */
 export const PIPELINE_PLANS = ['starter', 'pro'] as const;
 /**
- * The single pipeline entitlement rule, shared by the cron sweep and the per-owner check.
- * `users.plan` is the entitlement (the billing webhook drops it to `free` on cancel/delete);
- * a `past_due` subscription keeps the plan, so it is excluded here to stop paid automation while unpaid.
- * Owners with a paid plan and no subscription row (operator-granted plan) are eligible.
+ * The single pipeline entitlement rule, shared by the cron sweep and the per-owner check: a paid plan AND either
+ *  - no subscription row at all (operator-granted plan, e.g. the in-house account), or
+ *  - an active subscription.
+ * A billed owner whose subscriptions are all past_due/canceled is blocked even if users.plan still says paid
+ * (e.g. a cancel webhook that failed half-way before the transaction fix — codex review 2026-11-06).
  */
 export const pipelineEntitlement: Prisma.UserWhereInput = {
-  plan: { in: [...PIPELINE_PLANS] }, subscriptions: { none: { status: 'past_due' } },
+  plan: { in: [...PIPELINE_PLANS] },
+  OR: [{ subscriptions: { none: {} } }, { subscriptions: { some: { status: 'active' } } }],
 };
 export async function* pipelineOwners(ownerId?: string) {
   let cursor: string | undefined;

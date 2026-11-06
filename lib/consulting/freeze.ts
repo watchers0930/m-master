@@ -13,7 +13,9 @@ export function toLlmGa4(ga4: ConsultingGa4): ConsultingLlmGa4 {
 export const MAX_SNAPSHOT_BYTES = 2 * 1024 * 1024;
 /** Full chart evidence and fitted LLM projection are frozen separately before hashing. */
 export function freezeSnapshot(input: ConsultingSnapshot, version: 'v2' | 'v3' = input.schemaVersion ?? 'v2'): ConsultingSnapshot {
-  const {structuredMetrics,sections:_sections,llmInput:_llm,schemaVersion:_version,...legacy} = structuredClone(input);
+  const {structuredMetrics,sections:_sections,llmInput:_llm,schemaVersion:_version,business,...rest} = structuredClone(input);
+  // Brand context is a v3 field (v2 schemas are strict and unchanged).
+  const legacy = version === 'v3' && business ? {...rest, business} : rest;
   const base = {...legacy,structuredMetrics:structuredMetrics ?? {keywords:[],demand:[],location:MARKET_LOCATIONS[input.market].location_code,period:null}};
   const built=buildSections(base);
   const llmInput=fitSnapshot({...legacy, ...(legacy.ga4 ? { ga4:toLlmGa4(legacy.ga4) } : {}), evidence:[...legacy.evidence.filter(e=>e.source==='ga4'),...legacy.evidence.filter(e=>e.source!=='ga4')].slice(0,700),

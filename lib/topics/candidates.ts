@@ -75,6 +75,9 @@ export interface BuildCandidatesInput {
   businessContext?: BusinessContext;
 }
 
+// Account/legal/payment pages are traffic, not blog subjects (운영 실데이터: '마이페이지', '취소 및 환불 정책').
+const UTILITY_PAGE = /\/(?:login|signin|signup|register|logout|profile|mypage|my|account|settings|refund|terms|privacy|policy|legal|admin|checkout|cart|payment|billing|invite|offline)(?:\/|$|\?)/i;
+const UTILITY_TITLE = /마이페이지|로그인|회원가입|약관|개인정보|환불|정책|결제|장바구니|설정/;
 /** GA4 pageTitle → topic text: drop "| site" / " - site" suffixes and the brand name; null when nothing meaningful remains. */
 export function pageTopic(title: string | null | undefined, companyName?: string): string | null {
   if (!title) return null;
@@ -124,7 +127,7 @@ export function buildCandidates(input: BuildCandidatesInput): Candidate[] {
     // 주제는 페이지 제목에서(경로는 주제가 아님: 'renewal/jeonse' → "리뉴얼" 제목 오염, 2026-11-06 운영). 사이트명 접미사 제거,
     // 홈(/)·제목 없는 페이지는 후보에서 제외.
     const name = pageTopic(title, biz.companyName);
-    if (path === '/' || !name) continue;
+    if (path === '/' || !name || UTILITY_PAGE.test(path) || UTILITY_TITLE.test(name)) continue;
     const topic = `${name} 완벽 가이드`;
     const weight = sessions >= 100 ? 9 : 8;
     push(topic, 'ga4_popular', weight);

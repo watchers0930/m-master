@@ -35,7 +35,9 @@ function normalizeTokens<T>(value: T, evidence: Set<string>): T {
         return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, normalizeTokens(v, evidence)])) as T;
     return value;
 }
-const TASK_TITLE = /(?:콘텐츠|블로그|글|포스트|게시물)\s*(?:을|를)?\s*(?:작성|생성|제작|발행|기획|최적화)|(?:작성|생성|제작|최적화)(?:\s*(?:및|와|과)\s*\S+)?\s*$/;
+// A content_create title that names the work instead of the subject: "<콘텐츠|블로그|…> 작성/생성/제작/발행/기획" (but not
+// "작성법/작성 방법" — a how-to subject), or a bare "생성/최적화 …" label. "임대차 계약서 작성" (a subject) passes.
+const TASK_TITLE = /(?:콘텐츠|블로그|포스트|포스팅|게시물|게시글|원고)(?:\s*(?:을|를))?\s*(?:작성|생성|제작|발행|기획)(?!\s*(?:법|방법|요령|팁|노하우))|^\s*(?:콘텐츠\s*|SEO\s*)?(?:생성|최적화)(?:\s*(?:및|와|과)\s*\S+)?\s*$/;
 export function validateStrategy(raw: unknown, snapshot: ConsultingLlmSnapshot): ConsultingStrategy {
     const known = new Set(snapshot.evidence.map(e => e.id));
     const result = consultingStrategySchema.parse(normalizeTokens(raw, known));
@@ -77,17 +79,20 @@ export function validateStrategy(raw: unknown, snapshot: ConsultingLlmSnapshot):
         if (snapshot.market !== "ko-KR" && x.channel === "naver_paid")
             issues.push(`market action@priorityActions.${x.id}`);
     }
-    if (issues.length)
-        throw new Error(issues.slice(0, 8).join(" | "));
+    // Budget/allocation rules are collected too, so the single repair sees every violation (codex review 2026-11-06).
     const budget = snapshot.monthlyMarketingBudget;
     if (result.budgetProposal.currency !== MARKET_CURRENCY[snapshot.market] || result.budgetProposal.totalAmount !== (budget?.amount ?? null))
-        throw new Error("budget mismatch");
+        issues.push(`budget mismatch@budgetProposal:expected currency ${MARKET_CURRENCY[snapshot.market]} and totalAmount ${budget?.amount ?? "null"}`);
     if (new Set(result.budgetProposal.allocations.map(x => x.channel)).size !== 3)
-        throw new Error("duplicate allocation");
+        issues.push("duplicate allocation");
     for (const a of result.budgetProposal.allocations) {
-        if (a.ratio !== result.channelMix.find(x => x.channel === a.channel)!.recommendedRatio)
-            throw new Error("allocation mismatch");
+        const mix = result.channelMix.find(x => x.channel === a.channel);
+        if (!mix || a.ratio !== mix.recommendedRatio)
+            issues.push(`allocation mismatch@budgetProposal.allocations.${a.channel}`);
     }
+    // Every violation is reported (rule@path[:fragment]); the bound only protects the repair message size.
+    if (issues.length)
+        throw new Error(issues.length > 20 ? [...issues.slice(0, 20), `+${issues.length - 20} more`].join(" | ") : issues.join(" | "));
     // Server owns amounts; round to the currency minor unit and give the residue to the largest channel.
     const scale = result.budgetProposal.currency === "KRW" ? 1 : 100;
     const total = budget ? Math.round(budget.amount * scale) : null;

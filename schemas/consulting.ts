@@ -78,9 +78,15 @@ export const consultingSnapshotV2Schema = consultingSnapshotV1Schema.extend({
     for (const p of snapshot.sections.competitors.items ?? []) check(p.evidenceId);
     for (const e of snapshot.llmInput.evidence) check(e.id);
 });
+/** Brand context from the owner's settings (lib/consulting/business.ts) — untrusted descriptive data, no quantities. */
+export const consultingBusinessSchema = z.strictObject({
+    companyName: z.string().max(80).nullable(), industry: z.string().max(80).nullable(),
+    services: z.array(z.string().max(80)).max(12), coreKeywords: z.array(z.string().max(80)).max(12),
+    targetAudience: z.string().max(300).nullable(),
+});
 export const consultingSnapshotV3Schema = z.strictObject({ ...consultingSnapshotV2Schema.shape,
-    schemaVersion: z.literal("v3"), ga4: ga4ConsultingSchema.optional(),
-    llmInput: consultingSnapshotV1Schema.extend({ ga4: ga4LlmConsultingSchema.optional() }),
+    schemaVersion: z.literal("v3"), ga4: ga4ConsultingSchema.optional(), business: consultingBusinessSchema.optional(),
+    llmInput: consultingSnapshotV1Schema.extend({ ga4: ga4LlmConsultingSchema.optional(), business: consultingBusinessSchema.optional() }),
 }).superRefine((snapshot,ctx) => {
     const ids = new Set(snapshot.evidence.map(e=>e.id));
     const llmIds = new Set(snapshot.llmInput.evidence.map(e=>e.id));
@@ -90,8 +96,8 @@ export const consultingSnapshotV3Schema = z.strictObject({ ...consultingSnapshot
         for (const row of projection.reports[report])
           for (const id of row.evidenceIds) if (!allowed.has(id)) ctx.addIssue({code:'custom',message:'unknown GA4 evidence'});
     }
-    const {ga4: _ga4, ...base} = snapshot;
-    const {ga4: _llmGa4, ...llmInput} = snapshot.llmInput;
+    const {ga4: _ga4, business: _business, ...base} = snapshot;
+    const {ga4: _llmGa4, business: _llmBusiness, ...llmInput} = snapshot.llmInput;
     const legacy = consultingSnapshotV2Schema.safeParse({...base, schemaVersion:'v2', llmInput});
     if (!legacy.success) for (const issue of legacy.error.issues) ctx.addIssue({...issue, code:'custom', message:issue.message});
 });

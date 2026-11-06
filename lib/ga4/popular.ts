@@ -43,23 +43,31 @@ export async function fetchPopularPages(days = 30, scope?: Ga4Scope): Promise<Ga
     const [res] = await client.runReport({
       property,
       dateRanges: [range],
-      dimensions: [{ name: 'pagePath' }, { name: 'pageTitle' }],
+      dimensions: [{ name: 'pagePath' }],
       metrics: [{ name: 'sessions' }],
       orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
-      limit: 30,
+      limit: 10,
     });
-    // One row per path (a path can carry several titles): sessions summed, the top-session title kept. Top 10 paths.
-    const byPath = new Map<string, PopularPage & { top: number }>();
-    for (const row of res.rows ?? []) {
+    // Ranking and sessions come from pagePath alone (a path with many titles must not crowd others out — codex
+    // review 2026-11-06); a second, bounded query picks each top path's most-viewed title.
+    const top = (res.rows ?? []).slice(0, 10).map(row => ({ path: row.dimensionValues?.[0]?.value ?? '',
+      sessions: Math.round(parseNum(row.metricValues?.[0]?.value)) })).filter(row => row.path);
+    if (!top.length) return [];
+    const [titles] = await client.runReport({
+      property,
+      dateRanges: [range],
+      dimensions: [{ name: 'pagePath' }, { name: 'pageTitle' }],
+      metrics: [{ name: 'sessions' }],
+      dimensionFilter: { filter: { fieldName: 'pagePath', inListFilter: { values: top.map(t => t.path), caseSensitive: true } } },
+      orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+      limit: 100,
+    });
+    const titleOf = new Map<string, string>();
+    for (const row of titles.rows ?? []) {
       const path = row.dimensionValues?.[0]?.value ?? '', title = row.dimensionValues?.[1]?.value ?? '';
-      const sessions = Math.round(parseNum(row.metricValues?.[0]?.value));
-      if (!path) continue;
-      const cur = byPath.get(path) ?? { path, sessions: 0, title: null, top: -1 };
-      cur.sessions += sessions;
-      if (title && title !== '(not set)' && sessions > cur.top) { cur.title = title; cur.top = sessions; }
-      byPath.set(path, cur);
+      if (path && title && title !== '(not set)' && !titleOf.has(path)) titleOf.set(path, title);
     }
-    return [...byPath.values()].sort((a, b) => b.sessions - a.sessions).slice(0, 10).map(({ path, sessions, title }) => ({ path, sessions, title }));
+    return top.map(t => ({ ...t, title: titleOf.get(t.path) ?? null }));
   });
   return result;
 }

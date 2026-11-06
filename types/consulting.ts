@@ -107,6 +107,8 @@ export type ConsultingLlmSnapshot = NonNullable<ConsultingSnapshot["llmInput"]>;
 export interface ConsultingSnapshot {
     schemaVersion?: "v2" | "v3";
     ga4?: import("@/schemas/ga4-consulting").ConsultingGa4;
+    /** v3: brand context (services/keywords) that grounds content_create topics. */
+    business?: import("zod").infer<typeof import("@/schemas/consulting").consultingBusinessSchema>;
     structuredMetrics?: StructuredMetrics;
     sections?: ConsultingSectionsDTO;
     llmInput?: Omit<ConsultingSnapshot, "llmInput"|"sections"|"structuredMetrics"|"schemaVersion"|"ga4"> & { ga4?: import("@/schemas/ga4-consulting").ConsultingLlmGa4 };

@@ -147,15 +147,19 @@ function sanitize(items: RecommendedTopic[]): RecommendedTopic[] {
  * Omitted ones replace the lowest-scored non-strategy picks (selection stays ≤7; integrity of topic text kept).
  */
 export function ensureStrategyCandidates(items: RecommendedTopic[], candidates: Candidate[]): RecommendedTopic[] {
-  const isStrategy = (it: RecommendedTopic) => !!candidates[(it.candidateIndex ?? 0) - 1]?.strategy;
+  const strategyOf = (it: RecommendedTopic) => candidates[(it.candidateIndex ?? 0) - 1]?.strategy;
   const chosen = new Set(items.map(i => i.candidateIndex));
-  const missing = candidates.map((c, i) => ({ c, index: i + 1 })).filter(({ c, index }) => c.strategy && !chosen.has(index)).slice(0, 7);
-  if (!missing.length) return items;
-  const keep = [...items].sort((a, b) => Number(isStrategy(b)) - Number(isStrategy(a)) || b.score - a.score)
-    .slice(0, Math.max(0, 7 - missing.length));
-  const added = missing.map(({ c, index }) => ({ candidateIndex: index, recommendRank: null, factors: c.factors, rank: 0,
-    topic: c.topic.slice(0, 80), score: 60 + c.weight, tags: [{ label: '전략 과제', type: 'e' as const }], reason: '컨설팅 우선 실행 과제' }));
-  return [...keep, ...added];
+  const added = candidates.map((c, i) => ({ c, index: i + 1 })).filter(({ c, index }) => c.strategy && !chosen.has(index))
+    .map(({ c, index }) => ({ candidateIndex: index, recommendRank: null, factors: c.factors, rank: 0,
+      topic: c.topic.slice(0, 80), score: 60 + c.weight, tags: [{ label: '전략 과제', type: 'e' as const }], reason: '컨설팅 우선 실행 과제' }));
+  if (!added.length) return items;
+  // Selected and reinstated strategy topics compete together by priority (P0→P2), so a reinstated P2 never
+  // evicts an already-selected P0 (codex review 2026-11-06); the remaining slots keep the best other picks.
+  const order = { P0: 0, P1: 1, P2: 2 } as const;
+  const strategic = [...items.filter(strategyOf), ...added]
+    .sort((a, b) => order[strategyOf(a)!.priority] - order[strategyOf(b)!.priority] || b.score - a.score).slice(0, 7);
+  const others = items.filter(i => !strategyOf(i)).sort((a, b) => b.score - a.score).slice(0, 7 - strategic.length);
+  return [...strategic, ...others];
 }
 
 // 부족 시 후보 weight 상위에서 채움

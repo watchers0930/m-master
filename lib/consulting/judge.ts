@@ -28,11 +28,16 @@ export function judgeStrategy(response: Completion, snapshot: ConsultingSnapshot
     } catch (error) {
         const issue = (error as { issues?: { path?: unknown[]; code?: string; message?: string }[] })?.issues?.[0];
         const reason = issue ? `zod:${issue.code}@${(issue.path ?? []).join(".")}:${String(issue.message ?? "").slice(0, 120)}`
-            : String((error as Error)?.message ?? error).slice(0, 900);
+            : String((error as Error)?.message ?? error).slice(0, 3000);
         return reject(reportId, choice.finish_reason, reason, { id: call.id, function: { name: call.function.name, arguments: call.function.arguments } });
     }
 }
+/** Log rule codes and field paths only; the offending fragments (model text that may quote untrusted stored
+ * strings, e.g. names/phones) go to the repair message, never to logs (codex review 2026-11-06). */
+export function loggableReason(reason: string) {
+    return reason.split(" | ").map(r => r.replace(/^((?:zod:[^@]*@)?[^:]*(?:@[^:]*)?):[\s\S]*$/, "$1")).join(" | ").slice(0, 1000);
+}
 function reject(reportId: string, finishReason: string | null, reason: string, call: StrategyCall | null) {
-    console.error("[consulting] strategy rejected", { reportId, finishReason, reason, repairable: !!call });
+    console.error("[consulting] strategy rejected", { reportId, finishReason, reason: loggableReason(reason), repairable: !!call });
     return { strategy: null, call, reason };
 }

@@ -31,19 +31,23 @@ export async function POST(request: NextRequest) {
       if (userId && plan && subId) {
         const sub = await stripe.subscriptions.retrieve(subId, { expand: ['items.data'] });
         const periodEnd = sub.items?.data?.[0]?.current_period_end;
-        await prisma.subscription.create({
-          data: {
-            userId,
-            stripeSubId: subId,
-            plan,
-            status: 'active',
-            currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
-          },
-        });
-        await prisma.user.update({
-          where: { id: userId },
-          data: { plan },
-        });
+        // Subscription row and users.plan change together: a half-applied webhook must never leave them disagreeing
+        // (lib/pipeline/owners.ts and billing limits read them as one entitlement).
+        await prisma.$transaction([
+          prisma.subscription.create({
+            data: {
+              userId,
+              stripeSubId: subId,
+              plan,
+              status: 'active',
+              currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : null,
+            },
+          }),
+          prisma.user.update({
+            where: { id: userId },
+            data: { plan },
+          }),
+        ]);
       }
       break;
     }
@@ -58,19 +62,17 @@ export async function POST(request: NextRequest) {
           : sub.status === 'past_due' ? 'past_due'
           : 'canceled';
         const periodEnd = sub.items?.data?.[0]?.current_period_end;
-        await prisma.subscription.update({
-          where: { stripeSubId: sub.id },
-          data: {
-            status,
-            currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : undefined,
-          },
-        });
-        if (status === 'canceled') {
-          await prisma.user.update({
-            where: { id: existing.userId },
-            data: { plan: 'free' },
+        await prisma.$transaction(async tx => {
+          await tx.subscription.update({
+            where: { stripeSubId: sub.id },
+            data: {
+              status,
+              currentPeriodEnd: periodEnd ? new Date(periodEnd * 1000) : undefined,
+            },
           });
-        }
+          if (status === 'canceled')
+            await tx.user.update({ where: { id: existing.userId }, data: { plan: 'free' } });
+        });
       }
       break;
     }
@@ -81,14 +83,16 @@ export async function POST(request: NextRequest) {
         where: { stripeSubId: sub.id },
       });
       if (existing) {
-        await prisma.subscription.update({
-          where: { stripeSubId: sub.id },
-          data: { status: 'canceled' },
-        });
-        await prisma.user.update({
-          where: { id: existing.userId },
-          data: { plan: 'free' },
-        });
+        await prisma.$transaction([
+          prisma.subscription.update({
+            where: { stripeSubId: sub.id },
+            data: { status: 'canceled' },
+          }),
+          prisma.user.update({
+            where: { id: existing.userId },
+            data: { plan: 'free' },
+          }),
+        ]);
       }
       break;
     }

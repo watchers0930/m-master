@@ -1,4 +1,5 @@
 import { readStructuredInput } from "./structured-input";
+import { businessContext } from "./business";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { visibilityData } from "@/lib/visibility/data";
@@ -30,8 +31,9 @@ export async function collectInput(ownerId: string, domain: {
       try {
         return await prisma.$transaction(async (tx) => {
         const range = completedRange(now);
+        const business = await businessContext(tx, ownerId);
         const snapshot: ConsultingSnapshot = { market: domain.market, range, evidence: [], sourceStatus: [],
-            limitations: [], selection: [], monthlyMarketingBudget: budget };
+            limitations: [], selection: [], monthlyMarketingBudget: budget, ...(business ? { business } : {}) };
         const from = new Date(range.from), to = new Date(range.to);
         const add = (id: string, source: EvidenceSource, label: string, value: EvidenceRef["value"], at: Date | null, unit?: string) => {
             snapshot.evidence.push({ id, source, label, value, observedAt: at?.toISOString() ?? null,
