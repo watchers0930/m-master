@@ -35,6 +35,7 @@ function normalizeTokens<T>(value: T, evidence: Set<string>): T {
         return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, normalizeTokens(v, evidence)])) as T;
     return value;
 }
+const TASK_TITLE = /(?:콘텐츠|블로그|글|포스트|게시물)\s*(?:을|를)?\s*(?:작성|생성|제작|발행|기획|최적화)|(?:작성|생성|제작|최적화)(?:\s*(?:및|와|과)\s*\S+)?\s*$/;
 export function validateStrategy(raw: unknown, snapshot: ConsultingLlmSnapshot): ConsultingStrategy {
     const known = new Set(snapshot.evidence.map(e => e.id));
     const result = consultingStrategySchema.parse(normalizeTokens(raw, known));
@@ -69,6 +70,10 @@ export function validateStrategy(raw: unknown, snapshot: ConsultingLlmSnapshot):
         check(() => refs(x.evidenceIds, `priorityActions.${x.id}.evidenceIds`));
         for (const [field, t] of [["title", x.title], ["description", x.description], ["metric", x.metric]] as const)
             check(() => narrative(t, known, `priorityActions.${x.id}.${field}`));
+        // content_create titles become weekly blog topics verbatim (lib/topics/strategy-candidates.ts): a task label
+        // ("…콘텐츠 작성", "콘텐츠 생성 및 최적화") is not a topic. 2026-11-06 운영 v3.2·v3.3 리포트 재현.
+        if (x.destination === "content_create" && TASK_TITLE.test(x.title))
+            issues.push(`task-like content title@priorityActions.${x.id}.title:${x.title.slice(0, 24)}`);
         if (snapshot.market !== "ko-KR" && x.channel === "naver_paid")
             issues.push(`market action@priorityActions.${x.id}`);
     }
