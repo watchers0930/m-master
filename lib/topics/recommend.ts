@@ -97,7 +97,7 @@ ${keywordsList}
 - 70 미만은 가급적 추천하지 않음
 
 [tags 사용 규칙]
-- type 's' = 시즌 관련 (예: "5월 시즌", "결산 시즌")
+- type 's' = 시즌 관련 (예: "${month}월 시즌", "연말 결산") — 반드시 이번 달(${month}월) 기준
 - type 'e' = SEO/경쟁도/효율 (예: "SEO 고점수", "경쟁도 낮음")
 - type 't' = 트렌드/검색량 (예: "검색량↑", "트렌드↑")
 - label은 8자 이내 한국어 권장, 항목당 최대 3개
@@ -142,6 +142,22 @@ function sanitize(items: RecommendedTopic[]): RecommendedTopic[] {
   return sorted.slice(0, 7).map((it, idx) => ({ ...it, rank: idx + 1 }));
 }
 
+/**
+ * Strategy candidates are this week's consulting priorities: the selector may rank them, not drop them.
+ * Omitted ones replace the lowest-scored non-strategy picks (selection stays ≤7; integrity of topic text kept).
+ */
+export function ensureStrategyCandidates(items: RecommendedTopic[], candidates: Candidate[]): RecommendedTopic[] {
+  const isStrategy = (it: RecommendedTopic) => !!candidates[(it.candidateIndex ?? 0) - 1]?.strategy;
+  const chosen = new Set(items.map(i => i.candidateIndex));
+  const missing = candidates.map((c, i) => ({ c, index: i + 1 })).filter(({ c, index }) => c.strategy && !chosen.has(index)).slice(0, 7);
+  if (!missing.length) return items;
+  const keep = [...items].sort((a, b) => Number(isStrategy(b)) - Number(isStrategy(a)) || b.score - a.score)
+    .slice(0, Math.max(0, 7 - missing.length));
+  const added = missing.map(({ c, index }) => ({ candidateIndex: index, recommendRank: null, factors: c.factors, rank: 0,
+    topic: c.topic.slice(0, 80), score: 60 + c.weight, tags: [{ label: '전략 과제', type: 'e' as const }], reason: '컨설팅 우선 실행 과제' }));
+  return [...keep, ...added];
+}
+
 // 부족 시 후보 weight 상위에서 채움
 function fillFromCandidates(
   items: RecommendedTopic[],
@@ -184,6 +200,7 @@ export async function recommendTopFive(input: RecommendInput): Promise<Recommend
     ),
     '',
     '위 후보에서 TOP 7을 선정하여 submit_recommendations를 호출하세요. 각 항목 candidateIndex에 후보 번호를 반드시 포함하세요. ai_visibility_gap은 관측된 미노출 개선 기회로 우선 고려하되 브랜드 언급을 보장하지 마세요.',
+    'strategy 후보는 이번 주 컨설팅 전략의 우선 실행 과제입니다. 모두 TOP 7에 포함하세요(서버도 누락분을 보충합니다).',
   ].join('\n');
 
   input.onDispatch?.();
@@ -274,6 +291,7 @@ export async function recommendTopFive(input: RecommendInput): Promise<Recommend
     return true;
   });
   items = sanitize(items);
+  items = ensureStrategyCandidates(items, input.candidates);
   items = fillFromCandidates(items, input.candidates);
 
   const priority = (item: RecommendedTopic) => {

@@ -71,8 +71,16 @@ export interface BuildCandidatesInput {
   monthYmd: string; // YYYY-MM-01
   publishedTopics: string[];
   visibilityGaps?: Candidate[];
-  ga4PopularPaths?: { path: string; sessions: number }[];
+  ga4PopularPaths?: { path: string; sessions: number; title?: string | null }[];
   businessContext?: BusinessContext;
+}
+
+/** GA4 pageTitle → topic text: drop "| site" / " - site" suffixes and the brand name; null when nothing meaningful remains. */
+export function pageTopic(title: string | null | undefined, companyName?: string): string | null {
+  if (!title) return null;
+  let name = title.split(/\s[|·–—-]\s/)[0].trim();
+  if (companyName) name = name.replace(new RegExp(companyName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '').replace(/^[\s:·-]+|[\s:·-]+$/g, '').trim();
+  return name.length >= 2 ? name.slice(0, 60) : null;
 }
 
 export function buildCandidates(input: BuildCandidatesInput): Candidate[] {
@@ -112,11 +120,12 @@ export function buildCandidates(input: BuildCandidatesInput): Candidate[] {
 
   // 2) GA4 인기 페이지 기반 (가중치 9)
   const ga4 = (input.ga4PopularPaths ?? []).slice(0, 10);
-  for (const { path, sessions } of ga4) {
-    // path에서 토픽 추출 (슬래시 제거, 하이픈→공백)
-    const slug = path.replace(/^\//, '').replace(/\/$/, '').replace(/-/g, ' ');
-    if (!slug || slug === '') continue;
-    const topic = `${slug} 완벽 가이드`;
+  for (const { path, sessions, title } of ga4) {
+    // 주제는 페이지 제목에서(경로는 주제가 아님: 'renewal/jeonse' → "리뉴얼" 제목 오염, 2026-11-06 운영). 사이트명 접미사 제거,
+    // 홈(/)·제목 없는 페이지는 후보에서 제외.
+    const name = pageTopic(title, biz.companyName);
+    if (path === '/' || !name) continue;
+    const topic = `${name} 완벽 가이드`;
     const weight = sessions >= 100 ? 9 : 8;
     push(topic, 'ga4_popular', weight);
   }

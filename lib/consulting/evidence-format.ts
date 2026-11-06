@@ -12,5 +12,10 @@ export function formatEvidenceValue(ev: EvidenceRef | undefined): string {
 }
 export function renderEvidenceTokens(text: string, evidence: Map<string,EvidenceRef>) {
   if (!text) return ''; // 저장 JSON 의 누락 필드 방어 (화면·서버 공용)
-  return text.replace(/\{\{ev:([a-zA-Z0-9_.-]+)\}\}/g, (_,id) => formatEvidenceValue(evidence.get(id)));
+  // The rendered value already carries its unit ("6명"); a unit the model also wrote right after the token
+  // ("{{ev:x}}명") is dropped instead of doubling ("6명명", 2026-11-06 운영 리포트).
+  return text.replace(/\{\{ev:([a-zA-Z0-9_.-]+)\}\}(명|회|초|위|%|건|개)?/g, (_,id,after:string|undefined) => {
+    const value = formatEvidenceValue(evidence.get(id));
+    return after && value.endsWith(after) ? value : value + (after ?? '');
+  });
 }
