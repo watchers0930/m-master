@@ -17,9 +17,16 @@ export function renderEvidenceTokens(text: string, evidence: Map<string,Evidence
   // ("{{ev:x}}명") is dropped instead of doubling ("6명명", 2026-11-06 운영 리포트).
   // A token glued to a word or another token ("기록했습니다{{ev:x}}", "{{ev:a}}{{ev:b}}") is parenthesised so the value
   // stays readable ("기록했습니다(59.2%)") instead of fusing into the text.
-  return text.replace(/\{\{ev:([a-zA-Z0-9_.-]+)\}\}(명|회|초|위|%|건|개)?/g, (_,id,after:string|undefined,offset:number) => {
+  // A token the model cited after a predicate ending ("낮습니다 {{ev:x}}.", "부족하며 {{ev:y}},") is shown the same
+  // way, as a citation ("낮습니다(6명).") rather than a dangling number (2026-11-06 운영 v3.5 리포트 4건 중 3건).
+  return text.replace(/([ \t]*)\{\{ev:([a-zA-Z0-9_.-]+)\}\}(명|회|초|위|%|건|개)?/g, (_,space:string,id,after:string|undefined,offset:number) => {
     const raw = formatEvidenceValue(evidence.get(id));
     const value = after && raw.endsWith(after) ? raw : raw + (after ?? '');
-    return /[가-힣A-Za-z0-9)}]/.test(text[offset - 1] ?? '') && !after ? `(${value})` : value;
+    const prev = text[offset - 1] ?? '', next = text[offset + _.length] ?? '';
+    if (after) return space + value;
+    // A citation ends the clause (punctuation/space/end follows); "담요 {{ev:n}}장" is an inline quantity (codex 반례).
+    const cited = space ? /[다요며]/.test(prev) && !/[가-힣A-Za-z0-9]/.test(next) : /[가-힣A-Za-z0-9)}]/.test(prev);
+    if (cited) return `(${value})`;
+    return space + value;
   });
 }

@@ -3,6 +3,7 @@
 
 import type { Channel } from '@/types/db';
 import { blogPrompt } from './blog-prompt';
+import { brandSiteUrl } from '@/lib/content/brand-link';
 
 // ----------------------------------------------------------------
 // 공통: 톤 가이드
@@ -48,7 +49,7 @@ export function extractBusiness(brandGuide: Record<string, unknown>) {
     coreKeywords: (brandGuide.core_keywords as string[]) || [],
     targetAudience: (brandGuide.target_audience as string) || null,
     ctaMessage: (brandGuide.cta_message as string) || null,
-    websiteUrl: (brandGuide.website_url as string) || null,
+    websiteUrl: brandSiteUrl(brandGuide), // 서버 검증된 http(s) 주소만 프롬프트에 넣는다
   };
 }
 

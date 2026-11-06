@@ -15,6 +15,7 @@ import {
 } from '@/lib/claude/chat';
 import { translateImagePrompts, calcHaikuKrw } from '@/lib/claude/translate';
 import { ensureMinimumMarkers, extractImagePrompts, searchMany } from '@/lib/unsplash/search';
+import { ensureBrandLink } from '@/lib/content/brand-link';
 import { calcEmbeddingKrw } from '@/lib/openai/embedding';
 import { generateThumbnail, calcImageKrw } from '@/lib/openai/image';
 import { autoPublishToSocial } from '@/lib/publish/auto-publish';
@@ -134,6 +135,8 @@ export async function streamGenerate(ownerId: string, body: unknown): Promise<Re
 
         // 본문 마커 폴백을 먼저 적용 (이후 작업들이 갱신된 text를 참조)
         text = ensureMinimumMarkers(text, req.channel === 'blog' ? 6 : 5);
+        // 자사 링크 보정 (자리표시·누락 → 설정의 실제 주소)
+        text = ensureBrandLink(text, brandGuide, req.channel);
 
         // 9~10) 검수 + 썸네일 + 본문 이미지 → 병렬 실행 (가장 큰 속도 개선)
         const t0 = Date.now();

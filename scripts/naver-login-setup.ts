@@ -74,15 +74,11 @@ async function main(): Promise<void> {
 
   if (loggedIn) {
     // storageState 저장
+    // 세션은 이 파일 한 곳에만 둔다(본인만 읽기). 쿠키 평문 사본은 만들지 않는다 — 작업자는 이 파일을 직접 읽는다.
     await context.storageState({ path: STATE_PATH });
+    fs.chmodSync(STATE_PATH, 0o600);
     console.log(`\n✅ 로그인 성공! 세션이 저장되었습니다.`);
     console.log(`   파일: ${STATE_PATH}`);
-
-    // 쿠키 백업도 저장
-    const cookies = await context.cookies();
-    const cookiesPath = path.join(process.cwd(), 'naver-cookies.json');
-    fs.writeFileSync(cookiesPath, JSON.stringify(cookies, null, 2));
-    console.log(`   쿠키 백업: ${cookiesPath} (${cookies.length}개)`);
     console.log('\n   이제 GitHub Actions 자동발행이 이 세션을 사용합니다.');
   } else {
     console.error('\n❌ 5분 내 로그인이 완료되지 않았습니다.');

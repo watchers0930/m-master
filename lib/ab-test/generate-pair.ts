@@ -1,4 +1,5 @@
 import { persistGeneratedContent, type GenerationCost } from '@/lib/content/persist-generated';
+import { ensureBrandLink } from '@/lib/content/brand-link';
 // lib/ab-test/generate-pair.ts — A/B 변형 동시 생성 + 롤백
 // GPT-4o 비스트리밍 호출
 
@@ -115,8 +116,10 @@ async function generateOneVariant(
     ],
   });
 
-  const text = completion.choices[0]?.message?.content ?? '';
-  if (!text) throw new Error(`variant ${variantKey} 텍스트 빈 응답`);
+  const raw = completion.choices[0]?.message?.content ?? '';
+  if (!raw) throw new Error(`variant ${variantKey} 텍스트 빈 응답`);
+  // 자사 링크 보정 (자리표시·누락 → 설정의 실제 주소) — 일반 생성 경로와 동일
+  const text = ensureBrandLink(raw, settings.brand_guide, opts.channel);
 
   const usage: ChatUsage = toChatUsage(completion.usage);
   const chatKrw = calcChatKrw(usage);

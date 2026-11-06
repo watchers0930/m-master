@@ -16,6 +16,7 @@ import {
 } from '@/lib/claude/chat';
 import { translateImagePrompts, calcHaikuKrw } from '@/lib/claude/translate';
 import { ensureMinimumMarkers, extractImagePrompts, searchMany } from '@/lib/unsplash/search';
+import { ensureBrandLink } from '@/lib/content/brand-link';
 import { calcEmbeddingKrw } from '@/lib/openai/embedding';
 import { generateThumbnail, calcImageKrw } from '@/lib/openai/image';
 import { buildExternalContext } from '@/lib/external/context-builder';
@@ -122,6 +123,8 @@ export async function generateContentHeadless(
 
   // 본문 마커 폴백
   text = ensureMinimumMarkers(text, channel === 'blog' ? 6 : 5);
+  // 자사 링크 보정 (자리표시·누락 → 설정의 실제 주소)
+  text = ensureBrandLink(text, brandGuide, channel);
 
   // 7) 검수 + 썸네일 + 본문 이미지 → 병렬
   const [reviewSettled, thumbSettled, bodyImgsSettled] = await Promise.allSettled([

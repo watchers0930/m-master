@@ -1,7 +1,7 @@
 // scripts/naver-blog/config.ts — 작업자 공통 설정(환경변수·경로·시간 상한)
 //
 // 환경변수:
-//   NAVER_COOKIES        — base64 JSON 쿠키 (GitHub secret, 폴백용)
+//   NAVER_COOKIES        — base64 JSON 쿠키 (선택, 폴백용 — 2026-11-06 시크릿 삭제, 세션 파일 사용)
 //   NAVER_ID             — 네이버 아이디 (쿠키 만료 폴백)
 //   NAVER_PW             — 네이버 비밀번호
 //   BLOG_PUBLISH_API_KEY — M-Master 작업자 인증 키 (서버 env BLOG_PUBLISH_API_KEY와 동일 값)
