@@ -4,7 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireSession } from '@/lib/auth';
-import { deleteChannelCredential, listMaskedCredentials, writeChannelCredential, type CredentialInput } from '@/lib/credentials/store';
+import { deleteChannelCredential, writeChannelCredential, type CredentialInput } from '@/lib/credentials/store';
 import { CredentialCryptoError } from '@/lib/crypto/credentials';
 import { logAudit } from '@/lib/audit/logger';
 
@@ -48,17 +48,6 @@ async function saveCredential(ownerId: string, channel: string, data: Credential
     if (!(error instanceof CredentialCryptoError)) throw error;
     return storageUnavailable(channel, error, 'encrypt');
   }
-}
-
-// ── GET: 채널 목록 + 마스킹된 자격증명 ──────────────────────────────
-export async function GET() {
-  const session = await requireSession();
-  const ownerId = session.user.id;
-
-  // 본인 행만, 복호화 후 마스킹(암호문을 마스킹하지 않는다). 복호화 실패는 throw(500) — 값으로 숨기지 않는다.
-  const channels = await listMaskedCredentials(ownerId);
-
-  return NextResponse.json({ data: channels, error: null });
 }
 
 // ── POST: 자격증명 저장 + 실시간 검증 ───────────────────────────────
