@@ -13,11 +13,14 @@
 //       CREDENTIAL_ENCRYPTION_SECRET="$S" npx tsx scripts/crypto/key-id.ts      → kid(16 hex)만 출력, 기록
 //     **같은 비밀**을 production / preview / development 와 로컬 .env.local에 printf로 넣는다(echo는 끝 개행 → 키 형식 오류):
 //       printf '%s' "$S" | vercel env add CREDENTIAL_ENCRYPTION_SECRET <env>      (3개 환경 각각)
-//       .env.local: printf 'CREDENTIAL_ENCRYPTION_SECRET=%s\n' "$S" >> .env.local
+//       .env.local(기존 줄을 먼저 지운 뒤 추가 — 중복 줄이면 앞줄이 이긴다):
+//         sed -i '' '/^CREDENTIAL_ENCRYPTION_SECRET=/d' .env.local   (macOS BSD sed)
+//         printf 'CREDENTIAL_ENCRYPTION_SECRET=%s\n' "$S" >> .env.local
 //       unset S
 //     이전 코드는 이 env를 쓰지 않으므로 env를 먼저 넣어도 안전하다.
 // (2) 이 커밋의 코드를 한 번 배포한다.
 // (3) 플랫폼 오너로 운영 GET /api/admin/credential-key → kid 기록(이 시점 anchorKid=null, writable=false가 정상).
+//     500(internal_error)이면 (0) 테이블 미적용이다 — 멈추고 (0)부터.
 // (4) 로컬 `npx tsx scripts/crypto/key-id.ts`의 kid가 (1)·(3)과 같은지 확인.
 // (5) `npx tsx scripts/crypto/set-anchor.ts --kid=<kid>`를 한 번 실행(DB 앵커 고정).
 // (6) 엔드포인트가 anchorKid=<kid>, writable=true인지 확인(앱 앵커 캐시는 최대 60초).
@@ -28,10 +31,13 @@
 //
 // ── 앵커를 잘못 고정했을 때 복구(선점 등: 운영 런타임 kid ≠ anchorKid) ──────────────────────────────────
 // (a) 플랫폼 오너로 운영 GET /api/admin/credential-key → 운영 kid와 anchorKid가 다르고 writable=false임을 확인(kid는 비밀이 아님).
-// (b) **대장 승인 후에만** 공유 DB에서: DELETE FROM credential_key_anchor WHERE id='default';
+// (b) 잘못된 키 환경(그 키를 쓰는 로컬 dev·preview·스크립트 등)의 프로세스를 모두 중지하고, 앵커 캐시 TTL(60초)을 넘겨
+//     60초 이상 기다린다 — 그 프로세스가 캐시해 둔 잘못된 앵커로 계속 쓰는 것을 막기 위함.
+//     그 다음 **대장 승인 후에만** 공유 DB에서: DELETE FROM credential_key_anchor WHERE id='default';
 // (c) (a)에서 확인한 운영 kid로 `npx tsx scripts/crypto/set-anchor.ts --kid=<운영 kid>` 재실행(로컬 키도 그 kid여야 함) → (6) 재확인.
+//     이어서 이 스크립트 dry-run(--expect-kid=<운영 kid>)을 다시 돌려 "does not open" == 0 을 확인한다(0이 아니면 (d) 후 반복).
 // (d) 잘못된 앵커 동안 그 (운영이 아닌) 키로 쓴 행은 운영 키로 열리지 않는다 → 해당 채널은 화면에서 연결 해제 후 다시 입력(재연결)한다.
-//     이 스크립트 dry-run의 "does not open" 개수로 남은 행을 확인한다(0이 될 때까지).
+//     dry-run의 "does not open" 이 0이 될 때까지 반복한다.
 import { config } from 'dotenv'; config({ path: '.env.local' });
 (async () => {
   const apply = process.argv.includes('--apply');

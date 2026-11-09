@@ -17,9 +17,24 @@ const KID_PATTERN = /^[0-9a-f]{16}$/;
 type Db = Pick<PrismaClient, '$queryRaw'>;
 let cached: { kid: string | null; until: number } | null = null;
 
-/** 캐시 없이 앵커 kid를 읽는다(백필·스크립트용). */
+/** Postgres undefined_table(42P01) — Prisma $queryRaw는 PrismaClientKnownRequestError code P2010, meta.code '42P01'로 드러낸다(PGlite 실측). */
+function isUndefinedTable(error: unknown): boolean {
+  const e = error as { code?: unknown; meta?: { code?: unknown } } | null;
+  return !!e && e.code === 'P2010' && e.meta?.code === '42P01';
+}
+
+/**
+ * 캐시 없이 앵커 kid를 읽는다(백필·스크립트용).
+ * 앵커 테이블 자체가 없으면(마이그레이션 미적용) 설정 미완료 → CredentialCryptoError('not_configured')로 분류해
+ * 쓰기·삭제가 처리된 503 경로를 타게 한다. 그 외 DB 오류(연결·타임아웃 등)는 숨기지 않고 그대로 던진다.
+ */
 export async function readAnchorKid(db: Db): Promise<string | null> {
-  const rows = await db.$queryRaw<{ kid: string }[]>`SELECT kid FROM credential_key_anchor WHERE id = ${ANCHOR_ID}`;
+  let rows: { kid: string }[];
+  try { rows = await db.$queryRaw<{ kid: string }[]>`SELECT kid FROM credential_key_anchor WHERE id = ${ANCHOR_ID}`; }
+  catch (error) {
+    if (isUndefinedTable(error)) throw new CredentialCryptoError('not_configured');
+    throw error;
+  }
   return rows[0]?.kid ?? null;
 }
 
