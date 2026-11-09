@@ -2,13 +2,14 @@
 // scripts/db/encrypt-channel-credentials.ts가 호출한다. store.ts와 분리한 이유: 행 잠금(FOR UPDATE)·updated_at 보존이
 // 필요해 Prisma 모델 API가 아닌 raw SQL 트랜잭션을 쓰고, 앱 런타임 경로(store)와 섞지 않기 위함.
 // 원칙
-// 1) 사전 가드(쓰기 전): expectKid(운영자가 확인한 운영 kid) === 현재 키 kid === CREDENTIAL_KEY_ID.
+// 1) 사전 가드(쓰기 전): expectKid(운영자가 확인한 운영 kid) === 현재 키 kid === DB 앵커 kid.
 // 2) 사전 검증(쓰기 전): 기존 v1 비밀 필드를 전부 복호화해 본다. 하나라도 열리지 않으면(다른 키로 쓴 행 혼재 등) 중단.
 // 3) 평문 필드만 대상, 행마다 트랜잭션 → FOR UPDATE 잠금 재조회 → 암호화 → 재복호화 일치 확인 → 갱신 → 갱신 후 재조회 검증.
 // 출력(리포트·오류)에는 채널명·개수·고정 코드만 담는다. 값·키·context는 담지 않는다.
 
 import type { PrismaClient } from '@prisma/client';
-import { assertCredentialWritable, CredentialCryptoError, decryptSecret, encryptSecret } from '@/lib/crypto/credentials';
+import { CredentialCryptoError, decryptSecret, encryptSecret } from '@/lib/crypto/credentials';
+import { assertCredentialWritable } from './anchor';
 import { credentialContext, isLegacyPlaintext, SECRET_FIELDS } from './store';
 
 const PAGE_SIZE = 100;
@@ -142,8 +143,8 @@ async function* pages(db: PrismaClient): AsyncGenerator<Row> {
  * expectKid: 운영 앱 kid(16 hex, 읽기 전용으로 확인한 값). 현재 키와 다르면 어떤 읽기·쓰기 전에 중단.
  */
 export async function backfillChannelCredentials(db: PrismaClient, { apply, expectKid }: { apply: boolean; expectKid: string }): Promise<BackfillReport> {
-  // 키 형식 + CREDENTIAL_KEY_ID 일치(쓰기 가드)를 dry-run에서도 먼저 확인
-  const kid = assertCredentialWritable();
+  // 키 형식 + 런타임 kid == DB 앵커 kid(캐시 없이)를 dry-run에서도 먼저 확인
+  const kid = await assertCredentialWritable(db);
   if (typeof expectKid !== 'string' || !KID_PATTERN.test(expectKid)) throw new BackfillAbort('expect_kid_invalid');
   if (expectKid !== kid) throw new BackfillAbort('expect_kid_mismatch');
   const report: BackfillReport = { apply, scannedRows: 0, updatedRows: 0, legacy: {}, unreadable: {}, sealed: { readable: 0, unreadable: 0 } };

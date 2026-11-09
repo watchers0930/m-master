@@ -9,6 +9,10 @@ export async function autoPublishToSocial(params: {
   imageUrl: string | null; bodyImageUrls: string[]; blogScores: Record<string, number> | null;
   onProgress: (event: AutoPublishEvent) => void;
 }) {
-  await deriveCafeContent(params.ownerId, params.blogContentId);
+  const derived = await deriveCafeContent(params.ownerId, params.blogContentId);
+  // 자격증명 키 오류는 조용히 넘기지 않는다: 카페 변환 실패를 사유 코드로 알린 뒤 completed로 마무리
+  if (derived.status === 'skipped' && derived.reason === 'credential_storage_error') {
+    params.onProgress({ type: 'auto_publish', channel: 'naver_cafe', status: 'failed', error: 'credential_storage_error' });
+  }
   params.onProgress({ type: 'auto_publish', status: 'completed' });
 }

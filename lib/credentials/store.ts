@@ -6,7 +6,8 @@
 // - AAD context = `channel_credentials.<field>:<ownerId>:<channel>` — 다른 행·다른 필드로 옮긴 암호문은 열리지 않는다.
 
 import { prisma } from '@/lib/prisma';
-import { assertCredentialWritable, CredentialCryptoError, decryptSecret, encryptSecret, maskSecret, type CredentialCryptoReason } from '@/lib/crypto/credentials';
+import { CredentialCryptoError, decryptSecret, encryptSecret, maskSecret, type CredentialCryptoReason } from '@/lib/crypto/credentials';
+import { assertCredentialWritable, credentialKeyStatus } from './anchor';
 
 export const SECRET_FIELDS = {
   accessToken: true,
@@ -41,7 +42,8 @@ export interface CredentialInput {
 }
 
 export type CredentialRowError = 'decrypt_failed';
-export type MaskedCredentials = Record<string, { connected: boolean; masked: Record<string, string>; error?: CredentialRowError }>;
+/** recoverable: 런타임 키 = 정본(앵커) 키라서, 열리지 않는 행이 '다른 키로 쓴 행'임이 확정 → 재연결·해제로 복구 가능 */
+export type MaskedCredentials = Record<string, { connected: boolean; masked: Record<string, string>; error?: CredentialRowError; recoverable?: boolean }>;
 
 type ColumnField = 'access_token' | 'refresh_token';
 
@@ -124,16 +126,16 @@ export async function readChannelCredential(ownerId: string, channel: string): P
 }
 
 /** 연결 상태 화면용. 값은 반환하지 않고, 복호화 실패는 error로 구분한다(연결됨으로 보이지 않게). */
-export async function credentialPresence(ownerId: string, channel: string): Promise<{ hasRefreshToken: boolean; updatedAt: Date; error: CredentialRowError | null; reason: CredentialCryptoReason | null } | null> {
+export async function credentialPresence(ownerId: string, channel: string): Promise<{ hasRefreshToken: boolean; updatedAt: Date; error: CredentialRowError | null; reason: CredentialCryptoReason | null; recoverable: boolean } | null> {
   const row = await prisma.channelCredential.findUnique({ where: { ownerId_channel: { ownerId, channel } }, select: FULL_SELECT });
   if (!row) return null;
   try {
     const cred = openRow(row, ownerId, channel);
-    return { hasRefreshToken: !!cred.refreshToken, updatedAt: row.updatedAt, error: null, reason: null };
+    return { hasRefreshToken: !!cred.refreshToken, updatedAt: row.updatedAt, error: null, reason: null, recoverable: true };
   } catch (error) {
     if (!(error instanceof CredentialCryptoError)) throw error;
     logDecryptFailure(channel, error);
-    return { hasRefreshToken: false, updatedAt: row.updatedAt, error: 'decrypt_failed', reason: error.reason };
+    return { hasRefreshToken: false, updatedAt: row.updatedAt, error: 'decrypt_failed', reason: error.reason, recoverable: (await credentialKeyStatus()).writable };
   }
 }
 
@@ -141,12 +143,12 @@ type LockedRow = { access_token: string | null; refresh_token: string | null; me
 
 /**
  * 항상 암호화해서 저장한다.
- * - 키 형식·CREDENTIAL_KEY_ID 일치를 먼저 확인(비밀 필드가 없는 쓰기도 거부 — fail-closed).
+ * - 런타임 키 kid == DB 앵커 kid 를 먼저 확인(비밀 필드가 없는 쓰기도 거부 — fail-closed, 공유 DB에 다른 키로 쓰기 차단).
  * - 같은 행에 남아 있는 전환기 평문 비밀 필드는 이번 쓰기에 포함되지 않아도 함께 암호화한다(부분 갱신 후 평문 잔존 금지).
  *   이를 위해 행을 FOR UPDATE로 잠그고 다시 읽는다(동시 쓰기와의 lost update 방지).
  */
 export async function writeChannelCredential(ownerId: string, channel: string, data: CredentialInput): Promise<void> {
-  assertCredentialWritable();
+  await assertCredentialWritable();
   const sealed: { accessToken?: string | null; refreshToken?: string | null; expiresAt?: string | null; meta?: Record<string, unknown> } = {};
   if (data.accessToken !== undefined) sealed.accessToken = sealValue(data.accessToken, credentialContext('access_token', ownerId, channel));
   if (data.refreshToken !== undefined) sealed.refreshToken = sealValue(data.refreshToken, credentialContext('refresh_token', ownerId, channel));
@@ -190,13 +192,15 @@ export async function listMaskedCredentials(ownerId: string): Promise<MaskedCred
     take: LIST_LIMIT,
   });
   const out: MaskedCredentials = {};
+  let recoverable: boolean | undefined; // 오류 행이 있을 때만 앵커를 확인(정상 목록은 추가 조회 없음)
   for (const row of rows) {
     let cred: DecryptedCredential;
     try { cred = openRow(row, ownerId, row.channel); }
     catch (error) {
       if (!(error instanceof CredentialCryptoError)) throw error;
       logDecryptFailure(row.channel, error);
-      out[row.channel] = { connected: true, error: 'decrypt_failed', masked: {} };
+      recoverable ??= (await credentialKeyStatus()).writable;
+      out[row.channel] = { connected: true, error: 'decrypt_failed', masked: {}, recoverable };
       continue;
     }
     const masked: Record<string, string> = {};

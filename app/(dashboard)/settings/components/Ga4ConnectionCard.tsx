@@ -23,7 +23,7 @@ const ERROR_LABELS: Record<string, string> = {
 
 // OAuth 콜백 복귀 쿼리(?ga4=...) 실패 사유 — app/api/auth/ga4/callback/route.ts의 redirect 코드와 1:1
 const CALLBACK_ERRORS: Record<string, string> = {
-  save_error: `Google 계정은 확인됐지만 자격증명을 저장하지 못했습니다. ${CREDENTIAL_STORAGE_WARNING}`,
+  save_error: `Google 계정은 확인됐지만 자격증명을 저장하지 못했습니다(${CREDENTIAL_STORAGE_WARNING}). 운영자에게 문의해 주세요.`,
   token_error: 'Google 토큰 발급에 실패했습니다. 잠시 후 다시 연결해 주세요.',
   denied: 'Google 계정 연결이 취소되었습니다.',
   invalid_state: '연결 요청이 만료되었거나 올바르지 않습니다. 다시 시도해 주세요.',
@@ -36,7 +36,7 @@ export default function Ga4ConnectionCard() {
   const { query, disconnect, setAutomationDomain } = useGa4Settings();
   const domains = useOwnedDomains();
   const s = query.data;
-  const oauth = ga4OauthView(s ?? { connected_oauth: false, oauth_error: null, oauth_error_reason: null });
+  const oauth = ga4OauthView(s ?? { connected_oauth: false, oauth_error: null, oauth_error_reason: null, oauth_error_recoverable: false });
 
   // OAuth 콜백 복귀(?ga4=connected) — 쿼리 제거 후 서버 상태 재조회
   const { refetch } = query;

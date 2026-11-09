@@ -30,11 +30,12 @@ export async function ga4Settings(ownerId: string) {
       status: true, lastCheckedAt: true, lastErrorCode: true }, orderBy: { id: 'asc' }, take: 100 }),
     prisma.setting.findUnique({ where: { ownerId }, select: { automationDomainId: true } }),
   ]);
-  // 복호화 실패(운영 키 불일치 등)는 '연결됨'이 아니라 관리자 설정 오류로 표시한다(재연결로 고칠 문제가 아님).
+  // 복호화 실패는 '연결됨'이 아니라 관리자 설정 오류로 표시한다. 재연결·해제로 복구 가능한지는 recoverable(런타임 키 = DB 앵커)로 판정.
   return { connected_oauth: !!credential?.hasRefreshToken && !credential.error, oauth_updated_at: credential?.updatedAt ?? null,
     oauth_error: credential?.error ? 'credential_storage_error' as const : null,
     // 사유 코드(not_configured=운영 env 문제 / key_mismatch·invalid_blob=저장 행 문제)만 — 화면이 복구 버튼을 고른다
     oauth_error_reason: credential?.error ? credential.reason : null,
+    oauth_error_recoverable: !!credential?.error && credential.recoverable,
     bindings: bindings.map(b => ({ domain_id: b.domainId, host: b.host, property_id: b.propertyId,
       status: b.status, last_checked_at: b.lastCheckedAt, last_error_code: b.lastErrorCode })),
     automation_domain_id: setting?.automationDomainId ?? null };

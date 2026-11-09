@@ -22,7 +22,7 @@ function serviceAccount(raw: string): Record<string, string> {
   return data;
 }
 // 복호화 실패(키 불일치·env 누락·변조)는 값 없이 기록하고 owner_oauth 후보를 credential_storage_error로 만든다.
-// (재시도·재연결로 낫지 않는 관리자 키 설정 문제 — invalid_credentials와 구분해 '재연결하지 마세요'로 안내한다.)
+// (재시도로 낫지 않는 관리자 키 설정 문제 — invalid_credentials와 구분한다. 복구 가능 여부는 설정 화면이 앵커로 판정)
 async function ownerOauthCredential(ownerId: string): Promise<{ db: DecryptedCredential | null; decryptFailed: string | null }> {
   try { return { db: await readChannelCredential(ownerId, 'ga4'), decryptFailed: null }; }
   catch (error) {

@@ -58,40 +58,12 @@ export function credentialKeyId(): string {
   return currentKey().kid;
 }
 
-export type CredentialKeyStatus = { kid: string | null; writable: boolean; reason?: "not_configured" | "key_mismatch" };
-
-// 운영 런타임 키 확인용(읽기 전용): kid(비밀 아님)와 쓰기 가능 여부만. 비밀값·KEY_ID 원문은 담지 않는다.
-export function credentialKeyStatus(): CredentialKeyStatus {
-  let kid: string;
-  try { kid = currentKey().kid; } catch { return { kid: null, writable: false, reason: "not_configured" }; }
-  try { assertWriteKeyId(kid); } catch (error) {
-    const reason = error instanceof CredentialCryptoError && error.reason === "key_mismatch" ? "key_mismatch" : "not_configured";
-    return { kid, writable: false, reason };
-  }
-  return { kid, writable: true };
-}
-
-// 쓰기 가능 여부(키 형식 + CREDENTIAL_KEY_ID 일치)를 값 노출 없이 확인. 실패 시 CredentialCryptoError.
-export function assertCredentialWritable(): string {
-  const { kid } = currentKey();
-  assertWriteKeyId(kid);
-  return kid;
-}
-
-// 쓰기 전용 가드: 비밀값이 아닌 env CREDENTIAL_KEY_ID(16 hex)가 현재 키의 kid와 같아야 암호화한다.
-// 환경마다 다른 키로 운영 DB(공유)에 새 암호문을 쓰는 사고(2026-09-10 PII 키 불일치 유형)를 원천 차단한다.
-// 읽기(decryptSecret)는 요구하지 않는다 — blob 자체의 kid로 불일치를 판별한다.
-function assertWriteKeyId(kid: string): void {
-  const expected = process.env.CREDENTIAL_KEY_ID ?? "";
-  if (!KID_PATTERN.test(expected)) throw new CredentialCryptoError("not_configured");
-  if (expected !== kid) throw new CredentialCryptoError("key_mismatch");
-}
+// 쓰기 허용 여부(정본 키 = DB 앵커 kid)는 DB 접근이 있는 lib/credentials/anchor.ts가 판정한다. 이 모듈은 DB를 모른다.
 
 export function encryptSecret(plain: string, context: string): string {
   if (typeof plain !== "string" || plain.length === 0) throw new CredentialCryptoError("invalid_input");
   assertContext(context);
   const { key, kid } = currentKey();
-  assertWriteKeyId(kid);
   const iv = randomBytes(IV_BYTES);
   const cipher = createCipheriv(ALGORITHM, key, iv, { authTagLength: TAG_BYTES });
   cipher.setAAD(Buffer.from(context, "utf8"));

@@ -16,9 +16,11 @@ export interface Ga4BindingDTO {
 export interface Ga4SettingsDTO {
   connected_oauth: boolean;
   oauth_updated_at: string | null;
-  /** 저장된 자격증명을 복호화하지 못함(관리자 키 설정 오류) — 재연결로 해결되지 않는다 */
+  /** 저장된 자격증명을 복호화하지 못함(관리자 키 설정 오류). 복구 가능 여부는 oauth_error_recoverable */
   oauth_error: 'credential_storage_error' | null;
   oauth_error_reason: 'not_configured' | 'key_mismatch' | 'invalid_blob' | 'invalid_input' | null;
+  /** 런타임 키 = DB 앵커 정본 키 → 열리지 않는 행은 다른 키로 쓴 행 확정 → 재연결·해제로 복구 가능 */
+  oauth_error_recoverable: boolean;
   bindings: Ga4BindingDTO[];
   automation_domain_id: string | null;
 }

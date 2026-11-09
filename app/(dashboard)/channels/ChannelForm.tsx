@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { maskSecret } from '@/lib/crypto/mask';
 
 // ── 타입 ─────────────────────────────────────────────────────────────
-interface ChannelStatus { connected: boolean; masked?: Record<string, string>; error?: 'decrypt_failed' }
+interface ChannelStatus { connected: boolean; masked?: Record<string, string>; error?: 'decrypt_failed'; recoverable?: boolean }
 interface CafeTargetData { id: string; name: string; clubId: string; menuId: string; isDefault: boolean }
 interface Props { initial: Record<string, ChannelStatus>; cafeTargets?: CafeTargetData[] }
 
@@ -254,7 +254,7 @@ export default function ChannelForm({ initial, cafeTargets: initialTargets }: Pr
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{ch.label}</span>
                   {st?.error ? (
-                    <span role="alert" style={{ background: '#FEECEC', border: '1px solid #F5B5B5', color: '#B42318', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>자격증명 키 오류 — 관리자에게 문의</span>
+                    <span role="alert" style={{ background: '#FEECEC', border: '1px solid #F5B5B5', color: '#B42318', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>{st.recoverable ? '자격증명 키 오류 — 연결 해제 후 다시 연결하세요' : '자격증명 키 오류 — 관리자에게 문의'}</span>
                   ) : <Badge connected={connected} />}
                 </div>
                 {connected && (
@@ -267,7 +267,7 @@ export default function ChannelForm({ initial, cafeTargets: initialTargets }: Pr
                   </div>
                 )}
               </div>
-              {connected && (
+              {connected && (!st?.error || st.recoverable) && ( /* 키 오류 행은 정본 키일 때만 해제(복구) 허용 */
                 <button className="btn btn-ghost" style={{ fontSize: 11.5, flexShrink: 0 }} onClick={() => handleDisconnect(ch.id)} disabled={isLoading}>
                   연결 해제
                 </button>
