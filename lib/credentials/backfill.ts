@@ -4,12 +4,14 @@
 // 원칙
 // 1) 사전 가드(쓰기 전): expectKid(운영자가 확인한 운영 kid) === 현재 키 kid === DB 앵커 kid.
 // 2) 사전 검증(쓰기 전): 기존 v1 비밀 필드를 전부 복호화해 본다. 하나라도 열리지 않으면(다른 키로 쓴 행 혼재 등) 중단.
-// 3) 평문 필드만 대상, 행마다 트랜잭션 → FOR UPDATE 잠금 재조회 → 암호화 → 재복호화 일치 확인 → 갱신 → 갱신 후 재조회 검증.
+// 3) 평문 필드만 대상, 행마다 트랜잭션 → FOR UPDATE 잠금 재조회 → 봉인(sealForStorage: 같은 트랜잭션에서 앵커 재판정 + 암호화)
+//    → 재복호화 일치 확인 → 갱신 → 갱신 후 재조회 검증.
 // 출력(리포트·오류)에는 채널명·개수·고정 코드만 담는다. 값·키·context는 담지 않는다.
 
 import type { PrismaClient } from '@prisma/client';
-import { CredentialCryptoError, decryptSecret, encryptSecret } from '@/lib/crypto/credentials';
+import { CredentialCryptoError, decryptSecret } from '@/lib/crypto/credentials';
 import { assertCredentialWritable } from './anchor';
+import { sealForStorage } from './seal';
 import { credentialContext, isLegacyPlaintext, SECRET_FIELDS } from './store';
 
 const PAGE_SIZE = 100;
@@ -52,8 +54,11 @@ function legacyFields(row: Row): string[] {
   return fields;
 }
 
-function sealVerified(plain: string, context: string): string {
-  const blob = encryptSecret(plain, context);
+type Tx = Pick<PrismaClient, '$queryRaw'>;
+
+/** 단일 봉인 진입점으로 암호화(이 트랜잭션에서 캐시 없이 앵커 재판정) → 재복호화 일치 확인 */
+async function sealVerified(tx: Tx, plain: string, context: string): Promise<string> {
+  const blob = await sealForStorage(plain, context, tx);
   if (decryptSecret(blob, context) !== plain) throw new BackfillAbort('verify_failed');
   return blob;
 }
@@ -88,15 +93,15 @@ async function sealRow(db: PrismaClient, id: string): Promise<{ channel: string;
     const fields = legacyFields(row);
     if (!fields.length) return { channel: row.channel, fields };
     const ctx = (field: Ctx) => credentialContext(field, row.owner_id, row.channel);
-    const access = isLegacyPlaintext(row.access_token) ? sealVerified(row.access_token, ctx('access_token')) : row.access_token;
-    const refresh = isLegacyPlaintext(row.refresh_token) ? sealVerified(row.refresh_token, ctx('refresh_token')) : row.refresh_token;
+    const access = isLegacyPlaintext(row.access_token) ? await sealVerified(tx, row.access_token, ctx('access_token')) : row.access_token;
+    const refresh = isLegacyPlaintext(row.refresh_token) ? await sealVerified(tx, row.refresh_token, ctx('refresh_token')) : row.refresh_token;
     const original = metaObject(row.meta);
     let meta: Record<string, unknown> | null = original;
     if (original) {
       meta = { ...original };
       for (const key of SECRET_FIELDS.meta) {
         const value = original[key];
-        if (isLegacyPlaintext(value)) meta[key] = sealVerified(value, ctx(`meta.${key}`));
+        if (isLegacyPlaintext(value)) meta[key] = await sealVerified(tx, value, ctx(`meta.${key}`));
       }
     }
     const metaJson = meta ? JSON.stringify(meta) : row.meta == null ? null : JSON.stringify(row.meta);

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
-import { notFound } from '@/lib/visibility/http';
+import { notFound, VisibilityError } from '@/lib/visibility/http';
+import { CredentialCryptoError } from '@/lib/crypto/credentials';
 import { invalidateGa4Credentials } from '@/lib/ga4/auth';
 import { credentialPresence, deleteChannelCredential } from '@/lib/credentials/store';
 import type { z } from 'zod';
@@ -40,7 +41,13 @@ export async function ga4Settings(ownerId: string) {
       status: b.status, last_checked_at: b.lastCheckedAt, last_error_code: b.lastErrorCode })),
     automation_domain_id: setting?.automationDomainId ?? null };
 }
+// 삭제도 정본 키 환경(런타임 kid == 앵커)에서만 — 거부는 채널 저장·삭제와 같은 503 credential_storage_unavailable(값·원문 없음)
 export async function disconnectGa4(ownerId: string) {
-  await deleteChannelCredential(ownerId, 'ga4');
+  try { await deleteChannelCredential(ownerId, 'ga4'); }
+  catch (error) {
+    if (!(error instanceof CredentialCryptoError)) throw error;
+    console.error('[credentials] delete failed', { channel: 'ga4', reason: error.reason });
+    throw new VisibilityError('credential_storage_unavailable', '자격증명을 안전하게 변경할 수 없습니다. 관리자에게 문의하세요.', 503);
+  }
   invalidateGa4Credentials(ownerId);
 }

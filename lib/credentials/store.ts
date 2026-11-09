@@ -6,8 +6,9 @@
 // - AAD context = `channel_credentials.<field>:<ownerId>:<channel>` — 다른 행·다른 필드로 옮긴 암호문은 열리지 않는다.
 
 import { prisma } from '@/lib/prisma';
-import { CredentialCryptoError, decryptSecret, encryptSecret, maskSecret, type CredentialCryptoReason } from '@/lib/crypto/credentials';
+import { CredentialCryptoError, decryptSecret, maskSecret, type CredentialCryptoReason } from '@/lib/crypto/credentials';
 import { assertCredentialWritable, credentialKeyStatus } from './anchor';
+import { sealForStorage } from './seal';
 
 export const SECRET_FIELDS = {
   accessToken: true,
@@ -56,22 +57,37 @@ export function isLegacyPlaintext(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && !value.startsWith(SEALED_PREFIX);
 }
 
-/** 빈 값·null은 비밀이 아니므로 그대로 둔다(encryptSecret은 빈 평문을 거부한다). */
-export function sealValue(value: string | null | undefined, context: string): string | null | undefined {
+/** 빈 값·null은 비밀이 아니므로 그대로 둔다(빈 평문은 봉인하지 않음). 봉인은 단일 진입점 sealForStorage(앵커 판정 포함)만 쓴다. */
+async function sealValue(value: string | null | undefined, context: string): Promise<string | null | undefined> {
   if (value == null || value === '') return value;
-  return encryptSecret(value, context);
+  return sealForStorage(value, context);
 }
 
-// 같은 (채널, 사유)는 프로세스당 한 번만 기록한다(요청마다 반복되는 로그 폭주 방지). 실패 자체는 호출자가 계속 드러낸다.
-const loggedDecryptFailures = new Set<string>();
+// 같은 키는 프로세스당 한 번만 기록한다(요청마다 반복되는 로그 폭주 방지). 실패 자체는 호출자가 계속 드러낸다.
+const loggedOnce = new Set<string>();
+
+function logOnce(key: string, message: string, payload: Record<string, string>): void {
+  if (loggedOnce.has(key)) return;
+  if (loggedOnce.size >= 100) loggedOnce.clear();
+  loggedOnce.add(key);
+  console.error(message, payload);
+}
 
 /** 복호화 실패를 값 없이 기록한다(채널·사유 코드만, 프로세스당 (channel, reason) 1회). */
 export function logDecryptFailure(channel: string, error: CredentialCryptoError): void {
-  const key = `${channel}:${error.reason}`;
-  if (loggedDecryptFailures.has(key)) return;
-  if (loggedDecryptFailures.size >= 100) loggedDecryptFailures.clear();
-  loggedDecryptFailures.add(key);
-  console.error('[credentials] decrypt failed', { channel, reason: error.reason });
+  logOnce(`decrypt:${channel}:${error.reason}`, '[credentials] decrypt failed', { channel, reason: error.reason });
+}
+
+/**
+ * 오류 행의 복구 가능 여부(런타임 키 = 앵커). 화면용 보조 판정이라 절대 throw하지 않는다:
+ * 앵커 조회 실패(테이블 미적용·DB 장애)는 false(경고만)로 보고 고정 코드만 프로세스당 1회 기록한다(원문·DSN 미기록).
+ */
+async function isRecoverable(): Promise<boolean> {
+  try { return (await credentialKeyStatus()).writable; }
+  catch {
+    logOnce('anchor_status', '[credentials] anchor status failed', { code: 'anchor_unavailable' });
+    return false;
+  }
 }
 
 type OpenState = { legacy: boolean };
@@ -83,11 +99,11 @@ function openValue(value: unknown, context: string, state: OpenState): string | 
   return value;
 }
 
-function sealMeta(meta: Record<string, unknown>, ownerId: string, channel: string, onlyLegacy = false): Record<string, unknown> {
+async function sealMeta(meta: Record<string, unknown>, ownerId: string, channel: string, onlyLegacy = false): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(meta)) {
     const secret = SECRET_FIELDS.meta.includes(k) && typeof v === 'string' && (!onlyLegacy || isLegacyPlaintext(v));
-    out[k] = secret ? (sealValue(v as string, credentialContext(`meta.${k}`, ownerId, channel)) ?? '') : v;
+    out[k] = secret ? ((await sealValue(v as string, credentialContext(`meta.${k}`, ownerId, channel))) ?? '') : v;
   }
   return out;
 }
@@ -135,7 +151,7 @@ export async function credentialPresence(ownerId: string, channel: string): Prom
   } catch (error) {
     if (!(error instanceof CredentialCryptoError)) throw error;
     logDecryptFailure(channel, error);
-    return { hasRefreshToken: false, updatedAt: row.updatedAt, error: 'decrypt_failed', reason: error.reason, recoverable: (await credentialKeyStatus()).writable };
+    return { hasRefreshToken: false, updatedAt: row.updatedAt, error: 'decrypt_failed', reason: error.reason, recoverable: await isRecoverable() };
   }
 }
 
@@ -150,24 +166,24 @@ type LockedRow = { access_token: string | null; refresh_token: string | null; me
 export async function writeChannelCredential(ownerId: string, channel: string, data: CredentialInput): Promise<void> {
   await assertCredentialWritable();
   const sealed: { accessToken?: string | null; refreshToken?: string | null; expiresAt?: string | null; meta?: Record<string, unknown> } = {};
-  if (data.accessToken !== undefined) sealed.accessToken = sealValue(data.accessToken, credentialContext('access_token', ownerId, channel));
-  if (data.refreshToken !== undefined) sealed.refreshToken = sealValue(data.refreshToken, credentialContext('refresh_token', ownerId, channel));
+  if (data.accessToken !== undefined) sealed.accessToken = await sealValue(data.accessToken, credentialContext('access_token', ownerId, channel));
+  if (data.refreshToken !== undefined) sealed.refreshToken = await sealValue(data.refreshToken, credentialContext('refresh_token', ownerId, channel));
   if (data.expiresAt !== undefined) sealed.expiresAt = data.expiresAt;
-  if (data.meta !== undefined) sealed.meta = sealMeta(data.meta, ownerId, channel);
+  if (data.meta !== undefined) sealed.meta = await sealMeta(data.meta, ownerId, channel);
   await prisma.$transaction(async tx => {
     const [existing] = await tx.$queryRaw<LockedRow[]>`
       SELECT access_token, refresh_token, meta FROM channel_credentials WHERE owner_id = ${ownerId} AND channel = ${channel} FOR UPDATE`;
     const update = { ...sealed };
     if (existing) {
       if (update.accessToken === undefined && isLegacyPlaintext(existing.access_token)) {
-        update.accessToken = sealValue(existing.access_token, credentialContext('access_token', ownerId, channel));
+        update.accessToken = await sealValue(existing.access_token, credentialContext('access_token', ownerId, channel));
       }
       if (update.refreshToken === undefined && isLegacyPlaintext(existing.refresh_token)) {
-        update.refreshToken = sealValue(existing.refresh_token, credentialContext('refresh_token', ownerId, channel));
+        update.refreshToken = await sealValue(existing.refresh_token, credentialContext('refresh_token', ownerId, channel));
       }
       const oldMeta = metaObject(existing.meta);
       if (update.meta === undefined && oldMeta && SECRET_FIELDS.meta.some(k => isLegacyPlaintext(oldMeta[k]))) {
-        update.meta = sealMeta(oldMeta, ownerId, channel, true);
+        update.meta = await sealMeta(oldMeta, ownerId, channel, true);
       }
     }
     // Prisma Json 입력 타입으로 맞춘다(meta가 없으면 키 자체를 넣지 않음 = 기존 값 유지)
@@ -199,7 +215,7 @@ export async function listMaskedCredentials(ownerId: string): Promise<MaskedCred
     catch (error) {
       if (!(error instanceof CredentialCryptoError)) throw error;
       logDecryptFailure(row.channel, error);
-      recoverable ??= (await credentialKeyStatus()).writable;
+      recoverable ??= await isRecoverable();
       out[row.channel] = { connected: true, error: 'decrypt_failed', masked: {}, recoverable };
       continue;
     }
@@ -211,8 +227,13 @@ export async function listMaskedCredentials(ownerId: string): Promise<MaskedCred
   return out;
 }
 
-/** 본인 행만 삭제. 삭제된 행 수를 돌려준다. */
+/**
+ * 본인 행만 삭제. 삭제된 행 수를 돌려준다.
+ * 삭제도 자격증명 변경이다 — 쓰기와 같은 원칙으로 정본 키 환경(런타임 kid == 앵커 kid)에서만 허용한다
+ * (로컬처럼 다른 키 환경이 공유 DB의 운영 연결을 지우지 못하게). 거부는 CredentialCryptoError.
+ */
 export async function deleteChannelCredential(ownerId: string, channel: string): Promise<number> {
+  await assertCredentialWritable();
   const { count } = await prisma.channelCredential.deleteMany({ where: { ownerId, channel } });
   return count;
 }
