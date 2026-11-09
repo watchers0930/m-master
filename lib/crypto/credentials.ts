@@ -1,20 +1,21 @@
-import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes } from "node:crypto";
 
-// 채널 자격증명·광고 API 키 암호화 (AES-256-GCM).
-// 저장 형식: v1:<iv b64>:<tag b64>:<ct b64>
-// 실패는 절대 삼키지 않는다(fail-closed). 에러 메시지에 키·평문·암호문을 넣지 않는다.
+// 채널 자격증명·광고 API 키 암호화 (AES-256-GCM, context를 AAD로 묶음).
+// 저장 형식: v1:<kid>:<iv b64>:<tag b64>:<ct b64>
+// 실패는 절대 삼키지 않는다(fail-closed). 에러 메시지는 고정 문자열이며 키·평문·암호문·context를 넣지 않는다.
 
 const VERSION = "v1";
 const ALGORITHM = "aes-256-gcm";
 const IV_BYTES = 12;
 const TAG_BYTES = 16;
 const KEY_BYTES = 32;
-const MIN_SECRET_LENGTH = 32;
 const HKDF_SALT = "minteq-credentials";
 const HKDF_INFO = "v1";
+const KID_PATTERN = /^[0-9a-f]{16}$/;
 const MASK = "••••";
+const MASK_MIN_LENGTH = 8;
 
-export type CredentialCryptoReason = "not_configured" | "invalid_blob";
+export type CredentialCryptoReason = "not_configured" | "invalid_blob" | "key_mismatch" | "invalid_input";
 
 export class CredentialCryptoError extends Error {
   readonly reason: CredentialCryptoReason;
@@ -26,55 +27,84 @@ export class CredentialCryptoError extends Error {
   }
 }
 
-// 파생 키 캐시: secret 값이 바뀌면(키 교체·테스트) 자동으로 다시 파생한다.
-let cached: { secret: string; key: Buffer } | null = null;
+type DerivedKey = { secret: string; key: Buffer; kid: string };
 
-function deriveKey(): Buffer {
+// 파생 키 캐시: secret 문자열이 바뀌면(키 교체·테스트) 자동으로 다시 파생한다.
+let cached: DerivedKey | null = null;
+
+// 정규(canonical) base64인지 확인한다. 공백·개행·패딩 누락·잘못된 문자는 모두 거부.
+function decodeCanonical(value: string): Buffer | null {
+  if (value.length === 0) return null;
+  const buf = Buffer.from(value, "base64");
+  return buf.toString("base64") === value ? buf : null;
+}
+
+function currentKey(): DerivedKey {
+  // 절대 trim하지 않는다: 끝 개행 등 env 오염은 설정 오류로 드러나야 한다.
   const secret = process.env.CREDENTIAL_ENCRYPTION_SECRET ?? "";
-  if (secret.length < MIN_SECRET_LENGTH) throw new CredentialCryptoError("not_configured");
-  if (cached?.secret === secret) return cached.key;
-  const key = Buffer.from(hkdfSync("sha256", secret, HKDF_SALT, HKDF_INFO, KEY_BYTES));
-  cached = { secret, key };
-  return key;
+  if (cached?.secret === secret) return cached;
+  const raw = decodeCanonical(secret);
+  if (!raw || raw.length !== KEY_BYTES) throw new CredentialCryptoError("not_configured");
+  const key = Buffer.from(hkdfSync("sha256", raw, HKDF_SALT, HKDF_INFO, KEY_BYTES));
+  const kid = createHmac("sha256", key).update("kid").digest().subarray(0, 8).toString("hex");
+  cached = { secret, key, kid };
+  return cached;
 }
 
-const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
-
-function decodePart(part: string): Buffer {
-  if (!BASE64.test(part)) throw new CredentialCryptoError("invalid_blob");
-  return Buffer.from(part, "base64");
+function assertContext(context: unknown): asserts context is string {
+  if (typeof context !== "string" || context.length === 0) throw new CredentialCryptoError("invalid_input");
 }
 
-export function encryptSecret(plain: string): string {
-  const key = deriveKey();
+// 환경 간 키 일치 여부를 비밀값 노출 없이 비교하기 위한 식별자.
+export function credentialKeyId(): string {
+  return currentKey().kid;
+}
+
+export function encryptSecret(plain: string, context: string): string {
+  if (typeof plain !== "string" || plain.length === 0) throw new CredentialCryptoError("invalid_input");
+  assertContext(context);
+  const { key, kid } = currentKey();
   const iv = randomBytes(IV_BYTES);
   const cipher = createCipheriv(ALGORITHM, key, iv, { authTagLength: TAG_BYTES });
+  cipher.setAAD(Buffer.from(context, "utf8"));
   const ct = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
-  return [VERSION, iv.toString("base64"), tag.toString("base64"), ct.toString("base64")].join(":");
+  return [VERSION, kid, iv.toString("base64"), tag.toString("base64"), ct.toString("base64")].join(":");
 }
 
-export function decryptSecret(blob: string): string {
+export function decryptSecret(blob: string, context: string): string {
+  if (typeof blob !== "string") throw new CredentialCryptoError("invalid_input");
+  assertContext(context);
   // env 누락은 형식 오류보다 먼저 알린다(운영 설정 문제를 데이터 문제로 오인하지 않도록).
-  const key = deriveKey();
-  const parts = typeof blob === "string" ? blob.split(":") : [];
-  if (parts.length !== 4 || parts[0] !== VERSION) throw new CredentialCryptoError("invalid_blob");
-  const iv = decodePart(parts[1]);
-  const tag = decodePart(parts[2]);
-  const ct = decodePart(parts[3]);
-  if (iv.length !== IV_BYTES || tag.length !== TAG_BYTES) throw new CredentialCryptoError("invalid_blob");
-  try {
-    const decipher = createDecipheriv(ALGORITHM, key, iv, { authTagLength: TAG_BYTES });
-    decipher.setAuthTag(tag);
-    return Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
-  } catch {
-    // 인증 실패(키 불일치·변조)는 원인 노출 없이 invalid_blob으로만 알린다.
+  const { key, kid } = currentKey();
+  const parts = blob.split(":");
+  if (parts.length !== 5 || parts[0] !== VERSION || !KID_PATTERN.test(parts[1])) {
     throw new CredentialCryptoError("invalid_blob");
   }
+  if (parts[1] !== kid) throw new CredentialCryptoError("key_mismatch");
+  const iv = decodeCanonical(parts[2]);
+  const tag = decodeCanonical(parts[3]);
+  const ct = decodeCanonical(parts[4]);
+  if (!iv || !tag || !ct || iv.length !== IV_BYTES || tag.length !== TAG_BYTES) {
+    throw new CredentialCryptoError("invalid_blob");
+  }
+  let plain: string;
+  try {
+    const decipher = createDecipheriv(ALGORITHM, key, iv, { authTagLength: TAG_BYTES });
+    decipher.setAAD(Buffer.from(context, "utf8"));
+    decipher.setAuthTag(tag);
+    plain = Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
+  } catch {
+    // 인증 실패(변조·context 불일치)는 원인 노출 없이 invalid_blob으로만 알린다.
+    throw new CredentialCryptoError("invalid_blob");
+  }
+  if (plain.length === 0) throw new CredentialCryptoError("invalid_blob");
+  return plain;
 }
 
-// 화면 표시용: 뒤 4자리만 보인다. 4자 이하 값은 전체 노출을 막기 위해 마스크만 반환한다.
+// 화면 표시용: 8자 이하는 마스크만, 그보다 길면 뒤 4자리만 보인다(코드포인트 기준).
 export function maskSecret(plain: string): string {
-  if (plain.length <= 4) return MASK;
-  return MASK + plain.slice(-4);
+  const chars = Array.from(plain);
+  if (chars.length <= MASK_MIN_LENGTH) return MASK;
+  return MASK + chars.slice(-4).join("");
 }
