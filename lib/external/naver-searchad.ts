@@ -82,22 +82,33 @@ function parseErrorBody(text: string): ErrorInfo {
 }
 
 function classify(status: number, info: ErrorInfo, mutation: boolean): NaverAdsReason {
+  // 5xx가 먼저다: 본문 code(1016·1018 등)가 있어도 변이는 반영 여부를 알 수 없고(uncertain), 조회는 일시 장애다.
+  if (status >= 500) return mutation ? "ads_uncertain" : "ads_unavailable";
   if (status === 429 || info.naverCode === RATE_LIMIT_CODE) return "ads_rate_limited";
   if (status === 401) return "ads_auth_failed";
   if (status === 403) return info.invalidSignature ? "ads_auth_failed" : "ads_forbidden";
   if (info.naverCode !== undefined && FORBIDDEN_CODES.has(info.naverCode)) return "ads_forbidden";
-  if (status >= 400 && status < 500) return "ads_rejected";
-  // 5xx 등: 변이는 네이버에 반영됐는지 알 수 없다(재조회로 확인해야 함). 조회는 일시 장애.
-  return mutation ? "ads_uncertain" : "ads_unavailable";
+  if (status >= 400) return "ads_rejected";
+  return mutation ? "ads_uncertain" : "ads_unavailable"; // 1xx·3xx 등 비정상(redirect는 fetch가 이미 거부)
 }
 
-function retryAfterMs(header: string | null, attempt: number): number {
+function retryAfterMs(header: string | null, attempt: number, now: number): number {
   if (!header) return 1000 * 2 ** attempt;
   const seconds = Number(header);
-  return Number.isFinite(seconds) ? seconds * 1000 : Date.parse(header) - Date.now();
+  return Number.isFinite(seconds) ? seconds * 1000 : Date.parse(header) - now;
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+// 시간 의존성(시계·대기·시도별 타임아웃 신호). 기본값은 실제 시간이고, 테스트는 가짜 시계를 주입한다.
+export type NaverAdsClock = {
+  now: () => number;
+  sleep: (ms: number) => Promise<void>;
+  timeout: (ms: number) => AbortSignal;
+};
+const realClock: NaverAdsClock = {
+  now: () => Date.now(),
+  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  timeout: (ms) => AbortSignal.timeout(ms),
+};
 // 헤더 값에 제어문자가 섞이면 fetch가 요청 전에 throw → 변이가 "uncertain"으로 오분류된다. 생성 시 거부한다.
 const HEADER_SAFE = /^[\x21-\x7e]+$/;
 
@@ -105,12 +116,14 @@ export class NaverAdsClient {
   // #private: JSON.stringify·util.inspect·열거에 키가 드러나지 않는다.
   readonly #creds: AdCreds;
   readonly #transport: typeof fetch;
+  readonly #clock: NaverAdsClock;
 
-  constructor(creds: AdCreds, transport: typeof fetch = fetch) {
+  constructor(creds: AdCreds, transport: typeof fetch = fetch, clock: NaverAdsClock = realClock) {
     if (!/^\d{1,20}$/.test(creds.customerId) || !HEADER_SAFE.test(creds.apiKey) || !HEADER_SAFE.test(creds.secretKey))
       throw new NaverAdsError("ads_not_connected");
     this.#creds = { ...creds };
     this.#transport = transport;
+    this.#clock = clock;
   }
 
   get<T = unknown>(path: string, query?: NaverAdsQuery): Promise<T> {
@@ -137,12 +150,13 @@ export class NaverAdsClient {
     for (const [key, value] of Object.entries(query ?? {})) if (value !== undefined && value !== null) params.append(key, String(value));
     const url = `${BASE_URL}${path}${params.toString() ? `?${params}` : ""}`;
     const payload = body === undefined ? undefined : JSON.stringify(body);
-    const deadline = Date.now() + DEADLINE_MS;
+    const clock = this.#clock;
+    const deadline = clock.now() + DEADLINE_MS;
     let last = new NaverAdsError(mutation ? "ads_uncertain" : "ads_unavailable");
 
     for (let attempt = 0; attempt < (mutation ? 1 : GET_ATTEMPTS); attempt++) {
-      if (Date.now() >= deadline) throw last;
-      const ts = String(Date.now());
+      if (clock.now() >= deadline) throw last;
+      const ts = String(clock.now());
       const headers: Record<string, string> = {
         "X-Timestamp": ts,
         "X-API-KEY": this.#creds.apiKey,
@@ -158,7 +172,7 @@ export class NaverAdsClient {
           redirect: "error",
           headers,
           body: payload,
-          signal: AbortSignal.timeout(Math.max(1, Math.min(ATTEMPT_TIMEOUT_MS, deadline - Date.now()))),
+          signal: clock.timeout(Math.max(1, Math.min(ATTEMPT_TIMEOUT_MS, deadline - clock.now()))),
         });
         text = await response.text();
       } catch {
@@ -183,7 +197,7 @@ export class NaverAdsClient {
       last = new NaverAdsError(reason, info.naverCode, response.status);
       if (mutation || attempt === GET_ATTEMPTS - 1) throw last;
       if (reason === "ads_rate_limited") {
-        const wait = retryAfterMs(response.headers.get("retry-after"), attempt);
+        const wait = retryAfterMs(response.headers.get("retry-after"), attempt, clock.now());
         if (!(wait <= MAX_RETRY_AFTER_MS)) throw last;
         await this.#backoff(Math.max(0, wait), deadline, last);
       } else if (reason === "ads_unavailable") {
@@ -197,8 +211,8 @@ export class NaverAdsClient {
 
   async #backoff(ms: number, deadline: number, error: NaverAdsError): Promise<void> {
     const jittered = ms + Math.random() * 100;
-    if (Date.now() + jittered >= deadline) throw error;
-    await sleep(jittered);
+    if (this.#clock.now() + jittered >= deadline) throw error;
+    await this.#clock.sleep(jittered);
   }
 }
 
