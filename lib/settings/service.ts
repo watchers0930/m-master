@@ -33,6 +33,8 @@ export async function ga4Settings(ownerId: string) {
   // 복호화 실패(운영 키 불일치 등)는 '연결됨'이 아니라 관리자 설정 오류로 표시한다(재연결로 고칠 문제가 아님).
   return { connected_oauth: !!credential?.hasRefreshToken && !credential.error, oauth_updated_at: credential?.updatedAt ?? null,
     oauth_error: credential?.error ? 'credential_storage_error' as const : null,
+    // 사유 코드(not_configured=운영 env 문제 / key_mismatch·invalid_blob=저장 행 문제)만 — 화면이 복구 버튼을 고른다
+    oauth_error_reason: credential?.error ? credential.reason : null,
     bindings: bindings.map(b => ({ domain_id: b.domainId, host: b.host, property_id: b.propertyId,
       status: b.status, last_checked_at: b.lastCheckedAt, last_error_code: b.lastErrorCode })),
     automation_domain_id: setting?.automationDomainId ?? null };

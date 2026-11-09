@@ -6,6 +6,7 @@ import { notFound, VisibilityError } from '@/lib/visibility/http';
 import { isPublishable, type PublishTarget, type PublishContext } from './eligibility';
 import type { Channel } from '@/types/db';
 import { getNaverCafeCreds } from '@/lib/channel-credentials';
+import { loadCredentials } from './errors';
 export type TargetRef = { type: 'content' | 'idea_job'; id: string };
 export type ClaimInput = { ownerId: string; channel: Channel; destinationKey?: string; trigger: 'manual' | 'schedule' | 'worker'; dailyLimit?: boolean;
   /** 예약 슬롯 발행: 같은 트랜잭션에서 슬롯을 잠그고 scheduled·도래를 재확인(slot-mutation 과 직렬화) */ slotId?: string };
@@ -37,7 +38,9 @@ export async function decide(tx: Prisma.TransactionClient, target: PublishTarget
  */
 export async function canonicalDestinationKey(ownerId: string, channel: Channel, key = 'default'): Promise<string> {
   if (channel !== 'naver_cafe') return 'default';
-  const dest = key === 'default' ? await getNaverCafeCreds(ownerId)
+  // 기본 게시판 = 저장 자격증명의 clubId/menuId. 복호화 실패는 claim을 만들기 전의 확정 실패(422, 코드 분류) — 원본 500 금지.
+  const dest = key === 'default' ? await loadCredentials(() => getNaverCafeCreds(ownerId), 'naver_cafe', () => new VisibilityError(
+    'credential_storage_error', '저장된 채널 자격증명을 사용할 수 없습니다(관리자 키 설정 오류). 관리자에게 문의하세요.', 422))
     : await prisma.cafeTarget.findFirst({ where: { id: key, ownerId }, select: { clubId: true, menuId: true } });
   if (key !== 'default' && !dest) notFound();
   return dest?.clubId && dest.menuId ? `cafe:${dest.clubId}:${dest.menuId}` : 'default';

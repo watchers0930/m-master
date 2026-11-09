@@ -34,6 +34,8 @@ export interface BackfillReport {
   legacy: Record<string, Record<string, number>>;
   /** channel → reason(key_mismatch·invalid_blob 등) → 열리지 않는 기존 v1 필드 수. apply는 비어 있지 않으면 중단 */
   unreadable: Record<string, Record<string, number>>;
+  /** 기존 v1 비밀 필드 중 현재 키로 열리는/열리지 않는 개수(키 대조 증거 — 값 없음) */
+  sealed: { readable: number; unreadable: number };
 }
 
 function metaObject(meta: unknown): Record<string, unknown> | null {
@@ -58,14 +60,15 @@ function sealVerified(plain: string, context: string): string {
 type Ctx = Parameters<typeof credentialContext>[0];
 
 /** 이미 v1인 비밀 필드를 모두 열어 본다. 실패 사유 코드만 센다(값 없음). */
-function probeSealed(row: Row, into: Record<string, Record<string, number>>) {
+function probeSealed(row: Row, into: Record<string, Record<string, number>>, totals: { readable: number; unreadable: number }) {
   const fields: [unknown, Ctx][] = [[row.access_token, 'access_token'], [row.refresh_token, 'refresh_token']];
   const meta = metaObject(row.meta);
   for (const key of SECRET_FIELDS.meta) fields.push([meta?.[key], `meta.${key}`]);
   for (const [value, field] of fields) {
     if (typeof value !== 'string' || isLegacyPlaintext(value) || value === '') continue;
-    try { decryptSecret(value, credentialContext(field, row.owner_id, row.channel)); }
+    try { decryptSecret(value, credentialContext(field, row.owner_id, row.channel)); totals.readable++; }
     catch (error) {
+      totals.unreadable++;
       const reason = error instanceof CredentialCryptoError ? error.reason : 'unknown';
       const byReason = into[row.channel] ??= {};
       byReason[reason] = (byReason[reason] ?? 0) + 1;
@@ -143,12 +146,12 @@ export async function backfillChannelCredentials(db: PrismaClient, { apply, expe
   const kid = assertCredentialWritable();
   if (typeof expectKid !== 'string' || !KID_PATTERN.test(expectKid)) throw new BackfillAbort('expect_kid_invalid');
   if (expectKid !== kid) throw new BackfillAbort('expect_kid_mismatch');
-  const report: BackfillReport = { apply, scannedRows: 0, updatedRows: 0, legacy: {}, unreadable: {} };
+  const report: BackfillReport = { apply, scannedRows: 0, updatedRows: 0, legacy: {}, unreadable: {}, sealed: { readable: 0, unreadable: 0 } };
   // 1단계: 전 행 사전 검증 — 기존 암호문이 이 키로 모두 열리는지, 평문 필드가 몇 개인지
   const targets: string[] = [];
   for await (const row of pages(db)) {
     report.scannedRows++;
-    probeSealed(row, report.unreadable);
+    probeSealed(row, report.unreadable, report.sealed);
     const fields = legacyFields(row);
     if (!fields.length) continue;
     targets.push(row.id);

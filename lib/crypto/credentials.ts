@@ -58,6 +58,19 @@ export function credentialKeyId(): string {
   return currentKey().kid;
 }
 
+export type CredentialKeyStatus = { kid: string | null; writable: boolean; reason?: "not_configured" | "key_mismatch" };
+
+// 운영 런타임 키 확인용(읽기 전용): kid(비밀 아님)와 쓰기 가능 여부만. 비밀값·KEY_ID 원문은 담지 않는다.
+export function credentialKeyStatus(): CredentialKeyStatus {
+  let kid: string;
+  try { kid = currentKey().kid; } catch { return { kid: null, writable: false, reason: "not_configured" }; }
+  try { assertWriteKeyId(kid); } catch (error) {
+    const reason = error instanceof CredentialCryptoError && error.reason === "key_mismatch" ? "key_mismatch" : "not_configured";
+    return { kid, writable: false, reason };
+  }
+  return { kid, writable: true };
+}
+
 // 쓰기 가능 여부(키 형식 + CREDENTIAL_KEY_ID 일치)를 값 노출 없이 확인. 실패 시 CredentialCryptoError.
 export function assertCredentialWritable(): string {
   const { kid } = currentKey();

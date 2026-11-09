@@ -6,7 +6,7 @@
 // - AAD context = `channel_credentials.<field>:<ownerId>:<channel>` — 다른 행·다른 필드로 옮긴 암호문은 열리지 않는다.
 
 import { prisma } from '@/lib/prisma';
-import { assertCredentialWritable, CredentialCryptoError, decryptSecret, encryptSecret, maskSecret } from '@/lib/crypto/credentials';
+import { assertCredentialWritable, CredentialCryptoError, decryptSecret, encryptSecret, maskSecret, type CredentialCryptoReason } from '@/lib/crypto/credentials';
 
 export const SECRET_FIELDS = {
   accessToken: true,
@@ -60,8 +60,15 @@ export function sealValue(value: string | null | undefined, context: string): st
   return encryptSecret(value, context);
 }
 
-/** 복호화 실패를 값 없이 기록한다(채널·사유 코드만). */
+// 같은 (채널, 사유)는 프로세스당 한 번만 기록한다(요청마다 반복되는 로그 폭주 방지). 실패 자체는 호출자가 계속 드러낸다.
+const loggedDecryptFailures = new Set<string>();
+
+/** 복호화 실패를 값 없이 기록한다(채널·사유 코드만, 프로세스당 (channel, reason) 1회). */
 export function logDecryptFailure(channel: string, error: CredentialCryptoError): void {
+  const key = `${channel}:${error.reason}`;
+  if (loggedDecryptFailures.has(key)) return;
+  if (loggedDecryptFailures.size >= 100) loggedDecryptFailures.clear();
+  loggedDecryptFailures.add(key);
   console.error('[credentials] decrypt failed', { channel, reason: error.reason });
 }
 
@@ -117,16 +124,16 @@ export async function readChannelCredential(ownerId: string, channel: string): P
 }
 
 /** 연결 상태 화면용. 값은 반환하지 않고, 복호화 실패는 error로 구분한다(연결됨으로 보이지 않게). */
-export async function credentialPresence(ownerId: string, channel: string): Promise<{ hasRefreshToken: boolean; updatedAt: Date; error: CredentialRowError | null } | null> {
+export async function credentialPresence(ownerId: string, channel: string): Promise<{ hasRefreshToken: boolean; updatedAt: Date; error: CredentialRowError | null; reason: CredentialCryptoReason | null } | null> {
   const row = await prisma.channelCredential.findUnique({ where: { ownerId_channel: { ownerId, channel } }, select: FULL_SELECT });
   if (!row) return null;
   try {
     const cred = openRow(row, ownerId, channel);
-    return { hasRefreshToken: !!cred.refreshToken, updatedAt: row.updatedAt, error: null };
+    return { hasRefreshToken: !!cred.refreshToken, updatedAt: row.updatedAt, error: null, reason: null };
   } catch (error) {
     if (!(error instanceof CredentialCryptoError)) throw error;
     logDecryptFailure(channel, error);
-    return { hasRefreshToken: false, updatedAt: row.updatedAt, error: 'decrypt_failed' };
+    return { hasRefreshToken: false, updatedAt: row.updatedAt, error: 'decrypt_failed', reason: error.reason };
   }
 }
 
