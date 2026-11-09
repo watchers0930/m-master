@@ -2,10 +2,11 @@
 // - 쓰기: 비밀 필드는 항상 AES-256-GCM 암호화. 키가 없거나 잘못되면 쓰기 자체를 거부(fail-closed, 평문 저장 금지).
 // - 읽기: `v1:` 접두는 복호화, 접두가 없으면 전환기 평문으로 받아들이고 값 없이 경고만 남긴다.
 // - 복호화 실패는 CredentialCryptoError 그대로 throw한다(빈 값으로 숨기지 않는다). 경계에서 호출자가 번역한다.
+//   예외: 목록·연결상태 화면용 함수는 행별 오류 상태로 돌려준다(값·암호문은 절대 마스킹하지 않음).
 // - AAD context = `channel_credentials.<field>:<ownerId>:<channel>` — 다른 행·다른 필드로 옮긴 암호문은 열리지 않는다.
 
 import { prisma } from '@/lib/prisma';
-import { credentialKeyId, decryptSecret, encryptSecret, maskSecret } from '@/lib/crypto/credentials';
+import { assertCredentialWritable, CredentialCryptoError, decryptSecret, encryptSecret, maskSecret } from '@/lib/crypto/credentials';
 
 export const SECRET_FIELDS = {
   accessToken: true,
@@ -16,6 +17,8 @@ export const SECRET_FIELDS = {
 
 const SEALED_PREFIX = 'v1:';
 const LIST_LIMIT = 50; // (ownerId, channel) 유일 — 채널 수만큼만 존재하지만 상한을 둔다
+/** 채널 연동 화면이 다루는 채널(ga4는 설정 화면에서 따로 표시) */
+export const SOCIAL_CHANNELS = ['naver_cafe', 'instagram', 'facebook'] as const;
 
 export type CredentialMeta = Record<string, string>;
 
@@ -37,7 +40,8 @@ export interface CredentialInput {
   meta?: CredentialMeta;
 }
 
-export type MaskedCredentials = Record<string, { connected: boolean; masked: Record<string, string> }>;
+export type CredentialRowError = 'decrypt_failed';
+export type MaskedCredentials = Record<string, { connected: boolean; masked: Record<string, string>; error?: CredentialRowError }>;
 
 type ColumnField = 'access_token' | 'refresh_token';
 
@@ -56,6 +60,11 @@ export function sealValue(value: string | null | undefined, context: string): st
   return encryptSecret(value, context);
 }
 
+/** 복호화 실패를 값 없이 기록한다(채널·사유 코드만). */
+export function logDecryptFailure(channel: string, error: CredentialCryptoError): void {
+  console.error('[credentials] decrypt failed', { channel, reason: error.reason });
+}
+
 type OpenState = { legacy: boolean };
 
 function openValue(value: unknown, context: string, state: OpenState): string | null {
@@ -65,21 +74,25 @@ function openValue(value: unknown, context: string, state: OpenState): string | 
   return value;
 }
 
-function sealMeta(meta: CredentialMeta, ownerId: string, channel: string): CredentialMeta {
-  const out: CredentialMeta = {};
+function sealMeta(meta: Record<string, unknown>, ownerId: string, channel: string, onlyLegacy = false): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(meta)) {
-    out[k] = SECRET_FIELDS.meta.includes(k) ? (sealValue(v, credentialContext(`meta.${k}`, ownerId, channel)) ?? '') : v;
+    const secret = SECRET_FIELDS.meta.includes(k) && typeof v === 'string' && (!onlyLegacy || isLegacyPlaintext(v));
+    out[k] = secret ? (sealValue(v as string, credentialContext(`meta.${k}`, ownerId, channel)) ?? '') : v;
   }
   return out;
 }
 
 type RawRow = { accessToken?: unknown; refreshToken?: unknown; expiresAt?: unknown; meta?: unknown; updatedAt?: unknown };
 
+function metaObject(meta: unknown): Record<string, unknown> | null {
+  return meta && typeof meta === 'object' && !Array.isArray(meta) ? meta as Record<string, unknown> : null;
+}
+
 function openRow(row: RawRow, ownerId: string, channel: string): DecryptedCredential {
   const state: OpenState = { legacy: false };
   const meta: CredentialMeta = {};
-  const rawMeta = row.meta && typeof row.meta === 'object' && !Array.isArray(row.meta) ? row.meta as Record<string, unknown> : {};
-  for (const [k, v] of Object.entries(rawMeta)) {
+  for (const [k, v] of Object.entries(metaObject(row.meta) ?? {})) {
     if (typeof v !== 'string') continue;
     meta[k] = SECRET_FIELDS.meta.includes(k) ? (openValue(v, credentialContext(`meta.${k}`, ownerId, channel), state) ?? '') : v;
   }
@@ -95,50 +108,90 @@ function openRow(row: RawRow, ownerId: string, channel: string): DecryptedCreden
   return result;
 }
 
+const FULL_SELECT = { accessToken: true, refreshToken: true, expiresAt: true, meta: true, updatedAt: true } as const;
+
 /** 복호화된 자격증명. 행이 없으면 null, 복호화 실패는 CredentialCryptoError throw. */
 export async function readChannelCredential(ownerId: string, channel: string): Promise<DecryptedCredential | null> {
-  const row = await prisma.channelCredential.findUnique({
-    where: { ownerId_channel: { ownerId, channel } },
-    select: { accessToken: true, refreshToken: true, expiresAt: true, meta: true, updatedAt: true },
-  });
+  const row = await prisma.channelCredential.findUnique({ where: { ownerId_channel: { ownerId, channel } }, select: FULL_SELECT });
   return row ? openRow(row, ownerId, channel) : null;
 }
 
-/** 연결 여부만 필요한 화면용(복호화하지 않음 — 값은 반환하지 않는다). */
-export async function credentialPresence(ownerId: string, channel: string): Promise<{ hasRefreshToken: boolean; updatedAt: Date } | null> {
-  const row = await prisma.channelCredential.findUnique({
-    where: { ownerId_channel: { ownerId, channel } },
-    select: { refreshToken: true, updatedAt: true },
-  });
-  return row ? { hasRefreshToken: !!row.refreshToken, updatedAt: row.updatedAt } : null;
+/** 연결 상태 화면용. 값은 반환하지 않고, 복호화 실패는 error로 구분한다(연결됨으로 보이지 않게). */
+export async function credentialPresence(ownerId: string, channel: string): Promise<{ hasRefreshToken: boolean; updatedAt: Date; error: CredentialRowError | null } | null> {
+  const row = await prisma.channelCredential.findUnique({ where: { ownerId_channel: { ownerId, channel } }, select: FULL_SELECT });
+  if (!row) return null;
+  try {
+    const cred = openRow(row, ownerId, channel);
+    return { hasRefreshToken: !!cred.refreshToken, updatedAt: row.updatedAt, error: null };
+  } catch (error) {
+    if (!(error instanceof CredentialCryptoError)) throw error;
+    logDecryptFailure(channel, error);
+    return { hasRefreshToken: false, updatedAt: row.updatedAt, error: 'decrypt_failed' };
+  }
 }
 
-/** 항상 암호화해서 저장한다. 암호화는 DB 호출 전에 모두 끝낸다(부분 쓰기 없음). */
+type LockedRow = { access_token: string | null; refresh_token: string | null; meta: unknown };
+
+/**
+ * 항상 암호화해서 저장한다.
+ * - 키 형식·CREDENTIAL_KEY_ID 일치를 먼저 확인(비밀 필드가 없는 쓰기도 거부 — fail-closed).
+ * - 같은 행에 남아 있는 전환기 평문 비밀 필드는 이번 쓰기에 포함되지 않아도 함께 암호화한다(부분 갱신 후 평문 잔존 금지).
+ *   이를 위해 행을 FOR UPDATE로 잠그고 다시 읽는다(동시 쓰기와의 lost update 방지).
+ */
 export async function writeChannelCredential(ownerId: string, channel: string, data: CredentialInput): Promise<void> {
-  credentialKeyId(); // 비밀 필드가 비어 있어도 키 미설정이면 쓰기 거부
-  const sealed: { accessToken?: string | null; refreshToken?: string | null; expiresAt?: string | null; meta?: CredentialMeta } = {};
+  assertCredentialWritable();
+  const sealed: { accessToken?: string | null; refreshToken?: string | null; expiresAt?: string | null; meta?: Record<string, unknown> } = {};
   if (data.accessToken !== undefined) sealed.accessToken = sealValue(data.accessToken, credentialContext('access_token', ownerId, channel));
   if (data.refreshToken !== undefined) sealed.refreshToken = sealValue(data.refreshToken, credentialContext('refresh_token', ownerId, channel));
   if (data.expiresAt !== undefined) sealed.expiresAt = data.expiresAt;
   if (data.meta !== undefined) sealed.meta = sealMeta(data.meta, ownerId, channel);
-  await prisma.channelCredential.upsert({
-    where: { ownerId_channel: { ownerId, channel } },
-    create: { ownerId, channel, ...sealed },
-    update: sealed,
+  await prisma.$transaction(async tx => {
+    const [existing] = await tx.$queryRaw<LockedRow[]>`
+      SELECT access_token, refresh_token, meta FROM channel_credentials WHERE owner_id = ${ownerId} AND channel = ${channel} FOR UPDATE`;
+    const update = { ...sealed };
+    if (existing) {
+      if (update.accessToken === undefined && isLegacyPlaintext(existing.access_token)) {
+        update.accessToken = sealValue(existing.access_token, credentialContext('access_token', ownerId, channel));
+      }
+      if (update.refreshToken === undefined && isLegacyPlaintext(existing.refresh_token)) {
+        update.refreshToken = sealValue(existing.refresh_token, credentialContext('refresh_token', ownerId, channel));
+      }
+      const oldMeta = metaObject(existing.meta);
+      if (update.meta === undefined && oldMeta && SECRET_FIELDS.meta.some(k => isLegacyPlaintext(oldMeta[k]))) {
+        update.meta = sealMeta(oldMeta, ownerId, channel, true);
+      }
+    }
+    // Prisma Json 입력 타입으로 맞춘다(meta가 없으면 키 자체를 넣지 않음 = 기존 값 유지)
+    const asInput = ({ meta, ...rest }: typeof sealed) => (meta === undefined ? rest : { ...rest, meta: meta as Record<string, string> });
+    await tx.channelCredential.upsert({
+      where: { ownerId_channel: { ownerId, channel } },
+      create: { ownerId, channel, ...asInput(sealed) },
+      update: asInput(update),
+    });
   });
 }
 
-/** 본인(ownerId) 행만 조회 → 복호화 → 마스킹. 암호문을 마스킹하지 않는다. 복호화 실패는 throw. */
+/**
+ * 채널 연동 화면용: 본인(ownerId)의 소셜 채널 행만 조회 → 복호화 → 마스킹.
+ * 복호화 실패 행은 connected 유지 + error:'decrypt_failed' + 빈 masked(암호문을 마스킹하지 않는다).
+ */
 export async function listMaskedCredentials(ownerId: string): Promise<MaskedCredentials> {
   const rows = await prisma.channelCredential.findMany({
-    where: { ownerId },
-    select: { channel: true, accessToken: true, refreshToken: true, expiresAt: true, meta: true, updatedAt: true },
+    where: { ownerId, channel: { in: [...SOCIAL_CHANNELS] } },
+    select: { channel: true, ...FULL_SELECT },
     orderBy: { channel: 'asc' },
     take: LIST_LIMIT,
   });
   const out: MaskedCredentials = {};
   for (const row of rows) {
-    const cred = openRow(row, ownerId, row.channel);
+    let cred: DecryptedCredential;
+    try { cred = openRow(row, ownerId, row.channel); }
+    catch (error) {
+      if (!(error instanceof CredentialCryptoError)) throw error;
+      logDecryptFailure(row.channel, error);
+      out[row.channel] = { connected: true, error: 'decrypt_failed', masked: {} };
+      continue;
+    }
     const masked: Record<string, string> = {};
     if (cred.accessToken) masked.accessToken = maskSecret(cred.accessToken);
     for (const [k, v] of Object.entries(cred.meta)) if (v.length > 0) masked[k] = maskSecret(v);

@@ -1,4 +1,4 @@
-import { ChannelRejection } from './errors';
+import { ChannelRejection, loadCredentials } from './errors';
 import { buildInstagramCaption } from './payload';
 export { buildInstagramCaption };
 // lib/publish/instagram.ts — Instagram Graph API 발행
@@ -25,7 +25,7 @@ export interface InstagramPublishResult {
 
 /** SaaS: getInstagramCreds 단일 소스 — 자체 env fallback 제거 (credential 격리) */
 async function resolveCredentials(ownerId: string): Promise<{ token: string; igUserId: string }> {
-  const creds = await getInstagramCreds(ownerId);
+  const creds = await loadCredentials(() => getInstagramCreds(ownerId), 'instagram');
   if (!creds) {
     throw new ChannelRejection();
   }

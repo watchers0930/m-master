@@ -3,7 +3,7 @@
 // 바인딩(도메인↔속성) 생성은 운영자 CLI 전용이라 여기서는 상태만 보여준다. 전역 Property ID 입력은 제거됨(F6).
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useGa4Settings } from '@/hooks/useGa4Settings';
 import { useOwnedDomains } from '@/hooks/useOwnedDomains';
 import type { Ga4BindingStatus } from '@/lib/api/ga4-settings';
@@ -16,8 +16,17 @@ const STATUS_META: Record<Ga4BindingStatus, { label: string; color: string }> = 
 };
 
 const ERROR_LABELS: Record<string, string> = {
-  invalid_credentials: '인증 오류', permission_denied: '속성 권한 없음', quota_exceeded: '할당량 초과',
+  invalid_credentials: '인증 오류', credential_storage_error: '관리자 설정 오류(자격증명 키) — 재연결하지 마세요', permission_denied: '속성 권한 없음', quota_exceeded: '할당량 초과',
   timeout: '시간 초과', upstream_error: 'GA4 응답 오류', invalid_query: '조회 조건 오류',
+};
+
+// OAuth 콜백 복귀 쿼리(?ga4=...) 실패 사유 — app/api/auth/ga4/callback/route.ts의 redirect 코드와 1:1
+const CALLBACK_ERRORS: Record<string, string> = {
+  save_error: `Google 계정은 확인됐지만 자격증명을 저장하지 못했습니다. ${'관리자 설정 오류(자격증명 키) — 재연결하지 마세요'}`,
+  token_error: 'Google 토큰 발급에 실패했습니다. 잠시 후 다시 연결해 주세요.',
+  denied: 'Google 계정 연결이 취소되었습니다.',
+  invalid_state: '연결 요청이 만료되었거나 올바르지 않습니다. 다시 시도해 주세요.',
+  auth_error: '로그인 세션이 만료되었습니다. 다시 로그인 후 연결해 주세요.',
 };
 
 const dateText = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('ko-KR') : null);
@@ -29,12 +38,14 @@ export default function Ga4ConnectionCard() {
 
   // OAuth 콜백 복귀(?ga4=connected) — 쿼리 제거 후 서버 상태 재조회
   const { refetch } = query;
+  const [callbackError, setCallbackError] = useState<string | null>(null);
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('ga4') === 'connected') {
-      window.history.replaceState({}, '', '/settings');
-      void refetch();
-    }
+    const code = new URLSearchParams(window.location.search).get('ga4');
+    if (!code) return;
+    window.history.replaceState({}, '', '/settings');
+    // URL 쿼리(외부 상태)를 읽어 한 번만 반영 — 마운트 시 동기화
+    if (code !== 'connected') setCallbackError(CALLBACK_ERRORS[code] ?? 'Google 계정 연결에 실패했습니다.');
+    void refetch();
   }, [refetch]);
 
   const busy = disconnect.isPending || setAutomationDomain.isPending;
@@ -109,7 +120,14 @@ export default function Ga4ConnectionCard() {
               </p>
             </div>
 
+            {callbackError && <p role="alert" style={{ fontSize: 11.5, color: '#dc2626', margin: 0 }}>{callbackError}</p>}
+
             {/* Google 계정 (OAuth) */}
+            {s.oauth_error ? (
+              <p role="alert" style={{ fontSize: 12, color: '#dc2626', margin: 0, lineHeight: 1.6 }}>
+                Google 계정: {ERROR_LABELS[s.oauth_error]}. 운영자에게 문의해 주세요.
+              </p>
+            ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ width: 8, height: 8, borderRadius: '50%', background: s.connected_oauth ? '#22c55e' : '#9ca3af', flexShrink: 0 }} />
               <span style={{ fontSize: 12, color: 'var(--text)' }}>
@@ -129,6 +147,7 @@ export default function Ga4ConnectionCard() {
                 )}
               </span>
             </div>
+            )}
 
             {actionError && <p role="alert" style={{ fontSize: 11, color: '#dc2626', margin: 0 }}>{actionError.message}</p>}
           </>

@@ -41,7 +41,8 @@ export async function isPlatformOwner(ownerId: string): Promise<boolean> {
   return _platformOwnerId === ownerId;
 }
 
-// 복호화 실패(CredentialCryptoError)는 여기서 잡지 않는다 — 발행 경로가 throw를 실패로 처리한다.
+// 복호화 실패(CredentialCryptoError)는 여기서 잡지 않고 그대로 throw한다. 발행 어댑터의 resolveCredentials가
+// lib/publish/errors.ts loadCredentials로 ChannelRejection(확정 실패 — 전송 없음)으로 번역한다.
 
 /** 네이버 카페 자격증명: DB 우선 → 플랫폼 오너만 env fallback */
 export async function getNaverCafeCreds(ownerId: string): Promise<NaverCafeCreds | null> {
@@ -87,10 +88,10 @@ export async function getInstagramCreds(ownerId: string): Promise<InstagramCreds
   return { accessToken: at, businessId: bid };
 }
 
-/** 카페 타겟 목록 조회 */
-export async function getCafeTargets(ownerId?: string) {
-  const where = ownerId ? { ownerId } : {};
-  return prisma.cafeTarget.findMany({ where, orderBy: { createdAt: 'asc' } });
+/** 카페 타겟 목록 조회 — 본인(ownerId) 것만. ownerId 없이 전체를 읽는 경로는 두지 않는다(테넌트 격리). */
+export async function getCafeTargets(ownerId: string) {
+  if (typeof ownerId !== 'string' || ownerId.length === 0) throw new Error('getCafeTargets: ownerId required');
+  return prisma.cafeTarget.findMany({ where: { ownerId }, orderBy: { createdAt: 'asc' } });
 }
 
 /** 카페 타겟 단건 조회 */

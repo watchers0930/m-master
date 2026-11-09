@@ -1,5 +1,5 @@
 import { z } from 'zod';
-const errorCode = z.enum(['invalid_credentials','permission_denied','quota_exceeded','timeout','upstream_error','invalid_query']);
+const errorCode = z.enum(['invalid_credentials','credential_storage_error','permission_denied','quota_exceeded','timeout','upstream_error','invalid_query']);
 const source = z.enum(['service_account','owner_oauth','env_oauth','legacy_file']);
 export const ga4ProvenanceSchema = z.object({
   ownerId: z.string(), domainId: z.string(), bindingId: z.string(), propertyId: z.string().regex(/^properties\/\d+$/),
@@ -8,6 +8,7 @@ export const ga4ProvenanceSchema = z.object({
   timeZone: z.string().nullable(), queryVersion: z.string(), completeness: z.enum(['complete','partial']),
   quality: z.object({ thresholded: z.boolean().optional(), sampled: z.boolean().optional(), truncatedRows: z.boolean().optional(), dataLossFromOtherRow: z.boolean().optional() }).strict(),
   scopeLevel: z.enum(['host','stream']).optional(),
+  credentialFallbacks: z.array(z.object({ source, code: errorCode }).strict()).max(4).optional(),
 }).strict();
 const key = { key: z.string().max(200), evidenceIds: z.array(z.string()).max(10) };
 const num = z.number().finite().nonnegative();

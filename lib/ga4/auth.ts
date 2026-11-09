@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { BetaAnalyticsDataClient } from '@google-analytics/data';
 import { UserRefreshClient } from 'google-auth-library';
 import { CredentialCryptoError } from '@/lib/crypto/credentials';
-import { readChannelCredential, type DecryptedCredential } from '@/lib/credentials/store';
+import { logDecryptFailure, readChannelCredential, type DecryptedCredential } from '@/lib/credentials/store';
 import type { Ga4Scope, Ga4CredentialSource } from '@/types/ga4';
 import { Ga4Failure } from './errors';
 const clients = new Map<string, BetaAnalyticsDataClient>();
@@ -21,13 +21,13 @@ function serviceAccount(raw: string): Record<string, string> {
   if (data.type !== 'service_account' || typeof data.client_email !== 'string' || !data.client_email || typeof data.private_key !== 'string' || !data.private_key) throw new Ga4Failure('invalid_credentials');
   return data;
 }
-// 복호화 실패(키 불일치·env 누락·변조)는 값 없이 기록하고 owner_oauth 후보를 invalid_credentials로 만든다.
-// (재시도로 낫지 않으므로 upstream_error(재시도)가 아니라 재연결이 필요한 invalid_credentials가 가장 가깝다.)
+// 복호화 실패(키 불일치·env 누락·변조)는 값 없이 기록하고 owner_oauth 후보를 credential_storage_error로 만든다.
+// (재시도·재연결로 낫지 않는 관리자 키 설정 문제 — invalid_credentials와 구분해 '재연결하지 마세요'로 안내한다.)
 async function ownerOauthCredential(ownerId: string): Promise<{ db: DecryptedCredential | null; decryptFailed: string | null }> {
   try { return { db: await readChannelCredential(ownerId, 'ga4'), decryptFailed: null }; }
   catch (error) {
     if (!(error instanceof CredentialCryptoError)) throw error;
-    console.error('[credentials] decrypt failed', { channel: 'ga4', reason: error.reason });
+    logDecryptFailure('ga4', error);
     return { db: null, decryptFailed: error.reason };
   }
 }
@@ -40,6 +40,7 @@ async function loadCredentialCandidates(scope: Ga4Scope): Promise<CredentialCand
     let raw: string | undefined;
     let data: Record<string, string> | undefined;
     let invalid = false;
+    let storageError = false;
     try {
       if (source === 'service_account') {
         raw = process.env.GA4_SERVICE_ACCOUNT_JSON?.trim();
@@ -48,7 +49,7 @@ async function loadCredentialCandidates(scope: Ga4Scope): Promise<CredentialCand
         const file = process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.GA4_KEY_FILE;
         if (file) { raw = await readFile(file, 'utf8'); data = serviceAccount(raw); }
       } else if (source === 'owner_oauth' && decryptFailed) {
-        invalid = true; raw = 'decrypt_failed:' + decryptFailed;
+        storageError = true; raw = 'decrypt_failed:' + decryptFailed;
       } else {
         const meta = db?.meta;
         const refreshToken = source === 'owner_oauth' ? db?.refreshToken : process.env.GA4_OAUTH_REFRESH_TOKEN;
@@ -61,11 +62,12 @@ async function loadCredentialCandidates(scope: Ga4Scope): Promise<CredentialCand
         }
       }
     } catch { invalid = true; raw ??= 'invalid'; }
-    if (!raw && !invalid) continue;
+    if (!raw && !invalid && !storageError) continue;
     const version = source + ':' + createHash('sha256').update(JSON.stringify({ raw, at: source === 'owner_oauth' ? db?.updatedAt : null,
       epoch: epochs.get(scope.ownerId) ?? 0 })).digest('hex').slice(0, 16);
     const key = `${scope.ownerId}:${scope.bindingId}:${version}`;
     candidates.push({ source, version, client: () => {
+      if (storageError) throw new Ga4Failure('credential_storage_error');
       if (invalid || !data) throw new Ga4Failure('invalid_credentials');
       const cached = clients.get(key);
       if (cached) return cached;

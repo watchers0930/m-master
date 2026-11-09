@@ -5,7 +5,7 @@ const reportLabels: Record<string,string> = { channels:'유입 채널',sourceMed
 const labels: Record<string,string> = { activeUsers: '활성 사용자', sessions: '세션', engagedSessions: '참여 세션',
   engagementRate: '참여율', keyEvents: '주요 이벤트', screenPageViews: '페이지 조회', userEngagementDuration: '참여 시간', eventCount: '이벤트 수' };
 export function ga4Limitation(code: string): string {
-  return ({ upstream_error:'GA4 서버 응답 오류', invalid_credentials:'GA4 인증 정보 확인 필요',
+  return ({ upstream_error:'GA4 서버 응답 오류', invalid_credentials:'GA4 인증 정보 확인 필요', credential_storage_error:'GA4 관리자 설정 오류(자격증명 키) — 재연결하지 마세요',
     permission_denied:'GA4 조회 권한 확인 필요', quota_exceeded:'GA4 조회 한도 초과', timeout:'GA4 조회 시간 초과',
     invalid_query:'GA4 조회 조건 확인 필요', not_configured:'GA4 연결 미설정', unmapped:'GA4 도메인 매핑 필요',
     domain_required:'GA4 조회 도메인 선택 필요', binding_disabled:'GA4 연결 비활성화' } as Record<string,string>)[code] ?? 'GA4 데이터를 확인하지 못했습니다.';

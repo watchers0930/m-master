@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { maskSecret } from '@/lib/crypto/mask';
 
 // ── 타입 ─────────────────────────────────────────────────────────────
-interface ChannelStatus { connected: boolean; masked?: Record<string, string> }
+interface ChannelStatus { connected: boolean; masked?: Record<string, string>; error?: 'decrypt_failed' }
 interface CafeTargetData { id: string; name: string; clubId: string; menuId: string; isDefault: boolean }
 interface Props { initial: Record<string, ChannelStatus>; cafeTargets?: CafeTargetData[] }
 
@@ -95,7 +96,7 @@ export default function ChannelForm({ initial, cafeTargets: initialTargets }: Pr
       const masked: Record<string, string> = {};
       for (const [k, v] of Object.entries(fields)) {
         if (typeof v === 'string' && v.length > 0) {
-          masked[k] = v.length < 6 ? '***' : v.slice(0, 4) + '****' + v.slice(-3);
+          masked[k] = maskSecret(v); // 서버(listMaskedCredentials)와 같은 형식
         }
       }
       setStatuses(prev => ({ ...prev, [channelId]: { connected: true, masked } }));
@@ -252,7 +253,9 @@ export default function ChannelForm({ initial, cafeTargets: initialTargets }: Pr
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{ch.label}</span>
-                  <Badge connected={connected} />
+                  {st?.error ? (
+                    <span role="alert" style={{ background: '#FEECEC', border: '1px solid #F5B5B5', color: '#B42318', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>자격증명 키 오류 — 관리자에게 문의</span>
+                  ) : <Badge connected={connected} />}
                 </div>
                 {connected && (
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>

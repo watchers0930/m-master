@@ -25,12 +25,14 @@ export async function saveSettings(ownerId: string, input: z.infer<typeof settin
 }
 export async function ga4Settings(ownerId: string) {
   const [credential, bindings, setting] = await Promise.all([
-    credentialPresence(ownerId, 'ga4'), // 연결 여부만 — 복호화 불필요
+    credentialPresence(ownerId, 'ga4'), // 값은 반환하지 않음. 복호화 실패는 error로 구분
     prisma.ga4Binding.findMany({ where: { ownerId }, select: { domainId: true, host: true, propertyId: true,
       status: true, lastCheckedAt: true, lastErrorCode: true }, orderBy: { id: 'asc' }, take: 100 }),
     prisma.setting.findUnique({ where: { ownerId }, select: { automationDomainId: true } }),
   ]);
-  return { connected_oauth: !!credential?.hasRefreshToken, oauth_updated_at: credential?.updatedAt ?? null,
+  // 복호화 실패(운영 키 불일치 등)는 '연결됨'이 아니라 관리자 설정 오류로 표시한다(재연결로 고칠 문제가 아님).
+  return { connected_oauth: !!credential?.hasRefreshToken && !credential.error, oauth_updated_at: credential?.updatedAt ?? null,
+    oauth_error: credential?.error ? 'credential_storage_error' as const : null,
     bindings: bindings.map(b => ({ domain_id: b.domainId, host: b.host, property_id: b.propertyId,
       status: b.status, last_checked_at: b.lastCheckedAt, last_error_code: b.lastErrorCode })),
     automation_domain_id: setting?.automationDomainId ?? null };

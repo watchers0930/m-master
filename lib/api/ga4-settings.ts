@@ -16,6 +16,8 @@ export interface Ga4BindingDTO {
 export interface Ga4SettingsDTO {
   connected_oauth: boolean;
   oauth_updated_at: string | null;
+  /** 저장된 자격증명을 복호화하지 못함(관리자 키 설정 오류) — 재연결로 해결되지 않는다 */
+  oauth_error: 'credential_storage_error' | null;
   bindings: Ga4BindingDTO[];
   automation_domain_id: string | null;
 }
