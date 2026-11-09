@@ -2,7 +2,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { requireSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { writeChannelCredential } from '@/lib/credentials/store';
+import { CredentialCryptoError } from '@/lib/crypto/credentials';
 
 function verifyState(state: string): { uid: string } | null {
   try {
@@ -67,30 +68,26 @@ export async function GET(request: NextRequest) {
   const tokenData = await tokenRes.json() as Record<string, unknown>;
 
   if (tokenData.error || !tokenData.refresh_token) {
-    console.error('[ga4-oauth] Token exchange failed:', tokenData);
+    // 응답 본문에는 access_token이 섞여 있을 수 있으므로 오류 코드만 남긴다
+    console.error('[ga4-oauth] Token exchange failed:', { error: typeof tokenData.error === 'string' ? tokenData.error : 'no_refresh_token' });
     return NextResponse.redirect(`${settingsUrl}?ga4=token_error`);
   }
 
   const refreshToken = tokenData.refresh_token as string;
 
-  // 4) DB 저장 (ChannelCredential upsert)
-  await prisma.channelCredential.upsert({
-    where: { ownerId_channel: { ownerId: session.user.id, channel: 'ga4' } },
-    update: {
+  // 4) DB 저장 (비밀 필드 암호화 — 키 미설정이면 저장 거부)
+  try {
+    await writeChannelCredential(session.user.id, 'ga4', {
       refreshToken,
       meta: { client_id: clientId, client_secret: clientSecret },
       accessToken: (tokenData.access_token as string) ?? null,
       expiresAt: tokenData.expires_in ? String(Date.now() + Number(tokenData.expires_in) * 1000) : null,
-    },
-    create: {
-      ownerId: session.user.id,
-      channel: 'ga4',
-      refreshToken,
-      meta: { client_id: clientId, client_secret: clientSecret },
-      accessToken: (tokenData.access_token as string) ?? null,
-      expiresAt: tokenData.expires_in ? String(Date.now() + Number(tokenData.expires_in) * 1000) : null,
-    },
-  });
+    });
+  } catch (error) {
+    if (!(error instanceof CredentialCryptoError)) throw error;
+    console.error('[credentials] encrypt failed', { channel: 'ga4', reason: error.reason });
+    return NextResponse.redirect(`${settingsUrl}?ga4=save_error`);
+  }
 
   return NextResponse.redirect(`${settingsUrl}?ga4=connected`);
 }

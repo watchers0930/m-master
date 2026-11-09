@@ -4,15 +4,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireSession } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { deleteChannelCredential, listMaskedCredentials, writeChannelCredential, type CredentialInput } from '@/lib/credentials/store';
+import { CredentialCryptoError } from '@/lib/crypto/credentials';
 import { logAudit } from '@/lib/audit/logger';
 
 const GRAPH_VERSION = process.env.META_GRAPH_VERSION || 'v20.0';
-
-function mask(v: string): string {
-  if (v.length < 6) return '***';
-  return v.slice(0, 4) + '****' + v.slice(-3);
-}
 
 async function verifyMetaToken(token: string): Promise<boolean> {
   try {
@@ -38,23 +34,25 @@ async function verifyNaverToken(accessToken: string): Promise<boolean> {
   }
 }
 
+// 암호화 저장 실패(키 미설정 등)는 평문 저장으로 우회하지 않고 503으로 거부한다. 값은 로그에 남기지 않는다.
+async function saveCredential(ownerId: string, channel: string, data: CredentialInput): Promise<NextResponse | null> {
+  try {
+    await writeChannelCredential(ownerId, channel, data);
+    return null;
+  } catch (error) {
+    if (!(error instanceof CredentialCryptoError)) throw error;
+    console.error('[credentials] encrypt failed', { channel, reason: error.reason });
+    return NextResponse.json({ error: { code: 'credential_storage_unavailable', message: '자격증명을 안전하게 저장할 수 없습니다. 관리자에게 문의하세요.' } }, { status: 503 });
+  }
+}
+
 // ── GET: 채널 목록 + 마스킹된 자격증명 ──────────────────────────────
 export async function GET() {
   const session = await requireSession();
   const ownerId = session.user.id;
 
-  const creds = await prisma.channelCredential.findMany({ where: { ownerId } });
-  const channels: Record<string, { connected: boolean; masked: Record<string, string> }> = {};
-
-  for (const c of creds) {
-    const meta = (c.meta ?? {}) as Record<string, string>;
-    const masked: Record<string, string> = {};
-    if (c.accessToken) masked.accessToken = mask(c.accessToken);
-    for (const [k, v] of Object.entries(meta)) {
-      if (typeof v === 'string' && v.length > 0) masked[k] = mask(v);
-    }
-    channels[c.channel] = { connected: true, masked };
-  }
+  // 본인 행만, 복호화 후 마스킹(암호문을 마스킹하지 않는다). 복호화 실패는 throw(500) — 값으로 숨기지 않는다.
+  const channels = await listMaskedCredentials(ownerId);
 
   return NextResponse.json({ data: channels, error: null });
 }
@@ -104,11 +102,8 @@ export async function POST(request: NextRequest) {
     if (!ok) {
       return NextResponse.json({ error: { code: 'verify_failed', message: '네이버 Access Token 검증 실패. 토큰 값을 확인하세요.' } }, { status: 400 });
     }
-    await prisma.channelCredential.upsert({
-      where: { ownerId_channel: { ownerId, channel: 'naver_cafe' } },
-      create: { ownerId, channel: 'naver_cafe', accessToken: d.accessToken, refreshToken: d.refreshToken || null, meta: { clientId: d.clientId, clientSecret: d.clientSecret, clubId: d.clubId, menuId: d.menuId } },
-      update: { accessToken: d.accessToken, refreshToken: d.refreshToken || null, meta: { clientId: d.clientId, clientSecret: d.clientSecret, clubId: d.clubId, menuId: d.menuId } },
-    });
+    const failed = await saveCredential(ownerId, 'naver_cafe', { accessToken: d.accessToken, refreshToken: d.refreshToken || null, meta: { clientId: d.clientId, clientSecret: d.clientSecret, clubId: d.clubId, menuId: d.menuId } });
+    if (failed) return failed;
     await logAudit({ actor: session.user.id, action: 'channel.connect', targetType: 'channel', targetId: 'naver_cafe' });
     return NextResponse.json({ data: { ok: true, message: '네이버 카페 연결 완료' }, error: null });
   }
@@ -124,11 +119,8 @@ export async function POST(request: NextRequest) {
     if (!ok) {
       return NextResponse.json({ error: { code: 'verify_failed', message: 'Instagram Access Token 검증 실패. Meta Graph API Explorer에서 토큰을 확인하세요.' } }, { status: 400 });
     }
-    await prisma.channelCredential.upsert({
-      where: { ownerId_channel: { ownerId, channel: 'instagram' } },
-      create: { ownerId, channel: 'instagram', accessToken: d.accessToken, meta: { businessId: d.businessId } },
-      update: { accessToken: d.accessToken, meta: { businessId: d.businessId } },
-    });
+    const failed = await saveCredential(ownerId, 'instagram', { accessToken: d.accessToken, meta: { businessId: d.businessId } });
+    if (failed) return failed;
     await logAudit({ actor: session.user.id, action: 'channel.connect', targetType: 'channel', targetId: 'instagram' });
     return NextResponse.json({ data: { ok: true, message: 'Instagram 연결 완료' }, error: null });
   }
@@ -144,11 +136,8 @@ export async function POST(request: NextRequest) {
     if (!ok) {
       return NextResponse.json({ error: { code: 'verify_failed', message: 'Facebook Access Token 검증 실패. 페이지 토큰을 확인하세요.' } }, { status: 400 });
     }
-    await prisma.channelCredential.upsert({
-      where: { ownerId_channel: { ownerId, channel: 'facebook' } },
-      create: { ownerId, channel: 'facebook', accessToken: d.accessToken, meta: { pageId: d.pageId } },
-      update: { accessToken: d.accessToken, meta: { pageId: d.pageId } },
-    });
+    const failed = await saveCredential(ownerId, 'facebook', { accessToken: d.accessToken, meta: { pageId: d.pageId } });
+    if (failed) return failed;
     await logAudit({ actor: session.user.id, action: 'channel.connect', targetType: 'channel', targetId: 'facebook' });
     return NextResponse.json({ data: { ok: true, message: 'Facebook 연결 완료' }, error: null });
   }
@@ -174,7 +163,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: { code: 'validation', message: '유효하지 않은 채널명입니다.' } }, { status: 400 });
   }
 
-  await prisma.channelCredential.deleteMany({ where: { ownerId, channel: parsed.data.channel } });
+  await deleteChannelCredential(ownerId, parsed.data.channel);
   await logAudit({ actor: session.user.id, action: 'channel.disconnect', targetType: 'channel', targetId: parsed.data.channel });
 
   return NextResponse.json({ data: { ok: true }, error: null });

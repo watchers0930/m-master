@@ -2,6 +2,7 @@
 // publish 함수들이 이 헬퍼를 통해 자격증명을 가져온다.
 
 import { prisma } from './prisma';
+import { readChannelCredential } from './credentials/store';
 
 export interface NaverCafeCreds {
   accessToken: string;
@@ -29,7 +30,7 @@ export interface FacebookCreds {
  */
 let _platformOwnerId: string | null | undefined; // undefined=미조회, null=유저없음
 
-async function isPlatformOwner(ownerId: string): Promise<boolean> {
+export async function isPlatformOwner(ownerId: string): Promise<boolean> {
   if (_platformOwnerId === undefined) {
     const first = await prisma.user.findFirst({
       select: { id: true },
@@ -40,13 +41,13 @@ async function isPlatformOwner(ownerId: string): Promise<boolean> {
   return _platformOwnerId === ownerId;
 }
 
+// 복호화 실패(CredentialCryptoError)는 여기서 잡지 않는다 — 발행 경로가 throw를 실패로 처리한다.
+
 /** 네이버 카페 자격증명: DB 우선 → 플랫폼 오너만 env fallback */
 export async function getNaverCafeCreds(ownerId: string): Promise<NaverCafeCreds | null> {
-  const row = await prisma.channelCredential.findUnique({
-    where: { ownerId_channel: { ownerId, channel: 'naver_cafe' } },
-  });
+  const row = await readChannelCredential(ownerId, 'naver_cafe');
   if (row?.accessToken) {
-    const m = (row.meta ?? {}) as Record<string, string>;
+    const m = row.meta;
     return {
       accessToken: row.accessToken,
       refreshToken: row.refreshToken ?? '',
@@ -74,11 +75,9 @@ export async function getNaverCafeCreds(ownerId: string): Promise<NaverCafeCreds
 
 /** 인스타그램 자격증명: DB 우선 → 플랫폼 오너만 env fallback */
 export async function getInstagramCreds(ownerId: string): Promise<InstagramCreds | null> {
-  const row = await prisma.channelCredential.findUnique({
-    where: { ownerId_channel: { ownerId, channel: 'instagram' } },
-  });
+  const row = await readChannelCredential(ownerId, 'instagram');
   if (row?.accessToken) {
-    const m = (row.meta ?? {}) as Record<string, string>;
+    const m = row.meta;
     return { accessToken: row.accessToken, businessId: m.businessId ?? '' };
   }
   if (!(await isPlatformOwner(ownerId))) return null;
@@ -101,11 +100,9 @@ export async function getCafeTargetById(id: string) {
 
 /** 페이스북 자격증명: DB 우선 → 플랫폼 오너만 env fallback */
 export async function getFacebookCreds(ownerId: string): Promise<FacebookCreds | null> {
-  const row = await prisma.channelCredential.findUnique({
-    where: { ownerId_channel: { ownerId, channel: 'facebook' } },
-  });
+  const row = await readChannelCredential(ownerId, 'facebook');
   if (row?.accessToken) {
-    const m = (row.meta ?? {}) as Record<string, string>;
+    const m = row.meta;
     return { accessToken: row.accessToken, pageId: m.pageId ?? '' };
   }
   if (!(await isPlatformOwner(ownerId))) return null;
