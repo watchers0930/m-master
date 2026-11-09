@@ -16,6 +16,7 @@ import {
   beginExecution,
   releaseClaim,
 } from "./tasks";
+import { PAYMENT_DELAYED_MESSAGE, PAYMENT_REQUIRED_MESSAGE } from "./messages";
 import { onpageRequest, parseOnpage } from "./adapters/onpage";
 import { serpRequest, parseSerp } from "./adapters/serp";
 import { keywordsRequest, parseKeywords } from "./adapters/keywords";
@@ -49,7 +50,9 @@ export async function executeTask(
 ) {
   let started = false;
   let checkpointFailed = false,
-    receivedIdentity = !!task.vendorTaskId;
+    receivedIdentity = !!task.vendorTaskId,
+    // Vendors attach IDs to rejected tasks too; only an accepted status proves a (paid) submission.
+    accepted = !!task.vendorTaskId;
   try {
     const stored = await savedCheckpoint(task);
     if (stored) {
@@ -78,6 +81,9 @@ export async function executeTask(
       taskId: task.vendorTaskId ?? undefined,
       onTask: async (id, cost, response) => {
         receivedIdentity = !!id;
+        accepted ||= !!response?.tasks?.some((t) =>
+          [20000, 20100].includes(t.status_code),
+        );
         try {
           const success =
             response?.status_code === 20000 &&
@@ -167,6 +173,11 @@ export async function executeTask(
         }
         return;
       }
+      // Balance can run out after an accepted (paid) submission; keep that result collectable instead of discarding it.
+      if (error.reason === "vendor_payment_required" && accepted) {
+        await markTask(task, "submitted", PAYMENT_DELAYED_MESSAGE);
+        return;
+      }
       if (
         error.reason === "task_pending" ||
         (receivedIdentity &&
@@ -190,7 +201,13 @@ export async function executeTask(
         return;
       }
       // A known rejected request is final. Preserve any confirmed charge from onTask.
-      await markTask(task, "failed", "외부 수집에 실패했습니다.");
+      await markTask(
+        task,
+        "failed",
+        error.reason === "vendor_payment_required"
+          ? PAYMENT_REQUIRED_MESSAGE
+          : "외부 수집에 실패했습니다.",
+      );
       return;
     }
     // Preserve a received result so a database failure can be retried without buying it again.

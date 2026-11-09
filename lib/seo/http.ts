@@ -1,5 +1,6 @@
 import { jsonOk, VisibilityError } from "@/lib/visibility/http";
 import type { SeoAuditDTO } from "@/types/seo";
+import { PAYMENT_REQUIRED_MESSAGE } from "./messages";
 /** Preserve partial/uncertain reports; only a final all-task vendor failure is a gateway error. */
 export function auditResponse(data: SeoAuditDTO, reused = false) {
   if (
@@ -7,7 +8,9 @@ export function auditResponse(data: SeoAuditDTO, reused = false) {
     data.status === "failed" &&
     data.tasks.length > 0 &&
     data.tasks.every((task) => task.status === "failed") &&
-    data.tasks.some((task) => task.failReason === "외부 수집에 실패했습니다.")
+    data.tasks.some((task) => task.failReason === "외부 수집에 실패했습니다.") &&
+    // A 502 discards the DTO on the client; keep the actionable balance notice visible.
+    !data.tasks.some((task) => task.failReason === PAYMENT_REQUIRED_MESSAGE)
   ) {
     throw new VisibilityError(
       "external_failed",

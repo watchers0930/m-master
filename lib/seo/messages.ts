@@ -1,3 +1,8 @@
+import { VENDOR_PAYMENT_REQUIRED_MESSAGE } from "@/lib/external/dataforseo";
+export const PAYMENT_REQUIRED_MESSAGE = VENDOR_PAYMENT_REQUIRED_MESSAGE;
+/** Already-paid task: results are kept and collected automatically once the balance is restored. */
+export const PAYMENT_DELAYED_MESSAGE =
+  "외부 데이터 공급자 잔액 부족으로 결과 수집이 지연되고 있습니다. 운영자 확인 후 자동으로 다시 가져옵니다.";
 /** DTO allowlist: persisted codes and unexpected debug text never reach clients. */
 const messages: Record<string, string> = {
   submission_uncertain:
@@ -11,6 +16,8 @@ const publicMessages = new Set([
   "결과 확인 대기 중입니다.",
   "저장 결과 반영 대기 중입니다.",
   "외부 수집에 실패했습니다.",
+  PAYMENT_REQUIRED_MESSAGE,
+  PAYMENT_DELAYED_MESSAGE,
   "일부 URL 수집에 실패했습니다.",
   "예산 또는 실행 조건으로 자동 순위 수집을 생략했습니다.",
   "지원이 확인되지 않은 작업입니다.",

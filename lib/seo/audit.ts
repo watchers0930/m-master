@@ -30,6 +30,7 @@ import { recoverExpired } from "./pending";
 import { getAudit, ownedDomain } from "./data";
 import { technicalChecks } from "./checks";
 import { technicalScore } from "./score";
+import { PAYMENT_REQUIRED_MESSAGE } from "./messages";
 import { checkpointSchema } from "./adapters/types";
 export async function runAudit(
   ownerId: string,
@@ -257,6 +258,7 @@ async function synthesize(ownerId: string, id: string) {
         costKrw: true,
         resultCheckpoint: true,
         operation: true,
+        failReason: true,
       },
     });
     const config = audit.frozenConfig as unknown as Config;
@@ -304,6 +306,8 @@ async function synthesize(ownerId: string, id: string) {
         completedAt: pending ? null : (audit.completedAt ?? new Date()),
         failReason: tasks.some((t) => t.status === "uncertain")
           ? "과금 대조 및 복구가 필요한 작업이 있습니다."
+          : tasks.some((t) => t.failReason === PAYMENT_REQUIRED_MESSAGE)
+            ? PAYMENT_REQUIRED_MESSAGE
           : status === "partial" || status === "failed"
             ? "일부 수집이 실패했거나 실행 조건으로 완료되지 않았습니다."
             : null,

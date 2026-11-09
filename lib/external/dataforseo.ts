@@ -42,6 +42,13 @@ function responseCost(result: VendorEnvelope): number {
     ),
   );
 }
+/** Insufficient balance is a definitive vendor rejection with no charge (HTTP 402 / task 40200), never an uncertain submission. */
+const PAYMENT_REQUIRED = 40200;
+export const VENDOR_PAYMENT_REQUIRED_MESSAGE =
+  "외부 데이터 공급자 잔액 부족으로 수집하지 못했습니다(과금 없음). 운영자 확인 후 다시 실행하세요.";
+function statusReason(code: number | undefined) {
+  return code === PAYMENT_REQUIRED ? "vendor_payment_required" : `vendor_status_${code}`;
+}
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export function usdToKrw(usd: number): number {
   const rate = Number(process.env.DATAFORSEO_USD_KRW ?? "1400");
@@ -107,6 +114,7 @@ export class DataForSeoClient {
       if (!response.ok)
         throw new DataForSeoError(
           response.status === 401 ? "vendor_auth_failed" :
+            response.status === 402 ? "vendor_payment_required" :
             [400, 403, 404, 413, 422, 429].includes(response.status) ? "vendor_request_rejected" : "vendor_http_failed",
         );
       let raw: unknown;
@@ -139,7 +147,7 @@ export class DataForSeoClient {
     const task = result.tasks?.find((t) => t.status_code !== 20000) ?? result.tasks?.[0];
     if (result.status_code !== 20000 || !result.tasks?.length || result.tasks.some((t) => t.status_code !== 20000)) {
       throw new DataForSeoError(
-        `vendor_status_${task?.status_code ?? result.status_code}`,
+        statusReason(task?.status_code ?? result.status_code),
         responseCost(result),
         task?.id ?? undefined,
       );
@@ -166,7 +174,7 @@ export class DataForSeoClient {
         ![20000, 20100].includes(task.status_code)
       ) {
         throw new DataForSeoError(
-          `vendor_status_${task?.status_code ?? created.status_code}`,
+          statusReason(task?.status_code ?? created.status_code),
           cost,
           taskId,
         );
