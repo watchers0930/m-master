@@ -1,6 +1,7 @@
 -- 20261110_ads_phase4_1.sql — 네이버 검색광고 Phase 4-1 데이터 모델 (추가 전용: 새 ad_* 테이블·인덱스·FK만, 기존 테이블 무변경)
--- 생성: prisma migrate diff --from-schema-datamodel <HEAD schema> --to-schema-datamodel prisma/schema.prisma --script 결과를 재실행 안전하게 감쌈.
+-- 생성: prisma migrate diff --from-schema-datamodel <8b70c21 schema> --to-schema-datamodel prisma/schema.prisma --script 결과를 재실행 안전하게 감쌈.
 -- FK는 전부 ON DELETE RESTRICT: 계정 삭제는 status=disabled 소프트 삭제이며, 하위 미러·성과·로그·알림이 조용히 연쇄 삭제되지 않는다.
+-- 계정 연결 해제 = api_key_enc·secret_key_enc·key_last4를 NULL로 지우고 status=disabled(행·성과는 보존).
 -- 적용은 대장 승인 후(Task 13). db push 금지.
 BEGIN;
 SET LOCAL lock_timeout = '5s';
@@ -10,9 +11,9 @@ CREATE TABLE IF NOT EXISTS "ad_accounts" (
     "owner_id" TEXT NOT NULL,
     "naver_customer_id" TEXT NOT NULL,
     "label" TEXT NOT NULL,
-    "api_key_enc" TEXT NOT NULL,
-    "secret_key_enc" TEXT NOT NULL,
-    "key_last4" TEXT NOT NULL,
+    "api_key_enc" TEXT,
+    "secret_key_enc" TEXT,
+    "key_last4" TEXT,
     "status" TEXT NOT NULL DEFAULT 'active',
     "daily_cap_krw" INTEGER NOT NULL DEFAULT 100000,
     "shared_budget_krw" INTEGER NOT NULL DEFAULT 100000,
@@ -235,7 +236,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "ad_creatives_ad_account_id_naver_id_key" ON "
 CREATE INDEX IF NOT EXISTS "ad_performance_daily_owner_id_ad_account_id_date_idx" ON "ad_performance_daily"("owner_id", "ad_account_id", "date");
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "ad_performance_daily_naver_id_date_key" ON "ad_performance_daily"("naver_id", "date");
+CREATE UNIQUE INDEX IF NOT EXISTS "ad_performance_daily_ad_account_id_naver_id_date_key" ON "ad_performance_daily"("ad_account_id", "naver_id", "date");
 
 -- CreateIndex
 CREATE INDEX IF NOT EXISTS "ad_operation_logs_owner_id_ad_account_id_created_at_idx" ON "ad_operation_logs"("owner_id", "ad_account_id", "created_at");

@@ -630,9 +630,9 @@ model AdAccount { // ad_accounts — 네이버 검색광고 계정 연결(키는
   ownerId           String    @map("owner_id")
   naverCustomerId   String    @map("naver_customer_id")
   label             String
-  apiKeyEnc         String    @map("api_key_enc") @db.Text     // 봉인 blob. 평문 저장·노출 금지
-  secretKeyEnc      String    @map("secret_key_enc") @db.Text  // 봉인 blob. 평문 저장·노출 금지
-  keyLast4          String    @map("key_last4")                // 화면 표시용 뒤 4자리
+  apiKeyEnc         String?   @map("api_key_enc") @db.Text     // 봉인 blob. 평문 저장·노출 금지. null = 연결 해제(status=disabled)
+  secretKeyEnc      String?   @map("secret_key_enc") @db.Text  // 봉인 blob. 평문 저장·노출 금지. null = 연결 해제(status=disabled)
+  keyLast4          String?   @map("key_last4")                // 화면 표시용 뒤 4자리. 해제 시 null
   status            String    @default("active")               // active | invalid_key | disabled
   dailyCapKrw       Int       @default(100000) @map("daily_cap_krw")     // 하루 상한(VAT 별도, /stats salesAmt 기준)
   sharedBudgetKrw   Int       @default(100000) @map("shared_budget_krw") // 네이버 공유예산 금액
@@ -795,7 +795,7 @@ model AdPerformanceDaily { // ad_performance_daily — 일별 성과(KST 날짜,
   avgRnk      Float?    @map("avg_rnk")
   owner     User      @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   adAccount AdAccount @relation(fields: [adAccountId], references: [id], onDelete: Restrict)
-  @@unique([naverId, date])
+  @@unique([adAccountId, naverId, date]) // 계정 범위: 위임된 다른 소유자의 같은 엔티티와 충돌하지 않음
   @@index([ownerId, adAccountId, date])
   @@map("ad_performance_daily")
 }
