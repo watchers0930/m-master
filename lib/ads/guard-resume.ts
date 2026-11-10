@@ -15,7 +15,7 @@ import { NaverAdsError } from "@/lib/external/naver-searchad";
 import { prisma } from "@/lib/prisma";
 import { kstDate } from "./alerts";
 import { isExecutionEnabled, putUserLock } from "./execution";
-import { errorName, guardAlert, isAuthError, type GuardCtx } from "./guard-cap";
+import { errorName, guardAlert, guardDeps, isAuthError, type GuardCtx } from "./guard-cap";
 import type { DriftScan } from "./guard-drift";
 import { caps } from "./invariants";
 import { freshCheck } from "./launch-check";
@@ -34,10 +34,11 @@ export function kstDayStart(now: Date): Date {
 const isSpendUnknown = (error: unknown) => (error as AdsHttpError | null)?.code === "spend_unknown" || (error instanceof NaverAdsError && !isAuthError(error));
 
 async function resumeOne(ctx: GuardCtx, row: MirrorLockRow): Promise<boolean> {
-  const { account, client, now, deps } = ctx;
+  const { account, client, now } = ctx;
+  const deps = guardDeps(ctx);
   const mirror = mirrorOf(prisma, "campaign");
   try {
-    await freshCheck(client, account, "campaign", row, mirror); // ⑤
+    await freshCheck(client, account, "campaign", row, mirror, deps.now); // ⑤
   } catch (error) {
     if (isAuthError(error)) throw error;
     console.error("[ads] guard auto-resume blocked by fresh check", { accountId: account.id, error: (error as AdsHttpError).code ?? errorName(error) });
@@ -63,7 +64,7 @@ async function resumeOne(ctx: GuardCtx, row: MirrorLockRow): Promise<boolean> {
   if (current?.status !== "active") {
     await mirror.updateMany({ where: { id: row.id }, data: { lockedBy: "guard", lockedAt: now, lockVersion: { increment: 1 } } });
     const paused = await safetyPause(account, "campaign", row, "guard.resume_race_pause", deps, { reason: "resume_race" });
-    if (paused) await pauseAlert(account, { reason: "resume_race", entity: "campaign", naverId: row.naverId, paused: true });
+    if (paused) await pauseAlert(account, { reason: "resume_race", entity: "campaign", naverId: row.naverId, paused: true }, deps.now);
     return false;
   }
   const recorded = await mirror.updateMany({ where: { id: row.id, lockVersion: claimed }, data: { userLock: stored.userLock } }); // ⑨

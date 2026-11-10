@@ -39,15 +39,15 @@ export async function pauseNow(account: AdAccount, type: LockKind, naverId: stri
   try {
     return await pauseAndConfirm(client, account, type, naverId, { step });
   } catch (error) {
-    if (error instanceof NaverAdsError && error.reason === "ads_auth_failed") await markInvalidKey(account.id);
+    if (error instanceof NaverAdsError && error.reason === "ads_auth_failed") await markInvalidKey(account.id, deps.now);
     throw error;
   }
 }
 
 /** 안전 끄기 실패·경합 알림(같은 날 ads.drift에 묻히지 않는 별도 유형). 알림 큐 실패는 원래 흐름을 가리지 않는다. */
-export async function pauseAlert(account: AdAccount, payload: AlertPayload): Promise<void> {
+export async function pauseAlert(account: AdAccount, payload: AlertPayload, now?: () => Date): Promise<void> {
   try {
-    await queueAlert(account.id, "ads.pause_failed", payload);
+    await queueAlert(account.id, "ads.pause_failed", payload, now ? { now } : {}); // KST 날짜: 주입 시계(감시) 또는 실제 시각
   } catch (error) {
     console.error("[ads] pause_failed alert queue failed", { type: error instanceof Error ? error.name : "unknown" });
   }
@@ -56,6 +56,7 @@ export async function pauseAlert(account: AdAccount, payload: AlertPayload): Pro
 /**
  * 안전 끄기. 끈 것이 확인되면 true. 어떤 실패도 던지지 않고 false — 미러 userLock=false(사실: 켜짐·모름) + 알림 ads.pause_failed.
  * 네이버 오류뿐 아니라 복호화·DB·예상 못 한 오류도 같다(Task 11 CARRY: 감시는 조용히 실패하지 않는다 — 원인 이름만 기록).
+ * 알림 KST 날짜는 deps.now(감시는 주입 시각을 넘긴다), 없으면 실제 시각.
  * row.id = null: 미러 행이 없는 캠페인(네이버 화면에서 직접 만든 것 등). 미러 갱신 없이 끄기·알림만.
  */
 export async function safetyPause(
@@ -75,7 +76,7 @@ export async function safetyPause(
       console.error("[ads] safety pause mirror write failed", { step, type: error instanceof Error ? error.name : "unknown" });
     }
   }
-  if (!paused) await pauseAlert(account, { ...alert, entity: type, naverId: row.naverId, paused: false });
+  if (!paused) await pauseAlert(account, { ...alert, entity: type, naverId: row.naverId, paused: false }, deps.now);
   return paused;
 }
 

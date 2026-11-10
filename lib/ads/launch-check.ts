@@ -17,7 +17,7 @@ type Parent = { kind: LockKind; id: string } | null;
 type Seen = { type?: string; inspectStatus?: string | null; nccAdgroupId?: string; nccCampaignId?: string };
 
 /** 단건 재조회 + 대조. 통과하면 상위 엔티티(없으면 null)를 돌려준다. */
-async function verifyOne(client: NaverAdsClient, account: AdAccount, kind: LockKind, naverId: string): Promise<{ seen: Seen; parent: Parent }> {
+async function verifyOne(client: NaverAdsClient, account: AdAccount, kind: LockKind, naverId: string, now?: () => Date): Promise<{ seen: Seen; parent: Parent }> {
   const raw = await readEntity(client, kind, naverId);
   const parsed = ENTITY_SCHEMAS[kind].safeParse(raw);
   if (!parsed.success) throw unexpectedNaverResponse();
@@ -25,7 +25,7 @@ async function verifyOne(client: NaverAdsClient, account: AdAccount, kind: LockK
   const verdict = kind === "ad" ? (seen.type === "TEXT_45" ? { ok: true as const } : { ok: false as const, field: "type" }) : verifyStored(kind, account, raw);
   if (!verdict.ok) {
     try {
-      await queueAlert(account.id, "ads.drift", { entity: kind, naverId, field: verdict.field, at: "launch" });
+      await queueAlert(account.id, "ads.drift", { entity: kind, naverId, field: verdict.field, at: "launch" }, now ? { now } : {});
     } catch (error) {
       console.error("[ads] drift alert queue failed", { type: error instanceof Error ? error.name : "unknown" });
     }
@@ -36,9 +36,12 @@ async function verifyOne(client: NaverAdsClient, account: AdAccount, kind: LockK
   return { seen, parent };
 }
 
-export async function freshCheck(client: NaverAdsClient, account: AdAccount, type: LockKind, row: MirrorLockRow, mirror: MirrorDelegate): Promise<void> {
-  const { seen, parent } = await verifyOne(client, account, type, row.naverId);
-  for (let p = parent; p !== null; p = (await verifyOne(client, account, p.kind, p.id)).parent);
+/** now: 알림 KST 날짜용 시계(감시 자동 재개는 주입 시각, 생략하면 실제 시각). */
+export async function freshCheck(
+  client: NaverAdsClient, account: AdAccount, type: LockKind, row: MirrorLockRow, mirror: MirrorDelegate, now?: () => Date,
+): Promise<void> {
+  const { seen, parent } = await verifyOne(client, account, type, row.naverId, now);
+  for (let p = parent; p !== null; p = (await verifyOne(client, account, p.kind, p.id, now)).parent);
   if (type !== "keyword" && type !== "ad") return;
   const status = seen.inspectStatus ?? null;
   await mirror.updateMany({ where: { id: row.id }, data: { inspectStatus: status } });

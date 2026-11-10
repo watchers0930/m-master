@@ -3,7 +3,10 @@
 // (⚠️ /stats 반영 지연은 미실측 — 설계서 §5.6-1, 운영 1주 실측).
 // 계정마다(상한 take MAX_ACCOUNTS, createdAt 순):
 //   0. status invalid_key → 네이버 호출 없이 건너뛰고 ads.key_invalid(같은 날 1회). disconnecting·disabled는 해제 흐름 소관이라 제외.
-//   1. 오늘(KST) 비용 = todayCostKrw(단일 계산: 계정의 모든 캠페인 /stats salesAmt 합, VAT 별도). 모르면 null(끄기·재개 판단 안 함, 기록만).
+//   1. 오늘(KST) 비용 = todayCostKrw(단일 계산: 계정의 모든 캠페인 /stats salesAmt 합, VAT 별도). 모르면 null(끄기·재개 판단 안 함)
+//      + ads.guard_blind(reason spend_unknown). 키 복호화·클라이언트 생성 실패도 ads.guard_blind(credential_unavailable·client_unavailable)
+//      후 다음 계정으로 간다. 감시 불가만으로 자동 끄기는 하지 않는다(판정: 네이버 공유예산이 여전히 상한).
+//   감시 경로의 모든 알림(ads.pause_failed·ads.key_invalid·launch drift 포함) KST 날짜는 주입된 now 기준이다.
 //   2. ≥90% → ads.cap_90. ≥100% → 네이버에서 새로 읽은 켜진 캠페인 전부 guard로 끄기(guard-cap) + ads.cap_100.
 //   3. 드리프트 검사(guard-drift): 켜진 드리프트 캠페인은 끄고 ads.drift.
 //   4. 비용 < 상한이면 어제 이전의 guard 잠금 자동 재개(guard-resume — 전제 전부 재확인, 드리프트면 재개 없음).
@@ -18,10 +21,11 @@
 //   알림 발송은 1통 상한 10초(SEND_TIMEOUT_MS) × FLUSH_LIMIT(10) ≈ 100초 + DB → 170 + 100 < 300. 진행 중인 한 계정의 네이버 조회(GET 상한 45초)는
 //   끊지 않으므로 최악에는 넘을 수 있다 — 넘으면 남은 알림은 다음 실행이 보낸다(대기열에 남음).
 import type { AdAccount } from "@prisma/client";
-import { NaverAdsError } from "@/lib/external/naver-searchad";
+import { CredentialCryptoError } from "@/lib/crypto/credentials";
+import { NaverAdsError, clientForAccount, type NaverAdsClient } from "@/lib/external/naver-searchad";
 import { claimPipelineRun, finishPipelineRun } from "@/lib/pipeline/run-claim";
 import { prisma } from "@/lib/prisma";
-import { withAccountClient } from "./account-core";
+import { markInvalidKey } from "./account-core";
 import { flushAlerts, type FlushResult } from "./alerts";
 import { checkBizmoney, errorName, guardAlert, lockAtCap, type GuardAccountResult, type GuardCtx } from "./guard-cap";
 import { scanDrift } from "./guard-drift";
@@ -56,14 +60,31 @@ function reasonOf(error: unknown): string {
   return typeof code === "string" && /^[a-z_]{1,40}$/.test(code) ? code : errorName(error);
 }
 
-async function guardAccount(account: AdAccount, now: Date, deps: LockDeps): Promise<GuardAccountResult> {
+/** 감시 불가 알림(계정·KST 날짜당 1회). 자동 끄기는 하지 않는다 — 네이버 공유예산(1층)이 여전히 상한이다. 비밀값 없음. */
+async function blindAlert(account: AdAccount, now: Date, reason: string): Promise<void> {
+  await guardAlert({ account, now }, "ads.guard_blind", { reason, dailyCapKrw: account.dailyCapKrw, sharedBudgetKrw: account.sharedBudgetKrw });
+}
+
+/** 저장 키로 클라이언트를 만든다. 실패(복호화·형식)는 감시 불가 알림 후 다시 던진다(호출자가 다음 계정으로 계속). */
+async function guardClient(account: AdAccount, now: Date, deps: LockDeps): Promise<NaverAdsClient> {
+  try {
+    return clientForAccount(account, deps.transport);
+  } catch (error) {
+    await blindAlert(account, now, error instanceof CredentialCryptoError ? "credential_unavailable" : "client_unavailable");
+    throw error;
+  }
+}
+
+async function guardAccount(account: AdAccount, now: Date, baseDeps: LockDeps): Promise<GuardAccountResult> {
   const result = blank(account);
   if (account.status !== "active") {
     await guardAlert({ account, now }, "ads.key_invalid", { naverCustomerId: account.naverCustomerId });
     return { ...result, outcome: "skipped", reason: account.status };
   }
-  await withAccountClient(account, deps, async (client) => {
-    const ctx: GuardCtx = { account, client, now, deps, result };
+  const deps: LockDeps = { ...baseDeps, now: () => now }; // 감시 경로의 모든 알림 KST 날짜 = 주입 시각
+  const client = await guardClient(account, now, deps);
+  const ctx: GuardCtx = { account, client, now, deps, result };
+  try {
     const cap = caps(account).dailyCapKrw;
     let spend: number | null = null;
     try {
@@ -72,6 +93,7 @@ async function guardAccount(account: AdAccount, now: Date, deps: LockDeps): Prom
       const unknown = (error as { code?: string }).code === "spend_unknown" || (error instanceof NaverAdsError && error.reason !== "ads_auth_failed");
       if (!unknown) throw error;
       console.error("[ads] guard spend unknown", { accountId: account.id, error: reasonOf(error) });
+      await blindAlert(account, now, "spend_unknown");
     }
     result.todayCostKrw = spend;
     if (spend !== null && spend * 10 >= cap * 9) await guardAlert(ctx, "ads.cap_90", { todayCostKrw: spend, dailyCapKrw: cap });
@@ -79,7 +101,10 @@ async function guardAccount(account: AdAccount, now: Date, deps: LockDeps): Prom
     const scan = await scanDrift(ctx);
     if (spend !== null && spend < cap) await autoResume(ctx, scan);
     await checkBizmoney(ctx, cap);
-  });
+  } catch (error) {
+    if (error instanceof NaverAdsError && error.reason === "ads_auth_failed") await markInvalidKey(account.id, deps.now);
+    throw error;
+  }
   return result;
 }
 

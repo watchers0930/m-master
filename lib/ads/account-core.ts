@@ -90,12 +90,12 @@ export async function listAllCampaigns(client: NaverAdsClient): Promise<Campaign
 }
 
 /** 키가 무효해졌다: active → invalid_key, 알림 ads.key_invalid(같은 날 1회). 바뀌었으면 true. disabled 행은 건드리지 않는다. */
-export async function markInvalidKey(accountId: string): Promise<boolean> {
+export async function markInvalidKey(accountId: string, now?: () => Date): Promise<boolean> {
   const { count } = await prisma.adAccount.updateMany({ where: { id: accountId, status: "active" }, data: { status: "invalid_key" } });
   if (count === 0) return false;
   const row = await prisma.adAccount.findUnique({ where: { id: accountId }, select: { naverCustomerId: true } });
   try {
-    await queueAlert(accountId, "ads.key_invalid", { naverCustomerId: row?.naverCustomerId ?? "" });
+    await queueAlert(accountId, "ads.key_invalid", { naverCustomerId: row?.naverCustomerId ?? "" }, now ? { now } : {}); // 감시는 주입 시각
   } catch (error) {
     // 상태 전환은 이미 저장됐다. 알림 큐 실패가 원래 오류(키 무효)를 가리지 않게 코드만 남긴다.
     console.error("[ads] key_invalid alert queue failed", { type: error instanceof Error ? error.name : "unknown" });
@@ -109,7 +109,7 @@ export async function withAccountClient<T>(row: AdAccount, deps: AdsDeps, work: 
   try {
     return await work(client);
   } catch (error) {
-    if (error instanceof NaverAdsError && error.reason === "ads_auth_failed") await markInvalidKey(row.id);
+    if (error instanceof NaverAdsError && error.reason === "ads_auth_failed") await markInvalidKey(row.id, deps.now);
     throw error;
   }
 }
