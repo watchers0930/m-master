@@ -47,3 +47,24 @@ export const naverChannelSchema = z.object({
 });
 export const naverChannelListSchema = z.array(naverChannelSchema);
 export type NaverChannel = z.infer<typeof naverChannelSchema>;
+
+// GET /keywordstool 응답(Task 3 판정: { keywordList: RelKwdStat[] }). 수치는 숫자 또는 "< 10" 같은 문자열 → 해석은 lib/ads/keywords.ts.
+// 목록이 없거나 null이면 빈 결과, 그 밖의 형태(목록이 배열이 아님·relKeyword 누락)는 응답 오류다.
+const kwMetric = z.union([z.number(), z.string(), z.null()]).optional();
+export const naverKeywordToolSchema = z.object({
+  keywordList: z
+    .array(
+      z.object({
+        relKeyword: z.string(),
+        monthlyPcQcCnt: kwMetric,
+        monthlyMobileQcCnt: kwMetric,
+        monthlyAvePcCtr: kwMetric,
+        monthlyAveMobileCtr: kwMetric,
+        plAvgDepth: kwMetric,
+        compIdx: kwMetric,
+      }),
+    )
+    .nullable()
+    .optional(),
+});
+export type NaverKeywordRow = NonNullable<z.infer<typeof naverKeywordToolSchema>["keywordList"]>[number];
