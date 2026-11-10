@@ -4,7 +4,7 @@
 // - lockErrorView: 끄기 요청의 실패는 원인과 무관하게 urgent(끄기는 지금 바로 직접 확인해야 한다). 켜기 실패는 재끄기 실패일 때 urgent.
 // - disconnectingView: 해제 중 계정 경고(10분 넘게 멈추면 urgent + '해제 다시 시도').
 import type { AdAccountDTO, AdGuardSnapshotDTO, AdSafetyAlertDTO } from '@/types/ads';
-import { errorView, snapshotAgeLabel, type ErrorView } from './ads-format';
+import { errorView, failCodeMessage, snapshotAgeLabel, type ErrorView } from './ads-format';
 
 /** 감시 크론은 30분마다 돈다. 이보다 오래 기록이 없으면 '감시 멈춤' 경고. */
 export const GUARD_STALE_MINUTES = 90;
@@ -92,6 +92,7 @@ export function lockErrorView(error: unknown, locked: boolean): ErrorView {
     return { message: `끄기를 확인하지 못했습니다 — ${ACT_NOW}.`, urgent: true, reload: true };
   }
   const paused = e.details && typeof e.details === 'object' ? (e.details as Record<string, unknown>).paused : undefined;
+  if (code === 'spend_unknown') return { message: failCodeMessage('launch_spend_unknown') ?? base.message, urgent: false, reload: true }; // 재검토 I-1
   if ((code === 'resume_race' || code === 'ads_uncertain') && paused === false)
     return { message: `켜는 도중 문제가 생겼고 다시 끄지도 못했습니다 — ${ACT_NOW}.`, urgent: true, reload: true };
   return base;
