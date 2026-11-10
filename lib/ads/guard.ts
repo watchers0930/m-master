@@ -177,12 +177,12 @@ async function isolate(account: AdAccount, now: Date, result: GuardAccountResult
 /**
  * 감시 스냅샷(Task 12 판정): 계정 한 바퀴가 끝나면 마지막 관찰을 남긴다 — 화면(/ads)은 네이버를 부르지 않고 이것을 읽는다.
  * 비용을 모르면 null(0으로 쓰지 않는다), 비즈머니를 못 읽었으면 null. 기록 실패는 감시를 멈추지 않는다(로그만).
+ * updated_at은 건드리지 않는다(raw UPDATE — Prisma @updatedAt 우회, 시각은 Prisma와 같게 UTC로 저장): 해제 중 계정의 updatedAt = 해제 점유 시각이고,
+ * 10분 회수(STALE_CLAIM_MS)·disconnect_stuck 판정의 기준이다. 스냅샷은 계정 상태 변경이 아니다.
  */
 async function recordSnapshot(account: AdAccount, now: Date, result: GuardAccountResult): Promise<void> {
   try {
-    await prisma.adAccount.updateMany({
-      where: { id: account.id }, data: { lastGuardAt: now, lastSpendKrw: result.todayCostKrw, lastBizmoneyKrw: result.bizmoneyKrw },
-    });
+    await prisma.$executeRaw`UPDATE ad_accounts SET last_guard_at = (${now.toISOString()}::timestamptz AT TIME ZONE 'UTC'), last_spend_krw = ${result.todayCostKrw}, last_bizmoney_krw = ${result.bizmoneyKrw} WHERE id = ${account.id}`;
   } catch (error) {
     console.error("[ads] guard snapshot write failed", { accountId: account.id, error: errorName(error) });
   }
