@@ -15,6 +15,7 @@ import { prisma } from "@/lib/prisma";
 import type { NaverAdsClient } from "@/lib/external/naver-searchad";
 import { naverKeywordToolSchema, type NaverKeywordRow } from "@/schemas/ads";
 import { unexpectedNaverResponse } from "./http";
+import { collapseKeyword as collapse, isValidKeywordPhrase, isValidSeedText, keywordDedupeKey as dedupeKey, MAX_KEYWORD_LENGTH } from "./keyword-text";
 
 export type KeywordStat = {
   keyword: string;
@@ -29,18 +30,12 @@ export type KeywordStat = {
 
 export const MAX_SEEDS = 25;
 const HINTS_PER_CALL = 5; // 명세: hintKeywords는 쉼표 구분 최대 5개
-const MAX_SEED_LENGTH = 40;
 const MAX_RESULTS = 200;
 const SEO_SEED_TAKE = 50;
-const SEED_RE = /^[가-힣A-Za-z0-9]+$/;
-const RESULT_RE = /^[가-힣A-Za-z0-9]+(?: [가-힣A-Za-z0-9]+)*$/;
 const LT10_RE = /^<\s*10$/;
 const COMP_IDX: Readonly<Record<string, KeywordStat["compIdx"]>> = {
   낮음: "낮음", 중간: "중간", 높음: "높음", low: "낮음", mid: "중간", middle: "중간", medium: "중간", high: "높음",
 };
-
-const collapse = (text: string) => text.normalize("NFC").trim().replace(/\s+/g, " ");
-const dedupeKey = (text: string) => text.replace(/ /g, "").toLowerCase();
 
 /** 씨앗 정제: NFC·trim·공백 제거(네이버가 공백 힌트를 거부하는지는 미검증 — 안전한 쪽), 빈 값·40자 초과·한글/영문/숫자 외 문자 제외,
  *  대소문자 무시 중복 제거. 입력 순서를 유지한다. */
@@ -50,7 +45,7 @@ export function sanitizeSeeds(raw: readonly unknown[]): string[] {
   for (const value of raw) {
     if (typeof value !== "string") continue;
     const seed = collapse(value).replace(/ /g, "");
-    if (!seed || seed.length > MAX_SEED_LENGTH || !SEED_RE.test(seed)) continue;
+    if (!seed || seed.length > MAX_KEYWORD_LENGTH || !isValidSeedText(seed)) continue;
     const key = seed.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -77,7 +72,7 @@ function count(value: NaverKeywordRow["monthlyPcQcCnt"]): { value: number | null
 
 function toStat(row: NaverKeywordRow): KeywordStat | null {
   const keyword = collapse(row.relKeyword);
-  if (!RESULT_RE.test(keyword)) return null;
+  if (!isValidKeywordPhrase(keyword)) return null;
   const pc = count(row.monthlyPcQcCnt), mobile = count(row.monthlyMobileQcCnt);
   return {
     keyword,
