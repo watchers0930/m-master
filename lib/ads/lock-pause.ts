@@ -34,7 +34,7 @@ async function recordIntent(type: LockKind, ownerId: string, id: string, now: Da
 /** 끄기 PUT + 재조회 확인(끄기 전용 클라이언트, pauseAndConfirm). 키 무효(401)면 계정을 invalid_key로 표시하고 다시 던진다. */
 export async function pauseNow(account: AdAccount, type: LockKind, naverId: string, step: string, deps: LockDeps) {
   if (account.apiKeyEnc == null || account.secretKeyEnc == null) throw keysRemoved();
-  const client = clientForPause(account, deps.transport);
+  const client = clientForPause(account, deps.transport, { clock: deps.naverClock, budget: deps.callBudget }); // 감시는 호출 마감을 건다
   try {
     return await pauseAndConfirm(client, account, type, naverId, { step });
   } catch (error) {

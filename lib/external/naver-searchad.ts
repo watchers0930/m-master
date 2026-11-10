@@ -112,18 +112,24 @@ const realClock: NaverAdsClock = {
 // 헤더 값에 제어문자가 섞이면 fetch가 요청 전에 throw → 변이가 "uncertain"으로 오분류된다. 생성 시 거부한다.
 const HEADER_SAFE = /^[\x21-\x7e]+$/;
 
+// 호출 예산(선택, Task 11 감시): 남은 ms를 돌려주는 함수. ≤ 0이면 호출을 시작하지 않는다(ads_unavailable — 보내지 않음).
+// 호출 마감 = min(DEADLINE_MS, 남은 예산) — 시도별 타임아웃·GET 재시도도 그 안에서만. 없으면 기존 동작.
+export type NaverAdsBudget = () => number;
+
 export class NaverAdsClient {
   // #private: JSON.stringify·util.inspect·열거에 키가 드러나지 않는다.
   readonly #creds: AdCreds;
   readonly #transport: typeof fetch;
   readonly #clock: NaverAdsClock;
+  readonly #budget: NaverAdsBudget | undefined;
 
-  constructor(creds: AdCreds, transport: typeof fetch = fetch, clock: NaverAdsClock = realClock) {
+  constructor(creds: AdCreds, transport: typeof fetch = fetch, clock: NaverAdsClock = realClock, budget?: NaverAdsBudget) {
     if (!/^\d{1,20}$/.test(creds.customerId) || !HEADER_SAFE.test(creds.apiKey) || !HEADER_SAFE.test(creds.secretKey))
       throw new NaverAdsError("ads_not_connected");
     this.#creds = { ...creds };
     this.#transport = transport;
     this.#clock = clock;
+    this.#budget = budget;
   }
 
   get<T = unknown>(path: string, query?: NaverAdsQuery): Promise<T> {
@@ -151,7 +157,9 @@ export class NaverAdsClient {
     const url = `${BASE_URL}${path}${params.toString() ? `?${params}` : ""}`;
     const payload = body === undefined ? undefined : JSON.stringify(body);
     const clock = this.#clock;
-    const deadline = clock.now() + DEADLINE_MS;
+    const left = this.#budget ? this.#budget() : DEADLINE_MS;
+    if (!(left > 0)) throw new NaverAdsError("ads_unavailable"); // 예산 없음: 보내지 않는다(변이도 '불확실' 아님)
+    const deadline = clock.now() + Math.min(DEADLINE_MS, left);
     let last = new NaverAdsError(mutation ? "ads_uncertain" : "ads_unavailable");
 
     for (let attempt = 0; attempt < (mutation ? 1 : GET_ATTEMPTS); attempt++) {
@@ -218,7 +226,9 @@ export class NaverAdsClient {
 
 type ConnectableAccount = Pick<AdAccount, "ownerId" | "naverCustomerId" | "apiKeyEnc" | "secretKeyEnc" | "status">;
 
-function decryptedClient(account: ConnectableAccount, transport?: typeof fetch): NaverAdsClient {
+export type ClientOptions = { clock?: NaverAdsClock; budget?: NaverAdsBudget };
+
+function decryptedClient(account: ConnectableAccount, transport?: typeof fetch, opts: ClientOptions = {}): NaverAdsClient {
   if (account.apiKeyEnc == null || account.secretKeyEnc == null) throw new NaverAdsError("ads_not_connected");
   const { ownerId, naverCustomerId } = account;
   return new NaverAdsClient(
@@ -228,13 +238,15 @@ function decryptedClient(account: ConnectableAccount, transport?: typeof fetch):
       secretKey: decryptSecret(account.secretKeyEnc, adCredentialContext("secret_key", ownerId, naverCustomerId)),
     },
     transport,
+    opts.clock,
+    opts.budget,
   );
 }
 
 // 저장된 봉인 blob을 복호화해 클라이언트를 만든다. 비활성·키 없음은 복호화·네트워크 전에 ads_not_connected.
-export function clientForAccount(account: ConnectableAccount, transport?: typeof fetch): NaverAdsClient {
+export function clientForAccount(account: ConnectableAccount, transport?: typeof fetch, opts?: ClientOptions): NaverAdsClient {
   if (account.status !== "active") throw new NaverAdsError("ads_not_connected");
-  return decryptedClient(account, transport);
+  return decryptedClient(account, transport, opts);
 }
 
 // 해제 전용(lib/ads/disconnect.ts만 쓴다): status='disconnecting'인 행만 허용한다. 해제가 그 상태로 전이한 뒤에는
@@ -260,9 +272,9 @@ export function isPauseBody(body: unknown, query?: NaverAdsQuery): boolean {
     && entries.some(([k, v]) => PAUSE_ID_KEY.test(k) && typeof v === "string" && v.length > 0);
 }
 
-export function clientForPause(account: ConnectableAccount, transport?: typeof fetch): NaverAdsPauseClient {
+export function clientForPause(account: ConnectableAccount, transport?: typeof fetch, opts?: ClientOptions): NaverAdsPauseClient {
   if (!PAUSE_STATUSES.includes(account.status)) throw new NaverAdsError("ads_not_connected");
-  const inner = decryptedClient(account, transport);
+  const inner = decryptedClient(account, transport, opts);
   return {
     get: <T = unknown>(path: string, query?: NaverAdsQuery): Promise<T> => inner.get<T>(path, query),
     post: () => Promise.reject(new Error("naver_ads_pause_only")),

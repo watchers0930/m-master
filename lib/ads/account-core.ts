@@ -4,14 +4,15 @@
 //   이후 clientForAccount가 status !== 'active'를 네트워크 전에 거부하므로 그 계정의 호출은 0이 된다(크론 포함).
 import type { AdAccount, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { NaverAdsError, clientForAccount, type NaverAdsClient } from "@/lib/external/naver-searchad";
+import { NaverAdsError, clientForAccount, type NaverAdsBudget, type NaverAdsClient, type NaverAdsClock } from "@/lib/external/naver-searchad";
 import { VisibilityError } from "@/lib/visibility/errors";
 import { adsAccountIdSchema, naverCampaignListSchema } from "@/schemas/ads";
 import type { AdAccountDTO, AdAccountStatus } from "@/types/ads";
 import { queueAlert } from "./alerts";
 import { AdsHttpError, unexpectedNaverResponse } from "./http";
 
-export type AdsDeps = { transport?: typeof fetch; now?: () => Date }; // now: 시간 판정(해제 재점유) 주입용
+// now: 시간 판정(해제 재점유) 주입용. naverClock·callBudget: 감시(Task 11)가 모든 네이버 호출에 마감을 거는 선택 인자(naver-searchad ClientOptions).
+export type AdsDeps = { transport?: typeof fetch; now?: () => Date; naverClock?: NaverAdsClock; callBudget?: NaverAdsBudget };
 export const CAMPAIGN_PAGE = 1000; // 명세 recordSize 상한(1~1000)
 
 const DTO_SELECT = {
@@ -105,7 +106,7 @@ export async function markInvalidKey(accountId: string, now?: () => Date): Promi
 
 /** 저장된 계정으로 네이버를 부른다. 키 무효(ads_auth_failed)면 계정을 invalid_key로 바꾸고 다시 던진다. */
 export async function withAccountClient<T>(row: AdAccount, deps: AdsDeps, work: (client: NaverAdsClient) => Promise<T>): Promise<T> {
-  const client = clientForAccount(row, deps.transport);
+  const client = clientForAccount(row, deps.transport, { clock: deps.naverClock, budget: deps.callBudget });
   try {
     return await work(client);
   } catch (error) {

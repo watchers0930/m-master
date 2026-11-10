@@ -33,7 +33,7 @@ export const BIZMONEY_DAYS = 3;
 
 export const errorName = (error: unknown): string => (error instanceof Error ? error.name : "unknown");
 export const isAuthError = (error: unknown) => error instanceof NaverAdsError && error.reason === "ads_auth_failed";
-export const pastDeadline = (ctx: Pick<GuardCtx, "clock" | "deadline">) => ctx.clock() > ctx.deadline;
+export const pastDeadline = (ctx: Pick<GuardCtx, "clock" | "deadline">) => ctx.clock() >= ctx.deadline;
 
 /** 감시 알림(KST 날짜는 주입된 now 기준, dedupeKey는 판정 I-3). 큐 실패는 감시 흐름을 멈추지 않는다. */
 export async function guardAlert(ctx: Pick<GuardCtx, "account" | "now">, type: AdAlertType, payload: AlertPayload, dedupeKey = ""): Promise<void> {
