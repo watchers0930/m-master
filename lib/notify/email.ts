@@ -8,6 +8,7 @@ export const RESEND_ENDPOINT = "https://api.resend.com/emails";
 export const SEND_TIMEOUT_MS = 10_000;
 export const MAX_SUBJECT_CHARS = 150;
 export const MAX_TEXT_CHARS = 8_000;
+export const MAX_RECIPIENTS = 50; // Resend `to` 상한
 const MAX_IDEMPOTENCY_KEY_CHARS = 256;
 
 export type EmailErrorCode =
@@ -30,7 +31,7 @@ export class EmailError extends Error {
 /** fetch와 같은 모양. 테스트는 가짜를 주입한다. */
 export type EmailTransport = (url: string, init: RequestInit & { headers: Record<string, string> }) => Promise<Response>;
 
-export type EmailMessage = { to: string; subject: string; text: string };
+export type EmailMessage = { to: string | readonly string[]; subject: string; text: string };
 export type SendOptions = { transport?: EmailTransport; idempotencyKey?: string };
 
 // 단일 주소만. 공백·쉼표·꺾쇠·제어문자가 없어야 한다(여러 수신자·헤더 주입 차단).
@@ -69,14 +70,15 @@ export async function sendEmail(message: EmailMessage, options: SendOptions = {}
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const from = process.env.ADS_ALERT_FROM?.trim();
   if (!apiKey || !from) throw new EmailError("email_not_configured");
-  if (!isDeliverableEmail(message.to)) throw new EmailError("invalid_recipient");
+  const to = typeof message.to === "string" ? [message.to] : [...message.to];
+  if (!to.length || to.length > MAX_RECIPIENTS || !to.every(isDeliverableEmail)) throw new EmailError("invalid_recipient");
   const key = options.idempotencyKey;
   if (key !== undefined && (!key || key.length > MAX_IDEMPOTENCY_KEY_CHARS || !/^[\x21-\x7e]+$/.test(key))) {
     throw new EmailError("invalid_idempotency_key");
   }
   const headers: Record<string, string> = { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
   if (key) headers["Idempotency-Key"] = key;
-  const body = JSON.stringify({ from, to: [message.to], subject: sanitizeSubject(message.subject), text: sanitizeText(message.text) });
+  const body = JSON.stringify({ from, to, subject: sanitizeSubject(message.subject), text: sanitizeText(message.text) });
   const transport: EmailTransport = options.transport ?? ((url, init) => fetch(url, init));
 
   let response: Response;

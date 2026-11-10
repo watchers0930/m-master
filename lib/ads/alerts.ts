@@ -4,8 +4,9 @@
 //   · claim = claimedAt 기록 + attempts+1. 시도 상한 MAX_ATTEMPTS(5) — 발송 직전에 죽은 실행도 1회로 센다(무한 재시도 방지).
 //   · 죽은 실행이 남긴 claim은 CLAIM_TIMEOUT_MS(5분) 뒤 다시 잡을 수 있다. 근거: 1통 발송 상한 10초(SEND_TIMEOUT_MS) + DB 왕복 ≪ 5분,
 //     감시 크론은 30분 주기라 다음 실행에서 회수된다. 회수 후 재발송도 Idempotency-Key(=알림 id)라 Resend가 중복 메일을 막는다(24시간).
-//   · 발송 설정 없음(email_not_configured)·수신자 없음(no_recipient)은 claim하지 않는다 → attempts를 쓰지 않고 대기열에 남는다.
-// - 수신자 = 계정 소유자의 User.email(행마다 조회하지 않고 relation select로 flush당 일괄 조회).
+//   · 발송 설정 없음(email_not_configured: 키·발신·수신 env)은 claim하지 않는다 → attempts를 쓰지 않고 대기열에 남는다.
+// - 수신자 = env ADS_ALERT_EMAILS(쉼표 구분, trim, 주소 검증, 대소문자 무시 중복 제거, 최대 10개). 무효 항목은 버린다.
+//   유효 주소가 하나도 없으면 RESEND_API_KEY·ADS_ALERT_FROM 누락과 같이 email_not_configured로 대기(시도 미차감).
 // - payload 규칙은 alert-format.ts 머리말 참고(비밀값 금지).
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -17,6 +18,7 @@ export { ALERT_TYPES, type AdAlertType, type AlertPayload } from "./alert-format
 export const MAX_ATTEMPTS = 5;
 export const CLAIM_TIMEOUT_MS = 5 * 60_000;
 export const MAX_FLUSH_LIMIT = 100;
+export const MAX_ALERT_RECIPIENTS = 10;
 const KST_OFFSET_MS = 9 * 60 * 60_000;
 
 type Clock = () => Date;
@@ -51,6 +53,19 @@ export async function queueAlert(accountId: string, type: AdAlertType, payload: 
   }
 }
 
+/** ADS_ALERT_EMAILS → 유효 주소 목록(순서 유지, 중복 제거, 최대 10개). 없거나 전부 무효면 []. */
+export function alertRecipients(): string[] {
+  const seen = new Set<string>(), out: string[] = [];
+  for (const raw of (process.env.ADS_ALERT_EMAILS ?? "").split(",")) {
+    const addr = raw.trim();
+    if (!isDeliverableEmail(addr) || seen.has(addr.toLowerCase())) continue;
+    seen.add(addr.toLowerCase());
+    out.push(addr);
+    if (out.length === MAX_ALERT_RECIPIENTS) break;
+  }
+  return out;
+}
+
 function failureCode(error: unknown): string {
   return error instanceof EmailError ? error.code : "send_failed"; // 고정 코드만 저장(원문 메시지·키 금지)
 }
@@ -70,13 +85,13 @@ export async function flushAlerts(limit = 20, options: FlushOptions = {}): Promi
     take: limit,
     select: {
       id: true, type: true, kstDate: true, payload: true, attempts: true, claimedAt: true,
-      owner: { select: { email: true } },
       adAccount: { select: { label: true } },
     },
   });
   if (!due.length) return { sent: 0, failed: 0 };
 
-  if (!emailConfigured()) {
+  const to = alertRecipients();
+  if (!emailConfigured() || !to.length) {
     await prisma.adAlert.updateMany({ where: { AND: [claimable, { id: { in: due.map((a) => a.id) } }] }, data: { lastError: "email_not_configured" } });
     return { sent: 0, failed: due.length };
   }
@@ -84,12 +99,6 @@ export async function flushAlerts(limit = 20, options: FlushOptions = {}): Promi
   let sent = 0, failed = 0;
   for (const alert of due) {
     const observed = { id: alert.id, sentAt: null, attempts: alert.attempts, claimedAt: alert.claimedAt };
-    const to = alert.owner.email;
-    if (!isDeliverableEmail(to)) {
-      await prisma.adAlert.updateMany({ where: observed, data: { lastError: "no_recipient" } });
-      failed++;
-      continue;
-    }
     const claimedAt = now();
     const claim = await prisma.adAlert.updateMany({ where: observed, data: { claimedAt, attempts: { increment: 1 } } });
     if (claim.count !== 1) continue; // 다른 실행이 먼저 잡았거나 이미 보냄 — 이 실행의 몫이 아니다
