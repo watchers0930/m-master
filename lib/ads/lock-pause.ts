@@ -12,7 +12,7 @@ import { NaverAdsError, clientForPause } from "@/lib/external/naver-searchad";
 import { prisma } from "@/lib/prisma";
 import { markInvalidKey } from "./account-core";
 import { queueAlert, type AlertPayload } from "./alerts";
-import { putUserLock } from "./execution";
+import { pauseAndConfirm } from "./execution";
 import { AdsHttpError } from "./http";
 import type { LockKind } from "./invariants";
 import { MIRROR_SELECT, lockDto, lockMirrorRow, mirrorOf, type LockDeps, type LockResult, type MirrorLockRow } from "./lock-mirror";
@@ -32,12 +32,12 @@ async function recordIntent(type: LockKind, ownerId: string, id: string, now: Da
   });
 }
 
-/** 끄기 PUT(끄기 전용 클라이언트). 키 무효(401)면 계정을 invalid_key로 표시하고 다시 던진다. */
+/** 끄기 PUT + 재조회 확인(끄기 전용 클라이언트, pauseAndConfirm). 키 무효(401)면 계정을 invalid_key로 표시하고 다시 던진다. */
 export async function pauseNow(account: AdAccount, type: LockKind, naverId: string, step: string, deps: LockDeps) {
   if (account.apiKeyEnc == null || account.secretKeyEnc == null) throw keysRemoved();
   const client = clientForPause(account, deps.transport);
   try {
-    return await putUserLock(client, account, type, naverId, true, { step });
+    return await pauseAndConfirm(client, account, type, naverId, { step });
   } catch (error) {
     if (error instanceof NaverAdsError && error.reason === "ads_auth_failed") await markInvalidKey(account.id);
     throw error;
@@ -59,7 +59,7 @@ export async function safetyPause(
 ): Promise<boolean> {
   let paused = false;
   try {
-    paused = (await pauseNow(account, type, row.naverId, step, deps)).userLock === true;
+    paused = (await pauseNow(account, type, row.naverId, step, deps)).confirmed;
   } catch (error) {
     if (!(error instanceof NaverAdsError) && !(error instanceof AdsHttpError)) throw error;
   }
@@ -72,13 +72,17 @@ export async function ownerPause(type: LockKind, ownerId: string, id: string, ac
   if (account.status === "disabled" || account.apiKeyEnc == null || account.secretKeyEnc == null) throw keysRemoved();
   const claimed = await recordIntent(type, ownerId, id, now, deps);
   const mirror = mirrorOf(prisma, type);
-  let stored;
+  let confirmed: boolean;
   try {
-    stored = await pauseNow(account, type, claimed.naverId, `owner.pause:${type}`, deps);
+    confirmed = (await pauseNow(account, type, claimed.naverId, `owner.pause:${type}`, deps)).confirmed;
   } catch (error) {
     await mirror.updateMany({ where: { id, lockVersion: claimed.lockVersion }, data: { userLock: false } }); // 끄기 실패 = 켜짐·모름
     throw error;
   }
-  await mirror.updateMany({ where: { id, lockVersion: claimed.lockVersion }, data: { userLock: stored.userLock } });
+  await mirror.updateMany({ where: { id, lockVersion: claimed.lockVersion }, data: { userLock: confirmed } });
+  if (!confirmed) {
+    await pauseAlert(account, { reason: "owner_pause_unconfirmed", entity: type, naverId: claimed.naverId, paused: false });
+    throw new AdsHttpError("pause_unconfirmed", "네이버가 끄기 요청을 받았지만 다시 확인했을 때 아직 켜져 있습니다. 네이버 광고 화면에서 지금 바로 직접 꺼 주세요.", 502);
+  }
   return lockDto(type, (await mirror.findFirst({ where: { id, ownerId }, select: MIRROR_SELECT })) as MirrorLockRow);
 }

@@ -68,6 +68,27 @@ export async function putUserLock<K extends LockKind>(
 }
 
 /** 단건 재조회(원본 그대로). 형태 검사는 호출자가 한다(verifyStored·ENTITY_SCHEMAS). */
-export function readEntity(client: NaverAdsClient, kind: LockKind, naverId: string): Promise<unknown> {
+export function readEntity(client: Pick<NaverAdsClient, "get">, kind: LockKind, naverId: string): Promise<unknown> {
   return client.get(`${ENTITY_PATHS[kind]}/${naverId}`);
+}
+
+export type ConfirmClient = MutationClient & Pick<NaverAdsClient, "get">;
+
+/**
+ * 끄기의 단일 판정(Task 9 fix round 3 I-1): 끄기 PUT 뒤 다시 읽어 userLock===true일 때만 '꺼짐 확인'.
+ * PUT 응답의 값은 믿지 않는다(200이어도 반영 안 될 수 있다). 재조회 실패·형태 불일치도 확인 못 함(false).
+ * PUT 자체의 오류는 그대로 던진다. 적용(inspect·재시도)·안전 끄기(safetyPause)·대장 끄기가 모두 이 함수로 판정한다.
+ */
+export async function pauseAndConfirm<K extends LockKind>(
+  client: ConfirmClient, account: MutationAccount, kind: K, naverId: string, write: LockWrite,
+): Promise<{ confirmed: boolean; entity: EntityOf<K> | null }> {
+  await putUserLock(client, account, kind, naverId, true, write);
+  let entity: EntityOf<K> | null = null;
+  try {
+    const parsed = ENTITY_SCHEMAS[kind].safeParse(await readEntity(client, kind, naverId));
+    entity = parsed.success ? (parsed.data as EntityOf<K>) : null;
+  } catch (error) {
+    if (!(error instanceof NaverAdsError)) throw error;
+  }
+  return { confirmed: entity?.userLock === true, entity };
 }

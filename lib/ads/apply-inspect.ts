@@ -1,6 +1,6 @@
 // lib/ads/apply-inspect.ts — 적용 중 '네이버에 실제로 저장된 상태' 판정과 멈춤 규칙(apply-steps.ts·apply.ts 공용).
-// - inspect: 단건 GET → 형태 parse → 상한 값 verifyStored(소재는 TEXT_45) → userLock. 불일치이거나 켜져 있으면 즉시 끄고 다시 읽는다.
-//   그 끄기 PUT이 실패하면(Task 9 판정 adv I-2) pauseFailed — 호출자가 관찰값(userLock=false)으로 미러를 남긴 뒤 stopIfUnsafe가
+// - inspect: 단건 GET → 형태 parse → 상한 값 verifyStored(소재는 TEXT_45) → userLock. 불일치이거나 켜져 있으면 즉시 끈다.
+//   끄기 판정은 execution.ts pauseAndConfirm(재조회 userLock===true) 하나로 한다. 끄기 PUT이 실패하거나 200인데 재조회가 켜져 있으면(Task 9 판정 adv I-2) pauseFailed — 호출자가 관찰값(userLock=false)으로 미러를 남긴 뒤 stopIfUnsafe가
 //   알림 ads.pause_failed(reason=pause_failed — 별도 유형이라 같은 날 ads.drift에 묻히지 않음) + pause_failed:<step>으로 멈춘다(원장 PUT 행이 실패 증거). 다음 적용은 retryPendingPauses가 먼저 끈다.
 // - extend_group 대상(checkTarget·targetIsPaused): 삭제되지 않았고, 상한 값이 지켜지고, 그룹과 캠페인이 네이버에서 꺼져 있어야 한다
 //   (켜진 그룹에 소재를 붙이면 생성~끄기 사이·끄기 실패 시 과금된다). 켜져 있으면 target_active — 대장이 먼저 끈다(4-1 한계).
@@ -9,7 +9,7 @@ import { NaverAdsError, type NaverAdsClient } from "@/lib/external/naver-searcha
 import { prisma } from "@/lib/prisma";
 import { queueAlert, type AlertPayload } from "./alerts";
 import { ApplyFailure } from "./apply-errors";
-import { ENTITY_SCHEMAS, putUserLock, readEntity, type EntityOf } from "./execution";
+import { ENTITY_SCHEMAS, pauseAndConfirm, readEntity, type EntityOf } from "./execution";
 import { unexpectedNaverResponse } from "./http";
 import { verifyStored, type LockKind } from "./requests";
 
@@ -24,7 +24,7 @@ async function alert(ctx: InspectCtx, payload: AlertPayload, type: "ads.drift" |
   }
 }
 
-export async function readParsed<K extends LockKind>(client: NaverAdsClient, kind: K, naverId: string) {
+export async function readParsed<K extends LockKind>(client: Pick<NaverAdsClient, "get">, kind: K, naverId: string) {
   const raw = await readEntity(client, kind, naverId);
   const parsed = ENTITY_SCHEMAS[kind].safeParse(raw);
   return { raw, entity: parsed.success ? (parsed.data as EntityOf<K>) : null };
@@ -38,20 +38,21 @@ export async function inspect<K extends LockKind>(ctx: InspectCtx, kind: K, nave
       : verifyStored(kind as Exclude<LockKind, "ad">, ctx.account, first.raw);
   const field = verdict.ok ? null : verdict.field;
   if (field !== null || entity?.userLock !== true) {
+    let confirmed = false, after: EntityOf<K> | null = null;
     try {
-      await putUserLock(ctx.client, ctx.account, kind, naverId, true, { step: `pause:${ctx.step}`, proposalId: ctx.proposalId });
+      ({ confirmed, entity: after } = await pauseAndConfirm(ctx.client, ctx.account, kind, naverId, { step: `pause:${ctx.step}`, proposalId: ctx.proposalId }));
     } catch (error) {
       if (!(error instanceof NaverAdsError)) throw error;
-      // 끄기 실패 = 켜져 있거나 모름 → 미러에는 꺼졌다고 기록하지 않는다(판정 round 2)
-      return { userLock: false, inspectStatus: inspectOf(entity), drift: field, pauseFailed: true };
     }
-    ({ entity } = await readParsed(ctx.client, kind, naverId));
+    // 끄기 PUT 실패·200인데 재조회가 켜짐·재조회 실패 = 끄기 실패 → 미러에는 꺼졌다고 기록하지 않는다(판정 round 2·3)
+    if (!confirmed) return { userLock: false, inspectStatus: inspectOf(after ?? entity), drift: field, pauseFailed: true };
+    entity = after;
   }
   if (entity === null) {
-    await alert(ctx, { entity: kind, naverId, field: "shape" }); // 끈 뒤에도 형태를 모르면 미러 없이 멈춘다(재개 시 원장 naverId로 다시 대조)
+    await alert(ctx, { entity: kind, naverId, field: "shape" }); // 형태를 모르면 미러 없이 멈춘다(재개 시 원장 naverId로 다시 대조)
     throw new ApplyFailure("drift:shape");
   }
-  return { userLock: entity.userLock, inspectStatus: inspectOf(entity), drift: field ?? (entity.userLock !== true ? "userLock" : null), pauseFailed: false };
+  return { userLock: entity.userLock, inspectStatus: inspectOf(entity), drift: field, pauseFailed: false };
 }
 
 const inspectOf = (e: unknown) => ((e as { inspectStatus?: string | null } | null)?.inspectStatus ?? null);
@@ -80,7 +81,7 @@ export async function retryPendingPauses(ctx: InspectCtx): Promise<void> {
     ctx.step = `retry:${kind}:${row.naverId}`;
     let locked = false;
     try {
-      locked = (await putUserLock(ctx.client, ctx.account, kind, row.naverId, true, { step: `pause:${ctx.step}`, proposalId: ctx.proposalId })).userLock;
+      locked = (await pauseAndConfirm(ctx.client, ctx.account, kind, row.naverId, { step: `pause:${ctx.step}`, proposalId: ctx.proposalId })).confirmed;
     } catch (error) {
       if (!(error instanceof NaverAdsError)) throw error;
     }
