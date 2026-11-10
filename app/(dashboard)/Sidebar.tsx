@@ -12,10 +12,11 @@ function Badge({ count }: { count: number }) {
   return <span className="sb-badge">{count > 99 ? '99+' : count}</span>;
 }
 
-/** adsEnabled: 서버 layout이 isAdsOwner(session.user.id)로 정한다. false면 '광고' 섹션을 그리지 않는다. */
-export function Sidebar({ adsEnabled = false }: { adsEnabled?: boolean }) {
+export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  // '광고' 메뉴: 서버 세션 콜백이 정한 플래그(isAdsOwner, lib/auth-session.ts). UX 전용 — API가 허용목록을 강제한다.
+  const adsEnabled = session?.user?.adsEnabled === true;
   const active = (href: string) => href === '/home' ? pathname === '/home' : pathname.startsWith(href);
 
   const [draftCount, setDraftCount] = useState(0);
