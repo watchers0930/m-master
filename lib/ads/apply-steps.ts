@@ -4,9 +4,10 @@
 //   ③ 원장에 sent·uncertain이 있으면 결정적 이름으로 목록 대조만 한다 — 1개면 채택, 여럿이면 ambiguous:<step>,
 //      0개면 다시 만들지 않는다(재전송 금지, 설계서 §5.3 — 어느 실행에서도, 시간이 지나도). uncertain:<step> + 알림 ads.drift(reason=uncertain).
 //   ④ 그 밖(원장 없음 = 보낸 적 없음, failed = 확정 거절)이면 POST 1회. 그 POST가 불확실하면 재전송하지 않고 목록 대조, 없으면 ③과 같이 멈춘다.
-// 대조(inspect): 단건 GET → 형태 parse → 상한 값 verifyStored(소재는 TEXT_45) → userLock. 네이버가 userLock을 무시해 켜진 채면
-//   즉시 끄고(원장 기록) 다시 읽는다. 상한 불일치면 즉시 끄고, 미러를 남기고, 알림 ads.drift 후 drift:<field>로 멈춘다.
+// 대조·멈춤 규칙은 apply-inspect.ts(드리프트 → drift:<field>, 끄기 실패 → pause_failed:<step>). 멈추기 전에 미러를 먼저 남긴다.
 // 미러는 lockedBy='pending_launch', 관찰한 userLock으로 만든다. 이미 있으면 userLock·검수 상태만 갱신(lockedBy·lockVersion 무변경).
+// 소재 단계 식별자 = (proposalId, 그룹 인덱스, 소재 인덱스) → step 'ad:g{n}:c{i}', 미러 이름 mq-{id}-g{n}-c{i}(Task 9 판정 I-2).
+//   slot은 첫 시도에 정해 원장 step 접미사(#<그룹 id>:a{n})와 미러에 남긴다. 재개는 그 slot을 그대로 쓰고 현재 최대값으로 다시 계산하지 않는다.
 import type { AdAccount } from "@prisma/client";
 import { z } from "zod";
 import { NaverAdsError, type NaverAdsClient } from "@/lib/external/naver-searchad";
@@ -15,12 +16,13 @@ import { NAVER_ID_RE, naverChannelSchema, naverKeywordCreatedSchema } from "@/sc
 import type { ProposalCreative, ProposalKeyword } from "@/types/ads";
 import { queueAlert } from "./alerts";
 import { ApplyFailure } from "./apply-errors";
-import { ENTITY_SCHEMAS, createEntity, putUserLock, readEntity, type EntityOf } from "./execution";
+import { inspect, stopIfUnsafe } from "./apply-inspect";
+import { createEntity } from "./execution";
 import { unexpectedNaverResponse } from "./http";
 import { findAdgroups, findAds, findCampaigns, findKeywords } from "./reconcile";
-import { buildAdgroup, buildCampaign, buildKeyword, buildTextAd, verifyStored, type LockKind } from "./requests";
+import { buildAdgroup, buildCampaign, buildKeyword, buildTextAd } from "./requests";
 
-export type PriorOp = { status: string; naverId: string | null; createdAt: Date };
+export type PriorOp = { status: string; naverId: string | null; createdAt: Date; slot?: string };
 export type ApplyCtx = {
   client: NaverAdsClient; account: AdAccount; proposalId: string; prior: ReadonlyMap<string, PriorOp>;
   now: () => Date; heartbeat: () => Promise<void>; step: string; landingUrl?: string;
@@ -59,44 +61,6 @@ async function ensureId(ctx: ApplyCtx, e: Ensure): Promise<string> {
   }
 }
 
-type Observed<K extends LockKind> = { entity: EntityOf<K>; drift: string | null };
-
-async function readParsed<K extends LockKind>(ctx: ApplyCtx, kind: K, naverId: string): Promise<{ raw: unknown; entity: EntityOf<K> | null }> {
-  const raw = await readEntity(ctx.client, kind, naverId);
-  const parsed = ENTITY_SCHEMAS[kind].safeParse(raw);
-  return { raw, entity: parsed.success ? (parsed.data as EntityOf<K>) : null };
-}
-
-/** 저장된 값 대조. 불일치·켜짐이면 끈다. drift는 상한 위반 필드(없으면 null). */
-async function inspect<K extends LockKind>(ctx: ApplyCtx, kind: K, naverId: string): Promise<Observed<K>> {
-  const first = await readParsed(ctx, kind, naverId);
-  const raw = first.raw;
-  let entity = first.entity;
-  const verdict = entity === null ? { ok: false as const, field: "shape" }
-    : kind === "ad" ? ((entity as EntityOf<"ad">).type === "TEXT_45" ? { ok: true as const } : { ok: false as const, field: "type" })
-      : verifyStored(kind as Exclude<LockKind, "ad">, ctx.account, raw);
-  if (!verdict.ok || entity?.userLock !== true) {
-    await putUserLock(ctx.client, ctx.account, kind, naverId, true, { step: `pause:${ctx.step}`, proposalId: ctx.proposalId });
-    ({ entity } = await readParsed(ctx, kind, naverId));
-  }
-  if (entity === null) {
-    await driftStop(ctx, kind, naverId, "shape"); // 끈 뒤에도 형태를 모르면 미러 없이 멈춘다(재개 시 원장 naverId로 다시 대조)
-    throw new ApplyFailure("drift:shape");
-  }
-  const drift = !verdict.ok ? verdict.field : entity.userLock !== true ? "userLock" : null;
-  return { entity, drift };
-}
-
-async function driftStop(ctx: ApplyCtx, kind: LockKind, naverId: string, field: string | null): Promise<void> {
-  if (field === null) return;
-  try {
-    await queueAlert(ctx.account.id, "ads.drift", { proposalId: ctx.proposalId, step: ctx.step, entity: kind, naverId, field });
-  } catch (error) {
-    console.error("[ads] drift alert queue failed", { type: error instanceof Error ? error.name : "unknown" }); // 원래 실패를 가리지 않는다
-  }
-  throw new ApplyFailure(`drift:${field}`);
-}
-
 const base = (ctx: ApplyCtx) => ({ ownerId: ctx.account.ownerId, adAccountId: ctx.account.id, proposalId: ctx.proposalId, lockedBy: "pending_launch" });
 const key = (ctx: ApplyCtx, naverId: string) => ({ adAccountId_naverId: { adAccountId: ctx.account.id, naverId } });
 const idSchema = (field: string) => z.object({ [field]: z.string().regex(NAVER_ID_RE) });
@@ -113,8 +77,8 @@ export async function stepCampaign(ctx: ApplyCtx): Promise<string> {
       idSchema("nccCampaignId"), (r) => String(r.nccCampaignId))).nccCampaignId as string,
   });
   const o = await inspect(ctx, "campaign", id);
-  await prisma.adCampaign.upsert({ where: key(ctx, id), create: { ...base(ctx), naverId: id, name, userLock: o.entity.userLock }, update: { userLock: o.entity.userLock } });
-  await driftStop(ctx, "campaign", id, o.drift);
+  await prisma.adCampaign.upsert({ where: key(ctx, id), create: { ...base(ctx), naverId: id, name, userLock: o.userLock }, update: { userLock: o.userLock } });
+  await stopIfUnsafe(ctx, "campaign", id, o);
   return id;
 }
 
@@ -129,9 +93,9 @@ export async function stepAdgroup(ctx: ApplyCtx, campaignId: string, n: number, 
   });
   const o = await inspect(ctx, "adgroup", id);
   await prisma.adGroup.upsert({
-    where: key(ctx, id), create: { ...base(ctx), naverId: id, parentNaverId: campaignId, name, bidAmt, userLock: o.entity.userLock }, update: { userLock: o.entity.userLock },
+    where: key(ctx, id), create: { ...base(ctx), naverId: id, parentNaverId: campaignId, name, bidAmt, userLock: o.userLock }, update: { userLock: o.userLock },
   });
-  await driftStop(ctx, "adgroup", id, o.drift);
+  await stopIfUnsafe(ctx, "adgroup", id, o);
   return id;
 }
 
@@ -149,11 +113,11 @@ export async function stepKeyword(ctx: ApplyCtx, groupId: string, label: string,
     },
   });
   const o = await inspect(ctx, "keyword", id);
-  const seen = { userLock: o.entity.userLock, inspectStatus: o.entity.inspectStatus ?? null };
+  const seen = { userLock: o.userLock, inspectStatus: o.inspectStatus };
   await prisma.adKeyword.upsert({
     where: key(ctx, id), create: { ...base(ctx), naverId: id, parentNaverId: groupId, name: k.keyword, keyword: k.keyword, bidAmt: k.bidAmt, ...seen }, update: seen,
   });
-  await driftStop(ctx, "keyword", id, o.drift);
+  await stopIfUnsafe(ctx, "keyword", id, o);
 }
 
 /** 소재 최종 URL = 선택한 비즈채널(사이트)의 channelKey. ⚠️ 스킴 없는 값이면 https://를 붙인다(실측 전 가정). 적용 1회에 1번만 읽는다. */
@@ -166,35 +130,29 @@ async function landingUrl(ctx: ApplyCtx): Promise<string> {
   return ctx.landingUrl;
 }
 
-export async function stepAd(ctx: ApplyCtx, groupId: string, label: string, slot: string, c: ProposalCreative, mirrorName: string): Promise<void> {
-  const step = `ad:${label}:${slot}`;
+/** 소재 1개. slotFor는 첫 시도(미러·원장 모두 없음)에서만 부른다. */
+export async function stepAd(ctx: ApplyCtx, groupId: string, label: string, ci: number, c: ProposalCreative, slotFor: () => Promise<string>): Promise<void> {
+  const step = `ad:${label}:c${ci}`, name = `mq-${ctx.proposalId}-${label}-c${ci}`;
+  ctx.step = step;
+  const mirrored = await prisma.adCreative.findFirst({ where: { adAccountId: ctx.account.id, proposalId: ctx.proposalId, parentNaverId: groupId, name }, select: { naverId: true, slot: true } });
+  const slot = mirrored?.slot ?? ctx.prior.get(step)?.slot ?? (await slotFor());
   const id = await ensureId(ctx, {
     step,
-    mirror: async () => (await prisma.adCreative.findFirst({ where: { adAccountId: ctx.account.id, proposalId: ctx.proposalId, parentNaverId: groupId, slot }, select: { naverId: true } }))?.naverId ?? null,
+    mirror: async () => mirrored?.naverId ?? null,
     find: async () => findAds(ctx.client, groupId, c, await mirroredIds(prisma.adCreative.findMany({ where: { adAccountId: ctx.account.id, parentNaverId: groupId }, select: { naverId: true } }))),
     create: async () => {
       const url = await landingUrl(ctx);
       const body = buildTextAd(groupId, { headline: c.headline, description: c.description, pcUrl: url, mobileUrl: url });
-      return (await createEntity(ctx.client, acct(ctx), { step, method: "POST", path: "/ncc/ads", body, proposalId: ctx.proposalId },
+      return (await createEntity(ctx.client, acct(ctx), { step: `${step}#${groupId}:${slot}`, method: "POST", path: "/ncc/ads", body, proposalId: ctx.proposalId },
         idSchema("nccAdId"), (r) => String(r.nccAdId))).nccAdId as string;
     },
   });
   const o = await inspect(ctx, "ad", id); // 네이버가 생성 시 userLock을 무시할 수 있다(명세 #optional-update) → inspect가 끄고 원장에 남긴다
-  const seen = { userLock: o.entity.userLock, inspectStatus: o.entity.inspectStatus ?? null };
+  const seen = { userLock: o.userLock, inspectStatus: o.inspectStatus };
   await prisma.adCreative.upsert({
     where: key(ctx, id),
-    create: { ...base(ctx), naverId: id, parentNaverId: groupId, name: mirrorName, slot, headline: c.headline, description: c.description, ...seen },
+    create: { ...base(ctx), naverId: id, parentNaverId: groupId, name, slot, headline: c.headline, description: c.description, ...seen },
     update: seen,
   });
-  await driftStop(ctx, "ad", id, o.drift);
-}
-
-/** extend_group 대상 그룹: 네이버에서 삭제되지 않았고 상한 값이 지켜지고 있어야 한다. 대상은 이 제안이 만든 것이 아니므로 끄지 않고 알림만. */
-export async function checkTarget(ctx: ApplyCtx, groupId: string): Promise<void> {
-  ctx.step = "target";
-  const { raw, entity } = await readParsed(ctx, "adgroup", groupId);
-  if (entity === null) throw unexpectedNaverResponse();
-  if (entity.status === "DELETED") throw new ApplyFailure("target_adgroup_deleted");
-  const verdict = verifyStored("adgroup", ctx.account, raw);
-  if (!verdict.ok) await driftStop(ctx, "adgroup", groupId, verdict.field);
+  await stopIfUnsafe(ctx, "ad", id, o);
 }

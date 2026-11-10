@@ -243,3 +243,28 @@ export function clientForDisconnect(account: ConnectableAccount, transport?: typ
   if (account.status !== "disconnecting") throw new NaverAdsError("ads_not_connected");
   return decryptedClient(account, transport);
 }
+
+// ── 끄기 전용 클라이언트(Task 9 판정 I-1: 끄기는 정책 게이트로 막지 않는다) ──
+// status active | invalid_key | disconnecting을 받는다(invalid_key는 단 한 번의 401로도 설정되는 플래그일 뿐이다).
+// disabled 또는 키 없음은 ads_not_connected(키가 지워져 보낼 수 없다). 보낼 수 있는 것은 PUT ?fields=userLock + {ncc*Id, userLock:true}뿐이다.
+const PAUSE_STATUSES: readonly string[] = ["active", "invalid_key", "disconnecting"];
+const PAUSE_ID_KEY = /^ncc(Campaign|Adgroup|Keyword|Ad)Id$/;
+
+export type NaverAdsPauseClient = Pick<NaverAdsClient, "post" | "put">;
+
+export function isPauseBody(body: unknown, query?: NaverAdsQuery): boolean {
+  if (query?.fields !== "userLock" || typeof body !== "object" || body === null || Array.isArray(body)) return false;
+  const entries = Object.entries(body as Record<string, unknown>);
+  return entries.length === 2 && (body as Record<string, unknown>).userLock === true
+    && entries.some(([k, v]) => PAUSE_ID_KEY.test(k) && typeof v === "string" && v.length > 0);
+}
+
+export function clientForPause(account: ConnectableAccount, transport?: typeof fetch): NaverAdsPauseClient {
+  if (!PAUSE_STATUSES.includes(account.status)) throw new NaverAdsError("ads_not_connected");
+  const inner = decryptedClient(account, transport);
+  return {
+    post: () => Promise.reject(new Error("naver_ads_pause_only")),
+    put: <T = unknown>(path: string, body: unknown, query?: NaverAdsQuery): Promise<T> =>
+      isPauseBody(body, query) ? inner.put<T>(path, body, query) : Promise.reject(new Error("naver_ads_pause_only")),
+  };
+}

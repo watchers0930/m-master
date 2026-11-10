@@ -1,6 +1,6 @@
 // lib/ads/disconnect.ts — 광고 계정 해제(설계서 §5.6-1 수명주기). 키를 지우는 유일한 경로.
 // 순서(바꾸지 않는다, 적대 검토 Task 5 I-1·I-2 반영):
-//   ⓪ 조건부 전이 status(active|invalid_key) → 'disconnecting'(같은 트랜잭션에서 미러 캠페인 lockedBy='owner').
+//   ⓪ 조건부 전이 status(active|invalid_key) → 'disconnecting'(같은 트랜잭션에서 미러 캠페인 lockedBy='owner', 미러 4개 lockVersion +1).
 //      이후 clientForAccount(다른 모든 작업자: 가드 자동 재개·켜기·동기화)는 네트워크 전에 거부된다. 동시 해제 2건 중 하나만 진행(409).
 //      해제 자신은 clientForDisconnect(status='disconnecting' 전용)를 쓴다.
 //   ① 모든 캠페인 페이지를 읽어(listAllCampaigns) 꺼지지 않은 것만 buildPause + PUT ?fields=userLock (끄기는 비상 정지 스위치와 무관)
@@ -81,7 +81,12 @@ export async function disconnectAccount(ownerId: string, accountId: string, deps
       : { id: row.id, ownerId, status: row.status };
     const { count } = await tx.adAccount.updateMany({ where, data: { status: "disconnecting", disconnectFromStatus: previous, updatedAt: now } });
     if (count !== 1) throw inProgress();
-    await tx.adCampaign.updateMany({ where: { adAccountId: row.id, ownerId: row.ownerId }, data: { lockedBy: "owner" } });
+    // 잠금 변경이므로 lockVersion +1(미러 4개 전부) — 이 시점에 진행 중인 켜기의 결과 기록 CAS가 0행이 되어 다시 끈다(Task 9 adv I-3)
+    const scope = { where: { adAccountId: row.id, ownerId: row.ownerId } };
+    await tx.adCampaign.updateMany({ ...scope, data: { lockedBy: "owner", lockVersion: { increment: 1 } } });
+    await tx.adGroup.updateMany({ ...scope, data: { lockVersion: { increment: 1 } } });
+    await tx.adKeyword.updateMany({ ...scope, data: { lockVersion: { increment: 1 } } });
+    await tx.adCreative.updateMany({ ...scope, data: { lockVersion: { increment: 1 } } });
   });
 
   let unconfirmed: number;
@@ -106,7 +111,7 @@ export async function disconnectAccount(ownerId: string, accountId: string, deps
       data: { apiKeyEnc: null, secretKeyEnc: null, keyLast4: null, status: "disabled", disconnectFromStatus: null },
     });
     if (count !== 1) throw inProgress();
-    await tx.adCampaign.updateMany({ where: { adAccountId: row.id, ownerId: row.ownerId }, data: { userLock: true, lockedBy: "owner" } });
+    await tx.adCampaign.updateMany({ where: { adAccountId: row.id, ownerId: row.ownerId }, data: { userLock: true, lockedBy: "owner", lockVersion: { increment: 1 } } });
   });
   return accountDTO(ownerId, row.id);
 }

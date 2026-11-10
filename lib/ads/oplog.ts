@@ -10,11 +10,12 @@ import { prisma } from "@/lib/prisma";
 import { NaverAdsError, type NaverAdsClient, type NaverAdsQuery } from "@/lib/external/naver-searchad";
 
 export type MutationAccount = { id: string; ownerId: string };
+export type MutationClient = Pick<NaverAdsClient, "post" | "put">; // 끄기 전용 클라이언트(clientForPause)도 같은 모양
 // proposalId: 제안 적용(Task 9)이 보낸 변이면 그 제안. 재개 시 이 원장으로 이미 보낸 단계를 찾는다.
 export type Mutation = { step: string; method: "POST" | "PUT"; path: string; query?: NaverAdsQuery; body: unknown; naverId?: string; proposalId?: string };
 
 export async function sendMutation<S extends z.ZodTypeAny>(
-  client: NaverAdsClient,
+  client: MutationClient,
   account: MutationAccount,
   op: Mutation,
   schema: S,

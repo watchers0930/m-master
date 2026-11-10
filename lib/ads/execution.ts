@@ -10,7 +10,7 @@ import { NaverAdsError, type NaverAdsClient } from "@/lib/external/naver-searcha
 import { prisma } from "@/lib/prisma";
 import { naverAdSchema, naverAdgroupSchema, naverCampaignSchema, naverKeywordSchema } from "@/schemas/ads";
 import { AdsHttpError } from "./http";
-import { sendMutation, type Mutation, type MutationAccount } from "./oplog";
+import { sendMutation, type Mutation, type MutationAccount, type MutationClient } from "./oplog";
 import { buildPause, buildResume, type LockKind, type ResumeReason } from "./requests";
 
 export function isExecutionEnabled(): boolean {
@@ -57,7 +57,7 @@ export type LockWrite = { step: string; proposalId?: string; reason?: ResumeReas
  * 켜기 사유 기본값은 대장 승인(owner_approved). 가드 자동 재개(Task 11)만 guard_auto_resume을 넘긴다.
  */
 export async function putUserLock<K extends LockKind>(
-  client: NaverAdsClient, account: MutationAccount, kind: K, naverId: string, locked: boolean, write: LockWrite,
+  client: MutationClient, account: MutationAccount, kind: K, naverId: string, locked: boolean, write: LockWrite,
 ): Promise<EntityOf<K>> {
   if (!locked) await assertWritable(account);
   const body = locked ? buildPause(kind, naverId) : buildResume(kind, naverId, write.reason ?? "owner_approved");
