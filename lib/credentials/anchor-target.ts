@@ -5,7 +5,8 @@
 //   ① 로컬: 실제 접속 호스트가 localhost·127.0.0.1·::1, 또는 유닉스 소켓 경로(?host=/…, PGlite 소켓 서버·로컬 Postgres)
 //   ② 명시: env SET_ANCHOR_ALLOWED_HOSTS(쉼표 구분)에 그 호스트 전체 이름 또는 Neon 엔드포인트 id(첫 라벨에서 '-pooler'를 뗀 것)가 있을 때
 //   그 밖은 전부 거부(풀러·직접 별칭, 처음 보는 호스트 포함). 운영 엔드포인트(PRODUCTION_DB_ENDPOINTS)는 허용목록에 적어도 거부한다.
-// 실제 접속 호스트: url의 ?host=/?hostaddr= 쿼리가 호스트 부분을 덮어쓴다(libpq·Prisma 규칙) → 그 값으로 판정한다.
+// 판정 후보 = url 호스트 + ?host= + ?hostaddr= 전부(재검토 I-2: Prisma 6.19는 hostaddr를 무시하고 url 호스트로 붙고, host는 덮어쓴다 —
+//   어느 쪽으로 붙을지 추측하지 않고 후보 하나라도 운영이면 production_db, 하나라도 허용 밖이면 거부한다).
 // Neon ?options=endpoint%3D<id>는 다른 호스트(IP·프록시)로 같은 엔드포인트에 붙는다 → 그 id도 허용목록에 있어야 한다.
 
 /** 운영(=로컬 .env.local이 공유하는) Neon DB 엔드포인트 id. 허용목록에 적혀도 거부한다(이중 안전). */
@@ -18,17 +19,21 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 export type SetAnchorTargetRefusal =
   | "flag_missing" | "production_runtime" | "db_url_missing" | "db_url_unparsable" | "production_db" | "db_host_not_allowed";
 
-type Target = { host: string; endpoint: string; socket: boolean; optionEndpoint: string | null };
+/** 판정 후보: url 호스트·?host=·?hostaddr=(쉼표 여러 개 포함). 유닉스 소켓 경로('/…')는 socket. */
+type Target = { hosts: { host: string; endpoint: string; socket: boolean }[]; optionEndpoint: string | null };
 
 function targetOf(url: string): Target | null {
   try {
     const u = new URL(url);
-    const override = (u.searchParams.get("hostaddr") ?? u.searchParams.get("host") ?? "").trim();
-    const socket = override.startsWith("/");
-    const host = (override && !socket ? override : u.hostname).toLowerCase();
-    if (!host && !socket) return null;
+    const raw = [u.hostname, ...["host", "hostaddr"].flatMap((k) => (u.searchParams.get(k) ?? "").split(","))]
+      .map((h) => h.trim()).filter(Boolean);
+    if (!raw.length) return null;
+    const hosts = raw.map((h) => {
+      const host = h.toLowerCase();
+      return { host, endpoint: host.split(".")[0].replace(/-pooler$/, ""), socket: host.startsWith("/") };
+    });
     const m = /(?:^|\s)(?:-c\s*)?endpoint=([^\s&]+)/i.exec(u.searchParams.get("options") ?? "");
-    return { host, endpoint: host.split(".")[0].replace(/-pooler$/, ""), socket, optionEndpoint: m ? m[1].toLowerCase() : null };
+    return { hosts, optionEndpoint: m ? m[1].toLowerCase() : null };
   } catch {
     return null;
   }
@@ -48,10 +53,13 @@ export function setAnchorTargetRefusal(argv: readonly string[], env: Record<stri
   for (const url of urls) {
     const t = targetOf(url);
     if (!t) return "db_url_unparsable";
-    if ([t.endpoint, t.optionEndpoint].some((e) => e !== null && PRODUCTION_DB_ENDPOINTS.includes(e))) return "production_db";
+    // 후보 하나라도 운영이면 거부, 하나라도 허용 밖이면 거부(Prisma 6.19는 hostaddr를 무시하고 url 호스트로 붙는다 — 재검토 I-2)
+    if ([...t.hosts.map((h) => h.endpoint), t.optionEndpoint].some((e) => e !== null && PRODUCTION_DB_ENDPOINTS.includes(e))) return "production_db";
     if (t.optionEndpoint !== null && !allowed.has(t.optionEndpoint)) return "db_host_not_allowed";
-    if (t.socket || LOCAL_HOSTS.has(t.host)) continue;
-    if (!allowed.has(t.host) && !allowed.has(t.endpoint)) return "db_host_not_allowed";
+    for (const h of t.hosts) {
+      if (h.socket || LOCAL_HOSTS.has(h.host)) continue;
+      if (!allowed.has(h.host) && !allowed.has(h.endpoint)) return "db_host_not_allowed";
+    }
   }
   return null;
 }
