@@ -14,6 +14,7 @@ const REPORT_LABELS: Record<string, string> = {
 
 const ERROR_LABELS: Record<string, string> = {
   invalid_credentials: '인증 오류',
+  credential_storage_error: '관리자 설정 오류(자격증명 키) — 운영자 확인 필요',
   permission_denied: '권한 없음',
   quota_exceeded: '할당량 초과',
   timeout: '시간 초과',

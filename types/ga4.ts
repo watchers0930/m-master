@@ -1,5 +1,5 @@
 export type Ga4UnavailableReason = 'not_configured' | 'unmapped' | 'domain_required' | 'binding_disabled';
-export type Ga4ErrorCode = 'invalid_credentials' | 'permission_denied' | 'quota_exceeded' | 'timeout' | 'upstream_error' | 'invalid_query';
+export type Ga4ErrorCode = 'invalid_credentials' | 'credential_storage_error' | 'permission_denied' | 'quota_exceeded' | 'timeout' | 'upstream_error' | 'invalid_query';
 export type Ga4CredentialSource = 'service_account' | 'owner_oauth' | 'env_oauth' | 'legacy_file';
 export interface Ga4Provenance {
   ownerId: string; domainId: string; bindingId: string; propertyId: string; host: string;
@@ -9,6 +9,8 @@ export interface Ga4Provenance {
   quality: { thresholded?: boolean; sampled?: boolean; truncatedRows?: boolean; dataLossFromOtherRow?: boolean };
   /** 'stream' = realtime: GA4 Realtime has no hostName, so the figure is stream-wide (may include test hosts). */
   scopeLevel?: Ga4ScopeLevel;
+  /** 성공 전에 실패한 자격증명 후보(예: owner_oauth 복호화 실패 후 env_oauth로 대체) — 대체 사실을 숨기지 않는다 */
+  credentialFallbacks?: { source: Ga4CredentialSource; code: Ga4ErrorCode }[];
 }
 export type Ga4ScopeLevel = 'host' | 'stream';
 export type Ga4Result<T> =

@@ -15,6 +15,10 @@ const PAGE_TITLES: Record<string, string> = {
   '/visibility': 'AI 가시성',
   '/rag': 'RAG 지식베이스',
   '/settings': '설정',
+  // 광고: 긴 경로를 먼저(앞에서부터 startsWith로 고른다)
+  '/ads/proposals': '광고 제안',
+  '/ads/accounts': '광고 계정',
+  '/ads': '네이버 검색광고',
 };
 
 function getNow() {

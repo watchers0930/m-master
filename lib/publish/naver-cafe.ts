@@ -1,4 +1,4 @@
-import { ChannelRejection } from './errors';
+import { ChannelRejection, loadCredentials } from './errors';
 import { CAFE_FOOTER, generateDynamicTags, buildNaverCafeContent } from './naver-cafe-content';
 export { buildNaverCafeContent } from './naver-cafe-content';
 // lib/publish/naver-cafe.ts — 네이버 카페 API 발행
@@ -30,7 +30,7 @@ interface ResolvedNaverCreds {
 
 /** SaaS: getNaverCafeCreds 단일 소스 — 자체 env fallback 제거 (credential 격리) */
 async function resolveCredentials(ownerId: string): Promise<ResolvedNaverCreds> {
-  const creds = await getNaverCafeCreds(ownerId);
+  const creds = await loadCredentials(() => getNaverCafeCreds(ownerId), 'naver_cafe');
   if (!creds) {
     throw new ChannelRejection();
   }

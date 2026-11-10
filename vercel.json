@@ -6,6 +6,9 @@
     { "path": "/api/cron/strategy-refresh", "schedule": "*/10 15-20 * * 0" },
     { "path": "/api/cron/topics-refresh", "schedule": "*/10 21-23 * * 0" },
     { "path": "/api/cron/content-generate", "schedule": "*/15 0-2 * * *" },
-    { "path": "/api/cron/schedule-publish", "schedule": "*/15 * * * *" }
+    { "path": "/api/cron/schedule-publish", "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/ads-guard", "schedule": "*/30 * * * *" },
+    { "path": "/api/cron/ads-inspect", "schedule": "*/30 * * * *" },
+    { "path": "/api/cron/ads-stats", "schedule": "0 21 * * *" }
   ]
 }

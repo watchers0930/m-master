@@ -1,4 +1,4 @@
-import { ChannelRejection } from './errors';
+import { ChannelRejection, loadCredentials } from './errors';
 import { buildFacebookMessage } from './payload';
 export { buildFacebookMessage };
 // lib/publish/facebook.ts — Facebook Pages API 발행
@@ -21,7 +21,7 @@ export interface FacebookPublishResult {
 
 /** SaaS: getFacebookCreds 단일 소스 — 자체 env fallback 제거 (credential 격리) */
 async function resolveCredentials(ownerId: string): Promise<{ token: string; pageId: string }> {
-  const creds = await getFacebookCreds(ownerId);
+  const creds = await loadCredentials(() => getFacebookCreds(ownerId), 'facebook');
   if (!creds) {
     throw new ChannelRejection();
   }

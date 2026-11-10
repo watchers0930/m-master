@@ -85,7 +85,8 @@ export async function runGa4<T>(scope: Ga4Scope | undefined, queryKey: string,
         })]);
         return { status: 'success', data, provenance: { ownerId: scope.ownerId, domainId: scope.domainId,
           bindingId: scope.bindingId, propertyId: scope.propertyId, host: scope.host, credentialSource: candidate.source,
-          collectedAt: new Date().toISOString(), range: absoluteRange(range, timeZone), timeZone, queryVersion: queryKey, completeness: quality.truncatedRows ? 'partial' : 'complete', quality, scopeLevel } };
+          collectedAt: new Date().toISOString(), range: absoluteRange(range, timeZone), timeZone, queryVersion: queryKey, completeness: quality.truncatedRows ? 'partial' : 'complete', quality, scopeLevel,
+          ...(attempts.length ? { credentialFallbacks: [...attempts] } : {}) } };
       } catch (error) {
         last = classifyGa4Error(error);
         attempts.push({ source: candidate.source, code: last.code });
@@ -98,7 +99,8 @@ export async function runGa4<T>(scope: Ga4Scope | undefined, queryKey: string,
           if (suppressed.size >= 500) suppressed.delete(suppressed.keys().next().value!);
           suppressed.set(suppressionKey, { until: Date.now() + 300000, code: last.code });
         }
-        if (!['invalid_credentials', 'permission_denied'].includes(last.code)) break;
+        // credential_storage_error(저장 자격증명 복호화 실패)도 다음 후보(env_oauth 등)로 넘어간다 — 대체 사실은 provenance에 남는다.
+        if (!['invalid_credentials', 'permission_denied', 'credential_storage_error'].includes(last.code)) break;
       } finally { if (timer) clearTimeout(timer); }
     }
     return { status: 'error', ...last, attempts };
