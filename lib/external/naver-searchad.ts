@@ -218,10 +218,8 @@ export class NaverAdsClient {
 
 type ConnectableAccount = Pick<AdAccount, "ownerId" | "naverCustomerId" | "apiKeyEnc" | "secretKeyEnc" | "status">;
 
-// 저장된 봉인 blob을 복호화해 클라이언트를 만든다. 비활성·키 없음은 복호화·네트워크 전에 ads_not_connected.
-export function clientForAccount(account: ConnectableAccount, transport?: typeof fetch): NaverAdsClient {
-  if (account.status !== "active" || account.apiKeyEnc == null || account.secretKeyEnc == null)
-    throw new NaverAdsError("ads_not_connected");
+function decryptedClient(account: ConnectableAccount, transport?: typeof fetch): NaverAdsClient {
+  if (account.apiKeyEnc == null || account.secretKeyEnc == null) throw new NaverAdsError("ads_not_connected");
   const { ownerId, naverCustomerId } = account;
   return new NaverAdsClient(
     {
@@ -231,4 +229,17 @@ export function clientForAccount(account: ConnectableAccount, transport?: typeof
     },
     transport,
   );
+}
+
+// 저장된 봉인 blob을 복호화해 클라이언트를 만든다. 비활성·키 없음은 복호화·네트워크 전에 ads_not_connected.
+export function clientForAccount(account: ConnectableAccount, transport?: typeof fetch): NaverAdsClient {
+  if (account.status !== "active") throw new NaverAdsError("ads_not_connected");
+  return decryptedClient(account, transport);
+}
+
+// 해제 전용(lib/ads/disconnect.ts만 쓴다): status='disconnecting'인 행만 허용한다. 해제가 그 상태로 전이한 뒤에는
+// 다른 모든 작업자(clientForAccount)가 거부되므로, 이 클라이언트가 해제 중 계정에 닿는 유일한 경로다.
+export function clientForDisconnect(account: ConnectableAccount, transport?: typeof fetch): NaverAdsClient {
+  if (account.status !== "disconnecting") throw new NaverAdsError("ads_not_connected");
+  return decryptedClient(account, transport);
 }

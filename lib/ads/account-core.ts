@@ -19,7 +19,7 @@ const DTO_SELECT = {
   maxBidKrw: true, sharedBudgetId: true, businessChannelId: true, lastVerifiedAt: true, createdAt: true,
 } satisfies Prisma.AdAccountSelect;
 type DtoRow = Prisma.AdAccountGetPayload<{ select: typeof DTO_SELECT }>;
-const STATUSES: readonly string[] = ["active", "invalid_key", "disabled"];
+const STATUSES: readonly string[] = ["active", "invalid_key", "disconnecting", "disabled"];
 
 function toAccountDTO(r: DtoRow): AdAccountDTO {
   const status = (STATUSES.includes(r.status) ? r.status : "disabled") as AdAccountStatus;
@@ -55,10 +55,38 @@ export async function listAccountDTOs(ownerId: string, take: number): Promise<Ad
   return rows.map(toAccountDTO);
 }
 
+/** 한 페이지 조회(새 키 검증용). 완전성이 필요한 곳은 listAllCampaigns. */
 export async function listCampaigns(client: NaverAdsClient) {
   const parsed = naverCampaignListSchema.safeParse(await client.get("/ncc/campaigns", { recordSize: CAMPAIGN_PAGE }));
   if (!parsed.success) throw unexpectedNaverResponse();
   return parsed.data;
+}
+
+export const MAX_CAMPAIGN_PAGES = 50;
+export type CampaignRead = { campaigns: { nccCampaignId: string; userLock: boolean; status?: string | null }[]; complete: boolean };
+
+/** 꺼짐 = userLock=true 또는 삭제됨(DELETED는 노출·과금 없음). */
+export const isCampaignOff = (c: { userLock: boolean; status?: string | null }) => c.userLock === true || c.status === "DELETED";
+
+/**
+ * 모든 캠페인 페이지를 읽는다(명세: recordSize + baseSearchId 커서 + selector=NEXT). 서버가 요청보다 작게 잘라도 놓치지 않게
+ * '짧은 페이지'에서 멈추지 않고 빈 페이지가 나올 때까지 다음 커서를 요청한다(1회 추가 GET).
+ * complete=false: 커서가 진행하지 않음(새 id 0인 비어있지 않은 페이지 — 커서 미지원) 또는 페이지 상한 도달 → 호출자는 '확인 못 함'으로 본다.
+ */
+export async function listAllCampaigns(client: NaverAdsClient): Promise<CampaignRead> {
+  const seen = new Map<string, CampaignRead["campaigns"][number]>();
+  let cursor: string | undefined;
+  for (let page = 0; page < MAX_CAMPAIGN_PAGES; page++) {
+    const query = cursor ? { recordSize: CAMPAIGN_PAGE, baseSearchId: cursor, selector: "NEXT" } : { recordSize: CAMPAIGN_PAGE };
+    const parsed = naverCampaignListSchema.safeParse(await client.get("/ncc/campaigns", query));
+    if (!parsed.success) throw unexpectedNaverResponse();
+    if (parsed.data.length === 0) return { campaigns: [...seen.values()], complete: true };
+    let added = 0;
+    for (const c of parsed.data) if (!seen.has(c.nccCampaignId)) { seen.set(c.nccCampaignId, c); added++; }
+    if (added === 0) return { campaigns: [...seen.values()], complete: false };
+    cursor = parsed.data[parsed.data.length - 1].nccCampaignId;
+  }
+  return { campaigns: [...seen.values()], complete: false };
 }
 
 /** 키가 무효해졌다: active → invalid_key, 알림 ads.key_invalid(같은 날 1회). 바뀌었으면 true. disabled 행은 건드리지 않는다. */

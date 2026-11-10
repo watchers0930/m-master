@@ -31,7 +31,8 @@ export type AdsReplaceKeysInput = Pick<z.infer<typeof adsReplaceKeysSchema>, "ap
 const naverId = z.string().regex(NAVER_ID_RE);
 const optText = z.string().nullable().optional();
 
-export const naverCampaignListSchema = z.array(z.object({ nccCampaignId: naverId, userLock: z.boolean() }));
+// status: ELIGIBLE|PAUSED|DELETED(명세). DELETED는 userLock과 무관하게 노출·과금 없음
+export const naverCampaignListSchema = z.array(z.object({ nccCampaignId: naverId, userLock: z.boolean(), status: optText }));
 // 목록은 다른 공유예산(형태가 다를 수 있음)도 섞여 있다 → 고르는 데 필요한 필드만. 고른 것은 단건 재조회 + verifyStored로 엄격 검증.
 export const naverSharedBudgetListSchema = z.array(z.object({ sharedBudgetId: naverId, name: optText, status: optText }));
 export const naverSharedBudgetCreatedSchema = z.object({ sharedBudgetId: naverId });

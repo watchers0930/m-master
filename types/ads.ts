@@ -1,6 +1,6 @@
 // types/ads.ts — 광고 API 응답 DTO(서버·클라이언트 공용). 키 원문·암호문은 어떤 DTO에도 없다(화면엔 keyLast4만).
 
-export type AdAccountStatus = "active" | "invalid_key" | "disabled";
+export type AdAccountStatus = "active" | "invalid_key" | "disconnecting" | "disabled"; // disconnecting = 해제 진행 중(다른 모든 호출 거부)
 
 export type AdAccountDTO = {
   id: string;
