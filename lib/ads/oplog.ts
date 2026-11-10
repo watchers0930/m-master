@@ -10,7 +10,8 @@ import { prisma } from "@/lib/prisma";
 import { NaverAdsError, type NaverAdsClient, type NaverAdsQuery } from "@/lib/external/naver-searchad";
 
 export type MutationAccount = { id: string; ownerId: string };
-export type Mutation = { step: string; method: "POST" | "PUT"; path: string; query?: NaverAdsQuery; body: unknown; naverId?: string };
+// proposalId: 제안 적용(Task 9)이 보낸 변이면 그 제안. 재개 시 이 원장으로 이미 보낸 단계를 찾는다.
+export type Mutation = { step: string; method: "POST" | "PUT"; path: string; query?: NaverAdsQuery; body: unknown; naverId?: string; proposalId?: string };
 
 export async function sendMutation<S extends z.ZodTypeAny>(
   client: NaverAdsClient,
@@ -21,7 +22,10 @@ export async function sendMutation<S extends z.ZodTypeAny>(
 ): Promise<z.infer<S>> {
   const requestHash = createHash("sha256").update(JSON.stringify([op.method, op.path, op.query ?? null, op.body])).digest("hex");
   const log = await prisma.adOperationLog.create({
-    data: { ownerId: account.ownerId, adAccountId: account.id, step: op.step, method: op.method, path: op.path, requestHash, naverId: op.naverId ?? null },
+    data: {
+      ownerId: account.ownerId, adAccountId: account.id, proposalId: op.proposalId ?? null,
+      step: op.step, method: op.method, path: op.path, requestHash, naverId: op.naverId ?? null,
+    },
     select: { id: true },
   });
   const finish = (status: "ok" | "uncertain" | "failed", extra: { errorCode?: string; naverId?: string } = {}) =>

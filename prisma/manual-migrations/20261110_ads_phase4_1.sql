@@ -2,6 +2,7 @@
 -- 생성: prisma migrate diff --from-schema-datamodel <8b70c21 schema> --to-schema-datamodel prisma/schema.prisma --script 결과를 재실행 안전하게 감쌈.
 -- FK는 전부 ON DELETE RESTRICT: 계정 삭제는 status=disabled 소프트 삭제이며, 하위 미러·성과·로그·알림이 조용히 연쇄 삭제되지 않는다.
 -- 계정 연결 해제 = api_key_enc·secret_key_enc·key_last4를 NULL로 지우고 status=disabled(행·성과는 보존).
+-- 미러 4개(ad_campaigns·ad_groups·ad_keywords·ad_creatives)의 lock_version·locked_at = 켜기·끄기 CAS(Task 9, 동기화 쓰기는 건드리지 않음).
 -- 적용은 대장 승인 후(Task 13). db push 금지.
 BEGIN;
 SET LOCAL lock_timeout = '5s';
@@ -62,6 +63,8 @@ CREATE TABLE IF NOT EXISTS "ad_campaigns" (
     "inspect_status" TEXT,
     "user_lock" BOOLEAN NOT NULL DEFAULT true,
     "locked_by" TEXT,
+    "lock_version" INTEGER NOT NULL DEFAULT 0,
+    "locked_at" TIMESTAMP(3),
     "last_synced_at" TIMESTAMP(3),
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -81,6 +84,8 @@ CREATE TABLE IF NOT EXISTS "ad_groups" (
     "inspect_status" TEXT,
     "user_lock" BOOLEAN NOT NULL DEFAULT true,
     "locked_by" TEXT,
+    "lock_version" INTEGER NOT NULL DEFAULT 0,
+    "locked_at" TIMESTAMP(3),
     "last_synced_at" TIMESTAMP(3),
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -101,6 +106,8 @@ CREATE TABLE IF NOT EXISTS "ad_keywords" (
     "inspect_status" TEXT,
     "user_lock" BOOLEAN NOT NULL DEFAULT true,
     "locked_by" TEXT,
+    "lock_version" INTEGER NOT NULL DEFAULT 0,
+    "locked_at" TIMESTAMP(3),
     "last_synced_at" TIMESTAMP(3),
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -122,6 +129,8 @@ CREATE TABLE IF NOT EXISTS "ad_creatives" (
     "inspect_status" TEXT,
     "user_lock" BOOLEAN NOT NULL DEFAULT true,
     "locked_by" TEXT,
+    "lock_version" INTEGER NOT NULL DEFAULT 0,
+    "locked_at" TIMESTAMP(3),
     "last_synced_at" TIMESTAMP(3),
     "updated_at" TIMESTAMP(3) NOT NULL,
 

@@ -65,3 +65,28 @@ export const naverKeywordToolSchema = z
   .union([z.object({ keywordList: z.array(naverKeywordRowSchema) }), z.array(naverKeywordRowSchema)])
   .transform((body) => (Array.isArray(body) ? body : body.keywordList));
 export type NaverKeywordRow = z.infer<typeof naverKeywordRowSchema>;
+
+// ── 적용·켜기/끄기(Task 9) ──
+// 켜기·끄기 입력. 경합 CAS는 미러 lockVersion으로 한다(updatedAt은 동기화 쓰기마다 바뀌어 거짓 충돌을 낸다 — 계획 brief와 다른 점).
+export const ADS_LOCK_ENTITY_TYPES = ["campaign", "adgroup", "keyword", "ad"] as const;
+export const adsLockEntityTypeSchema = z.enum(ADS_LOCK_ENTITY_TYPES);
+export const adsLockSchema = z.strictObject({
+  locked: z.boolean(),
+  expected_lock_version: z.number().int().min(0).max(2_147_483_647),
+});
+export type AdsLockInput = z.infer<typeof adsLockSchema>;
+
+// 네이버 엔티티 응답(명세 Campaign·Adgroup·AdKeyword·Ad). 식별·대조에 필요한 필드만 엄격히. 상한 값은 verifyStored가 따로 parse한다.
+export const naverCampaignSchema = z.object({ nccCampaignId: naverId, name: z.string(), userLock: z.boolean(), status: optText });
+export const naverAdgroupSchema = z.object({ nccAdgroupId: naverId, nccCampaignId: naverId, name: z.string(), userLock: z.boolean(), status: optText });
+export const naverKeywordSchema = z.object({
+  nccKeywordId: naverId, nccAdgroupId: naverId, keyword: z.string(), userLock: z.boolean(), inspectStatus: optText, status: optText,
+});
+// ⚠️ 소재 본문(ad)의 응답 형태는 명세가 "string(json-schema form)"으로만 적는다. 객체로 오면 대조에 쓰고, 아니면 null(대조 불가).
+const naverAdBody = z.object({ headline: z.string(), description: z.string() }).nullable().catch(null);
+export const naverAdSchema = z.object({
+  nccAdId: naverId, nccAdgroupId: naverId, type: z.string(), userLock: z.boolean(), inspectStatus: optText, status: optText, ad: naverAdBody.optional(),
+});
+export const naverKeywordCreatedSchema = z.array(naverKeywordSchema).length(1);
+// GET /stats 응답. 금액은 유한한 0 이상 숫자만(문자열·음수·누락은 형식 오류 → '모름').
+export const naverStatsSchema = z.object({ data: z.array(z.object({ id: naverId, salesAmt: z.number().finite().nonnegative() })) });

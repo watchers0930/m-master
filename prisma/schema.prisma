@@ -696,6 +696,8 @@ model AdCampaign { // ad_campaigns — 네이버 캠페인 미러(이름 mq-{pro
   inspectStatus String?     @map("inspect_status")
   userLock      Boolean     @default(true) @map("user_lock")  // 생성 직후 일시중지
   lockedBy      String?     @map("locked_by")         // pending_launch | owner | guard | null
+  lockVersion   Int         @default(0) @map("lock_version") // 켜기·끄기 CAS 버전. 잠금 변경마다 +1, 동기화 쓰기는 건드리지 않는다
+  lockedAt      DateTime?   @map("locked_at")         // 마지막 잠금 변경 시각(가드 잠금 당일 판정)
   lastSyncedAt  DateTime?   @map("last_synced_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
   owner     User        @relation(fields: [ownerId], references: [id], onDelete: Restrict)
@@ -719,6 +721,8 @@ model AdGroup { // ad_groups — 네이버 광고그룹 미러(이름 mq-{propos
   inspectStatus String?     @map("inspect_status")
   userLock      Boolean     @default(true) @map("user_lock")
   lockedBy      String?     @map("locked_by")         // pending_launch | owner | guard | null
+  lockVersion   Int         @default(0) @map("lock_version") // 켜기·끄기 CAS 버전. 잠금 변경마다 +1, 동기화 쓰기는 건드리지 않는다
+  lockedAt      DateTime?   @map("locked_at")         // 마지막 잠금 변경 시각(가드 잠금 당일 판정)
   lastSyncedAt  DateTime?   @map("last_synced_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
   owner     User        @relation(fields: [ownerId], references: [id], onDelete: Restrict)
@@ -744,6 +748,8 @@ model AdKeyword { // ad_keywords — 네이버 키워드 미러
   inspectStatus String?     @map("inspect_status")
   userLock      Boolean     @default(true) @map("user_lock")
   lockedBy      String?     @map("locked_by")         // pending_launch | owner | guard | null
+  lockVersion   Int         @default(0) @map("lock_version") // 켜기·끄기 CAS 버전. 잠금 변경마다 +1, 동기화 쓰기는 건드리지 않는다
+  lockedAt      DateTime?   @map("locked_at")         // 마지막 잠금 변경 시각(가드 잠금 당일 판정)
   lastSyncedAt  DateTime?   @map("last_synced_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
   owner     User        @relation(fields: [ownerId], references: [id], onDelete: Restrict)
@@ -770,6 +776,8 @@ model AdCreative { // ad_creatives — 네이버 소재 미러(TEXT_45만, slot 
   inspectStatus String?     @map("inspect_status")
   userLock      Boolean     @default(true) @map("user_lock")
   lockedBy      String?     @map("locked_by")         // pending_launch | owner | guard | null
+  lockVersion   Int         @default(0) @map("lock_version") // 켜기·끄기 CAS 버전. 잠금 변경마다 +1, 동기화 쓰기는 건드리지 않는다
+  lockedAt      DateTime?   @map("locked_at")         // 마지막 잠금 변경 시각(가드 잠금 당일 판정)
   lastSyncedAt  DateTime?   @map("last_synced_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
   owner     User        @relation(fields: [ownerId], references: [id], onDelete: Restrict)
