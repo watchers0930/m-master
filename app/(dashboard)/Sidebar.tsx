@@ -12,7 +12,8 @@ function Badge({ count }: { count: number }) {
   return <span className="sb-badge">{count > 99 ? '99+' : count}</span>;
 }
 
-export function Sidebar() {
+/** adsEnabled: 서버 layout이 isAdsOwner(session.user.id)로 정한다. false면 '광고' 섹션을 그리지 않는다. */
+export function Sidebar({ adsEnabled = false }: { adsEnabled?: boolean }) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const active = (href: string) => href === '/home' ? pathname === '/home' : pathname.startsWith(href);
@@ -121,6 +122,30 @@ export function Sidebar() {
           A/B 테스트
         </Link>
       </div>
+
+      {adsEnabled && (
+        <div className="sb-section">
+          <div className="sb-label">광고</div>
+          <Link href="/ads" prefetch={false} className={`sb-item${pathname === '/ads' ? ' active' : ''}`}>
+            <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <path d="M3 11v2a1 1 0 001 1h2l5 4V6L6 10H4a1 1 0 00-1 1z"/><path d="M15.5 8.5a5 5 0 010 7"/><path d="M18.5 5.5a9 9 0 010 13"/>
+            </svg>
+            검색광고
+          </Link>
+          <Link href="/ads/proposals" prefetch={false} className={`sb-item${active('/ads/proposals') ? ' active' : ''}`}>
+            <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+            </svg>
+            광고 제안
+          </Link>
+          <Link href="/ads/accounts" prefetch={false} className={`sb-item${active('/ads/accounts') ? ' active' : ''}`}>
+            <svg className="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
+            </svg>
+            광고 계정
+          </Link>
+        </div>
+      )}
 
       {/* 운영 섹션: 스케줄러는 자동 크론으로 운영 — 메뉴 숨김 */}
 
