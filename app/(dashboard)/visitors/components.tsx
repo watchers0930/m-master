@@ -37,7 +37,7 @@ export function KpiCard({
     <div className="card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 6, minHeight: 80 }}>
       <div style={{ fontSize: 11, color: 'var(--sub)' }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>{value}</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 10.5 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
         {typeof delta === 'number' && (
           <span style={{ color: deltaColor(delta, lowerBetter), fontWeight: 600 }}>
             {deltaText(delta)}
@@ -88,7 +88,7 @@ export function DailySparkline({ data }: { data: DailyPoint[] }) {
           );
         })}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--sub)', padding: '0 4px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--sub)', padding: '0 4px' }}>
         <span>{data[0]?.date}</span>
         <span>{data[data.length - 1]?.date}</span>
       </div>
@@ -146,7 +146,7 @@ export function TopPagesTable({ rows }: { rows: TopPage[] }) {
             <tr key={r.path} style={{ borderBottom: '1px solid var(--border2)' }}>
               <Td>
                 <div style={{ fontWeight: 600 }}>{r.title}</div>
-                <div style={{ fontSize: 10.5, color: 'var(--sub)' }}>{r.path}</div>
+                <div style={{ fontSize: 12, color: 'var(--sub)' }}>{r.path}</div>
               </Td>
               <Td align="right">{nfmt(r.views)}</Td>
               <Td align="right">{dur(r.avgTimeOnPage)}</Td>

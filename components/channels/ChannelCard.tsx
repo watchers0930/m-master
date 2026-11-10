@@ -37,13 +37,13 @@ export default function ChannelCard({ ch, st, isLoading, error, ok, formValues, 
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{ch.label}</span>
               {st?.error ? (
-                <span role="alert" style={{ background: '#FEECEC', border: '1px solid #F5B5B5', color: '#B42318', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>{st.recoverable ? '자격증명 키 오류 — 연결 해제 후 다시 연결하세요' : '자격증명 키 오류 — 관리자에게 문의'}</span>
+                <span role="alert" style={{ background: '#FEECEC', border: '1px solid #F5B5B5', color: '#B42318', fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>{st.recoverable ? '자격증명 키 오류 — 연결 해제 후 다시 연결하세요' : '자격증명 키 오류 — 관리자에게 문의'}</span>
               ) : <Badge connected={connected} />}
             </div>
             {connected && (
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
                 {Object.entries(masked).map(([k, v]) => (
-                  <span key={k} style={{ fontSize: 10, color: 'var(--sub)', fontFamily: 'monospace', background: 'var(--n50)', padding: '1px 6px', borderRadius: 3 }}>
+                  <span key={k} style={{ fontSize: 12, color: 'var(--sub)', fontFamily: 'monospace', background: 'var(--n50)', padding: '1px 6px', borderRadius: 3 }}>
                     {k}: {v}
                   </span>
                 ))}

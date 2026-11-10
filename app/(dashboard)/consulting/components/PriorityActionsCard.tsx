@@ -45,8 +45,8 @@ export function PriorityActionsCard({ actions, evidenceById, domainId }: Props) 
           return (
             <div key={a.id} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: pm.color, background: pm.bg, borderRadius: 5, padding: '2px 8px' }}>{pm.label}</span>
-                <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', background: 'var(--n100)', borderRadius: 5, padding: '2px 8px' }}>{CHANNEL_LABELS[a.channel]}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: pm.color, background: pm.bg, borderRadius: 5, padding: '2px 8px' }}>{pm.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', background: 'var(--n100)', borderRadius: 5, padding: '2px 8px' }}>{CHANNEL_LABELS[a.channel]}</span>
                 <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>{titleDisplay}</span>
               </div>
 
@@ -55,7 +55,7 @@ export function PriorityActionsCard({ actions, evidenceById, domainId }: Props) 
               </p>
 
               {a.metric && (
-                <p style={{ fontSize: 10.5, color: 'var(--sub)' }}>관측 지표: {metricDisplay}</p>
+                <p style={{ fontSize: 12, color: 'var(--sub)' }}>관측 지표: {metricDisplay}</p>
               )}
 
               <EvidenceChips evidenceIds={a.evidenceIds} evidenceById={evidenceById} />

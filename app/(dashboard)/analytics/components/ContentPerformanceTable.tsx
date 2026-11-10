@@ -96,7 +96,7 @@ export function ContentPerformanceTable({ days, domainId }: Props) {
               onClick={() => setChannelFilter(ch)}
               style={{
                 padding: '4px 8px',
-                fontSize: 10.5,
+                fontSize: 12,
                 fontWeight: 600,
                 borderRadius: 4,
                 border: `1px solid ${channelFilter === ch ? 'var(--blue-600)' : 'var(--n200)'}`,
@@ -119,13 +119,13 @@ export function ContentPerformanceTable({ days, domainId }: Props) {
       {ga4 && ga4.state !== 'ok' && (
         <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: 4, marginBottom: 8 }}>
           <Ga4BlockState block={ga4} onRetry={() => { void refetch(); }} />
-          <p style={{ fontSize: 10.5, color: '#92400e', textAlign: 'center', margin: '0 0 8px' }}>발행 목록은 표시되지만 GA4 지표는 비어 있습니다(0 아님).</p>
+          <p style={{ fontSize: 12, color: '#92400e', textAlign: 'center', margin: '0 0 8px' }}>발행 목록은 표시되지만 GA4 지표는 비어 있습니다(0 아님).</p>
         </div>
       )}
       {naverFailed && (
         <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: 4, marginBottom: 8 }}>
           <Ga4BlockState block={naverFailed} onRetry={() => { void refetch(); }} />
-          <p style={{ fontSize: 10.5, color: '#92400e', textAlign: 'center', margin: '0 0 8px' }}>네이버 유입 지표를 불러오지 못했습니다 — 네이버 유입 칸은 비어 있습니다(0 아님).</p>
+          <p style={{ fontSize: 12, color: '#92400e', textAlign: 'center', margin: '0 0 8px' }}>네이버 유입 지표를 불러오지 못했습니다 — 네이버 유입 칸은 비어 있습니다(0 아님).</p>
         </div>
       )}
 
@@ -164,7 +164,7 @@ export function ContentPerformanceTable({ days, domainId }: Props) {
                     )}
                   </td>
                   <td style={{ padding: '8px 6px' }}>
-                    <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 3, background: `${CH_COLOR[r.channel]}15`, color: CH_COLOR[r.channel] }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, padding: '2px 6px', borderRadius: 3, background: `${CH_COLOR[r.channel]}15`, color: CH_COLOR[r.channel] }}>
                       {CH_LABEL[r.channel] ?? r.channel}
                     </span>
                   </td>
@@ -176,7 +176,7 @@ export function ContentPerformanceTable({ days, domainId }: Props) {
                     {m && r.naver_sessions !== null && r.naver_sessions > 0 ? (
                       <>
                         <span style={{ fontWeight: 600 }}>{r.naver_sessions.toLocaleString()}</span>
-                        <span style={{ fontSize: 10, color: 'var(--sub)', marginLeft: 4 }}>
+                        <span style={{ fontSize: 12, color: 'var(--sub)', marginLeft: 4 }}>
                           ({m.sessions > 0 ? ((r.naver_sessions / m.sessions) * 100).toFixed(0) : 0}%)
                         </span>
                       </>

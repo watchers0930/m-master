@@ -132,7 +132,7 @@ export default function PlannerPage() {
                 return (
                   <div key={e.id} style={{ background: ps.bg, border: `1px solid ${ps.border}`, borderRadius: 6, padding: '3px 6px', fontSize: 11 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <span style={{ fontSize: 10, flexShrink: 0 }}>{icon}</span>
+                      <span style={{ fontSize: 12, flexShrink: 0 }}>{icon}</span>
                       <span
                         style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: ps.color, fontWeight: 600, cursor: 'pointer' }}
                         onClick={() => {
@@ -144,7 +144,7 @@ export default function PlannerPage() {
                       <button onClick={() => handleDeleteJob(e.id)}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: 11, padding: 0, lineHeight: 1 }}>×</button>
                     </div>
-                    <div style={{ fontSize: 10, color: ps.color, marginTop: 1 }}>{ps.label}</div>
+                    <div style={{ fontSize: 12, color: ps.color, marginTop: 1 }}>{ps.label}</div>
                   </div>
                 );
               })}

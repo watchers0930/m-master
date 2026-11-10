@@ -23,11 +23,11 @@ function RankCell({ r }: { r: SeoRankingDTO }) {
     return (
       <span style={{ fontWeight: 700, color: 'var(--text)' }}>
         {r.rank}
-        {r.rankAbsolute !== null && <span style={{ fontSize: 9.5, color: 'var(--sub)', fontWeight: 400 }}> (abs {r.rankAbsolute})</span>}
+        {r.rankAbsolute !== null && <span style={{ fontSize: 12, color: 'var(--sub)', fontWeight: 400 }}> (abs {r.rankAbsolute})</span>}
       </span>
     );
   }
-  return <span style={{ fontSize: 10.5, color: meta.color }}>{meta.label}</span>;
+  return <span style={{ fontSize: 12, color: meta.color }}>{meta.label}</span>;
 }
 
 export function KeywordRankingTable({ rankings, loading, error, hasMore, fetchingMore, onLoadMore, onRetry }: Props) {
@@ -39,7 +39,7 @@ export function KeywordRankingTable({ rankings, loading, error, hasMore, fetchin
           <line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" />
         </svg>
         <span className="card-title">순위 스냅샷 이력</span>
-        <span style={{ fontSize: 10, color: 'var(--sub)' }}>{rankings.length}건</span>
+        <span style={{ fontSize: 12, color: 'var(--sub)' }}>{rankings.length}건</span>
       </div>
 
       {loading ? (
@@ -62,7 +62,7 @@ export function KeywordRankingTable({ rankings, loading, error, hasMore, fetchin
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
               <thead>
-                <tr style={{ textAlign: 'left', color: 'var(--sub)', fontSize: 10 }}>
+                <tr style={{ textAlign: 'left', color: 'var(--sub)', fontSize: 12 }}>
                   <th style={{ padding: '8px 16px' }}>키워드</th>
                   <th style={{ padding: '8px 8px' }}>엔진</th>
                   <th style={{ padding: '8px 8px' }}>기기</th>
@@ -81,11 +81,11 @@ export function KeywordRankingTable({ rankings, loading, error, hasMore, fetchin
                     <td style={{ padding: '8px 8px', textAlign: 'right' }}><RankCell r={r} /></td>
                     <td style={{ padding: '8px 8px', textAlign: 'right', color: 'var(--sub)' }}>{r.returnedRange ?? '—'}</td>
                     <td style={{ padding: '8px 8px' }}>
-                      <span style={{ fontSize: 9.5, fontWeight: 700, color: r.source === 'serp' ? 'var(--blue-400)' : 'var(--sub)', background: 'var(--n100)', borderRadius: 4, padding: '2px 6px' }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: r.source === 'serp' ? 'var(--blue-400)' : 'var(--sub)', background: 'var(--n100)', borderRadius: 4, padding: '2px 6px' }}>
                         {SOURCE_LABELS[r.source]}
                       </span>
                     </td>
-                    <td style={{ padding: '8px 16px', color: 'var(--sub)', fontSize: 10.5 }} title={r.source === 'labs' && r.sourceObservedAt ? `Labs 기준 ${formatDateTime(r.sourceObservedAt)}` : `수집 ${formatDateTime(r.capturedAt)}`}>
+                    <td style={{ padding: '8px 16px', color: 'var(--sub)', fontSize: 12 }} title={r.source === 'labs' && r.sourceObservedAt ? `Labs 기준 ${formatDateTime(r.sourceObservedAt)}` : `수집 ${formatDateTime(r.capturedAt)}`}>
                       {r.source === 'labs' && r.sourceObservedAt
                         ? `${formatDate(r.sourceObservedAt)} (Labs 기준)`
                         : formatDate(r.capturedAt)}

@@ -29,7 +29,7 @@ export default function AbTestStatusBadge({ status }: Props) {
         display: 'inline-block',
         padding: '2px 8px',
         borderRadius: 4,
-        fontSize: 10.5,
+        fontSize: 12,
         fontWeight: 600,
         background: st.bg,
         color: st.color,

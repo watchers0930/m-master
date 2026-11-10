@@ -60,7 +60,7 @@ export default function Ga4ConnectionCard() {
           <path d="M18 20V10M12 20V4M6 20v-6"/>
         </svg>
         <span className="card-title">GA4 분석 연동</span>
-        <span style={{ fontSize: 10, color: 'var(--sub)' }}>도메인별 GA4 속성 연결 상태</span>
+        <span style={{ fontSize: 12, color: 'var(--sub)' }}>도메인별 GA4 속성 연결 상태</span>
       </div>
 
       <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -91,7 +91,7 @@ export default function Ga4ConnectionCard() {
                         <span style={{ color: 'var(--sub)', fontSize: 11 }}>{b.property_id}</span>
                         <span style={{ color: meta.color, fontSize: 11, fontWeight: 600 }}>{meta.label}</span>
                         {b.last_error_code && <span style={{ color: '#dc2626', fontSize: 11 }}>{ERROR_LABELS[b.last_error_code] ?? b.last_error_code}</span>}
-                        {b.last_checked_at && <span style={{ color: 'var(--sub)', fontSize: 10.5 }}>확인 {dateText(b.last_checked_at)}</span>}
+                        {b.last_checked_at && <span style={{ color: 'var(--sub)', fontSize: 12 }}>확인 {dateText(b.last_checked_at)}</span>}
                       </li>
                     );
                   })}
@@ -116,7 +116,7 @@ export default function Ga4ConnectionCard() {
                   <option key={d.id} value={d.id}>{d.url}</option>
                 ))}
               </select>
-              <p style={{ fontSize: 10.5, color: 'var(--sub)', marginTop: 4 }}>
+              <p style={{ fontSize: 12, color: 'var(--sub)', marginTop: 4 }}>
                 주간 전략·토픽·자동 글 생성이 이 도메인 기준으로 실행됩니다. 자동 생성 글은 승인 후에만 게시됩니다.
                 {domains.isError && ' (도메인 목록을 불러오지 못했습니다)'}
               </p>

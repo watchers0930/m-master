@@ -31,7 +31,7 @@ const selectStyle: React.CSSProperties = {
   fontFamily: 'inherit',
 };
 
-const labelStyle: React.CSSProperties = { fontSize: 10.5, color: 'var(--sub)', fontWeight: 600 };
+const labelStyle: React.CSSProperties = { fontSize: 12, color: 'var(--sub)', fontWeight: 600 };
 
 export function VisibilityFilters({ value, queries, onChange }: Props) {
   const set = (patch: Partial<FiltersState>) => onChange({ ...value, ...patch });

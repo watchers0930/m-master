@@ -25,13 +25,13 @@ export function ReportHeader({ report, domainUrl, pollExhausted, onManualCheck, 
           <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
         </svg>
         <span className="card-title">{domainUrl ?? '전략 리포트'}</span>
-        <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, color: meta.color, background: meta.bg, borderRadius: 5, padding: '2px 8px' }}>
+        <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: meta.color, background: meta.bg, borderRadius: 5, padding: '2px 8px' }}>
           {meta.label}
         </span>
       </div>
 
       <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 10.5, color: 'var(--sub)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 12, color: 'var(--sub)' }}>
           <span>{MARKET_LABELS[report.market]}</span>
           <span>· 생성 {formatDateTime(report.generatedAt ?? report.createdAt)}</span>
           <span>· 관측 범위 {formatDate(report.range?.from)} ~ {formatDate(report.range?.to)}</span>
@@ -97,7 +97,7 @@ export function ReportHeader({ report, domainUrl, pollExhausted, onManualCheck, 
                 <span
                   key={`${s.source}:${i}`}
                   title={s.reason ?? undefined}
-                  style={{ fontSize: 10, fontWeight: 600, color: sm.color, background: 'var(--n100)', borderRadius: 5, padding: '2px 7px' }}
+                  style={{ fontSize: 12, fontWeight: 600, color: sm.color, background: 'var(--n100)', borderRadius: 5, padding: '2px 7px' }}
                 >
                   {SOURCE_LABELS[s.source] ?? s.source}: {sm.label}{when}
                 </span>
@@ -109,10 +109,10 @@ export function ReportHeader({ report, domainUrl, pollExhausted, onManualCheck, 
         {/* 한계 (누락·오래된 데이터·부분 표본) */}
         {report.limitations?.length > 0 && (
           <div>
-            <p style={{ fontSize: 10.5, color: 'var(--sub)', fontWeight: 600, marginBottom: 4 }}>분석 한계</p>
+            <p style={{ fontSize: 12, color: 'var(--sub)', fontWeight: 600, marginBottom: 4 }}>분석 한계</p>
             <ul style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 2 }}>
               {report.limitations.map((l, i) => (
-                <li key={i} style={{ fontSize: 10.5, color: 'var(--sub)' }}>{l}</li>
+                <li key={i} style={{ fontSize: 12, color: 'var(--sub)' }}>{l}</li>
               ))}
             </ul>
           </div>

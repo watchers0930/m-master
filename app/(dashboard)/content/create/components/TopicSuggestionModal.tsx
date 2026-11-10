@@ -131,18 +131,18 @@ export function TopicSuggestionModal({ open, onClose, onSelect }: Props) {
                           {tags.map(({ label, type }) => {
                             const c = tagBg[type] ?? tagBg.s;
                             return (
-                              <span key={label} style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 10, background: c.bg, color: c.color }}>{label}</span>
+                              <span key={label} style={{ fontSize: 12, fontWeight: 600, padding: '1px 6px', borderRadius: 10, background: c.bg, color: c.color }}>{label}</span>
                             );
                           })}
                         </div>
                       )}
                       {reason && (
-                        <div style={{ fontSize: 10.5, color: 'var(--sub)', lineHeight: 1.4 }}>{reason}</div>
+                        <div style={{ fontSize: 12, color: 'var(--sub)', lineHeight: 1.4 }}>{reason}</div>
                       )}
                     </div>
                     <div style={{ flexShrink: 0, textAlign: 'right' }}>
                       <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue-700)' }}>{Math.round(item.score)}</div>
-                      <div style={{ fontSize: 9, color: 'var(--sub)' }}>점수</div>
+                      <div style={{ fontSize: 12, color: 'var(--sub)' }}>점수</div>
                     </div>
                   </button>
                 );

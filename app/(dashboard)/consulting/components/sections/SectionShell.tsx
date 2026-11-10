@@ -29,7 +29,7 @@ function MetaLine({ meta }: { meta: SectionMeta }) {
   if (meta.observedAt) parts.push(`관측 ${formatDate(meta.observedAt)}`);
   if (parts.length === 0) return null;
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 10.5, color: 'var(--sub)', marginBottom: 10 }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 12, color: 'var(--sub)', marginBottom: 10 }}>
       {parts.map((p, i) => (
         <span key={i}>{i > 0 ? `· ${p}` : p}</span>
       ))}
@@ -48,7 +48,7 @@ export function SectionShell({ title, icon, meta, forceDegraded, children }: Pro
       <div className="card-head">
         {icon}
         <h2 id={titleId} className="card-title" style={{ margin: 0 }}>{title}</h2>
-        <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, color: sm.color, background: 'var(--n100)', borderRadius: 5, padding: '2px 8px' }}>
+        <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: sm.color, background: 'var(--n100)', borderRadius: 5, padding: '2px 8px' }}>
           {degraded ? '준비 필요' : sm.label}
         </span>
       </div>

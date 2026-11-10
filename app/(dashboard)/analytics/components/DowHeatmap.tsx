@@ -82,7 +82,7 @@ function HeatmapTable({ agg }: { agg: ReturnType<typeof aggregateDowPattern> }) 
           })}
         </tbody>
       </table>
-      <p style={{ fontSize: 10, color: 'var(--sub)', marginTop: 8 }}>
+      <p style={{ fontSize: 12, color: 'var(--sub)', marginTop: 8 }}>
         테두리가 있는 셀: 해당 채널의 상위 요일 (스케줄러 자동편성에 사용됨)
       </p>
     </div>

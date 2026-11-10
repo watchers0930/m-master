@@ -67,7 +67,7 @@ function MetricBar({
         {!diff.tie && (
           <span
             style={{
-              fontSize: 10,
+              fontSize: 12,
               fontWeight: 700,
               color: diff.aWins ? 'var(--green-500)' : 'var(--sub)',
             }}
@@ -86,7 +86,7 @@ function MetricBar({
             borderRadius: '50%',
             background: 'var(--blue-600)',
             color: '#fff',
-            fontSize: 9,
+            fontSize: 12,
             fontWeight: 700,
             display: 'inline-flex',
             alignItems: 'center',
@@ -120,7 +120,7 @@ function MetricBar({
             borderRadius: '50%',
             background: 'var(--amber-500)',
             color: '#fff',
-            fontSize: 9,
+            fontSize: 12,
             fontWeight: 700,
             display: 'inline-flex',
             alignItems: 'center',

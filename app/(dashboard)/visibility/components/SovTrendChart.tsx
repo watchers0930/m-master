@@ -12,7 +12,7 @@ import { formatRate } from '../constants';
 
 const W = 640;
 const H = 180;
-const PAD = { top: 16, right: 16, bottom: 26, left: 34 };
+const PAD = { top: 16, right: 16, bottom: 28, left: 42 }; // 축 라벨 12px("100%" 약 30px)이 잘리지 않는 여백
 const DAY = 86400000;
 /** 직전 관측일과 이 일수를 초과해 벌어지면 선을 끊는다(장기 미수집 구간). */
 const MAX_GAP_DAYS = 8;
@@ -99,7 +99,7 @@ export function SovTrendChart({ trend, from, to }: { trend: TrendPoint[]; from?:
         <span className="card-title">노출·인용 추세</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 12 }}>
           {SERIES.map((s) => (
-            <span key={s.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: 'var(--sub)' }}>
+            <span key={s.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--sub)' }}>
               <span style={{ width: 10, height: 3, borderRadius: 2, background: s.color, display: 'inline-block' }} />
               {s.label}
             </span>
@@ -120,7 +120,7 @@ export function SovTrendChart({ trend, from, to }: { trend: TrendPoint[]; from?:
               return (
                 <g key={g}>
                   <line x1={PAD.left} y1={gy} x2={W - PAD.right} y2={gy} stroke="var(--border)" strokeWidth={1} />
-                  <text x={PAD.left - 6} y={gy + 3} textAnchor="end" fontSize={9} fill="var(--sub)">
+                  <text x={PAD.left - 6} y={gy + 3} textAnchor="end" fontSize={12} fill="var(--sub)">
                     {g * 100}%
                   </text>
                 </g>
@@ -141,10 +141,10 @@ export function SovTrendChart({ trend, from, to }: { trend: TrendPoint[]; from?:
             {/* x축 라벨 (양끝만 — 과밀 방지) */}
             {points.length > 0 && (
               <>
-                <text x={PAD.left} y={H - 8} textAnchor="start" fontSize={9} fill="var(--sub)">
+                <text x={PAD.left} y={H - 8} textAnchor="start" fontSize={12} fill="var(--sub)">
                   {leftLabel}
                 </text>
-                <text x={W - PAD.right} y={H - 8} textAnchor="end" fontSize={9} fill="var(--sub)">
+                <text x={W - PAD.right} y={H - 8} textAnchor="end" fontSize={12} fill="var(--sub)">
                   {rightLabel}
                 </text>
               </>
@@ -152,7 +152,7 @@ export function SovTrendChart({ trend, from, to }: { trend: TrendPoint[]; from?:
           </svg>
         )}
         {hasAny && (
-          <p style={{ fontSize: 10, color: 'var(--sub)', marginTop: 6, textAlign: 'right' }}>
+          <p style={{ fontSize: 12, color: 'var(--sub)', marginTop: 6, textAlign: 'right' }}>
             최신 SoV {formatRate(points[points.length - 1]?.sov ?? null)} · 표본 {points[points.length - 1]?.validSamples ?? 0}건
           </p>
         )}

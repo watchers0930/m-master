@@ -32,7 +32,7 @@ function DemandBars({ monthly, unit, multiLocation }: { monthly: SummarySectionD
         const ym = formatYearMonth(p.year, p.month);
         return (
           <div key={`${p.location}:${p.year}:${p.month}:${i}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, minWidth: 34 }}>
-            <span style={{ fontSize: 9, color: 'var(--sub)' }}>{formatMetric(p.volume)}</span>
+            <span style={{ fontSize: 12, color: 'var(--sub)' }}>{formatMetric(p.volume)}</span>
             {/* 확정 높이 plot 영역 안에서 flex-end 정렬 — 바 높이 px 가 의도한 차트 높이에 대해 계산된다 */}
             <div style={{ height: PLOT_PX, display: 'flex', alignItems: 'flex-end' }}>
               <div
@@ -40,9 +40,9 @@ function DemandBars({ monthly, unit, multiLocation }: { monthly: SummarySectionD
                 style={{ width: 20, height: barPx, background: isZero ? 'var(--border)' : 'var(--blue-400)', borderRadius: '3px 3px 0 0' }}
               />
             </div>
-            <span style={{ fontSize: 9, color: 'var(--sub)', whiteSpace: 'nowrap' }}>{ym.slice(2)}</span>
+            <span style={{ fontSize: 12, color: 'var(--sub)', whiteSpace: 'nowrap' }}>{ym.slice(2)}</span>
             {/* 같은 월 다른 지역 포인트를 시각적으로 구분(교차검수 지적 4) */}
-            {multiLocation && <span style={{ fontSize: 8, color: 'var(--sub)', whiteSpace: 'nowrap' }}>#{p.location}</span>}
+            {multiLocation && <span style={{ fontSize: 12, color: 'var(--sub)', whiteSpace: 'nowrap' }}>#{p.location}</span>}
           </div>
         );
       })}
@@ -58,18 +58,18 @@ export function SummarySection({ section, evidenceById }: { section: SummarySect
     <SectionShell title="수요 추이" icon={ICON} meta={section.meta} forceDegraded={!hasData}>
       <DemandBars monthly={section.monthly} unit={section.meta.unit} multiLocation={multiLocation} />
       {hasData && (
-        <p style={{ fontSize: 10, color: 'var(--sub)', marginTop: 8, lineHeight: 1.5 }}>
+        <p style={{ fontSize: 12, color: 'var(--sub)', marginTop: 8, lineHeight: 1.5 }}>
           선택 키워드의 검색량 부분합입니다 — 전체 시장규모나 비교 가능한 성장 추이가 아닙니다.
         </p>
       )}
 
       {section.observedMonths.length > 0 && (
-        <p style={{ fontSize: 10.5, color: 'var(--sub)', marginTop: 10 }}>
+        <p style={{ fontSize: 12, color: 'var(--sub)', marginTop: 10 }}>
           관측 월 {section.observedMonths.length}개: {section.observedMonths.join(', ')}
         </p>
       )}
       {section.missingMonths.length > 0 && (
-        <p style={{ fontSize: 10.5, color: 'var(--amber-700)', marginTop: 4 }}>
+        <p style={{ fontSize: 12, color: 'var(--amber-700)', marginTop: 4 }}>
           누락 월 {section.missingMonths.length}개(0 으로 채우지 않음): {section.missingMonths.join(', ')}
         </p>
       )}

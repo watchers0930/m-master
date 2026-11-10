@@ -26,7 +26,7 @@ function ImageStrip({ images, square }: { images: string[]; square?: boolean }) 
             width: '100%', aspectRatio: square ? '1 / 1' : undefined, maxHeight: square ? undefined : 280,
             objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', display: 'block',
           }} />
-          {images.length > 1 && <figcaption style={{ fontSize: 10.5, color: 'var(--sub)', textAlign: 'center' }}>{i + 1} / {images.length}</figcaption>}
+          {images.length > 1 && <figcaption style={{ fontSize: 12, color: 'var(--sub)', textAlign: 'center' }}>{i + 1} / {images.length}</figcaption>}
         </figure>
       ))}
     </div>
@@ -76,7 +76,7 @@ export default function ChannelPayloadPreview({ preview }: { preview: Exclude<Pu
       <div>
         <p style={LABEL}>본문</p>
         <div style={BOX}>{preview.text ? renderBodyWithImages(preview.text, [], true) : <span style={{ color: 'var(--sub)' }}>본문이 없습니다</span>}</div>
-        {preview.footer_appended && <p style={{ fontSize: 10.5, color: 'var(--sub)', margin: '6px 0 0' }}>본문 하단에 서비스 안내 푸터가 자동으로 추가됩니다.</p>}
+        {preview.footer_appended && <p style={{ fontSize: 12, color: 'var(--sub)', margin: '6px 0 0' }}>본문 하단에 서비스 안내 푸터가 자동으로 추가됩니다.</p>}
       </div>
     </>
   );

@@ -72,7 +72,7 @@ export default function ContentReviewBar({ content }: { content: ContentDetail }
             style={{ width: '100%', borderRadius: 6, border: '1px solid var(--border)', padding: '6px 8px', fontSize: 12, fontFamily: 'inherit', resize: 'vertical', background: 'var(--surface)', color: 'var(--text)' }}
           />
           <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center' }}>
-            <span style={{ fontSize: 10.5, color: 'var(--sub)', marginRight: 'auto' }}>{reason.length}/{REASON_MAX}</span>
+            <span style={{ fontSize: 12, color: 'var(--sub)', marginRight: 'auto' }}>{reason.length}/{REASON_MAX}</span>
             <button type="button" disabled={pending} onClick={() => { setRejecting(false); setReason(''); }} style={btn('var(--surface)', 'var(--sub)', 'var(--border)', pending)}>취소</button>
             <button
               type="button" disabled={disabled}
@@ -87,7 +87,7 @@ export default function ContentReviewBar({ content }: { content: ContentDetail }
 
       {locked && <p style={{ fontSize: 11, color: 'var(--amber-700)', margin: 0 }}>발행이 진행 중이라 검토 상태를 바꿀 수 없습니다.</p>}
       {rs === 'pending_review' && !locked && (
-        <p style={{ fontSize: 10.5, color: 'var(--sub)', margin: 0 }}>승인해도 즉시 게시되지 않습니다. 다음 발행 주기에 게시됩니다.</p>
+        <p style={{ fontSize: 12, color: 'var(--sub)', margin: 0 }}>승인해도 즉시 게시되지 않습니다. 다음 발행 주기에 게시됩니다.</p>
       )}
       <NoticeLine notice={notice} />
     </div>

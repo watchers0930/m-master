@@ -347,7 +347,7 @@ export function RichEditor({ value, onChange, placeholder = '내용을 입력하
             />
           ))}
           {/* 크기 표시 */}
-          <div style={{ position: 'absolute', bottom: -22, left: '50%', transform: 'translateX(-50%)', background: '#1e293b', color: '#fff', fontSize: 10, padding: '2px 6px', borderRadius: 4, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
+          <div style={{ position: 'absolute', bottom: -22, left: '50%', transform: 'translateX(-50%)', background: '#1e293b', color: '#fff', fontSize: 12, padding: '2px 6px', borderRadius: 4, pointerEvents: 'none', whiteSpace: 'nowrap' }}>
             {Math.round(imgRect.width)} × {Math.round(imgRect.height)}
           </div>
         </div>

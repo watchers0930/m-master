@@ -30,7 +30,7 @@ export function EvidenceChips({ evidenceIds, evidenceById }: Props) {
           <span
             key={id}
             title={ev ? `${SOURCE_LABELS[ev.source]} · ${ev.label}${when}` : '근거를 찾을 수 없음'}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, color, background: 'var(--n100)', borderRadius: 5, padding: '2px 7px', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600, color, background: 'var(--n100)', borderRadius: 5, padding: '2px 7px', maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
           >
             {ev ? `${ev.label}: ${formatEvidenceValue(ev)}` : '근거 없음'}
           </span>

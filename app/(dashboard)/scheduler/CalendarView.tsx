@@ -178,7 +178,7 @@ export function CalendarView({ year, month, slots, onSlotsChange, onRefresh, onE
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 4 }}>콘텐츠 ID *</label>
                 <input style={fieldStyle} placeholder="생성된 콘텐츠 ID 입력" value={contentId} onChange={(e) => setContentId(e.target.value)} />
-                <p style={{ fontSize: 10, color: 'var(--sub)', marginTop: 3 }}>콘텐츠 생성 후 ID를 복사해 붙여넣기 하세요</p>
+                <p style={{ fontSize: 12, color: 'var(--sub)', marginTop: 3 }}>콘텐츠 생성 후 ID를 복사해 붙여넣기 하세요</p>
               </div>
               <div>
                 <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 4 }}>발행 시각</label>

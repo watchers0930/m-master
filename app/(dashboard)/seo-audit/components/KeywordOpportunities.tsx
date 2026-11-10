@@ -133,7 +133,7 @@ export function KeywordOpportunities({ domainId, keywords, loading, error, hasMo
           <path d="M3 3v18h18" /><path d="M18 9l-5 5-4-4-3 3" />
         </svg>
         <span className="card-title">키워드 수요·기회</span>
-        <span style={{ fontSize: 10, color: 'var(--sub)' }}>{keywords.length}{hasMore ? '+' : ''}개</span>
+        <span style={{ fontSize: 12, color: 'var(--sub)' }}>{keywords.length}{hasMore ? '+' : ''}개</span>
       </div>
 
       {/* 리서치 추가 (scope=research, 과금) */}
@@ -152,7 +152,7 @@ export function KeywordOpportunities({ domainId, keywords, loading, error, hasMo
             {researchM.isPending ? '요청 중…' : '키워드 리서치'}
           </button>
         </div>
-        <p style={{ fontSize: 10, color: 'var(--amber-700)' }}>리서치·순위 갱신은 외부 수집 비용이 발생하며 월 한도에서 차감됩니다.</p>
+        <p style={{ fontSize: 12, color: 'var(--amber-700)' }}>리서치·순위 갱신은 외부 수집 비용이 발생하며 월 한도에서 차감됩니다.</p>
       </div>
 
       {/* 선택 순위 갱신 (scope=ranking, 과금) */}
@@ -170,12 +170,12 @@ export function KeywordOpportunities({ domainId, keywords, loading, error, hasMo
             </button>
           </div>
           {overLimit && (
-            <span role="status" style={{ fontSize: 10.5, color: '#dc2626' }}>
+            <span role="status" style={{ fontSize: 12, color: '#dc2626' }}>
               조합이 {MAX_COMBO}개를 넘습니다(키워드 {selectedRows.length} × 엔진 {distinctEngines.length} = {comboCount}). 선택을 줄여 주세요.
             </span>
           )}
           {mixedEngines && !overLimit && (
-            <span role="status" style={{ fontSize: 10.5, color: 'var(--amber-700)' }}>
+            <span role="status" style={{ fontSize: 12, color: 'var(--amber-700)' }}>
               서로 다른 엔진의 키워드를 함께 선택하면 각 키워드가 선택된 모든 엔진({distinctEngines.map((e) => ENGINE_LABELS[e]).join('·')})으로 조회되어 조합이 늘어납니다.
             </span>
           )}
@@ -205,7 +205,7 @@ export function KeywordOpportunities({ domainId, keywords, loading, error, hasMo
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11.5 }}>
               <thead>
-                <tr style={{ textAlign: 'left', color: 'var(--sub)', fontSize: 10 }}>
+                <tr style={{ textAlign: 'left', color: 'var(--sub)', fontSize: 12 }}>
                   <th style={{ padding: '8px 16px', width: 28 }} />
                   <th style={{ padding: '8px 8px' }}>키워드</th>
                   <th style={{ padding: '8px 8px' }}>엔진</th>
@@ -233,7 +233,7 @@ export function KeywordOpportunities({ domainId, keywords, loading, error, hasMo
                       <td style={{ padding: '8px 8px', textAlign: 'right', color: 'var(--text)' }}>
                         {formatVolume(k.searchVolume, k.volumeScale)}
                         {(k.volumePeriod || k.metricsUpdatedAt) && (
-                          <div style={{ fontSize: 9, color: 'var(--sub)', fontWeight: 400, marginTop: 1 }}>
+                          <div style={{ fontSize: 12, color: 'var(--sub)', fontWeight: 400, marginTop: 1 }}>
                             {k.volumePeriod ?? ''}{k.volumePeriod && k.metricsUpdatedAt ? ' · ' : ''}{k.metricsUpdatedAt ? `갱신 ${formatDate(k.metricsUpdatedAt)}` : ''}
                           </div>
                         )}
@@ -243,9 +243,9 @@ export function KeywordOpportunities({ domainId, keywords, loading, error, hasMo
                         {hasRank ? (
                           <>
                             <span style={{ color: rankStale ? 'var(--sub)' : 'var(--text)', fontWeight: 700 }}>{k.rank}</span>
-                            {rankFailed && <div style={{ fontSize: 9, color: 'var(--amber-700)', fontWeight: 600 }}>갱신 실패 · 과거값</div>}
-                            {!rankFailed && rankStaleByDate && <div style={{ fontSize: 9, color: 'var(--amber-700)', fontWeight: 600 }}>오래됨</div>}
-                            {k.rankObservedAt && <div style={{ fontSize: 9, color: 'var(--sub)', fontWeight: 400 }}>관측 {formatDate(k.rankObservedAt)}</div>}
+                            {rankFailed && <div style={{ fontSize: 12, color: 'var(--amber-700)', fontWeight: 600 }}>갱신 실패 · 과거값</div>}
+                            {!rankFailed && rankStaleByDate && <div style={{ fontSize: 12, color: 'var(--amber-700)', fontWeight: 600 }}>오래됨</div>}
+                            {k.rankObservedAt && <div style={{ fontSize: 12, color: 'var(--sub)', fontWeight: 400 }}>관측 {formatDate(k.rankObservedAt)}</div>}
                           </>
                         ) : (
                           <span style={{ color: 'var(--sub)' }}>{rankStatus ? rankStatus.label : '—'}</span>
@@ -255,12 +255,12 @@ export function KeywordOpportunities({ domainId, keywords, loading, error, hasMo
                         {k.isOpportunity ? (
                           <span
                             title={rankStale ? '과거 관측 기준(오늘 갱신 결과 아님)' : undefined}
-                            style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--green-700)', background: 'var(--green-100)', borderRadius: 4, padding: '2px 7px', opacity: rankStale ? 0.6 : 1 }}
+                            style={{ fontSize: 12, fontWeight: 700, color: 'var(--green-700)', background: 'var(--green-100)', borderRadius: 4, padding: '2px 7px', opacity: rankStale ? 0.6 : 1 }}
                           >
                             기회{rankStale ? '*' : ''}
                           </span>
                         ) : (
-                          <span style={{ fontSize: 10, color: 'var(--sub)' }}>—</span>
+                          <span style={{ fontSize: 12, color: 'var(--sub)' }}>—</span>
                         )}
                       </td>
                     </tr>

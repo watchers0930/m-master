@@ -30,7 +30,7 @@ export function ChannelMixCard({ channelMix, evidenceById }: Props) {
             <div key={c.channel} style={{ opacity: applicable ? 1 : 0.6 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
                 <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>{CHANNEL_LABELS[c.channel]}</span>
-                <span style={{ fontSize: 10.5, color: 'var(--sub)' }}>{CHANNEL_DESC[c.channel]}</span>
+                <span style={{ fontSize: 12, color: 'var(--sub)' }}>{CHANNEL_DESC[c.channel]}</span>
                 <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 800, color }}>
                   {applicable ? formatRatio(c.recommendedRatio) : '해당 없음'}
                 </span>

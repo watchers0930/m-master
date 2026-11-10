@@ -22,7 +22,7 @@ export default function ContentBodyPreview({ data }: { data: ContentDetail }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, padding: 12, background: 'var(--n50)', borderRadius: 8 }}>
           {SCORE_KEYS.map((s) => (
             <div key={s.key} style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: 10.5, color: 'var(--sub)', margin: 0 }}>{s.label}</p>
+              <p style={{ fontSize: 12, color: 'var(--sub)', margin: 0 }}>{s.label}</p>
               <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', margin: '2px 0 0' }}>{data.scores![s.key] ?? '—'}</p>
             </div>
           ))}

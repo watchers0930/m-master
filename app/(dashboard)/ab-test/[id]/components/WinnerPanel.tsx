@@ -69,7 +69,7 @@ export default function WinnerPanel({ test, onUpdated }: Props) {
             display: 'inline-block',
             padding: '2px 8px',
             borderRadius: 4,
-            fontSize: 10.5,
+            fontSize: 12,
             fontWeight: 600,
             background: badgeStyle.bg,
             color: badgeStyle.color,

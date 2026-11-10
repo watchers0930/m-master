@@ -56,16 +56,16 @@ export function DocList({ docs, onDocsChange }: DocListProps) {
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--n50)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = '')}
           >
-            <div style={{ width: 32, height: 32, borderRadius: 6, background: typeColor, color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 6, background: typeColor, color: '#fff', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               {typeLabel}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.title}</p>
-              <p style={{ fontSize: 10.5, color: 'var(--sub)' }}>
+              <p style={{ fontSize: 12, color: 'var(--sub)' }}>
                 {new Date(doc.created_at).toLocaleDateString('ko-KR')}
               </p>
             </div>
-            <span style={{ background: st.bg, color: st.color, fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 4, flexShrink: 0 }}>{st.label}</span>
+            <span style={{ background: st.bg, color: st.color, fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 4, flexShrink: 0 }}>{st.label}</span>
             <button onClick={() => handleDelete(doc.id)} disabled={isDeleting} className="btn btn-ghost" style={{ fontSize: 11, padding: '4px 10px', color: '#dc2626', borderColor: '#fecaca', opacity: isDeleting ? 0.6 : 1 }}>
               {isDeleting ? '삭제 중...' : '삭제'}
             </button>

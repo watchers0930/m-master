@@ -196,7 +196,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 <polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/>
               </svg>
               <span className="card-title">이번 주 추천 토픽 TOP 5</span>
-              <span style={{fontSize:10,color:'var(--sub)',marginLeft:'auto',display:'inline-flex',alignItems:'center',gap:8}}>
+              <span style={{fontSize:12,color:'var(--sub)',marginLeft:'auto',display:'inline-flex',alignItems:'center',gap:8}}>
                 <span>매주 월요일 갱신</span>
                 <RefreshTopicsButton />
               </span>

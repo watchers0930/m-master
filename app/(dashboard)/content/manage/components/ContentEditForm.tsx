@@ -79,7 +79,7 @@ export default function ContentEditForm({ content, onClose, onResult }: Props) {
           id="edit-body" style={{ ...field, minHeight: 320, resize: 'vertical', lineHeight: 1.6 }}
           value={body} maxLength={BODY_MAX} onChange={(e) => setBody(e.target.value)}
         />
-        <p style={{ fontSize: 10.5, color: 'var(--sub)', margin: '4px 0 0', textAlign: 'right' }}>{body.length.toLocaleString()} / {BODY_MAX.toLocaleString()}자</p>
+        <p style={{ fontSize: 12, color: 'var(--sub)', margin: '4px 0 0', textAlign: 'right' }}>{body.length.toLocaleString()} / {BODY_MAX.toLocaleString()}자</p>
       </div>
 
       {inputError && <p role="alert" style={{ fontSize: 11, color: '#dc2626', margin: 0 }}>{inputError}</p>}

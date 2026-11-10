@@ -26,7 +26,7 @@ export default function StrategyEvidenceCard({ ctx }: { ctx: StrategyContextDTO 
     <section aria-label="전략 근거" style={{ border: '1px solid #ddd6fe', background: '#faf5ff', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11.5, fontWeight: 700, color: '#6d28d9' }}>전략 근거</span>
-        <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 3, background: tone.bg, color: tone.color }}>{ctx.priority}</span>
+        <span style={{ fontSize: 12, fontWeight: 700, padding: '1px 6px', borderRadius: 3, background: tone.bg, color: tone.color }}>{ctx.priority}</span>
         <Link
           href={reportHref(ctx)}
           style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, color: 'var(--blue-600)' }}
@@ -53,7 +53,7 @@ export default function StrategyEvidenceCard({ ctx }: { ctx: StrategyContextDTO 
         </ul>
       )}
 
-      <p style={{ fontSize: 10.5, color: 'var(--sub)', margin: 0 }}>
+      <p style={{ fontSize: 12, color: 'var(--sub)', margin: 0 }}>
         관측 기간 {ctx.range.from} ~ {ctx.range.to}
         {ctx.truncated ? ' · 근거 일부 생략' : ''}
       </p>
@@ -61,7 +61,7 @@ export default function StrategyEvidenceCard({ ctx }: { ctx: StrategyContextDTO 
       {ctx.limitations.length > 0 && (
         <ul style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 2 }}>
           {ctx.limitations.map((l, i) => (
-            <li key={i} style={{ fontSize: 10.5, color: 'var(--sub)' }}>{l}</li>
+            <li key={i} style={{ fontSize: 12, color: 'var(--sub)' }}>{l}</li>
           ))}
         </ul>
       )}

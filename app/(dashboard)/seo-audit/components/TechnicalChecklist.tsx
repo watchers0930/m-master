@@ -19,7 +19,7 @@ const STATUS_ORDER: Record<CheckStatus, number> = {
 function StatusBadge({ status }: { status: CheckStatus }) {
   const meta = CHECK_STATUS_META[status];
   return (
-    <span style={{ fontSize: 9.5, fontWeight: 700, color: meta.color, background: meta.bg, borderRadius: 4, padding: '2px 7px', flexShrink: 0 }}>
+    <span style={{ fontSize: 12, fontWeight: 700, color: meta.color, background: meta.bg, borderRadius: 4, padding: '2px 7px', flexShrink: 0 }}>
       {meta.label}
     </span>
   );
@@ -42,7 +42,7 @@ function CheckRow({ c }: { c: SeoCheckResult }) {
       >
         <StatusBadge status={c.status} />
         <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', flex: 1, minWidth: 0 }}>{c.label}</span>
-        <span style={{ fontSize: 10, color: 'var(--sub)', flexShrink: 0 }}>
+        <span style={{ fontSize: 12, color: 'var(--sub)', flexShrink: 0 }}>
           가중치 {c.weight}
           {c.evaluatedSamples > 0 && ` · 표본 ${c.evaluatedSamples}${c.failedSamples > 0 ? ` (문제 ${c.failedSamples})` : ''}`}
         </span>
@@ -62,7 +62,7 @@ function CheckRow({ c }: { c: SeoCheckResult }) {
           {c.subFindings && c.subFindings.length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {c.subFindings.map((f, i) => (
-                <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: 'var(--text)' }}>
+                <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--text)' }}>
                   <StatusBadge status={f.status} /> {f.label}
                 </span>
               ))}
@@ -77,12 +77,12 @@ function CheckRow({ c }: { c: SeoCheckResult }) {
 
           {c.affectedUrls.length > 0 && (
             <div>
-              <p style={{ fontSize: 10, color: 'var(--sub)', marginBottom: 4 }}>영향 URL (최대 20)</p>
+              <p style={{ fontSize: 12, color: 'var(--sub)', marginBottom: 4 }}>영향 URL (최대 20)</p>
               <ul style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 2 }}>
                 {c.affectedUrls.slice(0, 20).map((u, i) => {
                   const safe = /^https?:\/\//i.test(u);
                   return (
-                    <li key={i} style={{ fontSize: 10.5, color: 'var(--sub)', wordBreak: 'break-all' }}>
+                    <li key={i} style={{ fontSize: 12, color: 'var(--sub)', wordBreak: 'break-all' }}>
                       {safe ? (
                         <a href={u} target="_blank" rel="noopener noreferrer nofollow" style={{ color: 'var(--blue-400)' }}>{u}</a>
                       ) : (
@@ -110,7 +110,7 @@ export function TechnicalChecklist({ checks }: { checks: SeoCheckResult[] }) {
           <path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
         </svg>
         <span className="card-title">기술 체크리스트</span>
-        <span style={{ fontSize: 10, color: 'var(--sub)' }}>{checks.length}개 항목</span>
+        <span style={{ fontSize: 12, color: 'var(--sub)' }}>{checks.length}개 항목</span>
       </div>
 
       {checks.length === 0 ? (

@@ -52,13 +52,13 @@ export function AuditStatus({ audit, pollExhausted, onManualCheck, manualCheckin
           <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
         </svg>
         <span className="card-title">진단 진행 상태</span>
-        <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 700, color: meta.color, background: meta.bg, borderRadius: 5, padding: '2px 8px' }}>
+        <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: meta.color, background: meta.bg, borderRadius: 5, padding: '2px 8px' }}>
           {meta.label}
         </span>
       </div>
 
       <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 10.5, color: 'var(--sub)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 12, color: 'var(--sub)' }}>
           <span>실행 {formatDateTime(audit.createdAt)}</span>
           {audit.completedAt && <span>· 완료 {formatDateTime(audit.completedAt)}</span>}
           <span>· 비용 {audit.costKrw.toLocaleString('ko-KR')}원</span>
@@ -111,7 +111,7 @@ export function AuditStatus({ audit, pollExhausted, onManualCheck, manualCheckin
               <span
                 key={`${t.operation}:${t.itemKey}:${i}`}
                 title={t.failReason ?? undefined}
-                style={{ fontSize: 10, fontWeight: 600, color: TASK_COLOR[t.status] ?? 'var(--sub)', background: 'var(--n100)', borderRadius: 5, padding: '2px 7px' }}
+                style={{ fontSize: 12, fontWeight: 600, color: TASK_COLOR[t.status] ?? 'var(--sub)', background: 'var(--n100)', borderRadius: 5, padding: '2px 7px' }}
               >
                 {OPERATION_LABELS[t.operation] ?? t.operation} · {TASK_LABEL[t.status] ?? t.status}
               </span>
@@ -122,7 +122,7 @@ export function AuditStatus({ audit, pollExhausted, onManualCheck, manualCheckin
         {failed.length > 0 && failed.some((t) => t.failReason) && (
           <ul style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 2 }}>
             {failed.filter((t) => t.failReason).map((t, i) => (
-              <li key={i} style={{ fontSize: 10.5, color: 'var(--sub)' }}>
+              <li key={i} style={{ fontSize: 12, color: 'var(--sub)' }}>
                 {OPERATION_LABELS[t.operation] ?? t.operation}: {t.failReason}
               </li>
             ))}

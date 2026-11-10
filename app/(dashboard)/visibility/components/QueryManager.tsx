@@ -149,7 +149,7 @@ export function QueryManager({ queries, loading, error, defaultMarket, onRetry }
           <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
         </svg>
         <span className="card-title">추적 질문 관리</span>
-        <span style={{ fontSize: 10, color: 'var(--sub)' }}>{countLabel}</span>
+        <span style={{ fontSize: 12, color: 'var(--sub)' }}>{countLabel}</span>
         <button type="button" className="btn btn-primary" style={{ marginLeft: 'auto', padding: '6px 11px', opacity: canWrite ? 1 : 0.5 }} disabled={!canWrite} title={canWrite ? undefined : WRITE_GATE_TITLE} onClick={openCreate}>
           + 질문 추가
         </button>
@@ -204,14 +204,14 @@ export function QueryManager({ queries, loading, error, defaultMarket, onRetry }
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)' }}>{q.query}</span>
                           {!q.active && (
-                            <span style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--sub)', background: 'var(--n100)', borderRadius: 4, padding: '1px 6px' }}>비활성</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--sub)', background: 'var(--n100)', borderRadius: 4, padding: '1px 6px' }}>비활성</span>
                           )}
                         </div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 5 }}>
-                          <span style={{ fontSize: 10, color: 'var(--sub)' }}>{q.market}</span>
-                          <span style={{ fontSize: 10, color: 'var(--sub)' }}>· {FREQUENCY_LABELS[q.frequency]}</span>
-                          <span style={{ fontSize: 10, color: 'var(--sub)' }}>· {q.engines.map((e) => ENGINE_LABELS[e as EngineId] ?? e).join(', ')}</span>
-                          <span style={{ fontSize: 10, color: 'var(--sub)' }}>
+                          <span style={{ fontSize: 12, color: 'var(--sub)' }}>{q.market}</span>
+                          <span style={{ fontSize: 12, color: 'var(--sub)' }}>· {FREQUENCY_LABELS[q.frequency]}</span>
+                          <span style={{ fontSize: 12, color: 'var(--sub)' }}>· {q.engines.map((e) => ENGINE_LABELS[e as EngineId] ?? e).join(', ')}</span>
+                          <span style={{ fontSize: 12, color: 'var(--sub)' }}>
                             · 최근 수집 {q.lastCapturedAt ? q.lastCapturedAt.slice(0, 10) : '없음'}
                           </span>
                         </div>
@@ -235,7 +235,7 @@ export function QueryManager({ queries, loading, error, defaultMarket, onRetry }
                         {results.map((r) => {
                           const meta = STATUS_META[r.status];
                           return (
-                            <span key={r.engine} title={r.failReason} style={{ fontSize: 10, fontWeight: 600, color: meta.color, background: meta.bg, borderRadius: 5, padding: '2px 7px' }}>
+                            <span key={r.engine} title={r.failReason} style={{ fontSize: 12, fontWeight: 600, color: meta.color, background: meta.bg, borderRadius: 5, padding: '2px 7px' }}>
                               {ENGINE_LABELS[r.engine]} · {meta.label}
                             </span>
                           );
@@ -243,7 +243,7 @@ export function QueryManager({ queries, loading, error, defaultMarket, onRetry }
                       </div>
                     )}
                     {rowMsg[q.id] && (
-                      <p style={{ fontSize: 10.5, color: '#dc2626', marginTop: 6 }}>{rowMsg[q.id]}</p>
+                      <p style={{ fontSize: 12, color: '#dc2626', marginTop: 6 }}>{rowMsg[q.id]}</p>
                     )}
                   </div>
                 );

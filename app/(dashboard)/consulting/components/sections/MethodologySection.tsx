@@ -21,12 +21,12 @@ export function MethodologySection({ section }: { section: MethodologySectionDTO
           <div key={d.key} style={{ borderLeft: '3px solid var(--border)', paddingLeft: 10 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{d.key}</span>
-              <span style={{ fontSize: 9.5, color: 'var(--sub)', background: 'var(--n100)', borderRadius: 4, padding: '1px 6px' }}>{d.source}</span>
-              <span style={{ fontSize: 9.5, color: 'var(--sub)' }}>v{d.version}</span>
+              <span style={{ fontSize: 12, color: 'var(--sub)', background: 'var(--n100)', borderRadius: 4, padding: '1px 6px' }}>{d.source}</span>
+              <span style={{ fontSize: 12, color: 'var(--sub)' }}>v{d.version}</span>
             </div>
             <p style={{ fontSize: 11.5, color: 'var(--sub)', lineHeight: 1.6, marginTop: 3 }}>{d.definition}</p>
             {d.formula && (
-              <p style={{ fontSize: 10.5, color: 'var(--sub)', marginTop: 2, fontFamily: 'var(--font-mono, monospace)' }}>산식: {d.formula}</p>
+              <p style={{ fontSize: 12, color: 'var(--sub)', marginTop: 2, fontFamily: 'var(--font-mono, monospace)' }}>산식: {d.formula}</p>
             )}
           </div>
         ))}
@@ -34,10 +34,10 @@ export function MethodologySection({ section }: { section: MethodologySectionDTO
 
       {section.selectionLimits.filter(Boolean).length > 0 && (
         <div style={{ marginTop: 12 }}>
-          <p style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--sub)', marginBottom: 4 }}>선택 제한</p>
+          <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', marginBottom: 4 }}>선택 제한</p>
           <ul style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 2 }}>
             {section.selectionLimits.filter(Boolean).map((sel, i) => (
-              <li key={i} style={{ fontSize: 10.5, color: 'var(--sub)', lineHeight: 1.6 }}>
+              <li key={i} style={{ fontSize: 12, color: 'var(--sub)', lineHeight: 1.6 }}>
                 {sel!.rule} — {sel!.selected}/{sel!.total} 선택 (상한 {sel!.limit})
               </li>
             ))}

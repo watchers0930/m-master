@@ -39,7 +39,7 @@ export function Ga4ProvenanceCard({ p }: { p: Ga4ProvenanceDTO }) {
         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>GA4 데이터 출처</span>
         <span
           style={{
-            fontSize: 10, fontWeight: 600, borderRadius: 5, padding: '2px 7px', background: 'var(--n100)',
+            fontSize: 12, fontWeight: 600, borderRadius: 5, padding: '2px 7px', background: 'var(--n100)',
             color: partial ? 'var(--amber-700)' : 'var(--green-700)',
           }}
         >

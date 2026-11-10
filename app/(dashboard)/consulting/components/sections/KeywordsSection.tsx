@@ -15,7 +15,7 @@ const ICON = (
   </svg>
 );
 
-const TH: CSSProperties = { fontSize: 10, fontWeight: 700, color: 'var(--sub)', textAlign: 'left', padding: '6px 8px', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)' };
+const TH: CSSProperties = { fontSize: 12, fontWeight: 700, color: 'var(--sub)', textAlign: 'left', padding: '6px 8px', whiteSpace: 'nowrap', borderBottom: '1px solid var(--border)' };
 const TD: CSSProperties = { fontSize: 11.5, color: 'var(--text)', padding: '6px 8px', whiteSpace: 'nowrap', borderBottom: '1px solid var(--n100)' };
 
 export function KeywordsSection({ section }: { section: KeywordsSectionDTO }) {
@@ -51,7 +51,7 @@ export function KeywordsSection({ section }: { section: KeywordsSectionDTO }) {
                 <td style={{ ...TD, textAlign: 'right' }}>
                   {formatMetric(r.rank)}
                   {r.rank !== null && r.rankSource && (
-                    <span style={{ display: 'block', fontSize: 9, fontWeight: 400, color: 'var(--sub)', whiteSpace: 'normal', lineHeight: 1.4 }}>{r.rankSource}</span>
+                    <span style={{ display: 'block', fontSize: 12, fontWeight: 400, color: 'var(--sub)', whiteSpace: 'normal', lineHeight: 1.4 }}>{r.rankSource}</span>
                   )}
                 </td>
                 <td style={TD}>{r.period ? `${formatDate(r.period.from)}~${formatDate(r.period.to)}` : '—'}</td>

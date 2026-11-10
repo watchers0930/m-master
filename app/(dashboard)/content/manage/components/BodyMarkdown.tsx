@@ -19,7 +19,7 @@ export function renderBodyWithImages(text: string, bodyImageUrls: string[], drop
               alt={block.text}
               style={{ width: '100%', maxHeight: 360, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', display: 'block' }}
             />
-            <figcaption style={{ fontSize: 10.5, color: 'var(--sub)', textAlign: 'center', marginTop: 4, fontStyle: 'italic' }}>
+            <figcaption style={{ fontSize: 12, color: 'var(--sub)', textAlign: 'center', marginTop: 4, fontStyle: 'italic' }}>
               {block.text}
             </figcaption>
           </figure>
@@ -31,7 +31,7 @@ export function renderBodyWithImages(text: string, bodyImageUrls: string[], drop
             <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/>
           </svg>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <p style={{ fontSize: 10.5, color: 'var(--sub)', fontWeight: 600, margin: 0 }}>이미지</p>
+            <p style={{ fontSize: 12, color: 'var(--sub)', fontWeight: 600, margin: 0 }}>이미지</p>
             <p style={{ fontSize: 11.5, color: 'var(--text)', fontStyle: 'italic', margin: '2px 0 0', lineHeight: 1.4 }}>{block.text}</p>
           </div>
         </div>
@@ -42,7 +42,7 @@ export function renderBodyWithImages(text: string, bodyImageUrls: string[], drop
     if (block.type === 'h3') return <h3 key={i} style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)', marginTop: 6, marginBottom: 2, lineHeight: 1.4 }}>{renderInline(block.text)}</h3>;
     if (block.type === 'li') return (
       <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'flex-start', margin: '2px 0' }}>
-        <span style={{ color: 'var(--blue-400)', marginTop: 3, flexShrink: 0, fontSize: 10 }}>●</span>
+        <span style={{ color: 'var(--blue-400)', marginTop: 3, flexShrink: 0, fontSize: 12 }}>●</span>
         <p style={{ fontSize: 12, color: 'var(--sub)', lineHeight: 1.7, margin: 0 }}>{renderInline(block.text)}</p>
       </div>
     );

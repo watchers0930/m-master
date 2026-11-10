@@ -35,7 +35,7 @@ export function RealtimeBadge({ domainId }: { domainId: string | null }) {
       {failText ? `실시간 · ${failText}` : `실시간 ${ok ? ok.active_users.toLocaleString() : '·'}명`}
       {streamLevel && (
         <span
-          style={{ fontSize: 10, fontWeight: 500, color: 'var(--sub)', marginLeft: 4 }}
+          style={{ fontSize: 12, fontWeight: 500, color: 'var(--sub)', marginLeft: 4 }}
           title="GA4 실시간 지표는 도메인(host)별로 나눌 수 없어, 같은 웹 스트림을 쓰는 모든 도메인의 합계입니다"
         >
           스트림 전체 기준

@@ -137,9 +137,9 @@ function ContentCreatePageInner() {
             if (block.type === 'h1') return <h1 key={i} style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', lineHeight: 1.4 }}>{block.text}</h1>;
             if (block.type === 'h2') return <h2 key={i} style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue-700)', marginTop: 8, lineHeight: 1.4 }}>{block.text}</h2>;
             if (block.type === 'h3') return <h3 key={i} style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginTop: 4 }}>{block.text}</h3>;
-            if (block.type === 'li') return <div key={i} style={{ display: 'flex', gap: 6 }}><span style={{ color: 'var(--blue-400)', fontSize: 10, marginTop: 3 }}>●</span><p style={{ fontSize: 12, color: 'var(--sub)', lineHeight: 1.7 }}>{block.text}</p></div>;
+            if (block.type === 'li') return <div key={i} style={{ display: 'flex', gap: 6 }}><span style={{ color: 'var(--blue-400)', fontSize: 12, marginTop: 3 }}>●</span><p style={{ fontSize: 12, color: 'var(--sub)', lineHeight: 1.7 }}>{block.text}</p></div>;
             if (block.type === 'blockquote') return <div key={i} style={{ borderLeft: '3px solid var(--blue-300)', paddingLeft: 10 }}><p style={{ fontSize: 12, color: 'var(--sub)', lineHeight: 1.7, fontStyle: 'italic' }}>{block.text}</p></div>;
-            if (block.type === 'img-placeholder') return <div key={i} style={{ border: '1.5px dashed var(--border)', borderRadius: 6, padding: '8px 12px', background: 'var(--n50)', display: 'flex', alignItems: 'center', gap: 8 }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--n400)" strokeWidth="1.8" strokeLinecap="round" style={{ flexShrink: 0 }}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg><span style={{ fontSize: 10.5, color: 'var(--sub)', fontStyle: 'italic' }}>{block.text}</span></div>;
+            if (block.type === 'img-placeholder') return <div key={i} style={{ border: '1.5px dashed var(--border)', borderRadius: 6, padding: '8px 12px', background: 'var(--n50)', display: 'flex', alignItems: 'center', gap: 8 }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--n400)" strokeWidth="1.8" strokeLinecap="round" style={{ flexShrink: 0 }}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg><span style={{ fontSize: 12, color: 'var(--sub)', fontStyle: 'italic' }}>{block.text}</span></div>;
             if (block.type === 'table') return (
               <div key={i} style={{ overflowX: 'auto' }}>
                 <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 11.5 }}>
@@ -178,7 +178,7 @@ function ContentCreatePageInner() {
               <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/>
             </svg>
             <span className="card-title">생성 설정</span>
-            <span style={{ fontSize: 10, color: 'var(--sub)' }}>GPT-4o + RAG</span>
+            <span style={{ fontSize: 12, color: 'var(--sub)' }}>GPT-4o + RAG</span>
           </div>
           <div style={{ padding: '16px', flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
             <GenerateForm
@@ -197,7 +197,7 @@ function ContentCreatePageInner() {
               <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/>
             </svg>
             <span className="card-title">본문 미리보기</span>
-            {isStreaming && <span style={{ fontSize: 10, color: 'var(--blue-500)', marginLeft: 4 }}>{streamingText.length.toLocaleString()}자 생성 중...</span>}
+            {isStreaming && <span style={{ fontSize: 12, color: 'var(--blue-500)', marginLeft: 4 }}>{streamingText.length.toLocaleString()}자 생성 중...</span>}
             {!isStreaming && result && (
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <select

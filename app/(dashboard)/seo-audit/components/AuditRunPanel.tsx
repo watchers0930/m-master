@@ -111,7 +111,7 @@ export function AuditRunPanel({ domainId, market, canWrite, resumable, onAudit }
 
       <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         {/* 전체 진단 범위 안내 (설계 §8, 리뷰 지적 3) */}
-        <p style={{ fontSize: 10.5, color: 'var(--sub)', lineHeight: 1.6 }}>
+        <p style={{ fontSize: 12, color: 'var(--sub)', lineHeight: 1.6 }}>
           이 실행은 <strong style={{ color: 'var(--text)' }}>전체 진단</strong>입니다 — 기술 감사(아래 모드·경로 기준),
           키워드 발견·수요 수집, 자동 후보 키워드 순위까지 함께 진행합니다. 수집 페이지·리서치·순위 조합 상한은
           서버 정책으로 제한되며, 중단 시 아래 ‘재개’로 이어서 진행할 수 있습니다.
@@ -119,7 +119,7 @@ export function AuditRunPanel({ domainId, market, canWrite, resumable, onAudit }
 
         {/* 수집 모드 */}
         <div>
-          <p id="seo-mode-label" style={{ fontSize: 10.5, color: 'var(--sub)', fontWeight: 600, marginBottom: 6 }}>기술 감사 수집 모드</p>
+          <p id="seo-mode-label" style={{ fontSize: 12, color: 'var(--sub)', fontWeight: 600, marginBottom: 6 }}>기술 감사 수집 모드</p>
           <div role="group" aria-labelledby="seo-mode-label" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {(Object.keys(MODE_LABELS) as AuditMode[]).map((m) => (
               <button
@@ -139,7 +139,7 @@ export function AuditRunPanel({ domainId, market, canWrite, resumable, onAudit }
               </button>
             ))}
           </div>
-          <p style={{ fontSize: 10.5, color: 'var(--sub)', marginTop: 6 }}>
+          <p style={{ fontSize: 12, color: 'var(--sub)', marginTop: 6 }}>
             {mode === 'crawl'
               ? '여러 페이지를 크롤합니다(상한은 서버 정책으로 결정). 비용·소요가 더 큽니다.'
               : '대표 URL 1개(또는 지정 경로)만 즉시 수집합니다. JS 렌더링 미포함 — 정적 HTML 기준.'}
@@ -148,7 +148,7 @@ export function AuditRunPanel({ domainId, market, canWrite, resumable, onAudit }
 
         {/* 순위 수집 엔진 */}
         <div>
-          <p id="seo-engine-label" style={{ fontSize: 10.5, color: 'var(--sub)', fontWeight: 600, marginBottom: 6 }}>순위 수집 엔진</p>
+          <p id="seo-engine-label" style={{ fontSize: 12, color: 'var(--sub)', fontWeight: 600, marginBottom: 6 }}>순위 수집 엔진</p>
           <div role="group" aria-labelledby="seo-engine-label" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {SEO_ENGINES.map((en) => {
               const on = engines.includes(en);
@@ -175,13 +175,13 @@ export function AuditRunPanel({ domainId, market, canWrite, resumable, onAudit }
             })}
           </div>
           {!naverAllowed && (
-            <p style={{ fontSize: 10.5, color: 'var(--sub)', marginTop: 6 }}>네이버 순위는 한국(ko-KR) 시장에서만 수집됩니다.</p>
+            <p style={{ fontSize: 12, color: 'var(--sub)', marginTop: 6 }}>네이버 순위는 한국(ko-KR) 시장에서만 수집됩니다.</p>
           )}
         </div>
 
         {/* 대표 경로(선택) */}
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 10.5, color: 'var(--sub)', fontWeight: 600 }}>대표 경로 (선택 · 최대 5개, 쉼표/줄바꿈 구분)</span>
+          <span style={{ fontSize: 12, color: 'var(--sub)', fontWeight: 600 }}>대표 경로 (선택 · 최대 5개, 쉼표/줄바꿈 구분)</span>
           <textarea
             value={pathsText}
             onChange={(e) => setPathsText(e.target.value)}
@@ -190,7 +190,7 @@ export function AuditRunPanel({ domainId, market, canWrite, resumable, onAudit }
             placeholder="예: /, /pricing, /blog"
             style={{ borderRadius: 7, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 12, padding: '7px 10px', fontFamily: 'inherit', resize: 'vertical' }}
           />
-          <span style={{ fontSize: 10, color: 'var(--sub)' }}>비우면 등록 호스트의 HTTPS 루트를 기준으로 진단합니다.</span>
+          <span style={{ fontSize: 12, color: 'var(--sub)' }}>비우면 등록 호스트의 HTTPS 루트를 기준으로 진단합니다.</span>
         </label>
 
         {/* 비용 경고 (설계 §8: 새 진단 버튼만 비용 발생 명시) */}

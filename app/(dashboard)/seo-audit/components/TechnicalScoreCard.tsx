@@ -25,7 +25,7 @@ export function TechnicalScoreCard({ audit }: { audit: SeoAuditDTO }) {
         </svg>
         <span className="card-title">기술 점수</span>
         {audit.scoreVersion && (
-          <span style={{ marginLeft: 'auto', fontSize: 9.5, color: 'var(--sub)' }}>기준 {audit.scoreVersion}</span>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--sub)' }}>기준 {audit.scoreVersion}</span>
         )}
       </div>
 
@@ -34,14 +34,14 @@ export function TechnicalScoreCard({ audit }: { audit: SeoAuditDTO }) {
           {score === null ? (
             <>
               <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--sub)' }}>—</div>
-              <div style={{ fontSize: 10.5, color: 'var(--sub)', marginTop: 2 }}>판정 부족</div>
+              <div style={{ fontSize: 12, color: 'var(--sub)', marginTop: 2 }}>판정 부족</div>
             </>
           ) : (
             <>
               <div style={{ fontSize: 40, fontWeight: 800, lineHeight: 1, color: scoreColor(score), fontFamily: "'SCoreDream', 'Paperlogy', sans-serif" }}>
                 {score}
               </div>
-              <div style={{ fontSize: 10.5, color: 'var(--sub)', marginTop: 4 }}>/ 100점</div>
+              <div style={{ fontSize: 12, color: 'var(--sub)', marginTop: 4 }}>/ 100점</div>
             </>
           )}
         </div>
@@ -64,7 +64,7 @@ export function TechnicalScoreCard({ audit }: { audit: SeoAuditDTO }) {
           </div>
 
           {lowCoverage && (
-            <div style={{ marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 10.5, color: 'var(--amber-700)', background: 'var(--amber-100)', borderRadius: 5, padding: '4px 8px', alignSelf: 'flex-start' }}>
+            <div style={{ marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--amber-700)', background: 'var(--amber-100)', borderRadius: 5, padding: '4px 8px', alignSelf: 'flex-start' }}>
               참고 점수 · 판정 근거가 부족합니다(커버리지 {formatPercent(coverage)})
             </div>
           )}

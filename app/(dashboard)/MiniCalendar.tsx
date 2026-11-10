@@ -32,7 +32,7 @@ export function MiniCalendar({ year, month, scheduledDates }: MiniCalendarProps)
           <div
             key={d}
             className={[
-              'text-center text-[10px] font-medium py-1',
+              'text-center text-[12px] font-medium py-1',
               i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-[#8a9ab0]',
             ].join(' ')}
           >

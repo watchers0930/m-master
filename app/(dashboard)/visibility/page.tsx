@@ -35,7 +35,7 @@ function Kpi({ label, value, sub }: { label: string; value: string; sub?: string
         <span className="kpi-label">{label}</span>
         <span style={{ textAlign: 'right' }}>
           <span className="kpi-val">{value}</span>
-          {sub && <span style={{ display: 'block', fontSize: 10, color: 'var(--sub)' }}>{sub}</span>}
+          {sub && <span style={{ display: 'block', fontSize: 12, color: 'var(--sub)' }}>{sub}</span>}
         </span>
       </div>
     </div>

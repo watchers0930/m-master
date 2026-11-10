@@ -23,15 +23,15 @@ export default function CafeTargetList({
             <div key={t.id} style={{ background: 'var(--n50)', borderRadius: 6, padding: '10px', fontSize: 12 }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                 <div style={{ flex: '1 1 120px' }}>
-                  <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 이름</label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 이름</label>
                   <input type="text" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} style={{ ...inputStyle, fontSize: 11 }} autoComplete="off" />
                 </div>
                 <div style={{ flex: '0 0 100px' }}>
-                  <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 ID</label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 ID</label>
                   <input type="text" value={editForm.clubId} onChange={e => setEditForm(p => ({ ...p, clubId: e.target.value }))} style={{ ...inputStyle, fontSize: 11 }} autoComplete="off" />
                 </div>
                 <div style={{ flex: '0 0 100px' }}>
-                  <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>메뉴 ID</label>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>메뉴 ID</label>
                   <input type="text" value={editForm.menuId} onChange={e => setEditForm(p => ({ ...p, menuId: e.target.value }))} style={{ ...inputStyle, fontSize: 11 }} autoComplete="off" />
                 </div>
                 <button className="btn btn-primary" style={{ fontSize: 11, padding: '7px 12px', flexShrink: 0 }} onClick={handleSaveEdit} disabled={targetLoading}>
@@ -45,11 +45,11 @@ export default function CafeTargetList({
           ) : (
             <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--n50)', borderRadius: 6, padding: '8px 10px', fontSize: 12 }}>
               <span style={{ flex: 1, fontWeight: 600, color: 'var(--text)' }}>{t.name}</span>
-              <span style={{ fontSize: 10, color: 'var(--sub)', fontFamily: 'monospace' }}>club:{t.clubId} / menu:{t.menuId}</span>
+              <span style={{ fontSize: 12, color: 'var(--sub)', fontFamily: 'monospace' }}>club:{t.clubId} / menu:{t.menuId}</span>
               <button
                 onClick={() => handleToggleDefault(t.id, !t.isDefault)}
                 style={{
-                  fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                  fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 4, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                   background: t.isDefault ? '#E8F5E9' : 'var(--n100)',
                   color: t.isDefault ? '#2E7D32' : 'var(--sub)',
                 }}
@@ -58,13 +58,13 @@ export default function CafeTargetList({
               </button>
               <button
                 onClick={() => handleStartEdit(t)}
-                style={{ fontSize: 10, color: 'var(--blue-600)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '2px 4px' }}
+                style={{ fontSize: 12, color: 'var(--blue-600)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '2px 4px' }}
               >
                 수정
               </button>
               <button
                 onClick={() => handleDeleteTarget(t.id)}
-                style={{ fontSize: 10, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '2px 4px' }}
+                style={{ fontSize: 12, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '2px 4px' }}
               >
                 삭제
               </button>
@@ -76,7 +76,7 @@ export default function CafeTargetList({
       {/* 카페 추가 폼 */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 120px' }}>
-          <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 이름</label>
+          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 이름</label>
           <input
             type="text" placeholder="예: 부동산 정보 카페"
             value={targetForm.name} onChange={e => setTargetForm(p => ({ ...p, name: e.target.value }))}
@@ -84,7 +84,7 @@ export default function CafeTargetList({
           />
         </div>
         <div style={{ flex: '0 0 100px' }}>
-          <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 ID</label>
+          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 ID</label>
           <input
             type="text" placeholder="숫자"
             value={targetForm.clubId} onChange={e => setTargetForm(p => ({ ...p, clubId: e.target.value }))}
@@ -92,7 +92,7 @@ export default function CafeTargetList({
           />
         </div>
         <div style={{ flex: '0 0 100px' }}>
-          <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>메뉴 ID</label>
+          <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>메뉴 ID</label>
           <input
             type="text" placeholder="숫자"
             value={targetForm.menuId} onChange={e => setTargetForm(p => ({ ...p, menuId: e.target.value }))}

@@ -16,7 +16,7 @@ function hostOf(url: string): string {
 function Row({ c }: { c: CitationItem }) {
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border2)' }}>
-      <span style={{ width: 20, height: 20, borderRadius: 5, flexShrink: 0, fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.isOwnDomain ? 'var(--blue-600)' : 'var(--n100)', color: c.isOwnDomain ? '#fff' : 'var(--sub)' }}>
+      <span style={{ width: 20, height: 20, borderRadius: 5, flexShrink: 0, fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.isOwnDomain ? 'var(--blue-600)' : 'var(--n100)', color: c.isOwnDomain ? '#fff' : 'var(--sub)' }}>
         {c.position}
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -25,16 +25,16 @@ function Row({ c }: { c: CitationItem }) {
             {c.title || hostOf(c.url)}
           </span>
           {c.isOwnDomain && (
-            <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--blue-600)', background: 'var(--blue-100)', borderRadius: 4, padding: '1px 5px', flexShrink: 0 }}>자사</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--blue-600)', background: 'var(--blue-100)', borderRadius: 4, padding: '1px 5px', flexShrink: 0 }}>자사</span>
           )}
         </div>
-        <a href={c.url} target="_blank" rel="noopener noreferrer nofollow" style={{ fontSize: 10.5, color: 'var(--blue-500)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+        <a href={c.url} target="_blank" rel="noopener noreferrer nofollow" style={{ fontSize: 12, color: 'var(--blue-500)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
           {c.url}
         </a>
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <div style={{ fontSize: 10, color: 'var(--sub)' }}>{ENGINE_LABELS[c.engine]}</div>
-        <div style={{ fontSize: 9.5, color: 'var(--sub)' }}>{c.capturedAt.slice(0, 10)}</div>
+        <div style={{ fontSize: 12, color: 'var(--sub)' }}>{ENGINE_LABELS[c.engine]}</div>
+        <div style={{ fontSize: 12, color: 'var(--sub)' }}>{c.capturedAt.slice(0, 10)}</div>
       </div>
     </div>
   );
@@ -49,7 +49,7 @@ export function CitationSources({ citations }: { citations: CitationItem[] }) {
           <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
         </svg>
         <span className="card-title">인용 소스</span>
-        <span style={{ fontSize: 10, color: 'var(--sub)' }}>{citations.length}건</span>
+        <span style={{ fontSize: 12, color: 'var(--sub)' }}>{citations.length}건</span>
       </div>
       {citations.length === 0 ? (
         <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--sub)', padding: '32px 0' }}>

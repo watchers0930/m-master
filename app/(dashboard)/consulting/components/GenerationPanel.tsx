@@ -100,14 +100,14 @@ export function GenerationPanel({ domainId, market, canWrite, onReport, onPendin
       </div>
 
       <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <p style={{ fontSize: 10.5, color: 'var(--sub)', lineHeight: 1.6 }}>
+        <p style={{ fontSize: 12, color: 'var(--sub)', lineHeight: 1.6 }}>
           저장된 <strong style={{ color: 'var(--text)' }}>SEO·GEO 진단</strong>과 연결된 <strong style={{ color: 'var(--text)' }}>GA4 성과</strong>(생성 시 1회 조회)를 종합해
           채널 믹스·예산 배분·우선순위 액션을 한 번에 제안합니다. 광고를 집행하지 않으며, 전략 생성에만 AI를 1회 호출합니다.
         </p>
 
         {/* 월 마케팅 예산 (선택) — 금액 배분은 서버가 계산(§4.2) */}
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <span style={{ fontSize: 10.5, color: 'var(--sub)', fontWeight: 600 }}>월 마케팅 예산 (선택)</span>
+          <span style={{ fontSize: 12, color: 'var(--sub)', fontWeight: 600 }}>월 마케팅 예산 (선택)</span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, height: 34, padding: '0 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--n100)', fontSize: 12, fontWeight: 700, color: 'var(--text)', flexShrink: 0 }}>
               {CURRENCY_SYMBOL[currency]} {currency}
@@ -122,7 +122,7 @@ export function GenerationPanel({ domainId, market, canWrite, onReport, onPendin
               style={{ flex: 1, minWidth: 0, height: 34, borderRadius: 7, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 12, padding: '0 10px', fontFamily: 'inherit' }}
             />
           </span>
-          <span style={{ fontSize: 10, color: 'var(--sub)' }}>
+          <span style={{ fontSize: 12, color: 'var(--sub)' }}>
             통화는 도메인 시장({market}) 기준으로 고정됩니다. 입력 시 채널별 배분 금액을, 비우면 비율만 제안합니다.
           </span>
         </label>
