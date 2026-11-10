@@ -9,13 +9,14 @@
 //   ⑦ PUT buildResume(campaign, id, 'guard_auto_resume'). 실패면 ⑥을 되돌린다(불확실이면 안전 끄기도).
 //   ⑧ PUT 뒤 계정 상태 재확인: active가 아니면 즉시 끄기 전용 클라이언트로 다시 끄고 ads.pause_failed(resume_race) (Task 9 adv I-3 패턴).
 //   ⑨ 결과 기록은 lockVersion이 ⑥ 값 그대로일 때만. 아니면 안전 방향으로 다시 끈다(lock_race).
+//   마감(ctx.deadline)이 지나면 남은 행은 재개하지 않는다(unchecked, 다음 실행).
 // - 켠 것이 있으면 ads.auto_resume 1건/계정(같은 날 중복 제거).
 import type { AdsHttpError } from "./http";
 import { NaverAdsError } from "@/lib/external/naver-searchad";
 import { prisma } from "@/lib/prisma";
 import { kstDate } from "./alerts";
 import { isExecutionEnabled, putUserLock } from "./execution";
-import { errorName, guardAlert, guardDeps, isAuthError, type GuardCtx } from "./guard-cap";
+import { errorName, guardAlert, guardDeps, isAuthError, pastDeadline, type GuardCtx } from "./guard-cap";
 import type { DriftScan } from "./guard-drift";
 import { caps } from "./invariants";
 import { freshCheck } from "./launch-check";
@@ -99,6 +100,7 @@ export async function autoResume(ctx: GuardCtx, scan: DriftScan): Promise<void> 
   }
   const resumed: string[] = [];
   for (const row of rows) {
+    if (pastDeadline(ctx)) { ctx.result.unchecked++; continue; } // 마감: 확인 못 함 → 재개 안 함(다음 실행)
     if (!scan.budgetOk || !scan.clean.has(row.naverId) || !(await resumeOne(ctx, row))) { // ④
       ctx.result.blocked++;
       continue;

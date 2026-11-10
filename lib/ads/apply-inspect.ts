@@ -18,7 +18,7 @@ export type Observed = { userLock: boolean; inspectStatus: string | null; drift:
 
 async function alert(ctx: InspectCtx, payload: AlertPayload, type: "ads.drift" | "ads.pause_failed" = "ads.drift"): Promise<void> {
   try {
-    await queueAlert(ctx.account.id, type, { proposalId: ctx.proposalId, step: ctx.step, ...payload });
+    await queueAlert(ctx.account.id, type, { proposalId: ctx.proposalId, step: ctx.step, ...payload }, { dedupeKey: String(payload.naverId ?? ctx.step) }); // 엔티티별(판정 I-3)
   } catch (error) {
     console.error("[ads] apply alert queue failed", { type: error instanceof Error ? error.name : "unknown" }); // 원래 실패를 가리지 않는다
   }

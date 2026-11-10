@@ -830,7 +830,7 @@ model AdOperationLog { // ad_operation_logs — 네이버 변이 요청 원장(�
   @@map("ad_operation_logs")
 }
 
-model AdAlert { // ad_alerts — 알림 발송(같은 계정·유형·KST 날짜는 1회)
+model AdAlert { // ad_alerts — 알림 발송(같은 계정·유형·KST 날짜·dedupeKey는 1회)
   id          String    @id @default(cuid())
   ownerId     String    @map("owner_id")
   adAccountId String    @map("ad_account_id")
@@ -841,10 +841,11 @@ model AdAlert { // ad_alerts — 알림 발송(같은 계정·유형·KST 날짜
   lastError   String?   @map("last_error")
   claimedAt   DateTime? @map("claimed_at")             // 발송 중 표시(동시 flush 1회 발송). 5분 지나면 죽은 실행으로 보고 다시 잡는다
   payload     Json
+  dedupeKey   String    @default("") @map("dedupe_key") // 같은 날 별개 사건 구분: pause_failed·drift·inspect_denied = 엔티티 naverId, guard_blind = 사유, 나머지 ''
   createdAt   DateTime  @default(now()) @map("created_at")
   owner     User      @relation(fields: [ownerId], references: [id], onDelete: Restrict)
   adAccount AdAccount @relation(fields: [adAccountId], references: [id], onDelete: Restrict)
-  @@unique([adAccountId, type, kstDate])
+  @@unique([adAccountId, type, kstDate, dedupeKey])
   @@index([ownerId, kstDate])
   @@map("ad_alerts")
 }

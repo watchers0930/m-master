@@ -25,7 +25,7 @@ async function verifyOne(client: NaverAdsClient, account: AdAccount, kind: LockK
   const verdict = kind === "ad" ? (seen.type === "TEXT_45" ? { ok: true as const } : { ok: false as const, field: "type" }) : verifyStored(kind, account, raw);
   if (!verdict.ok) {
     try {
-      await queueAlert(account.id, "ads.drift", { entity: kind, naverId, field: verdict.field, at: "launch" }, now ? { now } : {});
+      await queueAlert(account.id, "ads.drift", { entity: kind, naverId, field: verdict.field, at: "launch" }, { ...(now ? { now } : {}), dedupeKey: naverId });
     } catch (error) {
       console.error("[ads] drift alert queue failed", { type: error instanceof Error ? error.name : "unknown" });
     }

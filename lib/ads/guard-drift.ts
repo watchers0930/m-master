@@ -6,13 +6,14 @@
 //   공유예산이 어긋나면 모든 캠페인이 드리프트다. 형식 불일치(shape)도 드리프트로 본다(안전 방향).
 // - 조회 실패(네트워크·목록 불완전)는 '확인 못 함'이다: 끄지 않고, 알림하지 않고, clean에 넣지 않는다(→ 자동 재개 안 함).
 // - 결과 clean = 이번 실행에서 공유예산·캠페인·모든 그룹이 검사를 통과한 캠페인 naverId. 자동 재개(guard-resume)는 여기 있는 것만 켠다.
-// - 알림 ads.drift 1건/실행(같은 날 중복 제거): { at:'guard', count, items(최대 10) }.
+// - 알림 ads.drift: 엔티티마다 1건(dedupeKey naverId, 실행당 최대 10건): { at:'guard', entity, naverId, campaign, field, paused }.
+// - 마감(ctx.deadline)이 지나면 남은 캠페인은 '확인 못 함'(unchecked) — clean에 넣지 않으므로 재개되지 않는다.
 // - 규모: 계정당 미러 캠페인 MAX_SCAN_CAMPAIGNS(50)개, 캠페인당 GET 1 + 그룹 목록(빈 페이지까지).
 import { prisma } from "@/lib/prisma";
 import { naverAdgroupSchema, naverCampaignSchema } from "@/schemas/ads";
 import { isCampaignOff } from "./account-core";
 import { readEntity } from "./execution";
-import { errorName, guardAlert, guardPause, isAuthError, type GuardCtx } from "./guard-cap";
+import { errorName, guardAlert, guardPause, isAuthError, pastDeadline, type GuardCtx } from "./guard-cap";
 import { listAll } from "./reconcile";
 import { verifyStored } from "./requests";
 
@@ -20,7 +21,7 @@ export const MAX_SCAN_CAMPAIGNS = 50;
 const MAX_ALERT_ITEMS = 10;
 const UNVERIFIED = Symbol("unverified");
 type DriftItem = { entity: string; naverId: string; campaign?: string; field: string; paused?: boolean };
-type CampaignCheck = { deleted: boolean; lit: boolean; item: DriftItem | null };
+type CampaignCheck = { deleted: boolean; lit: boolean; known: boolean; item: DriftItem | null }; // known = 켜짐·꺼짐을 실제로 읽었다
 export type DriftScan = { clean: Set<string>; budgetOk: boolean };
 
 const groupRow = naverAdgroupSchema.passthrough(); // verifyStored가 원본 필드(aiAdsOptIn 등)를 다시 parse한다
@@ -44,17 +45,18 @@ async function checkSharedBudget(ctx: GuardCtx): Promise<string | null | typeof 
 async function checkCampaign(ctx: GuardCtx, naverId: string): Promise<CampaignCheck> {
   const raw = await readEntity(ctx.client, "campaign", naverId);
   const parsed = naverCampaignSchema.safeParse(raw);
-  if (parsed.success && parsed.data.status === "DELETED") return { deleted: true, lit: false, item: null };
-  const lit = parsed.success ? !isCampaignOff(parsed.data) : true; // 모르면 켜진 쪽으로(끄기는 무해)
+  if (parsed.success && parsed.data.status === "DELETED") return { deleted: true, lit: false, known: true, item: null };
+  const lit = parsed.success ? !isCampaignOff(parsed.data) : true; // 모르면 켜진 쪽으로 끈다(끄기는 무해) — 단 guard 표시는 안 한다(판정 I-1)
+  const known = parsed.success;
   const verdict = verifyStored("campaign", ctx.account, raw);
-  if (!verdict.ok) return { deleted: false, lit, item: { entity: "campaign", naverId, campaign: naverId, field: verdict.field } };
+  if (!verdict.ok) return { deleted: false, lit, known, item: { entity: "campaign", naverId, campaign: naverId, field: verdict.field } };
   const groups = await listAll(ctx.client, "/ncc/adgroups", { nccCampaignId: naverId }, groupRow, (g) => g.nccAdgroupId, "guard.drift");
   for (const g of groups) {
     if (g.status === "DELETED") continue;
     const v = verifyStored("adgroup", ctx.account, g);
-    if (!v.ok) return { deleted: false, lit, item: { entity: "adgroup", naverId: g.nccAdgroupId, campaign: naverId, field: v.field } };
+    if (!v.ok) return { deleted: false, lit, known, item: { entity: "adgroup", naverId: g.nccAdgroupId, campaign: naverId, field: v.field } };
   }
-  return { deleted: false, lit, item: null };
+  return { deleted: false, lit, known, item: null };
 }
 
 export async function scanDrift(ctx: GuardCtx): Promise<DriftScan> {
@@ -66,6 +68,7 @@ export async function scanDrift(ctx: GuardCtx): Promise<DriftScan> {
     where: { adAccountId: ctx.account.id }, select: { id: true, naverId: true }, orderBy: { naverId: "asc" }, take: MAX_SCAN_CAMPAIGNS,
   });
   for (const row of rows) {
+    if (pastDeadline(ctx)) { ctx.result.unchecked++; continue; } // 마감: 확인 못 함(clean 아님 → 재개 안 함)
     let check: CampaignCheck;
     try {
       check = await checkCampaign(ctx, row.naverId);
@@ -80,10 +83,11 @@ export async function scanDrift(ctx: GuardCtx): Promise<DriftScan> {
       if (budget === null) clean.add(row.naverId);
       continue; // 공유예산을 확인 못 했으면 clean 아님(재개 안 함), 끄지도 않음
     }
-    if (check.lit) item.paused = await guardPause(ctx, row.id, row.naverId, "drift");
+    if (check.lit) item.paused = await guardPause(ctx, row.id, row.naverId, "drift", check.known);
     if (check.item !== null || check.lit) items.push(item);
   }
   ctx.result.drift = items.length;
-  if (items.length) await guardAlert(ctx, "ads.drift", { at: "guard", count: items.length, items: items.slice(0, MAX_ALERT_ITEMS) });
+  // 엔티티마다 1건(dedupeKey = naverId, 판정 I-3). 같은 엔티티의 같은 날 반복은 1회. 한 실행의 알림 행 수는 MAX_ALERT_ITEMS로 제한.
+  for (const item of items.slice(0, MAX_ALERT_ITEMS)) await guardAlert(ctx, "ads.drift", { at: "guard", ...item }, item.naverId);
   return { clean, budgetOk: budget === null };
 }

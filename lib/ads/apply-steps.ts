@@ -38,7 +38,7 @@ async function adoptOne(e: Ensure): Promise<string | null> {
 /** 반영 여부를 끝내 확인하지 못한 단계: 다시 보내지 않고 멈춘다. 대장이 네이버 화면에서 확인하도록 알린다(같은 날 1회). */
 async function uncertainStop(ctx: ApplyCtx, step: string): Promise<never> {
   try {
-    await queueAlert(ctx.account.id, "ads.drift", { reason: "uncertain", proposalId: ctx.proposalId, step });
+    await queueAlert(ctx.account.id, "ads.drift", { reason: "uncertain", proposalId: ctx.proposalId, step }, { dedupeKey: `${ctx.proposalId}:${step}` }); // 엔티티 id가 아직 없다 → 단계별
   } catch (error) {
     console.error("[ads] uncertain alert queue failed", { type: error instanceof Error ? error.name : "unknown" });
   }

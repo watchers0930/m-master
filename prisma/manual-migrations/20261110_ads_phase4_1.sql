@@ -184,6 +184,7 @@ CREATE TABLE IF NOT EXISTS "ad_alerts" (
     "last_error" TEXT,
     "claimed_at" TIMESTAMP(3),
     "payload" JSONB NOT NULL,
+    "dedupe_key" TEXT NOT NULL DEFAULT '',
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ad_alerts_pkey" PRIMARY KEY ("id")
@@ -259,7 +260,7 @@ CREATE INDEX IF NOT EXISTS "ad_operation_logs_proposal_id_idx" ON "ad_operation_
 CREATE INDEX IF NOT EXISTS "ad_alerts_owner_id_kst_date_idx" ON "ad_alerts"("owner_id", "kst_date");
 
 -- CreateIndex
-CREATE UNIQUE INDEX IF NOT EXISTS "ad_alerts_ad_account_id_type_kst_date_key" ON "ad_alerts"("ad_account_id", "type", "kst_date");
+CREATE UNIQUE INDEX IF NOT EXISTS "ad_alerts_ad_account_id_type_kst_date_dedupe_key_key" ON "ad_alerts"("ad_account_id", "type", "kst_date", "dedupe_key");
 
 -- AddForeignKey
 DO $$ BEGIN

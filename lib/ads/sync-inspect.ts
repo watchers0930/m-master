@@ -4,7 +4,7 @@
 // - 쓰는 것은 inspectStatus·lastSyncedAt뿐이다. lockVersion·lockedBy·lockedAt·userLock은 절대 건드리지 않는다(Task 2 m-2 / Task 9 CARRY —
 //   동기화 쓰기가 잠금 CAS를 깨지 않게). 행 범위는 (id, adAccountId).
 // - 응답은 zod로 parse한다. 형식 오류인 묶음은 기록하고 건너뛴다(값을 지우거나 바꾸지 않는다). 401은 계정을 invalid_key로 바꾼다.
-// - DENIED로 새로 바뀐 것이 있으면 ads.inspect_denied 1건/계정(같은 날 중복 제거 — 같은 날 두 번째 반려 묶음은 알림 행에 합쳐지지 않는다).
+// - DENIED로 새로 바뀐 엔티티마다 ads.inspect_denied 1건(dedupeKey = naverId).
 import type { AdAccount } from "@prisma/client";
 import { NaverAdsError, type NaverAdsClient } from "@/lib/external/naver-searchad";
 import { prisma } from "@/lib/prisma";
@@ -18,7 +18,6 @@ export const MAX_ACCOUNTS = 50;
 export const MAX_ROWS = 1000;
 export const ID_CHUNK = 50;
 const PENDING = ["PENDING", "UNDER_REVIEW"];
-const MAX_ALERT_ITEMS = 10;
 
 type Kind = "keyword" | "ad";
 type Row = { id: string; naverId: string; inspectStatus: string | null };
@@ -80,9 +79,9 @@ async function syncAccount(account: AdAccount, now: Date, deps: AdsDeps): Promis
     for (const kind of ["keyword", "ad"] as const) await syncKind(client, account, kind, now, r, denied);
   });
   r.denied = denied.length;
-  if (denied.length) {
+  for (const d of denied) { // 엔티티마다 1건(dedupeKey = naverId, 판정 Task 11 I-3) — 같은 날 다른 반려도 묻히지 않는다
     try {
-      await queueAlert(account.id, "ads.inspect_denied", { count: denied.length, items: denied.slice(0, MAX_ALERT_ITEMS) }, { now: () => now });
+      await queueAlert(account.id, "ads.inspect_denied", d, { now: () => now, dedupeKey: d.naverId });
     } catch (error) {
       console.error("[ads] inspect_denied alert queue failed", { type: error instanceof Error ? error.name : "unknown" });
     }

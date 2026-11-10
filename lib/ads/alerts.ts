@@ -1,4 +1,7 @@
-// lib/ads/alerts.ts — 광고 감시 알림 큐(ad_alerts)와 발송. 같은 (계정, 유형, KST 날짜)는 1회만.
+// lib/ads/alerts.ts — 광고 감시 알림 큐(ad_alerts)와 발송. 같은 (계정, 유형, KST 날짜, dedupeKey)는 1회만.
+// - dedupeKey(판정 Task 11 I-3, 기본 ''): 같은 날 별개 사건을 구분한다 — pause_failed·drift·inspect_denied = 엔티티 naverId, guard_blind = 사유.
+//   cap_90·cap_100·auto_resume·bizmoney_low·key_invalid는 ''(하루 1회).
+// - flushAlerts는 안전 유형(SAFETY_FIRST: pause_failed·cap_100·guard_blind·drift)을 먼저, 그다음 나머지를 오래된 순으로 보낸다.
 // - queueAlert: ownerId는 항상 AdAccount 행에서 읽는다(호출자 값 금지). 중복 요청은 첫 행을 그대로 둔다(sentAt·attempts·payload 유지).
 // - flushAlerts: 오래된 순으로 limit건. 각 행은 조건부 updateMany로 먼저 "잡고"(claim) 잡은 실행만 보낸다 → 동시 크론도 1회 발송.
 //   · claim = claimedAt 기록 + attempts+1. 시도 상한 MAX_ATTEMPTS(5) — 발송 직전에 죽은 실행도 1회로 센다(무한 재시도 방지).
@@ -22,7 +25,9 @@ export const MAX_ALERT_RECIPIENTS = 10;
 const KST_OFFSET_MS = 9 * 60 * 60_000;
 
 type Clock = () => Date;
-export type QueueOptions = { now?: Clock };
+export type QueueOptions = { now?: Clock; dedupeKey?: string };
+export const SAFETY_FIRST: readonly AdAlertType[] = ["ads.pause_failed", "ads.cap_100", "ads.guard_blind", "ads.drift"];
+const MAX_DEDUPE_KEY_CHARS = 200;
 export type FlushOptions = { now?: Clock; transport?: EmailTransport };
 export type FlushResult = { sent: number; failed: number };
 
@@ -40,10 +45,12 @@ export async function queueAlert(accountId: string, type: AdAlertType, payload: 
   const account = await prisma.adAccount.findUnique({ where: { id: accountId }, select: { ownerId: true } });
   if (!account) throw new Error("ad_account_not_found");
   const day = kstDate((options.now ?? (() => new Date()))());
+  const dedupeKey = options.dedupeKey ?? "";
+  if (typeof dedupeKey !== "string" || dedupeKey.length > MAX_DEDUPE_KEY_CHARS) throw new Error("invalid_dedupe_key");
   try {
     await prisma.adAlert.upsert({
-      where: { adAccountId_type_kstDate: { adAccountId: accountId, type, kstDate: day } },
-      create: { ownerId: account.ownerId, adAccountId: accountId, type, kstDate: day, payload: data },
+      where: { adAccountId_type_kstDate_dedupeKey: { adAccountId: accountId, type, kstDate: day, dedupeKey } },
+      create: { ownerId: account.ownerId, adAccountId: accountId, type, kstDate: day, dedupeKey, payload: data },
       update: {}, // 중복: 아무것도 바꾸지 않는다(이미 보낸 알림을 되살리지 않음)
     });
   } catch (error) {
@@ -79,15 +86,16 @@ export async function flushAlerts(limit = 20, options: FlushOptions = {}): Promi
     attempts: { lt: MAX_ATTEMPTS },
     OR: [{ claimedAt: null }, { claimedAt: { lte: staleBefore } }],
   };
-  const due = await prisma.adAlert.findMany({
-    where: claimable,
-    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-    take: limit,
-    select: {
-      id: true, type: true, kstDate: true, payload: true, attempts: true, claimedAt: true,
-      adAccount: { select: { label: true } },
-    },
-  });
+  const select = {
+    id: true, type: true, kstDate: true, payload: true, attempts: true, claimedAt: true,
+    adAccount: { select: { label: true } },
+  } as const;
+  const orderBy = [{ createdAt: "asc" as const }, { id: "asc" as const }];
+  const first = await prisma.adAlert.findMany({ where: { AND: [claimable, { type: { in: [...SAFETY_FIRST] } }] }, orderBy, take: limit, select });
+  const rest = first.length < limit
+    ? await prisma.adAlert.findMany({ where: { AND: [claimable, { type: { notIn: [...SAFETY_FIRST] } }] }, orderBy, take: limit - first.length, select })
+    : [];
+  const due = [...first, ...rest];
   if (!due.length) return { sent: 0, failed: 0 };
 
   const to = alertRecipients();

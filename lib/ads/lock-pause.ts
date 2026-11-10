@@ -1,7 +1,7 @@
 // lib/ads/lock-pause.ts — 대장 끄기(Task 9 판정 I-1: 끄기는 정책 게이트로 막지 않는다).
 // - 스위치·상한·검수·제안 상태·expected_lock_version과 무관하게 보낸다. 늘 이긴다(버전이 달라도 409 없음).
-// - 의도를 네트워크 전에 미러에 먼저 기록한다: lockedBy='owner', lockVersion+1, lockedAt=now. 단 guard 잠금은 guard로 남긴다
-//   (끄기로 가드 잠금을 owner로 세탁해 당일 켜기 제한을 우회하지 못하게) — lockVersion만 +1.
+// - 의도를 네트워크 전에 미러에 먼저 기록한다: lockedBy='owner', lockVersion+1, lockedAt=now. guard 잠금도 owner로 덮는다(판정 Task 11 I-2 —
+//   대장이 끈 것을 다음 날 자동 재개가 켜면 안 된다). 같은 날 대장 켜기는 상한 검사(cap_reached)가 여전히 막는다.
 // - 끄기 전용 클라이언트(clientForPause): 계정 status active | invalid_key | disconnecting을 받고 끄기 본문만 보낼 수 있다.
 //   disabled(키 삭제됨)는 보낼 수 없으므로 409 keys_removed(네이버 화면에서 직접 끄라는 안내).
 // - PUT이 실패해도 의도 기록은 남고 오류를 돌려준다. 결과(userLock)는 lockVersion이 그대로일 때만 기록한다. 실패면 userLock=false(켜짐·모름).
@@ -25,9 +25,8 @@ async function recordIntent(type: LockKind, ownerId: string, id: string, now: Da
     const row = await lockMirrorRow(tx, type, id, ownerId);
     await deps.afterLock?.(tx, row);
     const m = mirrorOf(tx, type);
-    // 두 조건부 갱신이 서로 배타적이다(잠금 아래에서 lockedBy를 다시 본다): guard 아님 → owner, guard → 버전만
-    await m.updateMany({ where: { id, ownerId, OR: [{ lockedBy: null }, { lockedBy: { not: "guard" } }] }, data: { lockedBy: "owner", lockedAt: now, lockVersion: { increment: 1 } } });
-    await m.updateMany({ where: { id, ownerId, lockedBy: "guard" }, data: { lockVersion: { increment: 1 } } });
+    // 대장 끄기는 언제나 owner(판정 Task 11 I-2: guard도 덮는다 — 대장이 끈 것을 다음 날 자동 재개가 켜지 않게)
+    await m.updateMany({ where: { id, ownerId }, data: { lockedBy: "owner", lockedAt: now, lockVersion: { increment: 1 } } });
     return (await m.findFirst({ where: { id, ownerId }, select: MIRROR_SELECT })) as MirrorLockRow;
   });
 }
@@ -47,7 +46,7 @@ export async function pauseNow(account: AdAccount, type: LockKind, naverId: stri
 /** 안전 끄기 실패·경합 알림(같은 날 ads.drift에 묻히지 않는 별도 유형). 알림 큐 실패는 원래 흐름을 가리지 않는다. */
 export async function pauseAlert(account: AdAccount, payload: AlertPayload, now?: () => Date): Promise<void> {
   try {
-    await queueAlert(account.id, "ads.pause_failed", payload, now ? { now } : {}); // KST 날짜: 주입 시계(감시) 또는 실제 시각
+    await queueAlert(account.id, "ads.pause_failed", payload, { ...(now ? { now } : {}), dedupeKey: String(payload.naverId ?? "") }); // KST 날짜: 주입 시계(감시) 또는 실제 시각, 엔티티별(판정 I-3)
   } catch (error) {
     console.error("[ads] pause_failed alert queue failed", { type: error instanceof Error ? error.name : "unknown" });
   }
