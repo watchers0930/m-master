@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS "ad_accounts" (
     "secret_key_enc" TEXT,
     "key_last4" TEXT,
     "status" TEXT NOT NULL DEFAULT 'active',
+    "disconnect_from_status" TEXT,
     "daily_cap_krw" INTEGER NOT NULL DEFAULT 100000,
     "shared_budget_krw" INTEGER NOT NULL DEFAULT 100000,
     "max_bid_krw" INTEGER NOT NULL DEFAULT 2000,

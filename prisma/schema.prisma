@@ -633,7 +633,8 @@ model AdAccount { // ad_accounts — 네이버 검색광고 계정 연결(키는
   apiKeyEnc         String?   @map("api_key_enc") @db.Text     // 봉인 blob. 평문 저장·노출 금지. null = 연결 해제(status=disabled)
   secretKeyEnc      String?   @map("secret_key_enc") @db.Text  // 봉인 blob. 평문 저장·노출 금지. null = 연결 해제(status=disabled)
   keyLast4          String?   @map("key_last4")                // 화면 표시용 뒤 4자리. 해제 시 null
-  status            String    @default("active")               // active | invalid_key | disabled
+  status            String    @default("active")               // active | invalid_key | disconnecting | disabled
+  disconnectFromStatus String? @map("disconnect_from_status")    // 해제 시작 전 상태(active|invalid_key). disconnecting일 때만 값, 중단 시 이 값으로 복원
   dailyCapKrw       Int       @default(100000) @map("daily_cap_krw")     // 하루 상한(VAT 별도, /stats salesAmt 기준)
   sharedBudgetKrw   Int       @default(100000) @map("shared_budget_krw") // 네이버 공유예산 금액
   maxBidKrw         Int       @default(2000) @map("max_bid_krw")         // 입찰 상한(70 ≤ bid ≤ maxBid, 최대 100,000)

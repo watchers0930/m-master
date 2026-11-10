@@ -11,7 +11,7 @@ import type { AdAccountDTO, AdAccountStatus } from "@/types/ads";
 import { queueAlert } from "./alerts";
 import { AdsHttpError, unexpectedNaverResponse } from "./http";
 
-export type AdsDeps = { transport?: typeof fetch };
+export type AdsDeps = { transport?: typeof fetch; now?: () => Date }; // now: 시간 판정(해제 재점유) 주입용
 export const CAMPAIGN_PAGE = 1000; // 명세 recordSize 상한(1~1000)
 
 const DTO_SELECT = {

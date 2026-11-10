@@ -75,7 +75,7 @@ export async function connectAccount(ownerId: string, input: AdsConnectInput, de
   const data = adsConnectSchema.parse(input);
   const client = await verifyNewKeys(data.customerId, data, deps);
   const sealed = await sealKeys(ownerId, data.customerId, data);
-  const verified = { ...sealed, status: "active", lastVerifiedAt: new Date(), label: data.label };
+  const verified = { ...sealed, status: "active", disconnectFromStatus: null, lastVerifiedAt: new Date(), label: data.label };
   const row = await prisma.adAccount.upsert({
     where: { ownerId_naverCustomerId: { ownerId, naverCustomerId: data.customerId } },
     create: { ownerId, naverCustomerId: data.customerId, ...verified },

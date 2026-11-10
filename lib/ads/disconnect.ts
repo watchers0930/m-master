@@ -10,6 +10,11 @@
 //   ④ 미러·성과·공유예산/채널 기록은 보존(재연결 시 같은 행 재활성).
 // - 중단(확인 실패·네이버 오류·복호화 오류)하면 'disconnecting' → 이전 상태로 되돌려 가드가 계속 감시하게 한다. 키는 그대로.
 //   중단 원인이 키 무효(ads_auth_failed)면 복원 후 invalid_key + 알림(markInvalidKey).
+// - 멈춘 해제(프로세스 사망으로 'disconnecting'에 남음) 회수: updatedAt이 STALE_CLAIM_MS(10분)보다 오래된 행만 다시 해제가 재점유한다
+//   (조건부 updateMany status='disconnecting' AND updatedAt < now-10분, count 1 — 동시 재점유는 하나만). 재점유는 updatedAt을 갱신한다.
+//   10분 근거: 해제 1회 = 페이지 조회 ×2 + 끄기 PUT(각 시도 25초·전체 45초 상한) — 정상 실행은 함수 maxDuration 안에 끝나므로
+//   10분 넘게 갱신 없는 disconnecting은 죽은 실행이다. 젊은 행은 409(진행 중).
+// - 해제 전 상태는 첫 점유 때 disconnectFromStatus에 저장한다 → 재점유 뒤 중단해도 원래 상태(active|invalid_key)로 복원.
 // - 한계: ② 이후 ③ 사이에, ⓪ 이전에 이미 만들어 둔 클라이언트로 켜는 작업자는 여기서 막을 수 없다 → Task 9/11의 모든 켜기·쓰기는
 //   보내기 직전 status==='active'를 다시 확인해야 한다(CARRY).
 import { NaverAdsError, clientForDisconnect, type NaverAdsClient } from "@/lib/external/naver-searchad";
@@ -25,6 +30,7 @@ import { buildPause } from "./requests";
 
 const pauseResponseSchema = naverCampaignListSchema.element;
 const CLAIMABLE = ["active", "invalid_key"] as const;
+export const STALE_CLAIM_MS = 10 * 60_000;
 const inProgress = () => new AdsHttpError("disconnect_in_progress", "이미 해제가 진행 중이거나 계정 상태가 바뀌었습니다. 잠시 후 다시 확인하세요.", 409);
 
 /** ①② — 확인하지 못한 캠페인 수(0이면 전부 꺼짐 확인). */
@@ -50,7 +56,9 @@ async function pauseAndConfirm(client: NaverAdsClient, row: AdAccount): Promise<
 }
 
 async function revert(row: AdAccount, previous: string, error?: unknown): Promise<void> {
-  await prisma.adAccount.updateMany({ where: { id: row.id, ownerId: row.ownerId, status: "disconnecting" }, data: { status: previous } });
+  await prisma.adAccount.updateMany({
+    where: { id: row.id, ownerId: row.ownerId, status: "disconnecting" }, data: { status: previous, disconnectFromStatus: null },
+  });
   if (error instanceof NaverAdsError && error.reason === "ads_auth_failed") await markInvalidKey(row.id);
 }
 
@@ -58,12 +66,20 @@ export async function disconnectAccount(ownerId: string, accountId: string, deps
   assertAdsOwner(ownerId);
   const row = await loadOwnedAccount(ownerId, accountId);
   if (row.status === "disabled") return accountDTO(ownerId, row.id);
-  const previous = row.status;
-  if (!(CLAIMABLE as readonly string[]).includes(previous)) throw inProgress();
+  const now = (deps.now ?? (() => new Date()))();
+  const takeover = row.status === "disconnecting";
+  if (!takeover && !(CLAIMABLE as readonly string[]).includes(row.status)) throw inProgress();
+  // 재점유면 첫 점유 때 저장한 원래 상태로 복원한다(값이 없거나 이상하면 active — 다음 호출이 키 무효를 다시 판정)
+  const stored = row.disconnectFromStatus ?? "";
+  const previous = takeover ? ((CLAIMABLE as readonly string[]).includes(stored) ? stored : "active") : row.status;
 
-  // ⓪ 조건부 전이 + 미러 owner 잠금(같은 트랜잭션). 읽은 뒤 상태가 바뀌었으면 count 0 → 409.
+  // ⓪ 조건부 전이(첫 점유: 이전 상태 → disconnecting / 재점유: 10분 넘게 멈춘 disconnecting만) + 미러 owner 잠금(같은 트랜잭션).
+  //    읽은 뒤 상태가 바뀌었거나 다른 실행이 먼저 점유했으면 count 0 → 409.
   await prisma.$transaction(async (tx) => {
-    const { count } = await tx.adAccount.updateMany({ where: { id: row.id, ownerId, status: previous }, data: { status: "disconnecting" } });
+    const where = takeover
+      ? { id: row.id, ownerId, status: "disconnecting", updatedAt: { lt: new Date(now.getTime() - STALE_CLAIM_MS) } }
+      : { id: row.id, ownerId, status: row.status };
+    const { count } = await tx.adAccount.updateMany({ where, data: { status: "disconnecting", disconnectFromStatus: previous, updatedAt: now } });
     if (count !== 1) throw inProgress();
     await tx.adCampaign.updateMany({ where: { adAccountId: row.id, ownerId: row.ownerId }, data: { lockedBy: "owner" } });
   });
@@ -87,7 +103,7 @@ export async function disconnectAccount(ownerId: string, accountId: string, deps
   await prisma.$transaction(async (tx) => {
     const { count } = await tx.adAccount.updateMany({
       where: { id: row.id, ownerId, status: "disconnecting" },
-      data: { apiKeyEnc: null, secretKeyEnc: null, keyLast4: null, status: "disabled" },
+      data: { apiKeyEnc: null, secretKeyEnc: null, keyLast4: null, status: "disabled", disconnectFromStatus: null },
     });
     if (count !== 1) throw inProgress();
     await tx.adCampaign.updateMany({ where: { adAccountId: row.id, ownerId: row.ownerId }, data: { userLock: true, lockedBy: "owner" } });
