@@ -4,7 +4,10 @@
 // 2단계(판정 round 2 (a)) — 계정은 take MAX_ACCOUNTS, createdAt 순:
 //   1단계(모든 계정 먼저): 0·1·2(비용 측정, cap_90, 상한 끄기). 2단계(1단계가 모든 계정에서 끝난 뒤): 3·4·5(드리프트, 재개, 비즈머니).
 //   앞 계정(상한 미만)의 드리프트·재개가 뒤 계정의 상한 끄기 예산을 먹지 않는다.
-//   0. status invalid_key → 네이버 호출 없이 건너뛰고 ads.key_invalid(같은 날 1회). disconnecting·disabled는 해제 흐름 소관이라 제외.
+//   0. status invalid_key → 네이버 호출 없이 건너뛰고 ads.key_invalid(같은 날 1회). disabled(키 삭제됨)는 제외.
+//      disconnecting(최종 판정 A2) → 1단계만: 끄기 전용 클라이언트(clientForPause, 조회·끄기만)로 비용 측정·cap_90·상한 끄기.
+//      2단계(드리프트·재개·비즈머니)는 하지 않는다(해제 흐름 소관). updatedAt에서 STALE_CLAIM_MS(10분)가 지나도 disconnecting이면
+//      죽은 해제다 → ads.guard_blind(reason disconnect_stuck, 같은 날 1회). 해제 루프가 죽어도 켜진 캠페인이 무감시로 남지 않는다.
 //   1. 오늘(KST) 비용 = todayCostKrw(단일 계산: 계정의 모든 캠페인 /stats salesAmt 합, VAT 별도). 모르면 null(끄기·재개 판단 안 함)
 //      + ads.guard_blind(reason spend_unknown). 키 복호화·클라이언트 생성 실패도 ads.guard_blind(credential_unavailable·client_unavailable)
 //      후 다음 계정으로 간다. 감시 불가만으로 자동 끄기는 하지 않는다(판정: 네이버 공유예산이 여전히 상한).
@@ -32,15 +35,16 @@
 //   발송은 계정 루프가 어떻게 끝나든(루프 밖 예외 포함) 언제나 돌고, 그 뒤 예외를 다시 던진다. 안전 유형 먼저.
 import type { AdAccount } from "@prisma/client";
 import { CredentialCryptoError } from "@/lib/crypto/credentials";
-import { NaverAdsError, clientForAccount, type NaverAdsClient } from "@/lib/external/naver-searchad";
+import { NaverAdsError, clientForAccount, clientForPause, type NaverAdsClient } from "@/lib/external/naver-searchad";
 import { claimPipelineRun, finishPipelineRun } from "@/lib/pipeline/run-claim";
 import { prisma } from "@/lib/prisma";
 import { markInvalidKey } from "./account-core";
 import type { EmailTransport } from "@/lib/notify/email";
 import { flushAlerts, type FlushResult } from "./alerts";
-import { checkBizmoney, errorName, guardAlert, guardBlind, lockAtCap, pastDeadline, type GuardAccountResult, type GuardCtx } from "./guard-cap";
+import { checkBizmoney, errorName, guardAlert, guardBlind, lockAtCap, pastDeadline, type GuardAccountResult, type GuardCtx, type GuardReadClient, type GuardWriteCtx } from "./guard-cap";
 import { scanDrift } from "./guard-drift";
 import { autoResume } from "./guard-resume";
+import { STALE_CLAIM_MS } from "./disconnect";
 import { caps } from "./invariants";
 import type { LockDeps } from "./lock-mirror";
 import { todayCostKrw } from "./spend";
@@ -83,12 +87,15 @@ class ClassifiedFailure extends Error {
 }
 
 type RunClock = { clock: () => number; deadline: number };
-type Phase1 = { ctx: GuardCtx; cap: number; spend: number | null };
+/** writeCtx = 2단계 문맥(활성 계정만). 해제 중 계정은 null → 2단계 없음. */
+type Phase1 = { ctx: GuardCtx; writeCtx: GuardWriteCtx | null; cap: number; spend: number | null };
 
-/** 저장 키로 클라이언트를 만든다(모든 호출에 남은 예산 마감). 실패(복호화·형식)는 감시 불가 알림 후 ClassifiedFailure. */
-async function guardClient(account: AdAccount, now: Date, deps: LockDeps): Promise<NaverAdsClient> {
+/** 저장 키로 클라이언트를 만든다(모든 호출에 남은 예산 마감). 실패(복호화·형식)는 감시 불가 알림 후 ClassifiedFailure.
+ *  활성 계정 = 전체 클라이언트, 해제 중 계정 = 끄기 전용(조회 + 끄기 본문만). */
+async function guardClient(account: AdAccount, now: Date, deps: LockDeps): Promise<NaverAdsClient | GuardReadClient> {
   try {
-    return clientForAccount(account, deps.transport, { clock: deps.naverClock, budget: deps.callBudget });
+    const opts = { clock: deps.naverClock, budget: deps.callBudget };
+    return account.status === "disconnecting" ? clientForPause(account, deps.transport, opts) : clientForAccount(account, deps.transport, opts);
   } catch (error) {
     const reason = error instanceof CredentialCryptoError ? "credential_unavailable" : "client_unavailable";
     await guardBlind({ account, now }, reason);
@@ -111,11 +118,13 @@ async function classify<T>(account: AdAccount, deps: LockDeps, work: () => Promi
 
 /** 1단계: 비용 측정 + cap_90 + 상한 끄기. 2단계에 넘길 문맥을 돌려준다(키 무효 계정은 null). */
 async function phase1(account: AdAccount, now: Date, baseDeps: LockDeps, run: RunClock, result: GuardAccountResult): Promise<Phase1 | null> {
-  if (account.status !== "active") {
+  if (account.status !== "active" && account.status !== "disconnecting") {
     await guardAlert({ account, now }, "ads.key_invalid", { naverCustomerId: account.naverCustomerId });
     Object.assign(result, { outcome: "skipped", reason: account.status });
     return null;
   }
+  if (account.status === "disconnecting" && account.updatedAt.getTime() < now.getTime() - STALE_CLAIM_MS)
+    await guardBlind({ account, now }, "disconnect_stuck"); // 죽은 해제(판정 A2) — 비용 측정·상한 끄기는 아래에서 계속
   // 감시 경로의 모든 알림 KST 날짜 = 주입 시각, 모든 네이버 호출 = 남은 예산 마감(판정 round 2 (b))
   const deps: LockDeps = { ...baseDeps, now: () => now, callBudget: () => run.deadline - run.clock() };
   const client = await guardClient(account, now, deps);
@@ -134,13 +143,14 @@ async function phase1(account: AdAccount, now: Date, baseDeps: LockDeps, run: Ru
     result.todayCostKrw = spend;
     if (spend !== null && spend * 10 >= cap * 9) await guardAlert(ctx, "ads.cap_90", { todayCostKrw: spend, dailyCapKrw: cap });
     if (spend !== null && spend >= cap) await lockAtCap(ctx, spend, cap);
-    return { ctx, cap, spend };
+    const writeCtx = account.status === "active" ? { ...ctx, client: client as NaverAdsClient } : null;
+    return { ctx, writeCtx, cap, spend };
   });
 }
 
 /** 2단계: 드리프트 → 자동 재개 → 비즈머니. 모든 계정의 1단계가 끝난 뒤에만 돈다. */
-async function phase2(p: Phase1): Promise<void> {
-  const { ctx, cap, spend } = p;
+async function phase2(p: Phase1 & { writeCtx: GuardWriteCtx }): Promise<void> {
+  const { writeCtx: ctx, cap, spend } = p;
   await classify(ctx.account, ctx.deps, async () => {
     if (pastDeadline(ctx)) ctx.result.unchecked++; // 2단계를 시작하지 못함 = 드리프트·재개 확인 못 함(재개 안 함)
     else {
@@ -187,24 +197,25 @@ export async function runGuard(now: Date = new Date(), deps: GuardDeps = {}): Pr
   let failure: unknown = null;
   try {
     const accounts = await prisma.adAccount.findMany({
-      where: { status: { in: ["active", "invalid_key"] } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: MAX_ACCOUNTS,
+      where: { status: { in: ["active", "invalid_key", "disconnecting"] } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], take: MAX_ACCOUNTS,
     });
     // 1단계(판정 round 2 (a)): 모든 계정의 비용 측정 + 상한 끄기를 먼저. 앞 계정의 드리프트·재개가 뒤 계정의 끄기를 굶기지 않는다.
-    const second: Phase1[] = [];
+    const second: (Phase1 & { writeCtx: GuardWriteCtx })[] = [];
     for (const account of accounts) {
       const result = blank(account);
       results.push(result);
       if (pastDeadline(runClock)) {
         Object.assign(result, { outcome: "skipped", reason: "time_budget" });
-        if (account.status === "active") await guardBlind({ account, now }, "deadline");
+        if (account.status !== "invalid_key") await guardBlind({ account, now }, "deadline");
         continue;
       }
       let p = null as Phase1 | null; // 콜백 안 대입 — 좁히기 방지
       await isolate(account, now, result, async () => {
         p = await phase1(account, now, deps, runClock, result);
       });
-      if (p) second.push(p);
-      else await recordSnapshot(account, now, result); // 이 계정의 한 바퀴는 1단계에서 끝났다(키 무효·오류)
+      const done = p as Phase1 | null;
+      if (done?.writeCtx) second.push({ ...done, writeCtx: done.writeCtx });
+      else await recordSnapshot(account, now, result); // 이 계정의 한 바퀴는 1단계에서 끝났다(키 무효·오류·해제 중)
     }
     // 2단계: 드리프트·재개·비즈머니(남은 예산 안에서). 끝나면 계정 스냅샷.
     for (const p of second) {

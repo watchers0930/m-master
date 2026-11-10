@@ -25,10 +25,14 @@ export type GuardAccountResult = {
   bizmoneyKrw: number | null; // 이번 실행이 읽은 비즈머니(못 읽으면 null) — 감시 스냅샷(Task 12)
   paused: number; pauseFailed: number; resumed: number; blocked: number; drift: number; unchecked: number;
 };
+/** 감시 경로의 조회 클라이언트: 활성 계정은 clientForAccount, 해제 중 계정은 끄기 전용(clientForPause) — 둘 다 GET만 쓴다. */
+export type GuardReadClient = Pick<NaverAdsClient, "get">;
 export type GuardCtx = {
-  account: AdAccount; client: NaverAdsClient; now: Date; deps: LockDeps; result: GuardAccountResult;
+  account: AdAccount; client: GuardReadClient; now: Date; deps: LockDeps; result: GuardAccountResult;
   clock: () => number; deadline: number; // 마감(ms, clock 기준). 지나면 루프를 멈추고 남은 것은 '확인 못 함'
 };
+/** 2단계(재개 PUT)용 문맥: 활성 계정의 전체 클라이언트. 해제 중 계정은 2단계에 오지 않는다. */
+export type GuardWriteCtx = GuardCtx & { client: NaverAdsClient };
 
 const LOCK_CAS_TRIES = 3;
 export const BIZMONEY_DAYS = 3;

@@ -12,7 +12,7 @@
 //   중단 원인이 키 무효(ads_auth_failed)면 복원 후 invalid_key + 알림(markInvalidKey).
 // - 멈춘 해제(프로세스 사망으로 'disconnecting'에 남음) 회수: updatedAt이 STALE_CLAIM_MS(10분)보다 오래된 행만 다시 해제가 재점유한다
 //   (조건부 updateMany status='disconnecting' AND updatedAt < now-10분, count 1 — 동시 재점유는 하나만). 재점유는 updatedAt을 갱신한다.
-//   10분 근거: 해제 1회 = 페이지 조회 ×2 + 끄기 PUT(각 시도 25초·전체 45초 상한) — 정상 실행은 함수 maxDuration 안에 끝나므로
+//   10분 근거: 해제 라우트 maxDuration 300초, 네이버 작업은 DISCONNECT_WORK_MS(270초) 창 안에서만 시작·종료한다 — 정상 실행은 5분 안에 끝나므로
 //   10분 넘게 갱신 없는 disconnecting은 죽은 실행이다. 젊은 행은 409(진행 중).
 // - 해제 전 상태는 첫 점유 때 disconnectFromStatus에 저장한다 → 재점유 뒤 중단해도 원래 상태(active|invalid_key)로 복원.
 // - 한계: ② 이후 ③ 사이에, ⓪ 이전에 이미 만들어 둔 클라이언트로 켜는 작업자는 여기서 막을 수 없다 → Task 9/11의 모든 켜기·쓰기는
@@ -31,13 +31,22 @@ import { buildPause } from "./requests";
 const pauseResponseSchema = naverCampaignListSchema.element;
 const CLAIMABLE = ["active", "invalid_key"] as const;
 export const STALE_CLAIM_MS = 10 * 60_000;
+/** 해제 라우트 maxDuration 300초 − 여유 30초(최종 판정 A2): 남은 시간이 30초 미만이면 네이버 호출을 새로 시작하지 않고
+ *  키를 유지한 채 중단(상태 복원 → 감시가 계속 본다). 각 호출 마감 = min(45초, 남은 창) — 창을 넘겨 끝나는 호출이 없다. */
+export const DISCONNECT_WORK_MS = 270_000;
+const deadlineAbort = (unconfirmed: number) => new AdsHttpError(
+  "disconnect_incomplete", "시간 안에 모든 캠페인을 끄고 확인하지 못해 해제를 중단했습니다. 키는 그대로 유지됩니다. 다시 시도하세요.", 502,
+  { unconfirmedCampaigns: unconfirmed, reason: "deadline" },
+);
 const inProgress = () => new AdsHttpError("disconnect_in_progress", "이미 해제가 진행 중이거나 계정 상태가 바뀌었습니다. 잠시 후 다시 확인하세요.", 409);
 
-/** ①② — 확인하지 못한 캠페인 수(0이면 전부 꺼짐 확인). */
-async function pauseAndConfirm(client: NaverAdsClient, row: AdAccount): Promise<number> {
+/** ①② — 확인하지 못한 캠페인 수(0이면 전부 꺼짐 확인). 목록 일괄 재조회로 판정한다 — 단건 pauseAndConfirm(execution.ts)과 다른 의도된 예외.
+ *  left() ≤ 0(창 소진)이면 다음 호출을 시작하지 않고 deadlineAbort(키 유지). */
+async function pauseAllAndConfirm(client: NaverAdsClient, row: AdAccount, left: () => number): Promise<number> {
   const first = await listAllCampaigns(client);
-  for (const c of first.campaigns) {
-    if (isCampaignOff(c)) continue;
+  const lit = first.campaigns.filter((c) => !isCampaignOff(c));
+  for (const [i, c] of lit.entries()) {
+    if (left() <= 0) throw deadlineAbort(lit.length - i);
     try {
       await sendMutation(client, row, {
         step: "campaign.pause", method: "PUT", path: `/ncc/campaigns/${c.nccCampaignId}`, query: { fields: "userLock" },
@@ -48,6 +57,7 @@ async function pauseAndConfirm(client: NaverAdsClient, row: AdAccount): Promise<
       if (error instanceof NaverAdsError && error.reason === "ads_auth_failed") throw error;
     }
   }
+  if (left() <= 0) throw deadlineAbort(Math.max(lit.length, 1));
   const final = await listAllCampaigns(client);
   const ids = new Set(final.campaigns.map((c) => c.nccCampaignId));
   const mirror = await prisma.adCampaign.findMany({ where: { adAccountId: row.id, ownerId: row.ownerId }, select: { naverId: true } });
@@ -90,8 +100,12 @@ export async function disconnectAccount(ownerId: string, accountId: string, deps
   });
 
   let unconfirmed: number;
+  const clock = deps.naverClock?.now ?? Date.now;
+  const end = clock() + DISCONNECT_WORK_MS;
+  const left = deps.callBudget ?? (() => end - clock());
   try {
-    unconfirmed = await pauseAndConfirm(clientForDisconnect({ ...row, status: "disconnecting" }, deps.transport), row);
+    const client = clientForDisconnect({ ...row, status: "disconnecting" }, deps.transport, { clock: deps.naverClock, budget: left });
+    unconfirmed = await pauseAllAndConfirm(client, row, left);
   } catch (error) {
     await revert(row, previous, error);
     throw error;

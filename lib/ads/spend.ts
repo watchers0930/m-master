@@ -1,6 +1,7 @@
 // lib/ads/spend.ts — 오늘(KST) 계정 광고비 = 계정의 모든 캠페인 /stats salesAmt(VAT 별도) 합계. 켜기(locks.ts)·감시(Task 11)가 같은 함수를 쓴다.
 // - fail-closed: 캠페인 목록이 불완전하거나, /stats 응답 본문이 없거나 형태가 다르면 0으로 보지 않고 409 spend_unknown.
-// - 통제자 판정(Task 9 concern 3): 형태가 맞는(parse된) 응답에서 빠진 캠페인은 0원으로 센다 — 네이버는 활동 없는 행을 빼는 것으로 보인다.
+// - 통제자 판정(Task 9 concern 3): 형태가 맞는(parse된) **비어 있지 않은** 응답에서 빠진 캠페인은 0원으로 센다 — 네이버는 활동 없는 행을 빼는 것으로 보인다.
+//   최종 판정 A1: id를 실은 요청의 유효한 응답이 행 0개(data:[])면 spend_unknown(fail-closed → 감시 guard_blind). 같은 id 행이 여럿이면 합산.
 //   ⚠️ 미확인(Task 13 실측: 노출·클릭 0인 캠페인이 /stats 응답에 행으로 오는지, 빠지는지 확인하고 이 주석·코드를 좁힌다).
 // - ⚠️ /stats 여러 id 형식은 미확인이다. NaverAdsQuery는 배열 값이 없어(Task 3) 쉼표로 이은 ids 하나로 보낸다. 형식은 statsQuery 한 곳에만 둔다.
 import type { AdAccount } from "@prisma/client";
@@ -30,7 +31,7 @@ function unknown(account: Pick<AdAccount, "id">, reason: string): AdsHttpError {
   return spendUnknown();
 }
 
-export async function todayCostKrw(account: Pick<AdAccount, "id">, client: NaverAdsClient, now: Date = new Date()): Promise<number> {
+export async function todayCostKrw(account: Pick<AdAccount, "id">, client: Pick<NaverAdsClient, "get">, now: Date = new Date()): Promise<number> {
   let read;
   try {
     read = await listAllCampaigns(client);
@@ -46,8 +47,12 @@ export async function todayCostKrw(account: Pick<AdAccount, "id">, client: Naver
     const chunk = ids.slice(i, i + STATS_ID_CHUNK);
     const parsed = naverStatsSchema.safeParse(await client.get("/stats", statsQuery(chunk, day)));
     if (!parsed.success) throw unknown(account, "stats_shape");
-    const byId = new Map(parsed.data.data.map((row) => [row.id, row.salesAmt]));
-    for (const id of chunk) total += byId.get(id) ?? 0; // ⚠️ 유효한 응답에 없는 캠페인 = 활동 없음 = 0원(Task 13 실측 대상)
+    // id를 실어 보냈는데 유효한 응답이 행 0개면 0원으로 보지 않는다(ids 형식 오해·빈 응답이 감시를 조용히 끄지 않게, 최종 판정 A1)
+    if (parsed.data.data.length === 0) throw unknown(account, "stats_empty");
+    const wanted = new Set(chunk);
+    // 같은 캠페인 행이 여럿이면 합산한다(마지막 값만 남기면 과소 계산). 요청하지 않은 id 행은 무시한다.
+    // ⚠️ 비어 있지 않은 유효 응답에 없는 캠페인 = 활동 없음 = 0원(Task 13 실측 대상)
+    for (const row of parsed.data.data) if (wanted.has(row.id)) total += row.salesAmt;
   }
   return total;
 }

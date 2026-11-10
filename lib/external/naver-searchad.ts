@@ -251,9 +251,9 @@ export function clientForAccount(account: ConnectableAccount, transport?: typeof
 
 // 해제 전용(lib/ads/disconnect.ts만 쓴다): status='disconnecting'인 행만 허용한다. 해제가 그 상태로 전이한 뒤에는
 // 다른 모든 작업자(clientForAccount)가 거부되므로, 이 클라이언트가 해제 중 계정에 닿는 유일한 경로다.
-export function clientForDisconnect(account: ConnectableAccount, transport?: typeof fetch): NaverAdsClient {
+export function clientForDisconnect(account: ConnectableAccount, transport?: typeof fetch, opts?: ClientOptions): NaverAdsClient {
   if (account.status !== "disconnecting") throw new NaverAdsError("ads_not_connected");
-  return decryptedClient(account, transport);
+  return decryptedClient(account, transport, opts);
 }
 
 // ── 끄기 전용 클라이언트(Task 9 판정 I-1: 끄기는 정책 게이트로 막지 않는다) ──

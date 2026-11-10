@@ -32,6 +32,22 @@ import { todayCostKrw } from "./spend";
 
 export { mirrorOf, type LockDeps, type LockEntity, type LockResult, type MirrorDelegate, type MirrorLockRow } from "./lock-mirror";
 
+/**
+ * 켜기 시간 예산(최종 판정 A2 — lock 라우트 maxDuration 300초). 점유 전 조회(freshCheck 최대 3 GET + 비용 목록·/stats)는
+ * 시작 후 180초 안에서만 시작하고 각 호출은 남은 창으로 잘린다(넘기면 보내지 않음 = 켜기 PUT 없음, 미러 그대로).
+ * 점유 뒤 최악 사슬 = 켜기 PUT 25초 + 해제 경합 확인(DB) + 안전 재끄기 PUT 25초 + 재조회 GET 45초 + 미러·알림 DB ≈ 100초 → 180 + 100 = 280초 < 300초.
+ * 점유 뒤에는 창을 적용하지 않는다(재끄기가 시간 예산 때문에 굶으면 안 된다). deps.callBudget을 넘기면 그것을 쓴다(테스트·호출자).
+ */
+export const LOCK_READ_WINDOW_MS = 180_000;
+
+function readPhaseBudget(deps: LockDeps): { deps: LockDeps; claimed: () => void } {
+  if (deps.callBudget) return { deps, claimed: () => {} };
+  const clock = deps.naverClock?.now ?? Date.now;
+  const end = clock() + LOCK_READ_WINDOW_MS;
+  let reading = true;
+  return { deps: { ...deps, callBudget: () => (reading ? end - clock() : Number.POSITIVE_INFINITY) }, claimed: () => { reading = false; } };
+}
+
 const fail = (code: string, message: string, details?: Record<string, string | number | null>) => new AdsHttpError(code, message, 409, details);
 const versionConflict = (current: number) =>
   fail("version_conflict", "다른 곳에서 켜기·끄기 상태가 바뀌었습니다. 최신 상태를 확인하세요.", { lock_version: current });
@@ -71,8 +87,10 @@ async function resumeRaceGuard(account: AdAccount, type: LockKind, row: MirrorLo
     : "켜는 도중 계정 연결이 해제됐고 다시 끄지 못했습니다. 네이버 광고 화면에서 지금 바로 직접 꺼 주세요.");
 }
 
-async function ownerResume(type: LockKind, ownerId: string, row: MirrorLockRow, account: AdAccount, expected: number, now: Date, deps: LockDeps) {
+async function ownerResume(type: LockKind, ownerId: string, row: MirrorLockRow, account: AdAccount, expected: number, now: Date, baseDeps: LockDeps) {
   assertExecutionEnabled();
+  const phase = readPhaseBudget(baseDeps);
+  const deps = phase.deps;
   if (row.lockVersion !== expected) throw versionConflict(row.lockVersion);
   if (row.lockedBy === null && !row.userLock) return lockDto(type, row); // 이미 켜져 있음
   await launchable(row, now);
@@ -85,6 +103,7 @@ async function ownerResume(type: LockKind, ownerId: string, row: MirrorLockRow, 
     if (today >= accountCaps.dailyCapKrw)
       throw fail("cap_reached", "오늘 광고비가 하루 상한에 도달해 켤 수 없습니다.", { todayCostKrw: today, dailyCapKrw: accountCaps.dailyCapKrw });
     const before = await claimResume(type, ownerId, row.id, expected, now, deps);
+    phase.claimed(); // 점유 뒤: 켜기 PUT·재끄기·재조회는 창과 무관(호출별 45초·25초 상한만)
     let stored;
     try {
       stored = await putUserLock(client, account, type, row.naverId, false, { step: `owner.resume:${type}`, reason: "owner_approved" });

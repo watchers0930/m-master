@@ -33,7 +33,8 @@ const STORED_SCHEMAS = {
     sharedBudgetId: z.string().nullable().optional(),
   }),
   keyword: z.object({ useGroupBidAmt: z.boolean(), bidAmt: int }),
-  sharedBudget: z.object({ sharedBudgetId: z.string(), ownerType: z.string(), dailyBudget: int }),
+  // status는 응답에 없으면 허용(다른 검사로 판정), DELETED면 1층 상한이 사라진 것이다(최종 판정 A5)
+  sharedBudget: z.object({ sharedBudgetId: z.string(), ownerType: z.string(), dailyBudget: int, status: z.string().nullable().optional() }),
 } as const;
 
 type Parsed<K extends StoredKind> = z.infer<(typeof STORED_SCHEMAS)[K]>;
@@ -64,6 +65,7 @@ function checkAdgroup(s: Parsed<"adgroup">, c: Caps): void {
 function checkSharedBudget(s: Parsed<"sharedBudget">, a: CapAccount, c: Caps): void {
   if (s.sharedBudgetId !== requireText(a.sharedBudgetId, "sharedBudgetId")) fail("sharedBudgetId");
   if (s.ownerType !== "CAMPAIGN") fail("ownerType");
+  if (s.status === "DELETED") fail("status");
   checkDailyBudget(s.dailyBudget, c);
 }
 

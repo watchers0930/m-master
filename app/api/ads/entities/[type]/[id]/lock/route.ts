@@ -9,7 +9,9 @@ import { notFound } from "@/lib/ads/account-core";
 import { jsonOk, parseBody, readJsonBody } from "@/lib/visibility/http";
 import { adsLockEntityTypeSchema, adsLockSchema } from "@/schemas/ads";
 
-export const maxDuration = 60;
+// 켜기 최악 사슬 = 점유 전 조회 ≤ 180초(LOCK_READ_WINDOW_MS) + 점유 뒤 켜기 PUT 25초 + 재끄기 PUT 25초 + 재조회 45초 + DB ≈ 280초(lib/ads/locks.ts).
+// 끄기 = 의도 기록 + PUT 25초 + 재조회 45초. 60초로는 PUT 직후 강제 종료돼 불확실 재끄기가 실행되지 않을 수 있었다(최종 판정 A2).
+export const maxDuration = 300;
 
 type Context = { params: Promise<{ type: string; id: string }> };
 

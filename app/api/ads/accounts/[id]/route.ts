@@ -7,6 +7,9 @@ import { adsRoute } from "@/lib/ads/http";
 import { jsonOk, parseBody, readJsonBody } from "@/lib/visibility/http";
 import { adsAccountPatchSchema } from "@/schemas/ads";
 
+// 해제(DELETE)는 켜진 캠페인마다 끄기 PUT을 차례로 보낸다 — 네이버 작업은 lib/ads/disconnect.ts DISCONNECT_WORK_MS(270초) 창 안에서만(최종 판정 A2).
+export const maxDuration = 300;
+
 type Context = { params: Promise<{ id: string }> };
 
 export async function GET(request: Request, context: Context) {

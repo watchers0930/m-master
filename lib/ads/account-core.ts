@@ -74,7 +74,7 @@ export const isCampaignOff = (c: { userLock: boolean; status?: string | null }) 
  * '짧은 페이지'에서 멈추지 않고 빈 페이지가 나올 때까지 다음 커서를 요청한다(1회 추가 GET).
  * complete=false: 커서가 진행하지 않음(새 id 0인 비어있지 않은 페이지 — 커서 미지원) 또는 페이지 상한 도달 → 호출자는 '확인 못 함'으로 본다.
  */
-export async function listAllCampaigns(client: NaverAdsClient): Promise<CampaignRead> {
+export async function listAllCampaigns(client: Pick<NaverAdsClient, "get">): Promise<CampaignRead> {
   const seen = new Map<string, CampaignRead["campaigns"][number]>();
   let cursor: string | undefined;
   for (let page = 0; page < MAX_CAMPAIGN_PAGES; page++) {

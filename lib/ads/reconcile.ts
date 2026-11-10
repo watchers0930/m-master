@@ -19,7 +19,7 @@ export class ReconcileIncomplete extends ApplyFailure {
 }
 
 export async function listAll<S extends z.ZodTypeAny>(
-  client: NaverAdsClient, path: string, base: NaverAdsQuery, item: S, idOf: (x: z.infer<S>) => string, step: string,
+  client: Pick<NaverAdsClient, "get">, path: string, base: NaverAdsQuery, item: S, idOf: (x: z.infer<S>) => string, step: string,
 ): Promise<z.infer<S>[]> {
   const seen = new Map<string, z.infer<S>>();
   const schema = item.array();
