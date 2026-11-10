@@ -60,13 +60,15 @@ export function sanitizeSeeds(raw: readonly unknown[]): string[] {
 }
 
 // 수치(명세는 모두 string 선언): 유한한 음이 아닌 숫자, 또는 trim 후 /^\d+(\.\d+)?$/인 정규 숫자 문자열 → 숫자.
-// 조회수의 "< 10"(공백 무관)은 null + lt10. 그 밖(음수·NaN·"1,200"·"1e3"·"abc")은 null — 조용히 0으로 만들지 않는다.
+// 조회수의 "< 10"(공백 무관)은 null + lt10. 그 밖(음수·NaN·Infinity로 변환되는 긴 숫자열·"1,200"·"1e3"·"abc")은 null — 조용히 0으로 만들지 않는다.
 const NUMERIC_RE = /^\d+(?:\.\d+)?$/;
 function metric(value: NaverKeywordRow["plAvgDepth"]): number | null {
   if (typeof value === "number") return Number.isFinite(value) && value >= 0 ? value : null;
   if (typeof value !== "string") return null;
   const text = value.trim();
-  return NUMERIC_RE.test(text) ? Number(text) : null;
+  if (!NUMERIC_RE.test(text)) return null;
+  const n = Number(text); // 숫자 경로와 같은 기준: 정규식을 통과해도 아주 긴 숫자열은 Infinity가 된다
+  return Number.isFinite(n) && n >= 0 ? n : null;
 }
 function count(value: NaverKeywordRow["monthlyPcQcCnt"]): { value: number | null; lt10: boolean } {
   const lt10 = typeof value === "string" && LT10_RE.test(value.trim());
