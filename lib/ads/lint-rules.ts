@@ -55,7 +55,17 @@ export const LINT_RULES = {
     id: "keyword-length", description: "키워드 길이 초과", basis: "Task 6 씨앗 상한과 같은 값(네이버 공식 한도 미확인)",
     verifiedAt: null, source: "설계 가정", limit: MAX_KEYWORD_LENGTH,
   },
+  forbiddenKeyword: {
+    id: "forbidden-keyword", description: "노출 금지 가능성이 있는 키워드", basis: "네이버 에러 3909(노출 금지 키워드). 사전은 초기 추정 목록",
+    verifiedAt: null, source: "설계 가정",
+  },
 } as const satisfies Record<string, LintRule>;
+
+/** 금지 키워드 사전 초기 목록(정규화 형태: 소문자·공백 없음). 네이버 공식 목록이 아니다 — 원금·수익 보장류 금융 표현과
+ *  명백한 불법 서비스 용어를 보수적으로 추정한 것이다. Task 13 실측과 실제 3909 반려 사례로 다듬는다.
+ *  매칭: 키워드를 정규화(NFC·전각→반각·소문자·공백 정리)해 토큰으로 나누고, 토큰 경계에서 시작·끝나는 연속 토큰을
+ *  공백 없이 이어 붙인 값이 사전어와 같을 때만 잡는다("원금 보장"은 위반, "원금보장형예금"은 통과). */
+export const FORBIDDEN_KEYWORDS: readonly string[] = ["원금보장", "확정수익", "고수익보장", "작업대출", "대포통장", "불법대출", "명의대여"];
 
 /** 최상급·보장 표현 사전. pattern은 정규화된 텍스트(NFC·전각→반각·공백/보이지 않는 문자 제거·소문자)에 적용한다.
  *  결정(오탐): '최고급'은 등급 우위 주장이라 잡는다. '유일하게'도 유일성 주장이라 잡는다. 숫자가 앞에 붙은 '21위'·'1000%'는 잡지 않는다. */

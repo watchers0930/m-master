@@ -6,7 +6,7 @@
 // 메시지는 사용자에게 보이는 한국어다. 제어·보이지 않는 문자는 원문 대신 U+XXXX로만 표기한다.
 import { collapseKeyword, isValidKeywordPhrase } from "./keyword-text";
 import {
-  ALLOWED_COPY_CHAR, EMOJI_CHAR, isControlChar, isZeroWidthChar, LINT_RULES, SUPERLATIVE_EXCEPTIONS, SUPERLATIVE_TERMS, type LintRule,
+  ALLOWED_COPY_CHAR, EMOJI_CHAR, FORBIDDEN_KEYWORDS, isControlChar, isZeroWidthChar, LINT_RULES, SUPERLATIVE_EXCEPTIONS, SUPERLATIVE_TERMS, type LintRule,
 } from "./lint-rules";
 
 export type LintField = "headline" | "description" | "keyword";
@@ -59,6 +59,12 @@ function charIssues(text: string, field: CopyField): LintIssue[] {
   return out;
 }
 
+/** 전각 ASCII(U+FF01–FF5E) 한 글자 → 반각. 그 밖은 그대로. */
+function toHalfWidth(ch: string): string {
+  const cp = ch.codePointAt(0) ?? 0;
+  return cp >= FULLWIDTH_START && cp <= FULLWIDTH_END ? String.fromCodePoint(cp - FULLWIDTH_OFFSET) : ch;
+}
+
 /** 매칭용 정규화: 전각 ASCII→반각, 공백·제어·보이지 않는 문자 제거, 소문자. 정규화된 각 코드단위의 원문 [시작, 끝)을 함께 남긴다. */
 function matchForm(text: string): { norm: string; spans: [number, number][] } {
   let norm = "";
@@ -68,9 +74,7 @@ function matchForm(text: string): { norm: string; spans: [number, number][] } {
     const start = index;
     index += ch.length;
     if (/^\s$/u.test(ch) || isInvisible(ch)) continue;
-    const cp = ch.codePointAt(0) ?? 0;
-    const half = cp >= FULLWIDTH_START && cp <= FULLWIDTH_END ? String.fromCodePoint(cp - FULLWIDTH_OFFSET) : ch;
-    for (const unit of half.toLowerCase()) {
+    for (const unit of toHalfWidth(ch).toLowerCase()) {
       for (let k = 0; k < unit.length; k++) spans.push([start, index]);
       norm += unit;
     }
@@ -142,6 +146,22 @@ export function lintCreativeGroup(creatives: readonly CreativeInput[]): LintIssu
   });
 }
 
+const FORBIDDEN_SET = new Set(FORBIDDEN_KEYWORDS);
+const FORBIDDEN_MAX_LENGTH = Math.max(0, ...FORBIDDEN_KEYWORDS.map((t) => t.length));
+
+/** 토큰 경계에 맞는 연속 토큰을 공백 없이 이어 붙인 값 중 사전어와 같은 첫 항목(없으면 null). */
+function forbiddenTerm(collapsed: string): string | null {
+  const tokens = Array.from(collapsed, toHalfWidth).join("").toLowerCase().split(" ");
+  for (let i = 0; i < tokens.length; i++) {
+    let joined = "";
+    for (let j = i; j < tokens.length && joined.length < FORBIDDEN_MAX_LENGTH; j++) {
+      joined += tokens[j];
+      if (FORBIDDEN_SET.has(joined)) return joined;
+    }
+  }
+  return null;
+}
+
 export function lintKeyword(keyword: unknown): LintIssue[] {
   const read = readText(keyword, "keyword");
   if ("issue" in read) return [read.issue];
@@ -152,6 +172,8 @@ export function lintKeyword(keyword: unknown): LintIssue[] {
     out.push(issue(LINT_RULES.keywordSpecialChar, "keyword",
       "키워드에는 한글·영문·숫자와 단어 사이 공백만 쓸 수 있습니다. 특수문자·이모지·보이지 않는 문자를 빼 주세요(네이버 3906)."));
   }
+  const term = forbiddenTerm(text);
+  if (term) out.push(issue(LINT_RULES.forbiddenKeyword, "keyword", `노출이 제한될 수 있는 키워드 '${term}'이(가) 들어 있습니다(네이버 3909).`));
   const limit = LINT_RULES.keywordLength.limit;
   const length = text.replace(/ /g, "").length; // Task 6 씨앗 상한과 같은 기준(공백 제외)
   if (length > limit) out.push(issue(LINT_RULES.keywordLength, "keyword", `키워드는 공백 제외 ${limit}자 이하여야 합니다(현재 ${length}자).`));
