@@ -11,6 +11,8 @@ export const ALERT_TYPES = [
   "ads.drift",
   "ads.inspect_denied",
   "ads.bizmoney_low",
+  // 안전 끄기 실패·켜기 경합(Task 9 판정 round 2). 별도 유형이라 같은 날 ads.drift가 있어도 중복 제거에 묻히지 않는다.
+  "ads.pause_failed",
 ] as const;
 export type AdAlertType = (typeof ALERT_TYPES)[number];
 export type AlertPayload = Prisma.InputJsonObject;
@@ -28,6 +30,7 @@ const TITLES: Readonly<Record<AdAlertType, string>> = {
   "ads.drift": "네이버 설정이 MINTEQ 기록과 다릅니다",
   "ads.inspect_denied": "광고 검수가 반려되었습니다",
   "ads.bizmoney_low": "비즈머니 잔액이 부족합니다",
+  "ads.pause_failed": "광고를 자동으로 끄지 못했거나 꺼졌는지 확인하지 못했습니다 — 네이버 광고 화면에서 지금 바로 직접 꺼 주세요",
 };
 
 export function isAdAlertType(value: unknown): value is AdAlertType {

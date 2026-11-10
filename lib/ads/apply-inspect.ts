@@ -1,7 +1,7 @@
 // lib/ads/apply-inspect.ts — 적용 중 '네이버에 실제로 저장된 상태' 판정과 멈춤 규칙(apply-steps.ts·apply.ts 공용).
 // - inspect: 단건 GET → 형태 parse → 상한 값 verifyStored(소재는 TEXT_45) → userLock. 불일치이거나 켜져 있으면 즉시 끄고 다시 읽는다.
 //   그 끄기 PUT이 실패하면(Task 9 판정 adv I-2) pauseFailed — 호출자가 관찰값(userLock=false)으로 미러를 남긴 뒤 stopIfUnsafe가
-//   알림 ads.drift(reason=pause_failed) + pause_failed:<step>으로 멈춘다(원장 PUT 행이 실패 증거). 다음 적용은 retryPendingPauses가 먼저 끈다.
+//   알림 ads.pause_failed(reason=pause_failed — 별도 유형이라 같은 날 ads.drift에 묻히지 않음) + pause_failed:<step>으로 멈춘다(원장 PUT 행이 실패 증거). 다음 적용은 retryPendingPauses가 먼저 끈다.
 // - extend_group 대상(checkTarget·targetIsPaused): 삭제되지 않았고, 상한 값이 지켜지고, 그룹과 캠페인이 네이버에서 꺼져 있어야 한다
 //   (켜진 그룹에 소재를 붙이면 생성~끄기 사이·끄기 실패 시 과금된다). 켜져 있으면 target_active — 대장이 먼저 끈다(4-1 한계).
 import type { AdAccount } from "@prisma/client";
@@ -16,9 +16,9 @@ import { verifyStored, type LockKind } from "./requests";
 export type InspectCtx = { client: NaverAdsClient; account: AdAccount; proposalId: string; step: string };
 export type Observed = { userLock: boolean; inspectStatus: string | null; drift: string | null; pauseFailed: boolean };
 
-async function alert(ctx: InspectCtx, payload: AlertPayload): Promise<void> {
+async function alert(ctx: InspectCtx, payload: AlertPayload, type: "ads.drift" | "ads.pause_failed" = "ads.drift"): Promise<void> {
   try {
-    await queueAlert(ctx.account.id, "ads.drift", { proposalId: ctx.proposalId, step: ctx.step, ...payload });
+    await queueAlert(ctx.account.id, type, { proposalId: ctx.proposalId, step: ctx.step, ...payload });
   } catch (error) {
     console.error("[ads] apply alert queue failed", { type: error instanceof Error ? error.name : "unknown" }); // 원래 실패를 가리지 않는다
   }
@@ -42,7 +42,8 @@ export async function inspect<K extends LockKind>(ctx: InspectCtx, kind: K, nave
       await putUserLock(ctx.client, ctx.account, kind, naverId, true, { step: `pause:${ctx.step}`, proposalId: ctx.proposalId });
     } catch (error) {
       if (!(error instanceof NaverAdsError)) throw error;
-      return { userLock: entity?.userLock === true, inspectStatus: inspectOf(entity), drift: field, pauseFailed: true };
+      // 끄기 실패 = 켜져 있거나 모름 → 미러에는 꺼졌다고 기록하지 않는다(판정 round 2)
+      return { userLock: false, inspectStatus: inspectOf(entity), drift: field, pauseFailed: true };
     }
     ({ entity } = await readParsed(ctx.client, kind, naverId));
   }
@@ -58,7 +59,7 @@ const inspectOf = (e: unknown) => ((e as { inspectStatus?: string | null } | nul
 /** 미러를 기록한 뒤 부른다. 끄기 실패가 드리프트보다 먼저다(켜진 엔티티가 남아 있다). */
 export async function stopIfUnsafe(ctx: InspectCtx, kind: LockKind, naverId: string, o: Observed): Promise<void> {
   if (o.pauseFailed) {
-    await alert(ctx, { reason: "pause_failed", entity: kind, naverId, ...(o.drift ? { field: o.drift } : {}) });
+    await alert(ctx, { reason: "pause_failed", entity: kind, naverId, ...(o.drift ? { field: o.drift } : {}) }, "ads.pause_failed");
     throw new ApplyFailure(`pause_failed:${ctx.step}`);
   }
   if (o.drift !== null) {

@@ -4,11 +4,14 @@
 //   (끄기로 가드 잠금을 owner로 세탁해 당일 켜기 제한을 우회하지 못하게) — lockVersion만 +1.
 // - 끄기 전용 클라이언트(clientForPause): 계정 status active | invalid_key | disconnecting을 받고 끄기 본문만 보낼 수 있다.
 //   disabled(키 삭제됨)는 보낼 수 없으므로 409 keys_removed(네이버 화면에서 직접 끄라는 안내).
-// - PUT이 실패해도 의도 기록은 남고 오류를 돌려준다. 결과(userLock)는 lockVersion이 그대로일 때만 기록한다.
+// - PUT이 실패해도 의도 기록은 남고 오류를 돌려준다. 결과(userLock)는 lockVersion이 그대로일 때만 기록한다. 실패면 userLock=false(켜짐·모름).
+// - safetyPause: 시스템이 스스로 거는 안전 끄기(켜기 경합 재끄기·켜기 불확실 끄기·lock_race 재끄기, Task 11 가드가 재사용).
+//   결과와 무관하게 미러에 사실(끄기 성공=true, 실패=false)을 기록하고, 실패하면 알림 ads.pause_failed(paused:false)를 보낸다(판정 round 2).
 import type { AdAccount } from "@prisma/client";
 import { NaverAdsError, clientForPause } from "@/lib/external/naver-searchad";
 import { prisma } from "@/lib/prisma";
 import { markInvalidKey } from "./account-core";
+import { queueAlert, type AlertPayload } from "./alerts";
 import { putUserLock } from "./execution";
 import { AdsHttpError } from "./http";
 import type { LockKind } from "./invariants";
@@ -41,11 +44,41 @@ export async function pauseNow(account: AdAccount, type: LockKind, naverId: stri
   }
 }
 
+/** 안전 끄기 실패·경합 알림(같은 날 ads.drift에 묻히지 않는 별도 유형). 알림 큐 실패는 원래 흐름을 가리지 않는다. */
+export async function pauseAlert(account: AdAccount, payload: AlertPayload): Promise<void> {
+  try {
+    await queueAlert(account.id, "ads.pause_failed", payload);
+  } catch (error) {
+    console.error("[ads] pause_failed alert queue failed", { type: error instanceof Error ? error.name : "unknown" });
+  }
+}
+
+/** 안전 끄기. 끈 것이 확인되면 true. 실패(네이버 오류·키 없음)는 던지지 않고 false — 미러 userLock=false + 알림. */
+export async function safetyPause(
+  account: AdAccount, type: LockKind, row: { id: string; naverId: string }, step: string, deps: LockDeps, alert: AlertPayload,
+): Promise<boolean> {
+  let paused = false;
+  try {
+    paused = (await pauseNow(account, type, row.naverId, step, deps)).userLock === true;
+  } catch (error) {
+    if (!(error instanceof NaverAdsError) && !(error instanceof AdsHttpError)) throw error;
+  }
+  await mirrorOf(prisma, type).updateMany({ where: { id: row.id }, data: { userLock: paused } });
+  if (!paused) await pauseAlert(account, { ...alert, entity: type, naverId: row.naverId, paused: false });
+  return paused;
+}
+
 export async function ownerPause(type: LockKind, ownerId: string, id: string, account: AdAccount, now: Date, deps: LockDeps): Promise<LockResult> {
   if (account.status === "disabled" || account.apiKeyEnc == null || account.secretKeyEnc == null) throw keysRemoved();
   const claimed = await recordIntent(type, ownerId, id, now, deps);
-  const stored = await pauseNow(account, type, claimed.naverId, `owner.pause:${type}`, deps);
   const mirror = mirrorOf(prisma, type);
+  let stored;
+  try {
+    stored = await pauseNow(account, type, claimed.naverId, `owner.pause:${type}`, deps);
+  } catch (error) {
+    await mirror.updateMany({ where: { id, lockVersion: claimed.lockVersion }, data: { userLock: false } }); // 끄기 실패 = 켜짐·모름
+    throw error;
+  }
   await mirror.updateMany({ where: { id, lockVersion: claimed.lockVersion }, data: { userLock: stored.userLock } });
   return lockDto(type, (await mirror.findFirst({ where: { id, ownerId }, select: MIRROR_SELECT })) as MirrorLockRow);
 }

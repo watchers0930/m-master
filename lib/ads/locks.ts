@@ -9,7 +9,8 @@
 // 경합: CAS는 (lockedBy, lockVersion)이다(updatedAt은 동기화 쓰기마다 바뀐다). 잠금 변경마다 lockVersion +1(해제 disconnect 포함),
 //   동기화는 lockVersion을 건드리지 않는다.
 //   ① 트랜잭션: FOR UPDATE → 재조회 → lockVersion·lockedBy 조건부 updateMany(count=1)로 '의도'를 먼저 기록 ② 네이버 PUT
-//   ③ PUT 뒤 계정 상태 재확인: active가 아니면(해제가 그 사이 끝남) 끄기 전용 클라이언트로 즉시 끄고 알림 ads.drift(resume_race) + 409.
+//   ③ PUT 뒤 계정 상태 재확인: active가 아니면(해제가 그 사이 끝남) 끄기 전용 클라이언트로 즉시 끄고 알림 ads.pause_failed(resume_race) + 409.
+//   시스템이 거는 모든 재끄기는 lock-pause.ts safetyPause(결과를 미러에 사실대로, 실패면 알림).
 //   ④ 결과 기록은 lockVersion이 ①의 값 그대로일 때만. 그 사이 가드가 잠갔으면(count 0) 즉시 다시 끄고 409 lock_race.
 //   켜기 PUT이 실패하면 ①의 기록을 되돌린다(불확실이면 안전 방향으로 끄기도 보낸다).
 import type { AdAccount } from "@prisma/client";
@@ -19,7 +20,6 @@ import { ADS_LOCK_ENTITY_TYPES } from "@/schemas/ads";
 import { isEntityId } from "@/schemas/id";
 import { assertAdsOwner } from "./access";
 import { loadOwnedAccount, notFound, withAccountClient } from "./account-core";
-import { queueAlert } from "./alerts";
 import { assertExecutionEnabled, putUserLock } from "./execution";
 import { AdsHttpError } from "./http";
 import { caps, type LockKind } from "./invariants";
@@ -27,7 +27,7 @@ import { freshCheck } from "./launch-check";
 import {
   MIRROR_SELECT, guardLockedToday, lockDto, lockMirrorRow, mirrorOf, type LockDeps, type LockEntity, type LockResult, type MirrorLockRow,
 } from "./lock-mirror";
-import { ownerPause, pauseNow } from "./lock-pause";
+import { ownerPause, pauseAlert, safetyPause } from "./lock-pause";
 import { todayCostKrw } from "./spend";
 
 export { mirrorOf, type LockDeps, type LockEntity, type LockResult, type MirrorDelegate, type MirrorLockRow } from "./lock-mirror";
@@ -58,18 +58,17 @@ async function launchable(row: MirrorLockRow, now: Date): Promise<void> {
   if (proposal?.status !== "applied") throw fail("not_launchable", "적용이 끝난 MINTEQ 제안의 항목만 켤 수 있습니다.");
 }
 
-/** ③ 켜기 PUT 뒤 계정이 active가 아니면(해제 경합) 메모리의 키로 즉시 다시 끈다. 키가 DB에서 지워졌어도 이 실행은 키를 들고 있다. */
+/** ③ 켜기 PUT 뒤 계정이 active가 아니면(해제 경합) 메모리의 키로 즉시 다시 끈다. 키가 DB에서 지워졌어도 이 실행은 키를 들고 있다.
+ *  끄기 결과와 무관하게 미러에 사실을 기록하고 알림 ads.pause_failed(reason=resume_race, paused)를 보낸다. */
 async function resumeRaceGuard(account: AdAccount, type: LockKind, row: MirrorLockRow, now: Date, deps: LockDeps): Promise<void> {
   const current = await prisma.adAccount.findFirst({ where: { id: account.id, ownerId: account.ownerId }, select: { status: true } });
   if (current?.status === "active") return;
-  await pauseNow(account, type, row.naverId, `owner.resume_race_pause:${type}`, deps);
-  await mirrorOf(prisma, type).updateMany({ where: { id: row.id }, data: { userLock: true, lockedBy: "owner", lockedAt: now, lockVersion: { increment: 1 } } });
-  try {
-    await queueAlert(account.id, "ads.drift", { reason: "resume_race", entity: type, naverId: row.naverId });
-  } catch (error) {
-    console.error("[ads] resume_race alert queue failed", { type: error instanceof Error ? error.name : "unknown" });
-  }
-  throw fail("resume_race", "켜는 도중 계정 연결이 해제됐습니다. 다시 껐습니다. 계정 상태를 확인하세요.");
+  await mirrorOf(prisma, type).updateMany({ where: { id: row.id }, data: { lockedBy: "owner", lockedAt: now, lockVersion: { increment: 1 } } });
+  const paused = await safetyPause(account, type, row, `owner.resume_race_pause:${type}`, deps, { reason: "resume_race" });
+  if (paused) await pauseAlert(account, { reason: "resume_race", entity: type, naverId: row.naverId, paused: true });
+  throw fail("resume_race", paused
+    ? "켜는 도중 계정 연결이 해제됐습니다. 다시 껐습니다. 계정 상태를 확인하세요."
+    : "켜는 도중 계정 연결이 해제됐고 다시 끄지 못했습니다. 네이버 광고 화면에서 지금 바로 직접 꺼 주세요.");
 }
 
 async function ownerResume(type: LockKind, ownerId: string, row: MirrorLockRow, account: AdAccount, expected: number, now: Date, deps: LockDeps) {
@@ -90,16 +89,17 @@ async function ownerResume(type: LockKind, ownerId: string, row: MirrorLockRow, 
     try {
       stored = await putUserLock(client, account, type, row.naverId, false, { step: `owner.resume:${type}`, reason: "owner_approved" });
     } catch (error) {
-      if (error instanceof NaverAdsError && error.reason === "ads_uncertain")
-        await pauseNow(account, type, row.naverId, `owner.resume_uncertain_pause:${type}`, deps).catch(() => undefined);
       await mirror.updateMany({ where: { id: row.id, lockVersion: claimed }, data: { lockedBy: before.lockedBy, lockedAt: before.lockedAt, lockVersion: { increment: 1 } } });
+      // 켜기가 반영됐는지 모르면 안전 방향으로 끈다(결과는 미러에 사실대로, 실패면 알림)
+      if (error instanceof NaverAdsError && error.reason === "ads_uncertain")
+        await safetyPause(account, type, row, `owner.resume_uncertain_pause:${type}`, deps, { reason: "resume_uncertain" });
       throw error;
     }
     await resumeRaceGuard(account, type, row, now, deps);
     const { count } = await mirror.updateMany({ where: { id: row.id, lockVersion: claimed }, data: { userLock: stored.userLock } });
     if (count !== 1) {
       // 켜기 PUT이 나가는 사이 가드(또는 다른 탭)가 잠금을 바꿨다 → 안전 방향으로 다시 끈다
-      await putUserLock(client, account, type, row.naverId, true, { step: `owner.race_pause:${type}` });
+      await safetyPause(account, type, row, `owner.race_pause:${type}`, deps, { reason: "lock_race" });
       throw fail("lock_race", "켜는 도중 감시가 이 항목을 잠갔습니다. 다시 껐습니다. 상태를 확인하세요.");
     }
     return lockDto(type, (await mirror.findFirst({ where: { id: row.id, ownerId }, select: MIRROR_SELECT })) as MirrorLockRow);

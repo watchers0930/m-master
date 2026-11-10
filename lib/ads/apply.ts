@@ -124,6 +124,10 @@ async function assertTargetPaused(ownerId: string, id: string, deps: ApplyDeps):
   const account = await prisma.adAccount.findFirst({ where: { id: row.adAccountId, ownerId } });
   const target = account && await prisma.adGroup.findFirst({ where: { ownerId, adAccountId: account.id, naverId: row.targetAdgroupId }, select: { id: true } });
   if (!account || account.status !== "active" || !target) return;
+  // 끄기 실패로 켜진 채 남은 이 제안 엔티티가 있으면 여기서 막지 않는다 — 점유 뒤 run이 그 끄기부터 재시도한다(판정 round 2 d)
+  const pending = { where: { proposalId: id, adAccountId: account.id, userLock: false } };
+  const counts = await Promise.all([prisma.adCampaign.count(pending), prisma.adGroup.count(pending), prisma.adKeyword.count(pending), prisma.adCreative.count(pending)]);
+  if (counts.some((n) => n > 0)) return;
   const groupId = row.targetAdgroupId;
   if (!(await withAccountClient(account, deps, (client) => targetIsPaused(client, groupId))))
     throw new AdsHttpError("target_active", "확장할 광고그룹이나 그 캠페인이 켜져 있습니다. 네이버에서 먼저 끈 뒤 적용하세요(새 소재가 바로 노출되지 않게).", 409);
