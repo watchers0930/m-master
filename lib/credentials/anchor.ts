@@ -2,7 +2,8 @@
 // 로컬 .env.local과 운영이 같은 DB를 공유한다. env(CREDENTIAL_KEY_ID)는 환경마다 따로 설정되므로 "같은 키"를 보장하지 못한다.
 // 그래서 정본 kid를 DB 한 행에 고정하고, 모든 자격증명 쓰기(store·backfill)는 런타임 키 kid == 앵커 kid 일 때만 허용한다.
 // - 앵커 없음 → not_configured, 다름 → key_mismatch (CredentialCryptoError, 값 없음)
-// - 앵커는 set-anchor 스크립트로 한 번만 만든다(있으면 같은 값만 no-op, 다르면 거부). 앱은 앵커를 쓰지 않는다.
+// - 앵커는 한 번만 만든다(있으면 같은 값만 no-op, 다르면 거부). 운영 앵커는 운영 런타임의 POST /api/admin/credential-key만 쓴다
+//   (런타임 자기 kid → 운영 kid == 앵커가 구조적으로 보장). scripts/crypto/set-anchor.ts는 운영 DB를 거부한다(anchor-target.ts).
 // 캐시: 앵커 행은 한 번 생기면 바뀌지 않으므로(쓰기 1회 정책) 프로세스당 60초 TTL로 읽기 비용을 줄인다.
 //   TTL이 영향을 주는 경우는 "없음 → 생성" 전이뿐이며, 그 경우 최대 60초 늦게 쓰기가 열린다(fail-closed 방향).
 //   앵커와 다른 키는 캐시 여부와 무관하게 항상 거부된다. 캐시 키에는 비밀값이 없다(단일 행 id).
@@ -46,7 +47,7 @@ export async function anchorKid(): Promise<string | null> {
   return kid;
 }
 
-/** 테스트·set-anchor 직후 재판정용 */
+/** 테스트·앵커 생성 직후 재판정용 */
 export function resetAnchorCache(): void {
   cached = null;
 }

@@ -64,6 +64,7 @@ const readBack = async (tx: Tx, ownerId: string, id: string) =>
 
 export async function editProposal(ownerId: string, id: string, input: AdsProposalEditInput, deps: ReviewDeps = {}): Promise<AdProposalDTO> {
   assertAdsOwner(ownerId);
+  if (deps.afterLock && process.env.NODE_ENV === "production") throw new Error("test_seam_forbidden"); // 이음새는 테스트 전용
   const data = adsProposalEditSchema.parse(input);
   const expected = Date.parse(data.expected_updated_at);
   return prisma.$transaction(async (tx) => {
@@ -94,6 +95,7 @@ export async function reviewProposal(
   ownerId: string, id: string, input: AdsProposalReviewInput, deps: ReviewDeps = {},
 ): Promise<AdProposalDTO & { changed: boolean }> {
   assertAdsOwner(ownerId);
+  if (deps.afterLock && process.env.NODE_ENV === "production") throw new Error("test_seam_forbidden"); // 이음새는 테스트 전용
   const data = adsProposalReviewSchema.parse(input);
   const target = data.decision === "approve" ? "approved" : "rejected";
   return prisma.$transaction(async (tx) => {
