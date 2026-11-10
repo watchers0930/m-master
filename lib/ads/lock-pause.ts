@@ -53,17 +53,28 @@ export async function pauseAlert(account: AdAccount, payload: AlertPayload): Pro
   }
 }
 
-/** 안전 끄기. 끈 것이 확인되면 true. 실패(네이버 오류·키 없음)는 던지지 않고 false — 미러 userLock=false + 알림. */
+/**
+ * 안전 끄기. 끈 것이 확인되면 true. 어떤 실패도 던지지 않고 false — 미러 userLock=false(사실: 켜짐·모름) + 알림 ads.pause_failed.
+ * 네이버 오류뿐 아니라 복호화·DB·예상 못 한 오류도 같다(Task 11 CARRY: 감시는 조용히 실패하지 않는다 — 원인 이름만 기록).
+ * row.id = null: 미러 행이 없는 캠페인(네이버 화면에서 직접 만든 것 등). 미러 갱신 없이 끄기·알림만.
+ */
 export async function safetyPause(
-  account: AdAccount, type: LockKind, row: { id: string; naverId: string }, step: string, deps: LockDeps, alert: AlertPayload,
+  account: AdAccount, type: LockKind, row: { id: string | null; naverId: string }, step: string, deps: LockDeps, alert: AlertPayload,
 ): Promise<boolean> {
   let paused = false;
   try {
     paused = (await pauseNow(account, type, row.naverId, step, deps)).confirmed;
   } catch (error) {
-    if (!(error instanceof NaverAdsError) && !(error instanceof AdsHttpError)) throw error;
+    if (!(error instanceof NaverAdsError) && !(error instanceof AdsHttpError))
+      console.error("[ads] safety pause failed", { step, type: error instanceof Error ? error.name : "unknown" });
   }
-  await mirrorOf(prisma, type).updateMany({ where: { id: row.id }, data: { userLock: paused } });
+  if (row.id !== null) {
+    try {
+      await mirrorOf(prisma, type).updateMany({ where: { id: row.id }, data: { userLock: paused } });
+    } catch (error) {
+      console.error("[ads] safety pause mirror write failed", { step, type: error instanceof Error ? error.name : "unknown" });
+    }
+  }
   if (!paused) await pauseAlert(account, { ...alert, entity: type, naverId: row.naverId, paused: false });
   return paused;
 }

@@ -90,3 +90,18 @@ export const naverAdSchema = z.object({
 export const naverKeywordCreatedSchema = z.array(naverKeywordSchema).length(1);
 // GET /stats 응답. 금액은 유한한 0 이상 숫자만(문자열·음수·누락은 형식 오류 → '모름').
 export const naverStatsSchema = z.object({ data: z.array(z.object({ id: naverId, salesAmt: z.number().finite().nonnegative() })) });
+
+// ── 감시·동기화(Task 11) ──
+// GET /billing/bizmoney. ⚠️ ncc 명세 밖(설계서: ncc-heroes-billing.json) — 필드 bizmoney(원)만 엄격히 본다(Task 13 실측으로 좁힌다).
+export const naverBizmoneySchema = z.object({ bizmoney: z.number().finite().nonnegative() });
+// GET /stats(성과 수집). 횟수는 0 이상 정수, 금액은 0 이상 유한수(VAT 별도), 평균순위는 없을 수 있다. 형식이 다르면 그 묶음을 버린다.
+const count = z.number().int().nonnegative();
+export const naverStatsDetailSchema = z.object({
+  data: z.array(z.object({
+    id: naverId, impCnt: count, clkCnt: count, salesAmt: z.number().finite().nonnegative(), ccnt: count,
+    avgRnk: z.number().finite().nonnegative().nullable().optional(),
+  })),
+});
+// GET /ncc/keywords?ids=…, /ncc/ads?ids=… (명세: 배열)
+export const naverKeywordListSchema = z.array(naverKeywordSchema);
+export const naverAdListSchema = z.array(naverAdSchema);

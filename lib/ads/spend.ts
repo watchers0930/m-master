@@ -12,9 +12,14 @@ import { AdsHttpError } from "./http";
 
 export const STATS_ID_CHUNK = 50;
 
-/** /stats 질의 형식(단일 출처). ids = 쉼표 구분, fields·timeRange = JSON 문자열(KST 날짜 하루). */
-export function statsQuery(ids: readonly string[], kstDay: string): NaverAdsQuery {
-  return { ids: ids.join(","), fields: JSON.stringify(["salesAmt"]), timeRange: JSON.stringify({ since: kstDay, until: kstDay }) };
+/** 여러 id 질의 값(단일 출처): 쉼표로 잇는다. /stats·/ncc/keywords?ids·/ncc/ads?ids가 같이 쓴다. ⚠️ 형식 Task 13 실측 대상. */
+export function idsParam(ids: readonly string[]): string {
+  return ids.join(",");
+}
+
+/** /stats 질의 형식(단일 출처). ids = 쉼표 구분, fields·timeRange = JSON 문자열(KST 날짜 하루). 성과 수집(sync-stats)은 fields를 넘긴다. */
+export function statsQuery(ids: readonly string[], kstDay: string, fields: readonly string[] = ["salesAmt"]): NaverAdsQuery {
+  return { ids: idsParam(ids), fields: JSON.stringify(fields), timeRange: JSON.stringify({ since: kstDay, until: kstDay }) };
 }
 
 export const spendUnknown = () =>

@@ -18,7 +18,7 @@ export class ReconcileIncomplete extends ApplyFailure {
   }
 }
 
-async function listAll<S extends z.ZodTypeAny>(
+export async function listAll<S extends z.ZodTypeAny>(
   client: NaverAdsClient, path: string, base: NaverAdsQuery, item: S, idOf: (x: z.infer<S>) => string, step: string,
 ): Promise<z.infer<S>[]> {
   const seen = new Map<string, z.infer<S>>();
