@@ -49,9 +49,9 @@ export function FocusSection({ section, labelOf, evidenceById }: Props) {
 function Metric({ label, value, period }: { label: string; value: string; period?: {from:string;to:string} }) {
   return (
     <div style={{ minWidth: 92 }}>
-      <span style={{ display: 'block', fontSize: 10, color: 'var(--sub)' }}>{label}</span>
+      <span style={{ display: 'block', fontSize: 12, color: 'var(--sub)' }}>{label}</span>
       <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{value}</span>
-      {period && <span style={{ display: 'block', fontSize: 10, color: 'var(--sub)' }}>{formatDate(period.from)} ~ {formatDate(period.to)}</span>}
+      {period && <span style={{ display: 'block', fontSize: 12, color: 'var(--sub)' }}>{formatDate(period.from)} ~ {formatDate(period.to)}</span>}
     </div>
   );
 }

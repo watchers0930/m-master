@@ -25,13 +25,13 @@ function EngineRow({ s }: { s: EngineScore }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
         <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)' }}>{ENGINE_LABELS[s.engine]}</span>
-        <span style={{ marginLeft: 'auto', fontSize: 10.5, color: 'var(--sub)' }}>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--sub)' }}>
           유효 표본 {s.validSamples}건
         </span>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-        <span style={{ fontSize: 10.5, color: 'var(--sub)', width: 56, flexShrink: 0 }}>노출 점유</span>
+        <span style={{ fontSize: 12, color: 'var(--sub)', width: 64, flexShrink: 0, whiteSpace: 'nowrap' }}>노출 점유</span>
         <Bar rate={s.sov} color={color} />
         <span style={{ fontSize: 12, fontWeight: 700, color: s.sov === null ? 'var(--sub)' : 'var(--text)', minWidth: 60, textAlign: 'right', fontFamily: "'SCoreDream', 'Paperlogy', sans-serif" }}>
           {s.sov === null ? '데이터 없음' : formatRate(s.sov)}
@@ -39,7 +39,7 @@ function EngineRow({ s }: { s: EngineScore }) {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <span style={{ fontSize: 10.5, color: 'var(--sub)', width: 56, flexShrink: 0 }}>인용률</span>
+        <span style={{ fontSize: 12, color: 'var(--sub)', width: 64, flexShrink: 0, whiteSpace: 'nowrap' }}>인용률</span>
         <Bar rate={s.citationRate} color="var(--blue-300)" />
         <span style={{ fontSize: 12, fontWeight: 700, color: s.citationRate === null ? 'var(--sub)' : 'var(--text)', minWidth: 60, textAlign: 'right', fontFamily: "'SCoreDream', 'Paperlogy', sans-serif" }}>
           {s.citationRate === null ? '데이터 없음' : formatRate(s.citationRate)}
@@ -47,7 +47,7 @@ function EngineRow({ s }: { s: EngineScore }) {
       </div>
 
       {extra.length > 0 && (
-        <p style={{ fontSize: 10, color: 'var(--sub)', marginTop: 6 }}>{extra.join(' · ')} (분모 제외)</p>
+        <p style={{ fontSize: 12, color: 'var(--sub)', marginTop: 6 }}>{extra.join(' · ')} (분모 제외)</p>
       )}
     </div>
   );

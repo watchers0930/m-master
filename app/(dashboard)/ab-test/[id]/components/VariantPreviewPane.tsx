@@ -50,7 +50,7 @@ export default function VariantPreviewPane({ variant, content }: Props) {
             borderRadius: '50%',
             background: badgeBg,
             color: '#fff',
-            fontSize: 10,
+            fontSize: 12,
             fontWeight: 700,
             flexShrink: 0,
           }}
@@ -66,7 +66,7 @@ export default function VariantPreviewPane({ variant, content }: Props) {
               display: 'inline-block',
               padding: '2px 8px',
               borderRadius: 4,
-              fontSize: 10.5,
+              fontSize: 12,
               fontWeight: 600,
               background: scoreBg,
               color: scoreColor,
@@ -123,7 +123,7 @@ export default function VariantPreviewPane({ variant, content }: Props) {
               { key: 'legal', label: '법률' },
             ] as const).map((s) => (
               <div key={s.key} style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: 10, color: 'var(--sub)', margin: 0 }}>{s.label}</p>
+                <p style={{ fontSize: 12, color: 'var(--sub)', margin: 0 }}>{s.label}</p>
                 <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', margin: '2px 0 0', fontFamily: "'SCoreDream', 'Paperlogy', sans-serif" }}>
                   {content.scores![s.key]}
                 </p>

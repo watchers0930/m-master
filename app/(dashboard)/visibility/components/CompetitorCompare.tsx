@@ -15,7 +15,7 @@ function Row({ c }: { c: CompetitorScore }) {
           {c.label}
         </span>
         {c.cited && (
-          <span style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--blue-600)', background: 'var(--blue-100)', borderRadius: 4, padding: '1px 6px' }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--blue-600)', background: 'var(--blue-100)', borderRadius: 4, padding: '1px 6px' }}>
             인용됨
           </span>
         )}
@@ -27,7 +27,7 @@ function Row({ c }: { c: CompetitorScore }) {
         <div style={{ flex: 1, height: 7, background: 'var(--n100)', borderRadius: 4, overflow: 'hidden' }}>
           <div style={{ width: `${pct}%`, height: '100%', background: 'var(--amber-500)', borderRadius: 4, transition: 'width 0.4s ease' }} />
         </div>
-        <span style={{ fontSize: 10, color: 'var(--sub)', minWidth: 46, textAlign: 'right' }}>언급 {c.mentionedCount}회</span>
+        <span style={{ fontSize: 12, color: 'var(--sub)', minWidth: 46, textAlign: 'right' }}>언급 {c.mentionedCount}회</span>
       </div>
     </div>
   );

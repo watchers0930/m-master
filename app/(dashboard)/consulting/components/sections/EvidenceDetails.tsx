@@ -32,14 +32,14 @@ export function EvidenceDetails({ ids, evidenceById, label = '근거' }: Props) 
 
   return (
     <details style={{ marginTop: 6 }}>
-      <summary style={{ fontSize: 10, color: 'var(--sub)', cursor: 'pointer', listStyle: 'revert' }}>
+      <summary style={{ fontSize: 12, color: 'var(--sub)', cursor: 'pointer', listStyle: 'revert' }}>
         {label} {refs.length}건 보기
       </summary>
       <ul style={{ margin: '4px 0 0', paddingLeft: 14, display: 'flex', flexDirection: 'column', gap: 3 }}>
         {refs.map((ev) => {
           const hasRange = !!(ev.rangeFrom || ev.rangeTo);
           return (
-            <li key={ev.id} style={{ fontSize: 10, color: 'var(--sub)', lineHeight: 1.5 }}>
+            <li key={ev.id} style={{ fontSize: 12, color: 'var(--sub)', lineHeight: 1.5 }}>
               <span style={{ fontWeight: 700 }}>[{SOURCE_LABELS[ev.source] ?? ev.source}]</span> {ev.label}: {formatEvidenceValue(ev)}
               {hasRange && <span> · 범위 {formatDate(ev.rangeFrom)}~{formatDate(ev.rangeTo)}</span>}
               {ev.observedAt && <span> · 관측 {formatDate(ev.observedAt)}</span>}

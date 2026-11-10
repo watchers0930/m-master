@@ -94,7 +94,7 @@ export default function VisitorsPage() {
                   <polyline points="3,17 9,11 13,15 21,7"/>
                 </svg>
                 <span className="card-title">일별 추이</span>
-                <span style={{ fontSize: 10, color: 'var(--sub)' }}>페이지뷰</span>
+                <span style={{ fontSize: 12, color: 'var(--sub)' }}>페이지뷰</span>
               </div>
               <div style={{ padding: 16 }}><Ga4BlockView block={data.daily} onRetry={retry} render={(daily) => <DailySparkline data={daily} />} /></div>
             </div>
@@ -116,7 +116,7 @@ export default function VisitorsPage() {
                 <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/>
               </svg>
               <span className="card-title">인기 페이지</span>
-              <span style={{ fontSize: 10, color: 'var(--sub)' }}>TOP 20 · 조회수 기준</span>
+              <span style={{ fontSize: 12, color: 'var(--sub)' }}>TOP 20 · 조회수 기준</span>
             </div>
             <div style={{ padding: '8px 12px 12px' }}><Ga4BlockView block={data.pages} onRetry={retry} render={(rows) => <TopPagesTable rows={rows} />} /></div>
           </div>
@@ -142,7 +142,7 @@ export default function VisitorsPage() {
                 <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
               </svg>
               <span className="card-title">인구통계</span>
-              <span style={{ fontSize: 10, color: 'var(--sub)' }}>연령 · 성별 · 지역</span>
+              <span style={{ fontSize: 12, color: 'var(--sub)' }}>연령 · 성별 · 지역</span>
             </div>
             <div style={{ padding: 16 }}>
               <Ga4BlockView block={data.demo} onRetry={retry} render={(demo) => (
@@ -177,7 +177,7 @@ export default function VisitorsPage() {
             </div>
           </div>
 
-          <p style={{ fontSize: 10.5, color: 'var(--sub)', textAlign: 'right' }}>
+          <p style={{ fontSize: 12, color: 'var(--sub)', textAlign: 'right' }}>
             캐시: 실시간 30초 · 개요 5분 · 상세 15분 · 클라이언트 5분
           </p>
         </>

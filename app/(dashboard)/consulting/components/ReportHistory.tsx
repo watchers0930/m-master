@@ -56,10 +56,10 @@ export function ReportHistory({ reports, loading, error, hasMore, fetchingMore, 
                         background: active ? 'var(--n100)' : 'var(--surface)',
                       }}
                     >
-                      <span style={{ fontSize: 10, fontWeight: 700, color: meta.color, background: meta.bg, borderRadius: 5, padding: '2px 7px', flexShrink: 0 }}>{meta.label}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: meta.color, background: meta.bg, borderRadius: 5, padding: '2px 7px', flexShrink: 0 }}>{meta.label}</span>
                       <span style={{ fontSize: 11.5, color: 'var(--text)', flex: 1 }}>{formatDateTime(r.generatedAt ?? r.createdAt)}</span>
                       {r.budgetProposal?.totalAmount != null && (
-                        <span style={{ fontSize: 10.5, color: 'var(--sub)' }}>예산 입력됨</span>
+                        <span style={{ fontSize: 12, color: 'var(--sub)' }}>예산 입력됨</span>
                       )}
                     </button>
                   </li>

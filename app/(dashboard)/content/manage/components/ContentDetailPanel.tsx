@@ -105,11 +105,11 @@ export default function ContentDetailPanel({ contentId }: Props) {
                 <ReviewStatusBadge reviewStatus={data.review_status} origin={data.origin} reviewedAt={data.reviewed_at} size="md" />
                 <PublishStatusBadge status={data.status} size="md" />
                 {avg !== undefined && (
-                  <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 10.5, fontWeight: 600, background: scoreBg, color: scoreColor }}>
+                  <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600, background: scoreBg, color: scoreColor }}>
                     AI {avg}점
                   </span>
                 )}
-                <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 10.5, fontWeight: 600, background: 'var(--n100)', color: 'var(--sub)' }}>
+                <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600, background: 'var(--n100)', color: 'var(--sub)' }}>
                   비용 {data.cost_krw.toLocaleString()}원
                 </span>
               </div>

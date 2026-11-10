@@ -49,16 +49,16 @@ export function BudgetProposalCard({ budget, evidenceById }: Props) {
 
         {budget.assumptions?.length > 0 && (
           <div style={{ marginTop: 4 }}>
-            <p style={{ fontSize: 10.5, color: 'var(--sub)', fontWeight: 600, marginBottom: 4 }}>전제</p>
+            <p style={{ fontSize: 12, color: 'var(--sub)', fontWeight: 600, marginBottom: 4 }}>전제</p>
             <ul style={{ margin: 0, paddingLeft: 16, display: 'flex', flexDirection: 'column', gap: 2 }}>
               {budget.assumptions.map((s, i) => (
-                <li key={i} style={{ fontSize: 10.5, color: 'var(--sub)', lineHeight: 1.6 }}>{renderEvidenceTokens(s, evidenceById)}</li>
+                <li key={i} style={{ fontSize: 12, color: 'var(--sub)', lineHeight: 1.6 }}>{renderEvidenceTokens(s, evidenceById)}</li>
               ))}
             </ul>
           </div>
         )}
 
-        <p style={{ fontSize: 10, color: 'var(--sub)', marginTop: 2 }}>
+        <p style={{ fontSize: 12, color: 'var(--sub)', marginTop: 2 }}>
           네이버 광고 배분은 집행 전 참고 제안이며, 예상 CPC·ROAS·매출은 표시하지 않습니다(실집행은 후속 단계).
         </p>
       </div>

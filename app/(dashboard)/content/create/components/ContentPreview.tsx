@@ -151,7 +151,7 @@ ${bodyHtml}
           <ScoreBar label="브랜드"    score={result.scores.brand} />
           <ScoreBar label="법적 준수" score={result.scores.legal} />
         </div>
-        <p style={{ marginTop: 8, fontSize: 10, color: 'var(--sub)' }}>생성 비용: {result.cost_krw.toLocaleString()}원 (텍스트 + 이미지)</p>
+        <p style={{ marginTop: 8, fontSize: 12, color: 'var(--sub)' }}>생성 비용: {result.cost_krw.toLocaleString()}원 (텍스트 + 이미지)</p>
       </div>
 
       {/* 본문 미리보기 */}
@@ -161,7 +161,7 @@ ${bodyHtml}
             <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/>
           </svg>
           <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text)', flex: 1 }}>본문 미리보기</span>
-          <span style={{ fontSize: 10, color: 'var(--sub)' }}>{result.text.length.toLocaleString()}자</span>
+          <span style={{ fontSize: 12, color: 'var(--sub)' }}>{result.text.length.toLocaleString()}자</span>
         </div>
         <div style={{ padding: '14px 16px', overflowY: 'auto', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
           {title && (
@@ -181,7 +181,7 @@ ${bodyHtml}
                   <figure key={i} style={{ margin: '8px 0' }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={url} alt={block.text} style={{ width: '100%', maxHeight: 280, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)', display: 'block' }} />
-                    <figcaption style={{ fontSize: 10, color: 'var(--sub)', textAlign: 'center', marginTop: 3, fontStyle: 'italic' }}>{block.text}</figcaption>
+                    <figcaption style={{ fontSize: 12, color: 'var(--sub)', textAlign: 'center', marginTop: 3, fontStyle: 'italic' }}>{block.text}</figcaption>
                   </figure>
                 );
               }
@@ -190,7 +190,7 @@ ${bodyHtml}
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--n400)" strokeWidth="1.8" strokeLinecap="round" style={{ flexShrink: 0 }}>
                     <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/>
                   </svg>
-                  <span style={{ fontSize: 10.5, color: 'var(--sub)', fontStyle: 'italic' }}>{block.text}</span>
+                  <span style={{ fontSize: 12, color: 'var(--sub)', fontStyle: 'italic' }}>{block.text}</span>
                 </div>
               );
             }
@@ -198,7 +198,7 @@ ${bodyHtml}
             if (block.type === 'h3') return <h3 key={i} style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginTop: 4, lineHeight: 1.4 }}>{renderInline(block.text)}</h3>;
             if (block.type === 'li') return (
               <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-                <span style={{ color: 'var(--blue-400)', marginTop: 2, flexShrink: 0, fontSize: 10 }}>●</span>
+                <span style={{ color: 'var(--blue-400)', marginTop: 2, flexShrink: 0, fontSize: 12 }}>●</span>
                 <p style={{ fontSize: 12, color: 'var(--sub)', lineHeight: 1.7 }}>{renderInline(block.text)}</p>
               </div>
             );

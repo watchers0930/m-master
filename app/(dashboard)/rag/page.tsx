@@ -89,7 +89,7 @@ export default function RagPage() {
             <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/>
           </svg>
           <span className="card-title">등록된 문서</span>
-          <span style={{ fontSize: 10, color: 'var(--sub)' }}>{docs.length}건</span>
+          <span style={{ fontSize: 12, color: 'var(--sub)' }}>{docs.length}건</span>
         </div>
         {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 0' }}>

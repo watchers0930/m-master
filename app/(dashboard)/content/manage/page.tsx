@@ -29,8 +29,8 @@ interface TopicGroup {
   latestDate: string;
 }
 
-// 헤더·토픽 행·콘텐츠 행이 같은 열 너비를 쓴다. 날짜 열은 'YYYY. MM. DD.'(약 80px)가 한 줄에 들어가는 폭.
-const LIST_COLUMNS = 'minmax(0, 1fr) 72px 92px';
+// 헤더·토픽 행·콘텐츠 행이 같은 열 너비를 쓴다. 날짜 열은 12px 'YYYY. MM. DD.'(약 88px)가 한 줄에 들어가는 폭.
+const LIST_COLUMNS = 'minmax(0, 1fr) 72px 100px';
 
 function ContentManageContent() {
   const router = useRouter();
@@ -160,12 +160,12 @@ function ContentManageContent() {
                       </svg>
                       <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{group.topic}</p>
                       {group.items.some((i) => i.review_status === 'pending_review') && (
-                        <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 3, background: 'var(--amber-100)', color: 'var(--amber-700)', flexShrink: 0 }}>
+                        <span style={{ fontSize: 12, fontWeight: 600, padding: '1px 6px', borderRadius: 3, background: 'var(--amber-100)', color: 'var(--amber-700)', flexShrink: 0 }}>
                           검토 대기 {group.items.filter((i) => i.review_status === 'pending_review').length}
                         </span>
                       )}
                     </div>
-                    <span style={{ fontSize: 10.5, color: 'var(--sub)', whiteSpace: 'nowrap' }}>{group.items.length}개</span>
+                    <span style={{ fontSize: 12, color: 'var(--sub)', whiteSpace: 'nowrap' }}>{group.items.length}개</span>
                     <span style={{ fontSize: 11, color: 'var(--sub)', whiteSpace: 'nowrap' }}>{new Date(group.latestDate).toLocaleDateString('ko-KR')}</span>
                   </div>
 
@@ -189,16 +189,16 @@ function ContentManageContent() {
                         onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = ''; }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                          <span style={{ fontSize: 10.5, fontWeight: 700, padding: '1px 6px', borderRadius: 3, background: ch.bg, color: ch.color, flexShrink: 0 }}>{CHANNEL_LABEL[item.channel] ?? item.channel}</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, padding: '1px 6px', borderRadius: 3, background: ch.bg, color: ch.color, flexShrink: 0 }}>{CHANNEL_LABEL[item.channel] ?? item.channel}</span>
                           <PublishStatusBadge status={item.status} />
                           <ReviewStatusBadge reviewStatus={item.review_status} origin={item.origin} reviewedAt={item.reviewed_at} />
                           <OriginBadge origin={item.origin} />
                           {item.scores?.avg !== undefined && (
-                            <span style={{ fontSize: 10, color: 'var(--sub)' }}>{item.scores.avg}점</span>
+                            <span style={{ fontSize: 12, color: 'var(--sub)' }}>{item.scores.avg}점</span>
                           )}
                         </div>
-                        <span style={{ fontSize: 10.5, color: 'var(--sub)', whiteSpace: 'nowrap' }}>{item.cost_krw.toLocaleString()}원</span>
-                        <span style={{ fontSize: 10.5, color: 'var(--sub)', whiteSpace: 'nowrap' }}>{new Date(item.created_at).toLocaleDateString('ko-KR')}</span>
+                        <span style={{ fontSize: 12, color: 'var(--sub)', whiteSpace: 'nowrap' }}>{item.cost_krw.toLocaleString()}원</span>
+                        <span style={{ fontSize: 12, color: 'var(--sub)', whiteSpace: 'nowrap' }}>{new Date(item.created_at).toLocaleDateString('ko-KR')}</span>
                       </div>
                     );
                   })}

@@ -48,7 +48,7 @@ const field: React.CSSProperties = {
   padding: '8px 10px', fontFamily: 'inherit',
 };
 const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 600, color: 'var(--text)', marginBottom: 4, display: 'block' };
-const hint: React.CSSProperties = { fontSize: 10, color: 'var(--sub)', marginTop: 3 };
+const hint: React.CSSProperties = { fontSize: 12, color: 'var(--sub)', marginTop: 3 };
 
 export function QueryFormModal({ initial, defaultMarket, submitting, errorMessage, onSubmit, onClose }: Props) {
   const isEdit = !!initial;

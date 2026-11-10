@@ -73,7 +73,7 @@ export default function UrlInputForm({ test, onUpdated }: Props) {
         {isRunning && (
           <span
             style={{
-              fontSize: 10.5,
+              fontSize: 12,
               color: 'var(--blue-600)',
               background: 'var(--blue-100)',
               padding: '2px 8px',
@@ -90,7 +90,7 @@ export default function UrlInputForm({ test, onUpdated }: Props) {
         {/* 변형 A URL */}
         <div>
           <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--sub)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: '50%', background: 'var(--blue-600)', color: '#fff', fontSize: 9, fontWeight: 700 }}>A</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: '50%', background: 'var(--blue-600)', color: '#fff', fontSize: 12, fontWeight: 700 }}>A</span>
             변형 A 발행 URL
           </label>
           <input
@@ -113,7 +113,7 @@ export default function UrlInputForm({ test, onUpdated }: Props) {
         {/* 변형 B URL */}
         <div>
           <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--sub)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: '50%', background: 'var(--amber-500)', color: '#fff', fontSize: 9, fontWeight: 700 }}>B</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 18, height: 18, borderRadius: '50%', background: 'var(--amber-500)', color: '#fff', fontSize: 12, fontWeight: 700 }}>B</span>
             변형 B 발행 URL
           </label>
           <input
@@ -205,7 +205,7 @@ export default function UrlInputForm({ test, onUpdated }: Props) {
           </div>
         )}
 
-        <p style={{ fontSize: 10.5, color: 'var(--sub)' }}>
+        <p style={{ fontSize: 12, color: 'var(--sub)' }}>
           두 URL을 모두 입력하면 자동으로 측정이 시작됩니다.
         </p>
       </form>

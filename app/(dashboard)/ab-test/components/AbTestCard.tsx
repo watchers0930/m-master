@@ -22,7 +22,7 @@ function VariantBadge({ label, variant }: { label: string; variant: 'a' | 'b' })
         borderRadius: '50%',
         background: isA ? 'var(--blue-600)' : 'var(--amber-500)',
         color: '#fff',
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: 700,
         flexShrink: 0,
       }}
@@ -127,7 +127,7 @@ export default function AbTestCard({ test }: Props) {
               display: 'inline-block',
               padding: '2px 8px',
               borderRadius: 4,
-              fontSize: 10.5,
+              fontSize: 12,
               fontWeight: 600,
               background: winnerStyle.bg,
               color: winnerStyle.color,

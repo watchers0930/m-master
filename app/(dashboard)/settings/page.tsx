@@ -186,7 +186,7 @@ export default function SettingsPage() {
             <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
           </svg>
           <span className="card-title">브랜드 가이드</span>
-          <span style={{ fontSize: 10, color: 'var(--sub)' }}>콘텐츠 생성 시 GPT-4o에게 전달됩니다</span>
+          <span style={{ fontSize: 12, color: 'var(--sub)' }}>콘텐츠 생성 시 GPT-4o에게 전달됩니다</span>
         </div>
         <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
@@ -227,7 +227,7 @@ export default function SettingsPage() {
             <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/>
           </svg>
           <span className="card-title">비즈니스 프로필</span>
-          <span style={{ fontSize: 10, color: 'var(--sub)' }}>토픽 추천과 콘텐츠 생성에 반영됩니다</span>
+          <span style={{ fontSize: 12, color: 'var(--sub)' }}>토픽 추천과 콘텐츠 생성에 반영됩니다</span>
         </div>
         <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -260,7 +260,7 @@ export default function SettingsPage() {
                 ))}
               </div>
             )}
-            <p style={{ fontSize: 10.5, color: 'var(--sub)', marginTop: 4 }}>토픽 추천 후보 생성에 활용됩니다</p>
+            <p style={{ fontSize: 12, color: 'var(--sub)', marginTop: 4 }}>토픽 추천 후보 생성에 활용됩니다</p>
           </div>
           <div>
             <label style={labelStyle}>주요 서비스</label>
@@ -302,7 +302,7 @@ export default function SettingsPage() {
             <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/>
           </svg>
           <span className="card-title">프롬프트 템플릿</span>
-          <span style={{ fontSize: 10, color: 'var(--sub)' }}>블로그 생성 기본 템플릿</span>
+          <span style={{ fontSize: 12, color: 'var(--sub)' }}>블로그 생성 기본 템플릿</span>
         </div>
         <div style={{ padding: 16 }}>
           <label style={labelStyle}>블로그 템플릿</label>
@@ -310,7 +310,7 @@ export default function SettingsPage() {
             value={settings.prompt_templates['blog'] ?? ''}
             onChange={(e) => setSettings((prev) => prev ? { ...prev, prompt_templates: { ...prev.prompt_templates, blog: e.target.value } } : prev)}
           />
-          <p style={{ fontSize: 10.5, color: 'var(--sub)', marginTop: 4 }}>사용 가능한 변수: {'{topic}'}, {'{tone}'}, {'{keywords}'}, {'{rag_context}'}</p>
+          <p style={{ fontSize: 12, color: 'var(--sub)', marginTop: 4 }}>사용 가능한 변수: {'{topic}'}, {'{tone}'}, {'{keywords}'}, {'{rag_context}'}</p>
         </div>
       </div>
 
@@ -321,7 +321,7 @@ export default function SettingsPage() {
             <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>
           </svg>
           <span className="card-title">비용 한도</span>
-          <span style={{ fontSize: 10, color: 'var(--sub)' }}>월간 AI API 사용 예산</span>
+          <span style={{ fontSize: 12, color: 'var(--sub)' }}>월간 AI API 사용 예산</span>
         </div>
         <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
@@ -341,7 +341,7 @@ export default function SettingsPage() {
               />
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--blue-700)', width: 40, textAlign: 'right' }}>{budgetPct}%</span>
             </div>
-            <p style={{ fontSize: 10.5, color: 'var(--sub)', marginTop: 4 }}>예산의 {budgetPct}% 도달 시 알림 발송</p>
+            <p style={{ fontSize: 12, color: 'var(--sub)', marginTop: 4 }}>예산의 {budgetPct}% 도달 시 알림 발송</p>
           </div>
         </div>
       </div>
@@ -353,7 +353,7 @@ export default function SettingsPage() {
             <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/>
           </svg>
           <span className="card-title">알림</span>
-          <span style={{ fontSize: 10, color: 'var(--sub)' }}>발생 시 이메일/콘솔 알림</span>
+          <span style={{ fontSize: 12, color: 'var(--sub)' }}>발생 시 이메일/콘솔 알림</span>
         </div>
         <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 0 }}>
           {Object.entries(NOTIF_LABELS).map(([key, label]) => {

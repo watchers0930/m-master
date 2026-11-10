@@ -194,7 +194,7 @@ export function GenerateForm({ initialTopic, onResult, onStreamStart, onStreamDe
             type="button"
             onClick={() => setTopicModalOpen(true)}
             className="btn btn-ghost"
-            style={{ fontSize: 10, padding: '3px 9px', gap: 4 }}
+            style={{ fontSize: 12, padding: '3px 9px', gap: 4 }}
             title="이번 주 추천 토픽 TOP 5 보기"
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -244,7 +244,7 @@ export function GenerateForm({ initialTopic, onResult, onStreamStart, onStreamDe
       <div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
           <label style={{ ...fieldLabel, marginBottom: 0 }}>SEO 키워드 <span style={{ fontWeight: 400, color: 'var(--n400)' }}>(해시태그로 활용)</span></label>
-          <button type="button" onClick={autoGenerateKeywords} disabled={kwLoading} className="btn btn-ghost" style={{ fontSize: 10, padding: '3px 9px', gap: 4, opacity: kwLoading ? 0.6 : 1 }}>
+          <button type="button" onClick={autoGenerateKeywords} disabled={kwLoading} className="btn btn-ghost" style={{ fontSize: 12, padding: '3px 9px', gap: 4, opacity: kwLoading ? 0.6 : 1 }}>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
             </svg>
@@ -337,7 +337,7 @@ export function GenerateForm({ initialTopic, onResult, onStreamStart, onStreamDe
                     <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/>
                   </svg>
                   <span style={{ fontSize: 11.5, color: 'var(--blue-700)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
-                  <span style={{ fontSize: 10, color: 'var(--sub)', flexShrink: 0 }}>{(file.size / 1024).toFixed(0)}KB</span>
+                  <span style={{ fontSize: 12, color: 'var(--sub)', flexShrink: 0 }}>{(file.size / 1024).toFixed(0)}KB</span>
                   <button type="button" onClick={() => setRefFiles(prev => prev.filter((_, j) => j !== i))}
                     style={{ color: 'var(--sub)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, lineHeight: 1, flexShrink: 0 }}>×</button>
                 </div>

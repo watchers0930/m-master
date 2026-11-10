@@ -26,7 +26,7 @@ export function AuditHistory({ audits, loading, error, hasMore, fetchingMore, ac
           <path d="M3 3v5h5" /><path d="M3.05 13A9 9 0 106 5.3L3 8" /><path d="M12 7v5l4 2" />
         </svg>
         <span className="card-title">진단 이력</span>
-        <span style={{ fontSize: 10, color: 'var(--sub)' }}>{audits.length}건</span>
+        <span style={{ fontSize: 12, color: 'var(--sub)' }}>{audits.length}건</span>
       </div>
 
       {loading ? (
@@ -60,9 +60,9 @@ export function AuditHistory({ audits, loading, error, hasMore, fetchingMore, ac
                   display: 'flex', alignItems: 'center', gap: 10,
                 }}
               >
-                <span style={{ fontSize: 10, fontWeight: 700, color: meta.color, background: meta.bg, borderRadius: 5, padding: '2px 7px', flexShrink: 0 }}>{meta.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: meta.color, background: meta.bg, borderRadius: 5, padding: '2px 7px', flexShrink: 0 }}>{meta.label}</span>
                 <span style={{ fontSize: 11.5, color: 'var(--text)', fontWeight: 600, flexShrink: 0 }}>{SCOPE_LABELS[a.scope]}</span>
-                <span style={{ fontSize: 10.5, color: 'var(--sub)' }}>{formatDateTime(a.createdAt)}</span>
+                <span style={{ fontSize: 12, color: 'var(--sub)' }}>{formatDateTime(a.createdAt)}</span>
                 <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--sub)', flexShrink: 0 }}>
                   {a.technicalScore !== null ? `${a.technicalScore}점` : '점수 없음'}
                   {a.coverage !== null && ` · 커버 ${formatPercent(a.coverage)}`}

@@ -25,9 +25,9 @@ export function CompetitorsSection({ section, evidenceById }: { section: Competi
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {(items ?? []).map((c, i) => (
           <div key={`${c.name}:${i}`} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 9, fontWeight: 700, color: '#2a7d5f', background: 'var(--green-100)', borderRadius: 5, padding: '2px 6px' }}>GEO</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#2a7d5f', background: 'var(--green-100)', borderRadius: 5, padding: '2px 6px' }}>GEO</span>
             <span style={{ fontSize: 12, color: 'var(--text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
-            <span style={{ fontSize: 10.5, color: 'var(--sub)' }}>{c.metric}</span>
+            <span style={{ fontSize: 12, color: 'var(--sub)' }}>{c.metric}</span>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', minWidth: 56, textAlign: 'right' }}>{formatMetric(c.value)}</span>
           </div>
         ))}

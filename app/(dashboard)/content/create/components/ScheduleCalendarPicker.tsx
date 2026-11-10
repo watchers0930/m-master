@@ -62,7 +62,7 @@ export function ScheduleCalendarPicker({ value, onChange }: Props) {
         {/* 요일 헤더 */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', borderBottom: '1px solid var(--border)' }}>
           {['일','월','화','수','목','금','토'].map((d, i) => (
-            <div key={d} style={{ textAlign: 'center', fontSize: 9.5, fontWeight: 700, padding: '4px 0', color: i === 0 ? 'var(--amber-500)' : i === 6 ? 'var(--blue-400)' : 'var(--sub)' }}>{d}</div>
+            <div key={d} style={{ textAlign: 'center', fontSize: 12, fontWeight: 700, padding: '4px 0', color: i === 0 ? 'var(--amber-500)' : i === 6 ? 'var(--blue-400)' : 'var(--sub)' }}>{d}</div>
           ))}
         </div>
 
@@ -94,7 +94,7 @@ export function ScheduleCalendarPicker({ value, onChange }: Props) {
                 {/* 날짜 숫자 */}
                 <div style={{
                   width: 18, height: 18, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 10, fontWeight: 600, marginBottom: 2,
+                  fontSize: 12, fontWeight: 600, marginBottom: 2,
                   background: isToday ? 'var(--blue-400)' : 'transparent',
                   color: isToday ? '#fff' : col === 0 ? 'var(--amber-500)' : col === 6 ? 'var(--blue-400)' : 'var(--text)',
                 }}>{day}</div>
@@ -103,12 +103,12 @@ export function ScheduleCalendarPicker({ value, onChange }: Props) {
                 {daySlots.slice(0, 2).map(s => {
                   const st = s.content_id ? ST_COLOR.content : (ST_COLOR[s.status] ?? ST_COLOR.scheduled);
                   return (
-                    <div key={s.id} style={{ fontSize: 9, fontWeight: 600, padding: '1px 4px', borderRadius: 3, marginBottom: 1, background: st.bg, color: st.color, border: st.border, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                    <div key={s.id} style={{ fontSize: 12, fontWeight: 600, padding: '1px 4px', borderRadius: 3, marginBottom: 1, background: st.bg, color: st.color, border: st.border, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
                       {CH_LABEL[s.channel] ?? s.channel}
                     </div>
                   );
                 })}
-                {daySlots.length > 2 && <div style={{ fontSize: 9, color: 'var(--sub)', paddingLeft: 2 }}>+{daySlots.length - 2}</div>}
+                {daySlots.length > 2 && <div style={{ fontSize: 12, color: 'var(--sub)', paddingLeft: 2 }}>+{daySlots.length - 2}</div>}
               </div>
             );
           })}

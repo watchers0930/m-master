@@ -98,7 +98,7 @@ export default function BillingPage() {
               }}
             >
               {isCurrent && (
-                <div style={{ position: 'absolute', top: -10, right: 12, background: 'var(--blue-500)', color: '#fff', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>
+                <div style={{ position: 'absolute', top: -10, right: 12, background: 'var(--blue-500)', color: '#fff', fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>
                   현재
                 </div>
               )}

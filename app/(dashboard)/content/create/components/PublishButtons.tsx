@@ -282,7 +282,7 @@ export function PublishAllBtn({
       {/* 카페 타겟 선택 패널 */}
       {showCafeSelect && cafeTargets.length > 0 && (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 11 }}>
-          <p style={{ fontSize: 10, color: 'var(--sub)', marginBottom: 6 }}>발행 대상 카페를 선택하세요:</p>
+          <p style={{ fontSize: 12, color: 'var(--sub)', marginBottom: 6 }}>발행 대상 카페를 선택하세요:</p>
           {cafeTargets.map(t => (
             <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', cursor: 'pointer' }}>
               <input
@@ -292,7 +292,7 @@ export function PublishAllBtn({
                 style={{ accentColor: '#03C75A' }}
               />
               <span style={{ fontWeight: 600, color: 'var(--text)' }}>{t.name}</span>
-              {t.isDefault && <span style={{ fontSize: 9, color: '#2E7D32', background: '#E8F5E9', padding: '1px 4px', borderRadius: 3 }}>기본</span>}
+              {t.isDefault && <span style={{ fontSize: 12, color: '#2E7D32', background: '#E8F5E9', padding: '1px 4px', borderRadius: 3 }}>기본</span>}
             </label>
           ))}
         </div>

@@ -48,8 +48,8 @@ const CHANNELS: { id: string; label: string; color: string; bgConnected: string;
 
 // ── 뱃지 ─────────────────────────────────────────────────────────────
 function Badge({ connected }: { connected: boolean }) {
-  if (connected) return <span style={{ background: '#E8F5E9', border: '1px solid #A5D6A7', color: '#2E7D32', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>연결됨</span>;
-  return <span style={{ background: 'var(--n100)', color: 'var(--sub)', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>미연결</span>;
+  if (connected) return <span style={{ background: '#E8F5E9', border: '1px solid #A5D6A7', color: '#2E7D32', fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>연결됨</span>;
+  return <span style={{ background: 'var(--n100)', color: 'var(--sub)', fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>미연결</span>;
 }
 
 // ── 메인 컴포넌트 ────────────────────────────────────────────────────
@@ -226,7 +226,7 @@ export default function ChannelForm({ initial, cafeTargets: initialTargets }: Pr
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>블로그 (HTML Export)</span>
-            <span style={{ background: 'var(--blue-50)', border: '1px solid var(--blue-200)', color: 'var(--blue-600)', fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>연결됨</span>
+            <span style={{ background: 'var(--blue-50)', border: '1px solid var(--blue-200)', color: 'var(--blue-600)', fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 4 }}>연결됨</span>
           </div>
           <p style={{ fontSize: 11.5, color: 'var(--sub)' }}>HTML 파일 다운로드 방식. 발행 버튼 클릭 시 og/meta/schema 포함된 HTML 생성.</p>
         </div>
@@ -257,7 +257,7 @@ export default function ChannelForm({ initial, cafeTargets: initialTargets }: Pr
                 {connected && (
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
                     {Object.entries(masked).map(([k, v]) => (
-                      <span key={k} style={{ fontSize: 10, color: 'var(--sub)', fontFamily: 'monospace', background: 'var(--n50)', padding: '1px 6px', borderRadius: 3 }}>
+                      <span key={k} style={{ fontSize: 12, color: 'var(--sub)', fontFamily: 'monospace', background: 'var(--n50)', padding: '1px 6px', borderRadius: 3 }}>
                         {k}: {v}
                       </span>
                     ))}
@@ -284,15 +284,15 @@ export default function ChannelForm({ initial, cafeTargets: initialTargets }: Pr
                       <div key={t.id} style={{ background: 'var(--n50)', borderRadius: 6, padding: '10px', fontSize: 12 }}>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                           <div style={{ flex: '1 1 120px' }}>
-                            <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 이름</label>
+                            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 이름</label>
                             <input type="text" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))} style={{ ...inputStyle, fontSize: 11 }} autoComplete="off" />
                           </div>
                           <div style={{ flex: '0 0 100px' }}>
-                            <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 ID</label>
+                            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 ID</label>
                             <input type="text" value={editForm.clubId} onChange={e => setEditForm(p => ({ ...p, clubId: e.target.value }))} style={{ ...inputStyle, fontSize: 11 }} autoComplete="off" />
                           </div>
                           <div style={{ flex: '0 0 100px' }}>
-                            <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>메뉴 ID</label>
+                            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>메뉴 ID</label>
                             <input type="text" value={editForm.menuId} onChange={e => setEditForm(p => ({ ...p, menuId: e.target.value }))} style={{ ...inputStyle, fontSize: 11 }} autoComplete="off" />
                           </div>
                           <button className="btn btn-primary" style={{ fontSize: 11, padding: '7px 12px', flexShrink: 0 }} onClick={handleSaveEdit} disabled={targetLoading}>
@@ -306,11 +306,11 @@ export default function ChannelForm({ initial, cafeTargets: initialTargets }: Pr
                     ) : (
                       <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--n50)', borderRadius: 6, padding: '8px 10px', fontSize: 12 }}>
                         <span style={{ flex: 1, fontWeight: 600, color: 'var(--text)' }}>{t.name}</span>
-                        <span style={{ fontSize: 10, color: 'var(--sub)', fontFamily: 'monospace' }}>club:{t.clubId} / menu:{t.menuId}</span>
+                        <span style={{ fontSize: 12, color: 'var(--sub)', fontFamily: 'monospace' }}>club:{t.clubId} / menu:{t.menuId}</span>
                         <button
                           onClick={() => handleToggleDefault(t.id, !t.isDefault)}
                           style={{
-                            fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                            fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 4, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                             background: t.isDefault ? '#E8F5E9' : 'var(--n100)',
                             color: t.isDefault ? '#2E7D32' : 'var(--sub)',
                           }}
@@ -319,13 +319,13 @@ export default function ChannelForm({ initial, cafeTargets: initialTargets }: Pr
                         </button>
                         <button
                           onClick={() => handleStartEdit(t)}
-                          style={{ fontSize: 10, color: 'var(--blue-600)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '2px 4px' }}
+                          style={{ fontSize: 12, color: 'var(--blue-600)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '2px 4px' }}
                         >
                           수정
                         </button>
                         <button
                           onClick={() => handleDeleteTarget(t.id)}
-                          style={{ fontSize: 10, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '2px 4px' }}
+                          style={{ fontSize: 12, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '2px 4px' }}
                         >
                           삭제
                         </button>
@@ -337,7 +337,7 @@ export default function ChannelForm({ initial, cafeTargets: initialTargets }: Pr
                 {/* 카페 추가 폼 */}
                 <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 120px' }}>
-                    <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 이름</label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 이름</label>
                     <input
                       type="text" placeholder="예: 부동산 정보 카페"
                       value={targetForm.name} onChange={e => setTargetForm(p => ({ ...p, name: e.target.value }))}
@@ -345,7 +345,7 @@ export default function ChannelForm({ initial, cafeTargets: initialTargets }: Pr
                     />
                   </div>
                   <div style={{ flex: '0 0 100px' }}>
-                    <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 ID</label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>카페 ID</label>
                     <input
                       type="text" placeholder="숫자"
                       value={targetForm.clubId} onChange={e => setTargetForm(p => ({ ...p, clubId: e.target.value }))}
@@ -353,7 +353,7 @@ export default function ChannelForm({ initial, cafeTargets: initialTargets }: Pr
                     />
                   </div>
                   <div style={{ flex: '0 0 100px' }}>
-                    <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>메뉴 ID</label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--sub)', display: 'block', marginBottom: 2 }}>메뉴 ID</label>
                     <input
                       type="text" placeholder="숫자"
                       value={targetForm.menuId} onChange={e => setTargetForm(p => ({ ...p, menuId: e.target.value }))}
@@ -427,7 +427,7 @@ export default function ChannelForm({ initial, cafeTargets: initialTargets }: Pr
         </svg>
         <div>
           <p style={{ margin: 0 }}>각 채널의 API 키를 입력하면 토큰 유효성을 실시간 검증합니다.</p>
-          <p style={{ margin: '4px 0 0', fontSize: 10.5, color: 'var(--sub)' }}>
+          <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--sub)' }}>
             Instagram/Facebook: Meta Graph API Explorer에서 장기 토큰 발급 &nbsp;|&nbsp;
             네이버: 네이버 개발자센터 &gt; 애플리케이션 &gt; 카페 API 설정
           </p>
