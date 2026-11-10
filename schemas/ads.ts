@@ -48,23 +48,20 @@ export const naverChannelSchema = z.object({
 export const naverChannelListSchema = z.array(naverChannelSchema);
 export type NaverChannel = z.infer<typeof naverChannelSchema>;
 
-// GET /keywordstool 응답(Task 3 판정: { keywordList: RelKwdStat[] }). 수치는 숫자 또는 "< 10" 같은 문자열 → 해석은 lib/ads/keywords.ts.
-// 목록이 없거나 null이면 빈 결과, 그 밖의 형태(목록이 배열이 아님·relKeyword 누락)는 응답 오류다.
+// GET /keywordstool 응답. 공식 명세의 200 스키마는 "keywordList"라는 제목의 배열이라 감싼 형태인지 최상위 배열인지 모호하다
+// (컨트롤러 판정) → { keywordList: RelKwdStat[] }와 최상위 RelKwdStat[] 둘 다 받는다. 그 밖({}·null·빈 본문·목록 아닌 값)은 응답 오류.
+// 수치는 숫자 또는 "< 10" 같은 문자열 → 해석은 lib/ads/keywords.ts.
 const kwMetric = z.union([z.number(), z.string(), z.null()]).optional();
-export const naverKeywordToolSchema = z.object({
-  keywordList: z
-    .array(
-      z.object({
-        relKeyword: z.string(),
-        monthlyPcQcCnt: kwMetric,
-        monthlyMobileQcCnt: kwMetric,
-        monthlyAvePcCtr: kwMetric,
-        monthlyAveMobileCtr: kwMetric,
-        plAvgDepth: kwMetric,
-        compIdx: kwMetric,
-      }),
-    )
-    .nullable()
-    .optional(),
+const naverKeywordRowSchema = z.object({
+  relKeyword: z.string(),
+  monthlyPcQcCnt: kwMetric,
+  monthlyMobileQcCnt: kwMetric,
+  monthlyAvePcCtr: kwMetric,
+  monthlyAveMobileCtr: kwMetric,
+  plAvgDepth: kwMetric,
+  compIdx: kwMetric,
 });
-export type NaverKeywordRow = NonNullable<z.infer<typeof naverKeywordToolSchema>["keywordList"]>[number];
+export const naverKeywordToolSchema = z
+  .union([z.object({ keywordList: z.array(naverKeywordRowSchema) }), z.array(naverKeywordRowSchema)])
+  .transform((body) => (Array.isArray(body) ? body : body.keywordList));
+export type NaverKeywordRow = z.infer<typeof naverKeywordRowSchema>;

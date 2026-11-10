@@ -1,6 +1,7 @@
 // lib/ads/keywords.ts — 네이버 키워드 도구 리서치(제안 Task 7·8의 입력 통계).
 // - researchKeywords: 씨앗을 정제해 5개씩 GET /keywordstool?hintKeywords=a,b,…&showDetail=1(배치는 순차, 재시도는 클라이언트 몫).
-//   응답은 zod로 검증한다. 형태 오류는 빈 결과가 아니라 ads_unexpected_response(502)다. keywordList 없음·null·[] → 빈 결과.
+//   응답은 zod로 검증한다. { keywordList: [...] }와 최상위 배열 둘 다 받고, 빈 배열이면 빈 결과다.
+//   그 밖({}·null·빈 본문·목록 아닌 값)은 빈 결과가 아니라 ads_unexpected_response(502)다.
 //   배치 하나라도 실패하면 그 NaverAdsError를 그대로 전파한다(부분 결과를 돌려주지 않는다 — 조용히 누락된 통계로 제안하지 않게).
 //   결과: 정규화 키워드로 중복 제거(먼저 본 것 유지) → 공백뿐·특수문자 키워드 제외(네이버 3906) → (pcQc+mobileQc) 내림차순
 //   ("< 10"은 0으로 계산) → 키워드 코드단위 오름차순 → 상위 200.
@@ -93,7 +94,7 @@ export async function researchKeywords(client: NaverAdsClient, seeds: readonly s
     const batch = hints.slice(i, i + HINTS_PER_CALL);
     const parsed = naverKeywordToolSchema.safeParse(await client.get("/keywordstool", { hintKeywords: batch.join(","), showDetail: 1 }));
     if (!parsed.success) throw unexpectedNaverResponse();
-    for (const row of parsed.data.keywordList ?? []) {
+    for (const row of parsed.data) {
       const stat = toStat(row);
       if (!stat || seen.has(dedupeKey(stat.keyword))) continue;
       seen.add(dedupeKey(stat.keyword));
