@@ -172,6 +172,7 @@ CREATE TABLE IF NOT EXISTS "ad_alerts" (
     "sent_at" TIMESTAMP(3),
     "attempts" INTEGER NOT NULL DEFAULT 0,
     "last_error" TEXT,
+    "claimed_at" TIMESTAMP(3),
     "payload" JSONB NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 

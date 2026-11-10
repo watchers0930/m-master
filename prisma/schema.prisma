@@ -830,6 +830,7 @@ model AdAlert { // ad_alerts — 알림 발송(같은 계정·유형·KST 날짜
   sentAt      DateTime? @map("sent_at")
   attempts    Int       @default(0)
   lastError   String?   @map("last_error")
+  claimedAt   DateTime? @map("claimed_at")             // 발송 중 표시(동시 flush 1회 발송). 5분 지나면 죽은 실행으로 보고 다시 잡는다
   payload     Json
   createdAt   DateTime  @default(now()) @map("created_at")
   owner     User      @relation(fields: [ownerId], references: [id], onDelete: Restrict)
