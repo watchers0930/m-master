@@ -6,7 +6,7 @@
 // 메시지는 사용자에게 보이는 한국어다. 제어·보이지 않는 문자는 원문 대신 U+XXXX로만 표기한다.
 import { collapseKeyword, isValidKeywordPhrase } from "./keyword-text";
 import {
-  ALLOWED_COPY_CHAR, EMOJI_CHAR, FORBIDDEN_KEYWORDS, isControlChar, isZeroWidthChar, LINT_RULES, SUPERLATIVE_EXCEPTIONS, SUPERLATIVE_TERMS, type LintRule,
+  ALLOWED_COPY_CHAR, EMOJI_CHAR, FORBIDDEN_KEYWORDS, isControlChar, MATCH_SEPARATOR_KEEP_BETWEEN_DIGITS, MATCH_SEPARATORS, isZeroWidthChar, LINT_RULES, SUPERLATIVE_EXCEPTIONS, SUPERLATIVE_TERMS, type LintRule,
 } from "./lint-rules";
 
 export type LintField = "headline" | "description" | "keyword";
@@ -65,19 +65,42 @@ function toHalfWidth(ch: string): string {
   return cp >= FULLWIDTH_START && cp <= FULLWIDTH_END ? String.fromCodePoint(cp - FULLWIDTH_OFFSET) : ch;
 }
 
-/** 매칭용 정규화: 전각 ASCII→반각, 공백·제어·보이지 않는 문자 제거, 소문자. 정규화된 각 코드단위의 원문 [시작, 끝)을 함께 남긴다. */
+const SYLLABLE_OR_DIGIT = /^[가-힣0-9]$/;
+const DIGIT = /^[0-9]$/;
+type Cell = { ch: string; start: number; end: number };
+
+/** 음절·숫자 사이의 구분 부호 묶음을 지운다(규칙은 lint-rules.ts MATCH_SEPARATORS 주석). */
+function dropSeparators(cells: Cell[]): Cell[] {
+  const out: Cell[] = [];
+  for (let i = 0; i < cells.length; ) {
+    if (!MATCH_SEPARATORS.has(cells[i].ch)) { out.push(cells[i++]); continue; }
+    let j = i;
+    while (j < cells.length && MATCH_SEPARATORS.has(cells[j].ch)) j++;
+    const before = cells[i - 1]?.ch ?? "", after = cells[j]?.ch ?? "";
+    const run = cells.slice(i, j);
+    const numberFormat = DIGIT.test(before) && DIGIT.test(after) && run.length === 1 && MATCH_SEPARATOR_KEEP_BETWEEN_DIGITS.has(run[0].ch);
+    if (!(SYLLABLE_OR_DIGIT.test(before) && SYLLABLE_OR_DIGIT.test(after)) || numberFormat) out.push(...run);
+    i = j;
+  }
+  return out;
+}
+
+/** 매칭용 정규화: 전각 ASCII→반각, 공백·제어·보이지 않는 문자 제거, 소문자, 음절·숫자 사이 구분 부호 제거.
+ *  정규화된 각 코드단위의 원문 [시작, 끝)을 함께 남긴다. */
 function matchForm(text: string): { norm: string; spans: [number, number][] } {
-  let norm = "";
-  const spans: [number, number][] = [];
+  const cells: Cell[] = [];
   let index = 0;
   for (const ch of text) {
     const start = index;
     index += ch.length;
     if (/^\s$/u.test(ch) || isInvisible(ch)) continue;
-    for (const unit of toHalfWidth(ch).toLowerCase()) {
-      for (let k = 0; k < unit.length; k++) spans.push([start, index]);
-      norm += unit;
-    }
+    for (const unit of toHalfWidth(ch).toLowerCase()) cells.push({ ch: unit, start, end: index });
+  }
+  let norm = "";
+  const spans: [number, number][] = [];
+  for (const cell of dropSeparators(cells)) {
+    norm += cell.ch;
+    for (let k = 0; k < cell.ch.length; k++) spans.push([cell.start, cell.end]);
   }
   return { norm, spans };
 }
