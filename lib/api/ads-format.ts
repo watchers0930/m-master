@@ -97,8 +97,10 @@ export const capPercent = (spend: number | null, cap: number) => (spend === null
 export const ctr = (clicks: number, impressions: number) => (impressions > 0 ? `${((clicks / impressions) * 100).toFixed(2)}%` : '—');
 
 // ── 잠금·검수 ──
-export type LockTone = 'on' | 'off' | 'guard' | 'pending';
-export function lockLabel(userLock: boolean, lockedBy: string | null): { text: string; tone: LockTone } {
+export type LockTone = 'on' | 'off' | 'guard' | 'pending' | 'danger';
+/** pauseUnconfirmed: 켜짐 기록인데 마지막 끄기가 확인되지 않음(개요 DTO) → 녹색 '켜짐'이 아니라 붉은 경고(최종 판정 B1). */
+export function lockLabel(userLock: boolean, lockedBy: string | null, pauseUnconfirmed = false): { text: string; tone: LockTone } {
+  if (!userLock && pauseUnconfirmed) return { text: '꺼지지 않았을 수 있음 — 네이버에서 직접 확인', tone: 'danger' };
   if (!userLock) return { text: '켜짐', tone: 'on' };
   if (lockedBy === 'guard') return { text: '꺼짐 · 감시(하루 상한)', tone: 'guard' };
   if (lockedBy === 'pending_launch') return { text: '꺼짐 · 켜기 전(적용 직후)', tone: 'pending' };

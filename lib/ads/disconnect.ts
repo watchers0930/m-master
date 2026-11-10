@@ -23,14 +23,14 @@ import { naverCampaignListSchema } from "@/schemas/ads";
 import type { AdAccount } from "@prisma/client";
 import type { AdAccountDTO } from "@/types/ads";
 import { assertAdsOwner } from "./access";
-import { accountDTO, isCampaignOff, listAllCampaigns, loadOwnedAccount, markInvalidKey, type AdsDeps } from "./account-core";
+import { STALE_CLAIM_MS, accountDTO, isCampaignOff, listAllCampaigns, loadOwnedAccount, markInvalidKey, type AdsDeps } from "./account-core";
 import { AdsHttpError } from "./http";
 import { sendMutation } from "./oplog";
 import { buildPause } from "./requests";
 
 const pauseResponseSchema = naverCampaignListSchema.element;
 const CLAIMABLE = ["active", "invalid_key"] as const;
-export const STALE_CLAIM_MS = 10 * 60_000;
+export { STALE_CLAIM_MS } from "./account-core";
 /** 해제 라우트 maxDuration 300초 − 여유 30초(최종 판정 A2): 남은 시간이 30초 미만이면 네이버 호출을 새로 시작하지 않고
  *  키를 유지한 채 중단(상태 복원 → 감시가 계속 본다). 각 호출 마감 = min(45초, 남은 창) — 창을 넘겨 끝나는 호출이 없다. */
 export const DISCONNECT_WORK_MS = 270_000;

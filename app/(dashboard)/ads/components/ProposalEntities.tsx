@@ -5,10 +5,11 @@
 'use client';
 
 import { errorView, inspectLabel, isInspectPassed } from '@/lib/api/ads-format';
+import { alertBadges } from '@/lib/api/ads-safety';
 import { useAdsOverview } from '@/hooks/useAdsOverview';
 import type { AdLockEntityType, AdMirrorBaseDTO } from '@/types/ads';
 import { LockButton } from './LockButton';
-import { Card, Empty, LockBadge, Notice, subText, tableStyle, tdStyle, thStyle } from './ui';
+import { AlertTags, Card, Empty, LockBadge, Notice, subText, tableStyle, tdStyle, thStyle } from './ui';
 
 type Row = { type: AdLockEntityType; kind: string; label: string; row: AdMirrorBaseDTO; needsInspect: boolean };
 
@@ -17,6 +18,7 @@ export function ProposalEntities({ proposalId, accountId }: { proposalId: string
   if (overview.isPending) return <Empty>불러오는 중…</Empty>;
   if (overview.error) return <Notice view={errorView(overview.error)} />;
   const o = overview.data;
+  const badges = alertBadges(o.alerts);
   const mine = <T extends AdMirrorBaseDTO>(list: T[]) => list.filter((x) => x.proposalId === proposalId);
   const rows: Row[] = [
     ...mine(o.campaigns).map((r) => ({ type: 'campaign' as const, kind: '캠페인', label: r.name, row: r, needsInspect: false })),
@@ -40,12 +42,13 @@ export function ProposalEntities({ proposalId, accountId }: { proposalId: string
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                       <span>{label}</span>
                       <span style={subText}>{row.naverId}</span>
+                      <AlertTags badges={badges.get(row.naverId)} />
                     </div>
                   </td>
                   <td style={{ ...tdStyle, whiteSpace: 'nowrap', color: needsInspect && !isInspectPassed(row.inspectStatus) ? 'var(--amber-700)' : 'var(--text)' }}>
                     {needsInspect ? inspectLabel(row.inspectStatus) : '—'}
                   </td>
-                  <td style={tdStyle}><LockBadge userLock={row.userLock} lockedBy={row.lockedBy} /></td>
+                  <td style={tdStyle}><LockBadge userLock={row.userLock} lockedBy={row.lockedBy} pauseUnconfirmed={row.pauseUnconfirmed} /></td>
                   <td style={{ ...tdStyle, paddingRight: 16 }}><LockButton accountId={accountId} type={type} row={row} /></td>
                 </tr>
               ))}

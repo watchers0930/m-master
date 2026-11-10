@@ -1,7 +1,7 @@
 // app/(dashboard)/ads/components/ConnectForm.tsx
 // 광고 계정 연결 폼(Task 12): 고객 ID · API 키 · 비밀키 · 라벨. 서버가 키를 네이버로 검증한 뒤에만 저장한다(실패면 저장 0).
 // - 진행 중에는 버튼을 잠근다(빠른 두 번 클릭이 공유예산 mq-cap을 두 개 만들지 않게 — Task 5 m-2). 서버도 같은 고객ID는 한 행으로 합친다.
-// - 키는 제출 직후(성공·실패 모두) 상태에서 지운다. 화면에는 뒤 4자리만 다시 보인다.
+// - 키는 제출 직후(성공·실패 모두) 폼 상태에서 지우고, 끝나면 mutation 상태도 reset()한다. 화면에는 뒤 4자리만 다시 보인다.
 'use client';
 
 import { useState, type FormEvent } from 'react';
@@ -31,6 +31,7 @@ export function ConnectForm() {
         setLabel('');
       },
       onError: (err) => setNotice({ view: errorView(err), ok: false }),
+      onSettled: () => connect.reset(), // 키가 든 변수를 mutation 상태에서 지운다(gcTime 0과 함께, B5)
     });
   };
 

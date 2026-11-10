@@ -18,6 +18,8 @@ export type AdAccountDTO = {
   businessChannelId: string | null;
   lastVerifiedAt: string | null;
   createdAt: string;
+  /** 'disconnecting'이 10분 넘게 이어짐(죽은 해제) — 화면이 '해제 다시 시도'를 보인다(서버가 같은 DELETE로 재점유) */
+  disconnectStuck: boolean;
 };
 
 export type AdChannelDTO = {
@@ -102,6 +104,8 @@ export type AdGuardSnapshotDTO = { at: string | null; ageMinutes: number | null;
 export type AdMirrorBaseDTO = {
   id: string; naverId: string; parentNaverId: string | null; name: string; proposalId: string | null;
   userLock: boolean; lockedBy: string | null; lockVersion: number; lockedAt: string | null; inspectStatus: string | null;
+  /** 켜짐으로 기록됐지만 마지막 잠금 변경 뒤의 끄기가 확인되지 않음(ads.pause_failed paused:false) — '켜짐'이 아니라 '꺼지지 않았을 수 있음' */
+  pauseUnconfirmed: boolean;
 };
 export type AdMirrorCampaignDTO = AdMirrorBaseDTO;
 export type AdMirrorGroupDTO = AdMirrorBaseDTO & { bidAmt: number | null };
@@ -111,9 +115,18 @@ export type AdMirrorAdDTO = AdMirrorBaseDTO & { slot: string | null; headline: s
 export type AdPerfTotals = { impCnt: number; clkCnt: number; costKrw: number; ccnt: number };
 export type AdCampaignPerfDTO = { naverId: string; days7: AdPerfTotals; days30: AdPerfTotals };
 export type AdDailyPerfDTO = AdPerfTotals & { date: string };
+/** 화면 경보로 보이는 안전 유형(최근 48시간, 메일 발송 여부와 무관). */
+export type AdSafetyAlertType = 'ads.pause_failed' | 'ads.guard_blind' | 'ads.cap_100' | 'ads.drift' | 'ads.inspect_denied';
+/** 안전 경보 1건(알림 payload에서 알려진 필드만). sent = 메일 발송됨. */
+export type AdSafetyAlertDTO = {
+  type: AdSafetyAlertType; at: string; sent: boolean;
+  reason: string | null; entity: string | null; naverId: string | null; field: string | null; paused: boolean | null; pauseFailed: number | null;
+};
 export type AdOverviewDTO = {
   account: AdAccountDTO;
   snapshot: AdGuardSnapshotDTO;
+  /** 최근 48시간 안전 경보(최신순, 최대 OVERVIEW_ALERT_LIMIT건) */
+  alerts: AdSafetyAlertDTO[];
   campaigns: AdMirrorCampaignDTO[];
   groups: AdMirrorGroupDTO[];
   keywords: AdMirrorKeywordDTO[];

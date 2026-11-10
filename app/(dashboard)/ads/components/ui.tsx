@@ -5,6 +5,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { ErrorView } from '@/lib/api/ads-format';
 import { lockLabel, type LockTone } from '@/lib/api/ads-format';
+import type { AlertBadge } from '@/lib/api/ads-safety';
 
 export function Card({ title, right, children, bodyStyle }: { title: string; right?: ReactNode; children: ReactNode; bodyStyle?: CSSProperties }) {
   return (
@@ -44,11 +45,25 @@ const TONE: Record<LockTone, CSSProperties> = {
   off: { background: 'var(--n100)', color: 'var(--n500)' },
   guard: { background: 'var(--amber-100)', color: 'var(--amber-700)' },
   pending: { background: 'var(--blue-50)', color: 'var(--blue-500)' },
+  danger: { background: '#fee2e2', color: '#991b1b', border: '1px solid #dc2626' },
 };
 
-export function LockBadge({ userLock, lockedBy }: { userLock: boolean; lockedBy: string | null }) {
-  const l = lockLabel(userLock, lockedBy);
-  return <span style={{ fontSize: 12, fontWeight: 700, borderRadius: 4, padding: '2px 8px', whiteSpace: 'nowrap', ...TONE[l.tone] }}>{l.text}</span>;
+/** pauseUnconfirmed: 켜짐 기록인데 끄기가 확인되지 않음 → 녹색 '켜짐' 대신 붉은 경고(최종 판정 B1). */
+export function LockBadge({ userLock, lockedBy, pauseUnconfirmed = false }: { userLock: boolean; lockedBy: string | null; pauseUnconfirmed?: boolean }) {
+  const l = lockLabel(userLock, lockedBy, pauseUnconfirmed);
+  return <span style={{ fontSize: 12, fontWeight: 700, borderRadius: 4, padding: '2px 8px', whiteSpace: l.tone === 'danger' ? 'normal' : 'nowrap', ...TONE[l.tone] }}>{l.text}</span>;
+}
+
+/** 엔티티별 경보 꼬리표(드리프트·검수 반려·끄기 미확인). */
+export function AlertTags({ badges }: { badges?: AlertBadge[] }) {
+  if (!badges?.length) return null;
+  return (
+    <span style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {badges.map((b) => (
+        <span key={b.text} style={{ fontSize: 12, fontWeight: 700, borderRadius: 4, padding: '2px 8px', ...(b.urgent ? TONE.danger : TONE.guard) }}>{b.text}</span>
+      ))}
+    </span>
+  );
 }
 
 export const tableStyle: CSSProperties = { width: '100%', borderCollapse: 'collapse', fontSize: 12.5 };

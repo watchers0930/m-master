@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { errorView, failCodeMessage, isUrgentFailCode, proposalStatusLabel } from '@/lib/api/ads-format';
 import { useAdsProposal } from '@/hooks/useAdsProposal';
 import type { AdProposalDTO, ProposalGroup } from '@/types/ads';
+import { LockNoticeBanner, LockNoticesProvider } from './LockNotices';
 import { ProposalActions } from './ProposalActions';
 import { ProposalEntities } from './ProposalEntities';
 import { ProposalGroupEditor } from './ProposalGroupEditor';
@@ -28,7 +29,8 @@ function Body({ proposal }: { proposal: AdProposalDTO }) {
   const applied = proposal.status === 'applied' || proposal.status === 'apply_failed' || proposal.status === 'applying';
 
   return (
-    <>
+    <LockNoticesProvider>
+      <LockNoticeBanner />
       <Card title={`AI 광고 제안 · ${proposal.kind === 'extend_group' ? '광고그룹 확장' : '새 캠페인'}`} right={<Link href="/ads/proposals" prefetch={false} className="btn btn-ghost">목록</Link>}>
         <div style={subText}>
           상태 <b style={{ color: 'var(--text)' }}>{proposalStatusLabel(proposal.status)}</b> · 그룹 {proposal.groupCount}개 · 키워드 {proposal.keywordCount}개 ·
@@ -46,7 +48,7 @@ function Body({ proposal }: { proposal: AdProposalDTO }) {
         <ProposalGroupEditor key={i} index={i} group={g} issues={dirty ? [] : issues} editable={editable} onChange={(next) => setGroup(i, next)} />
       ))}
       {applied && <ProposalEntities proposalId={proposal.id} accountId={proposal.accountId} />}
-    </>
+    </LockNoticesProvider>
   );
 }
 

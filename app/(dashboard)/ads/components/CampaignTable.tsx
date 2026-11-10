@@ -5,14 +5,16 @@
 import Link from 'next/link';
 import type { AdOverviewDTO } from '@/types/ads';
 import { costPerSignup, ctr, formatCount, formatKrw, inspectLabel } from '@/lib/api/ads-format';
+import { alertBadges } from '@/lib/api/ads-safety';
 import { LockButton } from './LockButton';
-import { Card, Empty, LockBadge, numStyle, subText, tableStyle, tdStyle, thStyle } from './ui';
+import { AlertTags, Card, Empty, LockBadge, numStyle, subText, tableStyle, tdStyle, thStyle } from './ui';
 
 export function CampaignTable({ overview }: { overview: AdOverviewDTO }) {
   const perf = new Map(overview.performance.campaigns.map((p) => [p.naverId, p]));
   const groupCount = new Map<string, number>();
   for (const g of overview.groups) if (g.parentNaverId) groupCount.set(g.parentNaverId, (groupCount.get(g.parentNaverId) ?? 0) + 1);
   const rows = overview.campaigns;
+  const badges = alertBadges(overview.alerts);
   return (
     <Card title="캠페인" right={<span style={subText}>{rows.length}개{overview.truncated.campaigns ? ' (일부만 표시)' : ''}</span>} bodyStyle={{ padding: 0, gap: 0 }}>
       {rows.length === 0 ? (
@@ -41,9 +43,10 @@ export function CampaignTable({ overview }: { overview: AdOverviewDTO }) {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <span style={{ fontWeight: 700 }}>{c.proposalId ? <Link href={`/ads/proposals/${c.proposalId}`} prefetch={false}>{c.name}</Link> : c.name}</span>
                         <span style={subText}>{c.naverId} · 광고그룹 {groupCount.get(c.naverId) ?? 0}개{c.inspectStatus ? ` · 검수 ${inspectLabel(c.inspectStatus)}` : ''}</span>
+                        <AlertTags badges={badges.get(c.naverId)} />
                       </div>
                     </td>
-                    <td style={tdStyle}><LockBadge userLock={c.userLock} lockedBy={c.lockedBy} /></td>
+                    <td style={tdStyle}><LockBadge userLock={c.userLock} lockedBy={c.lockedBy} pauseUnconfirmed={c.pauseUnconfirmed} /></td>
                     <td style={numStyle}>{formatKrw(d7?.costKrw ?? 0)}</td>
                     <td style={numStyle}>{formatKrw(d30?.costKrw ?? 0)}</td>
                     <td style={numStyle}>{formatCount(d30?.clkCnt ?? 0)} ({ctr(d30?.clkCnt ?? 0, d30?.impCnt ?? 0)})</td>

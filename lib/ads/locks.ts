@@ -48,7 +48,7 @@ function readPhaseBudget(deps: LockDeps): { deps: LockDeps; claimed: () => void 
   return { deps: { ...deps, callBudget: () => (reading ? end - clock() : Number.POSITIVE_INFINITY) }, claimed: () => { reading = false; } };
 }
 
-const fail = (code: string, message: string, details?: Record<string, string | number | null>) => new AdsHttpError(code, message, 409, details);
+const fail = (code: string, message: string, details?: Record<string, string | number | boolean | null>) => new AdsHttpError(code, message, 409, details);
 const versionConflict = (current: number) =>
   fail("version_conflict", "다른 곳에서 켜기·끄기 상태가 바뀌었습니다. 최신 상태를 확인하세요.", { lock_version: current });
 const guardLocked = () => fail("guard_locked", "오늘 하루 상한으로 감시가 멈춘 항목입니다. 내일 0시(KST)에 자동으로 다시 켜집니다.");
@@ -84,7 +84,7 @@ async function resumeRaceGuard(account: AdAccount, type: LockKind, row: MirrorLo
   if (paused) await pauseAlert(account, { reason: "resume_race", entity: type, naverId: row.naverId, paused: true });
   throw fail("resume_race", paused
     ? "켜는 도중 계정 연결이 해제됐습니다. 다시 껐습니다. 계정 상태를 확인하세요."
-    : "켜는 도중 계정 연결이 해제됐고 다시 끄지 못했습니다. 네이버 광고 화면에서 지금 바로 직접 꺼 주세요.");
+    : "켜는 도중 계정 연결이 해제됐고 다시 끄지 못했습니다. 네이버 광고 화면에서 지금 바로 직접 꺼 주세요.", { paused }); // 화면 urgent 판정(B3)
 }
 
 async function ownerResume(type: LockKind, ownerId: string, row: MirrorLockRow, account: AdAccount, expected: number, now: Date, baseDeps: LockDeps) {
@@ -109,9 +109,13 @@ async function ownerResume(type: LockKind, ownerId: string, row: MirrorLockRow, 
       stored = await putUserLock(client, account, type, row.naverId, false, { step: `owner.resume:${type}`, reason: "owner_approved" });
     } catch (error) {
       await mirror.updateMany({ where: { id: row.id, lockVersion: claimed }, data: { lockedBy: before.lockedBy, lockedAt: before.lockedAt, lockVersion: { increment: 1 } } });
-      // 켜기가 반영됐는지 모르면 안전 방향으로 끈다(결과는 미러에 사실대로, 실패면 알림)
-      if (error instanceof NaverAdsError && error.reason === "ads_uncertain")
-        await safetyPause(account, type, row, `owner.resume_uncertain_pause:${type}`, deps, { reason: "resume_uncertain" });
+      // 켜기가 반영됐는지 모르면 안전 방향으로 끈다(결과는 미러에 사실대로, 실패면 알림). 재끄기 결과는 details.paused로 화면에(B3).
+      if (error instanceof NaverAdsError && error.reason === "ads_uncertain") {
+        const paused = await safetyPause(account, type, row, `owner.resume_uncertain_pause:${type}`, deps, { reason: "resume_uncertain" });
+        throw new AdsHttpError("ads_uncertain", paused
+          ? "켜기가 반영됐는지 확인하지 못해 안전하게 다시 껐습니다. 상태를 확인하세요."
+          : "켜기가 반영됐는지 확인하지 못했고 다시 끄지도 못했습니다. 네이버 광고 화면에서 지금 바로 직접 꺼 주세요.", 502, { paused });
+      }
       throw error;
     }
     await resumeRaceGuard(account, type, row, now, deps);

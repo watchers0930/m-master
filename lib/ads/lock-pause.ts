@@ -4,7 +4,8 @@
 //   대장이 끈 것을 다음 날 자동 재개가 켜면 안 된다). 같은 날 대장 켜기는 상한 검사(cap_reached)가 여전히 막는다.
 // - 끄기 전용 클라이언트(clientForPause): 계정 status active | invalid_key | disconnecting을 받고 끄기 본문만 보낼 수 있다.
 //   disabled(키 삭제됨)는 보낼 수 없으므로 409 keys_removed(네이버 화면에서 직접 끄라는 안내).
-// - PUT이 실패해도 의도 기록은 남고 오류를 돌려준다. 결과(userLock)는 lockVersion이 그대로일 때만 기록한다. 실패면 userLock=false(켜짐·모름).
+// - PUT이 실패해도 의도 기록은 남고 오류를 돌려준다. 결과(userLock)는 lockVersion이 그대로일 때만 기록한다. 실패면 userLock=false(켜짐·모름)
+//   + ads.pause_failed(owner_pause_failed, paused:false) — 개요가 '꺼지지 않았을 수 있음'으로 보인다.
 // - safetyPause: 시스템이 스스로 거는 안전 끄기(켜기 경합 재끄기·켜기 불확실 끄기·lock_race 재끄기, Task 11 가드가 재사용).
 //   결과와 무관하게 미러에 사실(끄기 성공=true, 실패=false)을 기록하고, 실패하면 알림 ads.pause_failed(paused:false)를 보낸다(판정 round 2).
 import type { AdAccount } from "@prisma/client";
@@ -88,6 +89,8 @@ export async function ownerPause(type: LockKind, ownerId: string, id: string, ac
     confirmed = (await pauseNow(account, type, claimed.naverId, `owner.pause:${type}`, deps)).confirmed;
   } catch (error) {
     await mirror.updateMany({ where: { id, lockVersion: claimed.lockVersion }, data: { userLock: false } }); // 끄기 실패 = 켜짐·모름
+    // 화면 경보·'꺼지지 않았을 수 있음' 표시와 메일의 근거(최종 판정 B1) — 원래 오류를 가리지 않는다(pauseAlert는 던지지 않는다)
+    await pauseAlert(account, { reason: "owner_pause_failed", entity: type, naverId: claimed.naverId, paused: false });
     throw error;
   }
   await mirror.updateMany({ where: { id, lockVersion: claimed.lockVersion }, data: { userLock: confirmed } });

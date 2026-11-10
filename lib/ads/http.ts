@@ -12,7 +12,7 @@ import { AdsInvariantError } from "./invariants";
 
 /** details는 jsonError가 error 객체에 펼쳐 싣는다(내부 코드가 만든 값만). */
 export class AdsHttpError extends VisibilityError {
-  constructor(code: string, message: string, status: number, public details?: Record<string, string | number | null>) {
+  constructor(code: string, message: string, status: number, public details?: Record<string, string | number | boolean | null>) {
     super(code, message, status);
   }
 }

@@ -4,15 +4,23 @@
 // - 미러 4종은 계정 범위 쿼리 1회씩(take 상한, 넘치면 truncated). 성과는 캠페인 미러 naverId `in` 필터로 1회 groupBy(naverId, date)
 //   → 캠페인별 7·30일 합계와 날짜별 추이를 메모리에서 만든다. 표마다 쿼리 1회 — 캠페인 수와 무관(N+1 없음).
 // - 창: KST 날짜 기준 오늘 포함 7일(D-6..D)·30일(D-29..D). 성과 행 date는 KST 날짜의 00:00Z로 저장된다(sync-stats.ts).
+// - 안전 경보(최종 판정 B1): 최근 48시간의 SAFETY_ALERT_TYPES를 DB에서 그대로(미발송 포함 — 메일이 실패해도 화면에 보인다), 쿼리 1회·take 상한.
+//   payload는 알려진 필드만 싣는다. 미러 pauseUnconfirmed = 켜짐 기록인데 마지막 잠금 변경(lockedAt) 뒤에
+//   그 naverId의 ads.pause_failed(paused:false)가 있음 → 화면은 '켜짐'(녹색) 대신 '꺼지지 않았을 수 있음'(붉게).
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { adsAccountIdSchema } from "@/schemas/ads";
-import type { AdCampaignPerfDTO, AdDailyPerfDTO, AdGuardSnapshotDTO, AdMirrorBaseDTO, AdOverviewDTO, AdPerfTotals } from "@/types/ads";
+import type {
+  AdCampaignPerfDTO, AdDailyPerfDTO, AdGuardSnapshotDTO, AdMirrorBaseDTO, AdOverviewDTO, AdPerfTotals, AdSafetyAlertDTO, AdSafetyAlertType,
+} from "@/types/ads";
 import { assertAdsOwner } from "./access";
 import { DTO_SELECT, notFound, toAccountDTO } from "./account-core";
 import { kstDate } from "./alerts";
 
 export const OVERVIEW_LIMITS = { campaigns: 200, groups: 500, keywords: 1000, ads: 500 } as const;
+export const SAFETY_ALERT_TYPES: readonly AdSafetyAlertType[] = ["ads.pause_failed", "ads.guard_blind", "ads.cap_100", "ads.drift", "ads.inspect_denied"];
+export const OVERVIEW_ALERT_LIMIT = 100;
+export const ALERT_WINDOW_MS = 48 * 3_600_000;
 const DAY_MS = 86_400_000;
 
 const BASE = {
@@ -22,10 +30,38 @@ const BASE = {
 type BaseRow = { id: string; naverId: string; parentNaverId: string | null; name: string; proposalId: string | null;
   userLock: boolean; lockedBy: string | null; lockVersion: number; lockedAt: Date | null; inspectStatus: string | null };
 
-const base = (r: BaseRow): AdMirrorBaseDTO => ({
-  id: r.id, naverId: r.naverId, parentNaverId: r.parentNaverId, name: r.name, proposalId: r.proposalId,
-  userLock: r.userLock, lockedBy: r.lockedBy, lockVersion: r.lockVersion, lockedAt: r.lockedAt?.toISOString() ?? null, inspectStatus: r.inspectStatus,
-});
+/** naverId → 마지막 '끄기 확인 못 함'(pause_failed paused:false) 시각(ms). */
+type Unconfirmed = Map<string, number>;
+
+const base = (unconfirmed: Unconfirmed) => (r: BaseRow): AdMirrorBaseDTO => {
+  const failedAt = unconfirmed.get(r.naverId);
+  return {
+    id: r.id, naverId: r.naverId, parentNaverId: r.parentNaverId, name: r.name, proposalId: r.proposalId,
+    userLock: r.userLock, lockedBy: r.lockedBy, lockVersion: r.lockVersion, lockedAt: r.lockedAt?.toISOString() ?? null, inspectStatus: r.inspectStatus,
+    pauseUnconfirmed: !r.userLock && failedAt !== undefined && failedAt >= (r.lockedAt?.getTime() ?? 0),
+  };
+};
+
+type AlertRow = { type: string; createdAt: Date; sentAt: Date | null; payload: Prisma.JsonValue };
+const str = (v: unknown) => (typeof v === "string" ? v.slice(0, 80) : null);
+
+function toAlertDTO(r: AlertRow): AdSafetyAlertDTO {
+  const p = (r.payload && typeof r.payload === "object" && !Array.isArray(r.payload) ? r.payload : {}) as Record<string, unknown>;
+  return {
+    type: r.type as AdSafetyAlertType, at: r.createdAt.toISOString(), sent: r.sentAt !== null,
+    reason: str(p.reason), entity: str(p.entity), naverId: str(p.naverId), field: str(p.field),
+    paused: typeof p.paused === "boolean" ? p.paused : null, pauseFailed: typeof p.pauseFailed === "number" ? p.pauseFailed : null,
+  };
+}
+
+function unconfirmedOf(alerts: AdSafetyAlertDTO[]): Unconfirmed {
+  const out: Unconfirmed = new Map();
+  for (const a of alerts) {
+    if (a.type !== "ads.pause_failed" || a.paused !== false || !a.naverId) continue;
+    out.set(a.naverId, Math.max(out.get(a.naverId) ?? 0, Date.parse(a.at)));
+  }
+  return out;
+}
 
 /** take+1로 읽어 넘침을 안다. */
 function capped<T>(rows: T[], limit: number): { rows: T[]; truncated: boolean } {
@@ -80,13 +116,19 @@ export async function getOverview(ownerId: string, accountId: string, now: Date 
   const scope = { where: { adAccountId: row.id, ownerId } };
   const order = [{ name: "asc" }, { id: "asc" }] satisfies Prisma.AdCampaignOrderByWithRelationInput[];
   const L = OVERVIEW_LIMITS;
-  const [campaigns, groups, keywords, ads] = await Promise.all([
+  const [alertRows, campaigns, groups, keywords, ads] = await Promise.all([
+    prisma.adAlert.findMany({
+      where: { adAccountId: row.id, ownerId, type: { in: [...SAFETY_ALERT_TYPES] }, createdAt: { gte: new Date(now.getTime() - ALERT_WINDOW_MS) } },
+      select: { type: true, createdAt: true, sentAt: true, payload: true }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: OVERVIEW_ALERT_LIMIT,
+    }),
     prisma.adCampaign.findMany({ ...scope, select: BASE, orderBy: order, take: L.campaigns + 1 }),
     prisma.adGroup.findMany({ ...scope, select: { ...BASE, bidAmt: true }, orderBy: order, take: L.groups + 1 }),
     prisma.adKeyword.findMany({ ...scope, select: { ...BASE, keyword: true, bidAmt: true }, orderBy: order, take: L.keywords + 1 }),
     prisma.adCreative.findMany({ ...scope, select: { ...BASE, slot: true, headline: true, description: true }, orderBy: order, take: L.ads + 1 }),
   ]);
   const c = capped(campaigns, L.campaigns), g = capped(groups, L.groups), k = capped(keywords, L.keywords), a = capped(ads, L.ads);
+  const alerts = alertRows.map(toAlertDTO);
+  const mirror = base(unconfirmedOf(alerts));
 
   const today = kstDate(now);
   const since7 = shiftDay(today, 6), since30 = shiftDay(today, 29);
@@ -98,12 +140,13 @@ export async function getOverview(ownerId: string, accountId: string, now: Date 
   });
 
   return {
-    account: toAccountDTO(row),
+    account: toAccountDTO(row, now),
     snapshot: snapshotOf(row, now),
-    campaigns: c.rows.map(base),
-    groups: g.rows.map((r) => ({ ...base(r), bidAmt: r.bidAmt })),
-    keywords: k.rows.map((r) => ({ ...base(r), keyword: r.keyword, bidAmt: r.bidAmt })),
-    ads: a.rows.map((r) => ({ ...base(r), slot: r.slot, headline: r.headline, description: r.description })),
+    alerts,
+    campaigns: c.rows.map(mirror),
+    groups: g.rows.map((r) => ({ ...mirror(r), bidAmt: r.bidAmt })),
+    keywords: k.rows.map((r) => ({ ...mirror(r), keyword: r.keyword, bidAmt: r.bidAmt })),
+    ads: a.rows.map((r) => ({ ...mirror(r), slot: r.slot, headline: r.headline, description: r.description })),
     truncated: { campaigns: c.truncated, groups: g.truncated, keywords: k.truncated, ads: a.truncated },
     performance: { since7, since30, ...aggregate(perfRows as PerfRow[], since7) },
   };

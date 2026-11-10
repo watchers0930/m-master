@@ -15,14 +15,17 @@ import { AdsHttpError, unexpectedNaverResponse } from "./http";
 export type AdsDeps = { transport?: typeof fetch; now?: () => Date; naverClock?: NaverAdsClock; callBudget?: NaverAdsBudget };
 export const CAMPAIGN_PAGE = 1000; // 명세 recordSize 상한(1~1000)
 
+/** 멈춘 해제 판정: 'disconnecting'이 updatedAt(해제 점유 시각)에서 이만큼 지나면 죽은 실행(해제 재점유·감시 disconnect_stuck·화면 '다시 시도'). */
+export const STALE_CLAIM_MS = 10 * 60_000;
+
 export const DTO_SELECT = {
   id: true, naverCustomerId: true, label: true, keyLast4: true, status: true, dailyCapKrw: true, sharedBudgetKrw: true,
-  maxBidKrw: true, sharedBudgetId: true, businessChannelId: true, lastVerifiedAt: true, createdAt: true,
+  maxBidKrw: true, sharedBudgetId: true, businessChannelId: true, lastVerifiedAt: true, createdAt: true, updatedAt: true,
 } satisfies Prisma.AdAccountSelect;
 type DtoRow = Prisma.AdAccountGetPayload<{ select: typeof DTO_SELECT }>;
 const STATUSES: readonly string[] = ["active", "invalid_key", "disconnecting", "disabled"];
 
-export function toAccountDTO(r: DtoRow): AdAccountDTO {
+export function toAccountDTO(r: DtoRow, now: Date = new Date()): AdAccountDTO {
   const status = (STATUSES.includes(r.status) ? r.status : "disabled") as AdAccountStatus;
   return {
     id: r.id, naverCustomerId: r.naverCustomerId, label: r.label, keyLast4: r.keyLast4, status,
@@ -30,6 +33,7 @@ export function toAccountDTO(r: DtoRow): AdAccountDTO {
     dailyCapKrw: r.dailyCapKrw, sharedBudgetKrw: r.sharedBudgetKrw, maxBidKrw: r.maxBidKrw,
     sharedBudgetId: r.sharedBudgetId, businessChannelId: r.businessChannelId,
     lastVerifiedAt: r.lastVerifiedAt?.toISOString() ?? null, createdAt: r.createdAt.toISOString(),
+    disconnectStuck: status === "disconnecting" && r.updatedAt.getTime() < now.getTime() - STALE_CLAIM_MS,
   };
 }
 
@@ -53,7 +57,7 @@ export async function accountDTO(ownerId: string, id: string): Promise<AdAccount
 
 export async function listAccountDTOs(ownerId: string, take: number): Promise<AdAccountDTO[]> {
   const rows = await prisma.adAccount.findMany({ where: { ownerId }, select: DTO_SELECT, orderBy: { createdAt: "asc" }, take });
-  return rows.map(toAccountDTO);
+  return rows.map((r) => toAccountDTO(r));
 }
 
 /** 한 페이지 조회(새 키 검증용). 완전성이 필요한 곳은 listAllCampaigns. */
