@@ -19,21 +19,23 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 export type SetAnchorTargetRefusal =
   | "flag_missing" | "production_runtime" | "db_url_missing" | "db_url_unparsable" | "production_db" | "db_host_not_allowed";
 
-/** 판정 후보: url 호스트·?host=·?hostaddr=(쉼표 여러 개 포함). 유닉스 소켓 경로('/…')는 socket. */
-type Target = { hosts: { host: string; endpoint: string; socket: boolean }[]; optionEndpoint: string | null };
+/** 판정 후보: url 호스트·?host=·?hostaddr=의 **모든** 값(같은 키 반복·쉼표 여러 호스트 포함). 유닉스 소켓 경로('/…')는 socket.
+ *  재검토 I-4: Prisma 6.19는 같은 키가 여럿이면 마지막 값으로 붙는다 — get(첫 값)이 아니라 getAll로 전부 본다. options도 전부·endpoint 전부. */
+type Target = { hosts: { host: string; endpoint: string; socket: boolean }[]; optionEndpoints: string[] };
 
 function targetOf(url: string): Target | null {
   try {
     const u = new URL(url);
-    const raw = [u.hostname, ...["host", "hostaddr"].flatMap((k) => (u.searchParams.get(k) ?? "").split(","))]
-      .map((h) => h.trim()).filter(Boolean);
+    const raw = [u.hostname, ...u.searchParams.getAll("host"), ...u.searchParams.getAll("hostaddr")]
+      .flatMap((v) => v.split(",")).map((h) => h.trim()).filter(Boolean);
     if (!raw.length) return null;
     const hosts = raw.map((h) => {
       const host = h.toLowerCase();
       return { host, endpoint: host.split(".")[0].replace(/-pooler$/, ""), socket: host.startsWith("/") };
     });
-    const m = /(?:^|\s)(?:-c\s*)?endpoint=([^\s&]+)/i.exec(u.searchParams.get("options") ?? "");
-    return { hosts, optionEndpoint: m ? m[1].toLowerCase() : null };
+    const optionEndpoints = u.searchParams.getAll("options")
+      .flatMap((o) => [...o.matchAll(/(?:^|\s)(?:-c\s*)?endpoint=([^\s&]+)/gi)].map((m) => m[1].toLowerCase()));
+    return { hosts, optionEndpoints };
   } catch {
     return null;
   }
@@ -54,8 +56,8 @@ export function setAnchorTargetRefusal(argv: readonly string[], env: Record<stri
     const t = targetOf(url);
     if (!t) return "db_url_unparsable";
     // 후보 하나라도 운영이면 거부, 하나라도 허용 밖이면 거부(Prisma 6.19는 hostaddr를 무시하고 url 호스트로 붙는다 — 재검토 I-2)
-    if ([...t.hosts.map((h) => h.endpoint), t.optionEndpoint].some((e) => e !== null && PRODUCTION_DB_ENDPOINTS.includes(e))) return "production_db";
-    if (t.optionEndpoint !== null && !allowed.has(t.optionEndpoint)) return "db_host_not_allowed";
+    if ([...t.hosts.map((h) => h.endpoint), ...t.optionEndpoints].some((e) => PRODUCTION_DB_ENDPOINTS.includes(e))) return "production_db";
+    if (t.optionEndpoints.some((e) => !allowed.has(e))) return "db_host_not_allowed";
     for (const h of t.hosts) {
       if (h.socket || LOCAL_HOSTS.has(h.host)) continue;
       if (!allowed.has(h.host) && !allowed.has(h.endpoint)) return "db_host_not_allowed";
