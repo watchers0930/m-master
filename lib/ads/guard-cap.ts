@@ -9,6 +9,7 @@
 //   (campaign_list_incomplete) + 목록에서 못 본 미러는 단건 재조회: 켜짐 → 끄기(guard), 꺼짐 → 그대로, 못 읽음 → 끄기만(표시 없음).
 //   마감(ctx.deadline)이 지나면 남은 대상은 '확인 못 함'(unchecked) — 판정 I-4: 발송 몫을 남긴다. 그다음 ads.cap_100(결과 수 포함).
 // - checkBizmoney: GET /billing/bizmoney(zod). 3×dailyCapKrw 미만이면 ads.bizmoney_low. 형식 오류·조회 실패는 기록만(알림·중단 없음).
+//   읽은 값은 result.bizmoneyKrw(감시 스냅샷, 못 읽으면 null 그대로).
 import type { AdAccount } from "@prisma/client";
 import { NaverAdsError, type NaverAdsClient } from "@/lib/external/naver-searchad";
 import { prisma } from "@/lib/prisma";
@@ -21,6 +22,7 @@ import { safetyPause } from "./lock-pause";
 
 export type GuardAccountResult = {
   accountId: string; outcome: "ok" | "skipped" | "error"; reason?: string; todayCostKrw: number | null;
+  bizmoneyKrw: number | null; // 이번 실행이 읽은 비즈머니(못 읽으면 null) — 감시 스냅샷(Task 12)
   paused: number; pauseFailed: number; resumed: number; blocked: number; drift: number; unchecked: number;
 };
 export type GuardCtx = {
@@ -149,6 +151,7 @@ export async function checkBizmoney(ctx: GuardCtx, cap: number): Promise<void> {
     console.error("[ads] bizmoney response shape unexpected; no alert", { accountId: ctx.account.id });
     return;
   }
+  ctx.result.bizmoneyKrw = parsed.data.bizmoney;
   const thresholdKrw = BIZMONEY_DAYS * cap;
   if (parsed.data.bizmoney < thresholdKrw) await guardAlert(ctx, "ads.bizmoney_low", { bizmoneyKrw: parsed.data.bizmoney, thresholdKrw });
 }

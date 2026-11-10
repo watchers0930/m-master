@@ -89,3 +89,37 @@ export type AdProposalDTO = AdProposalSummaryDTO & {
 };
 
 export type AdProposalPage = { items: AdProposalSummaryDTO[]; nextCursor: string | null };
+
+// ── 적용·켜기/끄기 결과(Task 9 라우트 응답) ──
+export type AdApplyResultDTO = { status: "applied" | "apply_failed"; failCode?: string };
+export type AdLockEntityType = "campaign" | "adgroup" | "keyword" | "ad";
+export type AdLockResultDTO = { type: AdLockEntityType; id: string; naverId: string; userLock: boolean; lockedBy: string | null; lockVersion: number };
+
+// ── 계정 개요(Task 12, GET /api/ads/accounts/[id]/overview — DB만 읽는다, 네이버 호출 없음) ──
+/** 감시(30분 크론)의 마지막 관찰. 값이 null이면 '모름'(0이 아니다). ageMinutes = 지금 − at(분, 내림, 0 이상). */
+export type AdGuardSnapshotDTO = { at: string | null; ageMinutes: number | null; spendKrw: number | null; bizmoneyKrw: number | null };
+/** 미러 공통. lockedBy: owner | guard | pending_launch | null(켜짐 또는 외부). lockVersion은 켜기 요청의 expected_lock_version. */
+export type AdMirrorBaseDTO = {
+  id: string; naverId: string; parentNaverId: string | null; name: string; proposalId: string | null;
+  userLock: boolean; lockedBy: string | null; lockVersion: number; lockedAt: string | null; inspectStatus: string | null;
+};
+export type AdMirrorCampaignDTO = AdMirrorBaseDTO;
+export type AdMirrorGroupDTO = AdMirrorBaseDTO & { bidAmt: number | null };
+export type AdMirrorKeywordDTO = AdMirrorBaseDTO & { keyword: string; bidAmt: number | null };
+export type AdMirrorAdDTO = AdMirrorBaseDTO & { slot: string | null; headline: string; description: string };
+/** 성과 합계(/stats 기준). costKrw = salesAmt(VAT 별도), ccnt = 네이버 전환 수(4-2 전에는 0). */
+export type AdPerfTotals = { impCnt: number; clkCnt: number; costKrw: number; ccnt: number };
+export type AdCampaignPerfDTO = { naverId: string; days7: AdPerfTotals; days30: AdPerfTotals };
+export type AdDailyPerfDTO = AdPerfTotals & { date: string };
+export type AdOverviewDTO = {
+  account: AdAccountDTO;
+  snapshot: AdGuardSnapshotDTO;
+  campaigns: AdMirrorCampaignDTO[];
+  groups: AdMirrorGroupDTO[];
+  keywords: AdMirrorKeywordDTO[];
+  ads: AdMirrorAdDTO[];
+  /** 상한(take)에 걸려 일부만 실었는가 */
+  truncated: { campaigns: boolean; groups: boolean; keywords: boolean; ads: boolean };
+  /** since7·since30 = 창의 첫 KST 날짜(오늘 포함 7일·30일). daily = 30일 창의 날짜별 합계(행 있는 날만, 오름차순). */
+  performance: { since7: string; since30: string; campaigns: AdCampaignPerfDTO[]; daily: AdDailyPerfDTO[]; totals7: AdPerfTotals; totals30: AdPerfTotals };
+};

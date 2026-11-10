@@ -14,7 +14,7 @@
 import type { AdAccount, AdProposal, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isEntityId } from "@/schemas/id";
-import type { ProposalPayload } from "@/types/ads";
+import type { AdApplyResultDTO, ProposalPayload } from "@/types/ads";
 import { assertAdsOwner } from "./access";
 import { notFound, withAccountClient, type AdsDeps } from "./account-core";
 import { ApplyFailure, failCodeOf } from "./apply-errors";
@@ -31,7 +31,7 @@ type Tx = Prisma.TransactionClient;
 export const STALE_APPLY_MS = 10 * 60_000;
 /** 테스트 전용 이음새: 잠금·재조회 직후 같은 트랜잭션에서 실행된다(기본 no-op). 라우트는 이 인자를 넘기지 않는다. */
 export type ApplyDeps = AdsDeps & { afterLock?: (tx: Tx, row: AdProposal) => Promise<void> };
-export type ApplyResult = { status: "applied" | "apply_failed"; failCode?: string };
+export type ApplyResult = AdApplyResultDTO; // 응답 DTO(types/ads.ts) — 화면과 같은 타입
 
 const conflict = (code: "apply_in_progress" | "apply_conflict") =>
   new AdsHttpError(code, code === "apply_in_progress" ? "이미 적용이 진행 중입니다. 잠시 후 결과를 확인하세요." : "다른 곳에서 제안 상태가 바뀌었습니다. 최신 상태를 확인하세요.", 409);

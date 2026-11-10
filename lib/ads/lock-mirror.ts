@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import type { AdsDeps } from "./account-core";
 import { notFound } from "./account-core";
 import { kstDate } from "./alerts";
+import type { AdLockResultDTO } from "@/types/ads";
 import type { LockKind } from "./invariants";
 
 export type Tx = Prisma.TransactionClient;
@@ -41,7 +42,7 @@ export async function lockMirrorRow(tx: Tx, type: LockKind, id: string, ownerId:
 export type LockEntity = { type: LockKind; id: string };
 /** 테스트 전용 이음새: 잠금·재조회 직후 같은 트랜잭션에서 실행된다(기본 no-op). 라우트는 이 인자를 넘기지 않는다. */
 export type LockDeps = AdsDeps & { afterLock?: (tx: Tx, row: MirrorLockRow) => Promise<void> };
-export type LockResult = { type: LockKind; id: string; naverId: string; userLock: boolean; lockedBy: string | null; lockVersion: number };
+export type LockResult = AdLockResultDTO; // 응답 DTO(types/ads.ts) — 화면과 같은 타입
 
 export const lockDto = (type: LockKind, r: MirrorLockRow): LockResult =>
   ({ type, id: r.id, naverId: r.naverId, userLock: r.userLock, lockedBy: r.lockedBy, lockVersion: r.lockVersion });

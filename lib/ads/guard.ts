@@ -14,6 +14,8 @@
 //   3. 드리프트 검사(guard-drift): 켜진 드리프트 캠페인은 끄고 ads.drift(엔티티별).
 //   4. 비용 < 상한이면 어제 이전의 guard 잠금 자동 재개(guard-resume — 전제 전부 재확인, 드리프트면 재개 없음).
 //   5. 비즈머니 < 3×상한 → ads.bizmoney_low.
+//   끝. 계정 한 바퀴가 끝나면 스냅샷(lastGuardAt·lastSpendKrw·lastBizmoneyKrw, 모르면 null)을 남긴다(Task 12 — 화면은 이것만 읽는다).
+//   시간 예산으로 건너뛴 계정은 남기지 않는다(이전 스냅샷과 그 나이가 그대로 보인다).
 // - 분류 외 계정 예외(상한값 손상·DB 오류 등) → ads.guard_blind(guard_error, code=사유 이름만) 후 다음 계정(판정 I-5). 자동 끄기 없음.
 // - 스위치: 끄기는 PIPELINE_AUTOMATION_ENABLED·ADS_EXECUTION_ENABLED와 무관(끄기 전용 클라이언트). 재개만 ADS_EXECUTION_ENABLED==='true'.
 // - 401이면 계정을 invalid_key로 바꾸고 ads.key_invalid(분류된 실패 — guard_error는 내지 않는다).
@@ -64,7 +66,7 @@ export function guardSlot(now: Date): string {
 }
 
 const blank = (account: AdAccount): GuardAccountResult =>
-  ({ accountId: account.id, outcome: "ok", todayCostKrw: null, paused: 0, pauseFailed: 0, resumed: 0, blocked: 0, drift: 0, unchecked: 0 });
+  ({ accountId: account.id, outcome: "ok", todayCostKrw: null, bizmoneyKrw: null, paused: 0, pauseFailed: 0, resumed: 0, blocked: 0, drift: 0, unchecked: 0 });
 
 function reasonOf(error: unknown): string {
   if (error instanceof NaverAdsError) return error.reason;
@@ -162,6 +164,20 @@ async function isolate(account: AdAccount, now: Date, result: GuardAccountResult
   }
 }
 
+/**
+ * 감시 스냅샷(Task 12 판정): 계정 한 바퀴가 끝나면 마지막 관찰을 남긴다 — 화면(/ads)은 네이버를 부르지 않고 이것을 읽는다.
+ * 비용을 모르면 null(0으로 쓰지 않는다), 비즈머니를 못 읽었으면 null. 기록 실패는 감시를 멈추지 않는다(로그만).
+ */
+async function recordSnapshot(account: AdAccount, now: Date, result: GuardAccountResult): Promise<void> {
+  try {
+    await prisma.adAccount.updateMany({
+      where: { id: account.id }, data: { lastGuardAt: now, lastSpendKrw: result.todayCostKrw, lastBizmoneyKrw: result.bizmoneyKrw },
+    });
+  } catch (error) {
+    console.error("[ads] guard snapshot write failed", { accountId: account.id, error: errorName(error) });
+  }
+}
+
 export async function runGuard(now: Date = new Date(), deps: GuardDeps = {}): Promise<GuardSummary> {
   const run = await claimPipelineRun({ ...GUARD_RUN, periodKey: guardSlot(now) });
   if (!run.acquired) return { skipped: "already_claimed", accounts: [], alerts: null };
@@ -183,13 +199,18 @@ export async function runGuard(now: Date = new Date(), deps: GuardDeps = {}): Pr
         if (account.status === "active") await guardBlind({ account, now }, "deadline");
         continue;
       }
+      let p = null as Phase1 | null; // 콜백 안 대입 — 좁히기 방지
       await isolate(account, now, result, async () => {
-        const p = await phase1(account, now, deps, runClock, result);
-        if (p) second.push(p);
+        p = await phase1(account, now, deps, runClock, result);
       });
+      if (p) second.push(p);
+      else await recordSnapshot(account, now, result); // 이 계정의 한 바퀴는 1단계에서 끝났다(키 무효·오류)
     }
-    // 2단계: 드리프트·재개·비즈머니(남은 예산 안에서)
-    for (const p of second) if (p.ctx.result.outcome === "ok") await isolate(p.ctx.account, now, p.ctx.result, () => phase2(p));
+    // 2단계: 드리프트·재개·비즈머니(남은 예산 안에서). 끝나면 계정 스냅샷.
+    for (const p of second) {
+      if (p.ctx.result.outcome === "ok") await isolate(p.ctx.account, now, p.ctx.result, () => phase2(p));
+      await recordSnapshot(p.ctx.account, now, p.ctx.result);
+    }
   } catch (error) {
     failure = error;
   }

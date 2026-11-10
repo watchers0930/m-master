@@ -15,14 +15,14 @@ import { AdsHttpError, unexpectedNaverResponse } from "./http";
 export type AdsDeps = { transport?: typeof fetch; now?: () => Date; naverClock?: NaverAdsClock; callBudget?: NaverAdsBudget };
 export const CAMPAIGN_PAGE = 1000; // 명세 recordSize 상한(1~1000)
 
-const DTO_SELECT = {
+export const DTO_SELECT = {
   id: true, naverCustomerId: true, label: true, keyLast4: true, status: true, dailyCapKrw: true, sharedBudgetKrw: true,
   maxBidKrw: true, sharedBudgetId: true, businessChannelId: true, lastVerifiedAt: true, createdAt: true,
 } satisfies Prisma.AdAccountSelect;
 type DtoRow = Prisma.AdAccountGetPayload<{ select: typeof DTO_SELECT }>;
 const STATUSES: readonly string[] = ["active", "invalid_key", "disconnecting", "disabled"];
 
-function toAccountDTO(r: DtoRow): AdAccountDTO {
+export function toAccountDTO(r: DtoRow): AdAccountDTO {
   const status = (STATUSES.includes(r.status) ? r.status : "disabled") as AdAccountStatus;
   return {
     id: r.id, naverCustomerId: r.naverCustomerId, label: r.label, keyLast4: r.keyLast4, status,

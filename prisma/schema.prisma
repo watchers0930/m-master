@@ -641,6 +641,9 @@ model AdAccount { // ad_accounts — 네이버 검색광고 계정 연결(키는
   sharedBudgetId    String?   @map("shared_budget_id")
   businessChannelId String?   @map("business_channel_id")
   lastVerifiedAt    DateTime? @map("last_verified_at")
+  lastGuardAt       DateTime? @map("last_guard_at")       // 감시 스냅샷: 마지막 감시 실행 시각(화면은 네이버 대신 이것을 읽는다)
+  lastSpendKrw      Int?      @map("last_spend_krw")      // 그 실행이 본 오늘 비용(VAT 별도). 모르면 null — 0으로 쓰지 않는다
+  lastBizmoneyKrw   Int?      @map("last_bizmoney_krw")   // 그 실행이 본 비즈머니. 못 읽으면 null
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
   owner        User                 @relation(fields: [ownerId], references: [id], onDelete: Restrict)

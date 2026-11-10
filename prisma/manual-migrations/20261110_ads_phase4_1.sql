@@ -23,6 +23,9 @@ CREATE TABLE IF NOT EXISTS "ad_accounts" (
     "shared_budget_id" TEXT,
     "business_channel_id" TEXT,
     "last_verified_at" TIMESTAMP(3),
+    "last_guard_at" TIMESTAMP(3),
+    "last_spend_krw" INTEGER,
+    "last_bizmoney_krw" INTEGER,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
