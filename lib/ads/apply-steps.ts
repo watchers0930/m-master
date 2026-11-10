@@ -1,9 +1,9 @@
 // lib/ads/apply-steps.ts — 적용의 단계 하나(엔티티 1개) = 확보(ensureId) → 재조회 대조(inspect) → 미러 기록(pending_launch).
 // 확보 순서(재개 안전, Review Focus 2):
 //   ① 이 제안의 미러 행이 있으면 그 id ② 원장(oplog)의 이 단계 POST가 ok면 그 naverId(미러 기록 직전에 죽은 경우)
-//   ③ 원장에 sent·uncertain이 있으면 결정적 이름으로 목록 대조 — 1개면 채택, 여럿이면 ambiguous:<step>,
-//      0개면 그 시도가 SETTLE_MS(2분)보다 오래됐을 때만 새로 만든다(아니면 uncertain:<step> — 늦게 보이는 쓰기를 기다림)
-//   ④ 그 밖(원장 없음 = 보낸 적 없음, failed = 확정 거절)이면 POST 1회. 그 POST가 불확실하면 재전송하지 않고 목록 대조, 없으면 uncertain:<step>.
+//   ③ 원장에 sent·uncertain이 있으면 결정적 이름으로 목록 대조만 한다 — 1개면 채택, 여럿이면 ambiguous:<step>,
+//      0개면 다시 만들지 않는다(재전송 금지, 설계서 §5.3 — 어느 실행에서도, 시간이 지나도). uncertain:<step> + 알림 ads.drift(reason=uncertain).
+//   ④ 그 밖(원장 없음 = 보낸 적 없음, failed = 확정 거절)이면 POST 1회. 그 POST가 불확실하면 재전송하지 않고 목록 대조, 없으면 ③과 같이 멈춘다.
 // 대조(inspect): 단건 GET → 형태 parse → 상한 값 verifyStored(소재는 TEXT_45) → userLock. 네이버가 userLock을 무시해 켜진 채면
 //   즉시 끄고(원장 기록) 다시 읽는다. 상한 불일치면 즉시 끄고, 미러를 남기고, 알림 ads.drift 후 drift:<field>로 멈춘다.
 // 미러는 lockedBy='pending_launch', 관찰한 userLock으로 만든다. 이미 있으면 userLock·검수 상태만 갱신(lockedBy·lockVersion 무변경).
@@ -20,7 +20,6 @@ import { unexpectedNaverResponse } from "./http";
 import { findAdgroups, findAds, findCampaigns, findKeywords } from "./reconcile";
 import { buildAdgroup, buildCampaign, buildKeyword, buildTextAd, verifyStored, type LockKind } from "./requests";
 
-export const SETTLE_MS = 2 * 60_000;
 export type PriorOp = { status: string; naverId: string | null; createdAt: Date };
 export type ApplyCtx = {
   client: NaverAdsClient; account: AdAccount; proposalId: string; prior: ReadonlyMap<string, PriorOp>;
@@ -34,6 +33,16 @@ async function adoptOne(e: Ensure): Promise<string | null> {
   return found[0] ?? null;
 }
 
+/** 반영 여부를 끝내 확인하지 못한 단계: 다시 보내지 않고 멈춘다. 대장이 네이버 화면에서 확인하도록 알린다(같은 날 1회). */
+async function uncertainStop(ctx: ApplyCtx, step: string): Promise<never> {
+  try {
+    await queueAlert(ctx.account.id, "ads.drift", { reason: "uncertain", proposalId: ctx.proposalId, step });
+  } catch (error) {
+    console.error("[ads] uncertain alert queue failed", { type: error instanceof Error ? error.name : "unknown" });
+  }
+  throw new ApplyFailure(`uncertain:${step}`);
+}
+
 async function ensureId(ctx: ApplyCtx, e: Ensure): Promise<string> {
   ctx.step = e.step;
   await ctx.heartbeat();
@@ -41,18 +50,12 @@ async function ensureId(ctx: ApplyCtx, e: Ensure): Promise<string> {
   if (mirrored) return mirrored;
   const prior = ctx.prior.get(e.step);
   if (prior?.status === "ok" && prior.naverId) return prior.naverId;
-  if (prior && prior.status !== "failed") {
-    const found = await adoptOne(e);
-    if (found) return found;
-    if (ctx.now().getTime() - prior.createdAt.getTime() < SETTLE_MS) throw new ApplyFailure(`uncertain:${e.step}`);
-  }
+  if (prior && prior.status !== "failed") return (await adoptOne(e)) ?? uncertainStop(ctx, e.step); // 대조만, 재전송 없음
   try {
     return await e.create();
   } catch (error) {
     if (!(error instanceof NaverAdsError) || error.reason !== "ads_uncertain") throw error;
-    const found = await adoptOne(e); // 재전송 금지: 반영됐는지 목록으로만 확인한다
-    if (found) return found;
-    throw new ApplyFailure(`uncertain:${e.step}`);
+    return (await adoptOne(e)) ?? uncertainStop(ctx, e.step); // 재전송 금지: 반영됐는지 목록으로만 확인한다
   }
 }
 
