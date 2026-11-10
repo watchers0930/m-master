@@ -29,6 +29,9 @@ interface TopicGroup {
   latestDate: string;
 }
 
+// 헤더·토픽 행·콘텐츠 행이 같은 열 너비를 쓴다. 날짜 열은 'YYYY. MM. DD.'(약 80px)가 한 줄에 들어가는 폭.
+const LIST_COLUMNS = 'minmax(0, 1fr) 72px 92px';
+
 function ContentManageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -115,9 +118,9 @@ function ContentManageContent() {
         {/* 좌측: 목록 카드 */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, height: '100%' }}>
           {/* 헤더 행 */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 70px', gap: 8, padding: '10px 14px', borderBottom: '1px solid var(--border)', background: 'var(--n50)', flexShrink: 0 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: LIST_COLUMNS, gap: 8, padding: '10px 14px', borderBottom: '1px solid var(--border)', background: 'var(--n50)', flexShrink: 0 }}>
             {['토픽', '채널', '생성일'].map((h) => (
-              <span key={h} style={{ fontSize: 11, fontWeight: 600, color: 'var(--sub)' }}>{h}</span>
+              <span key={h} style={{ fontSize: 11, fontWeight: 600, color: 'var(--sub)', whiteSpace: 'nowrap' }}>{h}</span>
             ))}
           </div>
 
@@ -140,7 +143,7 @@ function ContentManageContent() {
                   {/* 아코디언 헤더 — 토픽 제목 */}
                   <div
                     style={{
-                      display: 'grid', gridTemplateColumns: '1fr 60px 70px', gap: 8, alignItems: 'center',
+                      display: 'grid', gridTemplateColumns: LIST_COLUMNS, gap: 8, alignItems: 'center',
                       padding: '10px 14px', borderBottom: '1px solid var(--border2)',
                       cursor: 'pointer', transition: 'background 0.1s',
                       background: isOpen ? 'var(--n50)' : '',
@@ -162,8 +165,8 @@ function ContentManageContent() {
                         </span>
                       )}
                     </div>
-                    <span style={{ fontSize: 10.5, color: 'var(--sub)' }}>{group.items.length}개</span>
-                    <span style={{ fontSize: 11, color: 'var(--sub)' }}>{new Date(group.latestDate).toLocaleDateString('ko-KR')}</span>
+                    <span style={{ fontSize: 10.5, color: 'var(--sub)', whiteSpace: 'nowrap' }}>{group.items.length}개</span>
+                    <span style={{ fontSize: 11, color: 'var(--sub)', whiteSpace: 'nowrap' }}>{new Date(group.latestDate).toLocaleDateString('ko-KR')}</span>
                   </div>
 
                   {/* 아코디언 바디 — 채널별 콘텐츠 */}
@@ -173,7 +176,7 @@ function ContentManageContent() {
                     return (
                       <div key={item.id}
                         style={{
-                          display: 'grid', gridTemplateColumns: '1fr 60px 70px', gap: 8, alignItems: 'center',
+                          display: 'grid', gridTemplateColumns: LIST_COLUMNS, gap: 8, alignItems: 'center',
                           padding: '8px 14px 8px 32px', borderBottom: '1px solid var(--border2)',
                           borderLeft: isSelected ? '3px solid var(--blue-400)' : '3px solid transparent',
                           background: isSelected ? 'var(--blue-50, #eff6ff)' : '',
@@ -194,8 +197,8 @@ function ContentManageContent() {
                             <span style={{ fontSize: 10, color: 'var(--sub)' }}>{item.scores.avg}점</span>
                           )}
                         </div>
-                        <span style={{ fontSize: 10.5, color: 'var(--sub)' }}>{item.cost_krw.toLocaleString()}원</span>
-                        <span style={{ fontSize: 10.5, color: 'var(--sub)' }}>{new Date(item.created_at).toLocaleDateString('ko-KR')}</span>
+                        <span style={{ fontSize: 10.5, color: 'var(--sub)', whiteSpace: 'nowrap' }}>{item.cost_krw.toLocaleString()}원</span>
+                        <span style={{ fontSize: 10.5, color: 'var(--sub)', whiteSpace: 'nowrap' }}>{new Date(item.created_at).toLocaleDateString('ko-KR')}</span>
                       </div>
                     );
                   })}
