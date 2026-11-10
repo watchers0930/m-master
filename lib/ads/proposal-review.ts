@@ -20,6 +20,9 @@ import { checkPayload, lintPayload, type Problem } from "./proposal-check";
 import { kindOf, lintResultOf, payloadOf, PROPOSAL_SELECT, sourceKeywordsOf, toProposalDTO } from "./proposals";
 
 type Tx = Prisma.TransactionClient;
+type LockedRow = Awaited<ReturnType<typeof lockProposal>>;
+/** 테스트 전용 이음새: 잠금·재조회 직후 같은 트랜잭션에서 실행된다(기본 no-op). 라우트는 이 인자를 넘기지 않는다. */
+export type ReviewDeps = { afterLock?: (tx: Tx, row: LockedRow) => Promise<void> };
 const CONFLICT_MESSAGE: Readonly<Record<string, string>> = {
   version_conflict: "다른 곳에서 제안이 바뀌었습니다. 최신 내용을 확인하세요.",
   invalid_transition: "지금 상태에서는 할 수 없는 작업입니다.",
@@ -59,12 +62,13 @@ async function audit(tx: Tx, ownerId: string, id: string, action: string, payloa
 const readBack = async (tx: Tx, ownerId: string, id: string) =>
   toProposalDTO(await tx.adProposal.findFirstOrThrow({ where: { id, ownerId }, select: PROPOSAL_SELECT }));
 
-export async function editProposal(ownerId: string, id: string, input: AdsProposalEditInput): Promise<AdProposalDTO> {
+export async function editProposal(ownerId: string, id: string, input: AdsProposalEditInput, deps: ReviewDeps = {}): Promise<AdProposalDTO> {
   assertAdsOwner(ownerId);
   const data = adsProposalEditSchema.parse(input);
   const expected = Date.parse(data.expected_updated_at);
   return prisma.$transaction(async (tx) => {
     const row = await lockProposal(tx, ownerId, id);
+    await deps.afterLock?.(tx, row);
     if (row.updatedAt.getTime() !== expected) proposalConflict("version_conflict", row.updatedAt);
     if (row.status !== "pending_review") proposalConflict("invalid_transition");
     const checked = checkPayload(data.payload, {
@@ -86,12 +90,15 @@ export async function editProposal(ownerId: string, id: string, input: AdsPropos
   });
 }
 
-export async function reviewProposal(ownerId: string, id: string, input: AdsProposalReviewInput): Promise<AdProposalDTO & { changed: boolean }> {
+export async function reviewProposal(
+  ownerId: string, id: string, input: AdsProposalReviewInput, deps: ReviewDeps = {},
+): Promise<AdProposalDTO & { changed: boolean }> {
   assertAdsOwner(ownerId);
   const data = adsProposalReviewSchema.parse(input);
   const target = data.decision === "approve" ? "approved" : "rejected";
   return prisma.$transaction(async (tx) => {
     const row = await lockProposal(tx, ownerId, id);
+    await deps.afterLock?.(tx, row);
     if (row.status === target) return { ...(await readBack(tx, ownerId, id)), changed: false };
     if (row.updatedAt.getTime() !== Date.parse(data.expected_updated_at)) proposalConflict("version_conflict", row.updatedAt);
     if (row.status !== "pending_review") proposalConflict("invalid_transition");
