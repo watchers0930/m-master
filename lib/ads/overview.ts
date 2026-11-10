@@ -5,8 +5,8 @@
 //   → 캠페인별 7·30일 합계와 날짜별 추이를 메모리에서 만든다. 표마다 쿼리 1회 — 캠페인 수와 무관(N+1 없음).
 // - 창: KST 날짜 기준 오늘 포함 7일(D-6..D)·30일(D-29..D). 성과 행 date는 KST 날짜의 00:00Z로 저장된다(sync-stats.ts).
 // - 안전 경보(최종 판정 B1): 최근 48시간의 SAFETY_ALERT_TYPES를 DB에서 그대로(미발송 포함 — 메일이 실패해도 화면에 보인다), 쿼리 1회·take 상한.
-//   payload는 알려진 필드만 싣는다. 미러 pauseUnconfirmed = 켜짐 기록인데 마지막 잠금 변경(lockedAt) 뒤에
-//   그 naverId의 ads.pause_failed(paused:false)가 있음 → 화면은 '켜짐'(녹색) 대신 '꺼지지 않았을 수 있음'(붉게).
+//   payload는 알려진 필드만 싣는다. 미러 pauseUnconfirmed = 켜짐 기록인데 잠금 의도(lockedBy)가 남아 있거나, 마지막 잠금 변경(lockedAt) 뒤에
+//   그 naverId의 ads.pause_failed(paused:false)가 있음 → 화면은 '켜짐'(녹색) 대신 '꺼지지 않았을 수 있음'(붉게). 대장 켜기는 lockedBy를 비운다.
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { adsAccountIdSchema } from "@/schemas/ads";
@@ -38,7 +38,8 @@ const base = (unconfirmed: Unconfirmed) => (r: BaseRow): AdMirrorBaseDTO => {
   return {
     id: r.id, naverId: r.naverId, parentNaverId: r.parentNaverId, name: r.name, proposalId: r.proposalId,
     userLock: r.userLock, lockedBy: r.lockedBy, lockVersion: r.lockVersion, lockedAt: r.lockedAt?.toISOString() ?? null, inspectStatus: r.inspectStatus,
-    pauseUnconfirmed: !r.userLock && failedAt !== undefined && failedAt >= (r.lockedAt?.getTime() ?? 0),
+    // 잠금 의도(lockedBy)가 남았는데 켜짐 = 끄기 확인 없음. 같은 날 재시도 실패는 경보가 첫 행으로 합쳐져 시각 비교만으론 놓친다(재검토 N1)
+    pauseUnconfirmed: !r.userLock && (r.lockedBy !== null || (failedAt !== undefined && failedAt >= (r.lockedAt?.getTime() ?? 0))),
   };
 };
 
