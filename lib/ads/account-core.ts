@@ -68,7 +68,7 @@ export async function listCampaigns(client: NaverAdsClient) {
 }
 
 export const MAX_CAMPAIGN_PAGES = 50;
-export type CampaignRead = { campaigns: { nccCampaignId: string; userLock: boolean; status?: string | null }[]; complete: boolean };
+export type CampaignRead = { campaigns: { nccCampaignId: string; userLock: boolean; status?: string | null; editTm?: string | null }[]; complete: boolean };
 
 /** 꺼짐 = userLock=true 또는 삭제됨(DELETED는 노출·과금 없음). */
 export const isCampaignOff = (c: { userLock: boolean; status?: string | null }) => c.userLock === true || c.status === "DELETED";

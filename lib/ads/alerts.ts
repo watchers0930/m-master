@@ -38,6 +38,11 @@ export function kstDate(at: Date): string {
   return new Date(ms + KST_OFFSET_MS).toISOString().slice(0, 10);
 }
 
+/** 그 시각이 속한 KST 날짜의 0시(UTC Date). 감시 재개(guard-resume)·오늘 비용(spend)이 같이 쓴다. */
+export function kstDayStart(now: Date): Date {
+  return new Date(Date.parse(`${kstDate(now)}T00:00:00Z`) - KST_OFFSET_MS);
+}
+
 export async function queueAlert(accountId: string, type: AdAlertType, payload: AlertPayload, options: QueueOptions = {}): Promise<void> {
   if (typeof accountId !== "string" || !accountId) throw new Error("ad_account_not_found");
   if (!isAdAlertType(type)) throw new Error("invalid_alert_type");

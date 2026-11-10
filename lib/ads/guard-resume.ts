@@ -15,7 +15,7 @@
 import type { AdsHttpError } from "./http";
 import { NaverAdsError } from "@/lib/external/naver-searchad";
 import { prisma } from "@/lib/prisma";
-import { kstDate } from "./alerts";
+import { kstDayStart } from "./alerts";
 import { isExecutionEnabled, putUserLock } from "./execution";
 import { errorName, guardAlert, guardDeps, isAuthError, pastDeadline, type GuardWriteCtx } from "./guard-cap";
 import type { DriftScan } from "./guard-drift";
@@ -26,12 +26,7 @@ import { pauseAlert, safetyPause } from "./lock-pause";
 import { todayCostKrw } from "./spend";
 
 export const RESUME_PAGE = 50;
-const KST_OFFSET_MS = 9 * 60 * 60_000;
-
-/** 그 시각이 속한 KST 날짜의 0시(UTC Date). */
-export function kstDayStart(now: Date): Date {
-  return new Date(Date.parse(`${kstDate(now)}T00:00:00Z`) - KST_OFFSET_MS);
-}
+export { kstDayStart };
 
 const isSpendUnknown = (error: unknown) => (error as AdsHttpError | null)?.code === "spend_unknown" || (error instanceof NaverAdsError && !isAuthError(error));
 
