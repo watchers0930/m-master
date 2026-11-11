@@ -9,6 +9,7 @@ import { consultingSnapshotSchema } from "@/schemas/consulting";
 import type { ConsultingSnapshot, EvidenceRef, EvidenceSource } from "@/types/consulting";
 import type { Market } from "@/types/visibility";
 import { snapshotHash } from "./hash";
+import { utcTimestamp } from "@/lib/sql-time";
 import { citationHost } from "@/lib/visibility/normalize";
 import { ga4Evidence } from "./ga4-evidence";
 import type { Ga4Collection } from "./ga4-collect";
@@ -70,7 +71,7 @@ export async function collectInput(ownerId: string, domain: {
                     const total = await tx.seoKeyword.count({ where: { ...where, reservationOnly: false, metricsUpdatedAt: { lte: to } } });
                     snapshot.selection.push({ source: "seo_keywords", total, selected: keywords.length, limit: 50, rule: "latest metricsUpdatedAt then id" });
                     const rankingWhere = Prisma.sql `r.domain_id=${domain.id} AND r.market=${domain.market}
-            AND r.captured_at >= ${from} AND r.captured_at <= ${to}
+            AND r.captured_at >= ${utcTimestamp(from)} AND r.captured_at <= ${utcTimestamp(to)}
             AND EXISTS (SELECT 1 FROM domains d WHERE d.id=r.domain_id AND d.owner_id=${ownerId})
             AND EXISTS (SELECT 1 FROM seo_keywords k JOIN domains d ON d.id=k.domain_id WHERE k.id=r.keyword_id AND d.owner_id=${ownerId})
             AND EXISTS (SELECT 1 FROM seo_audits a JOIN domains d ON d.id=a.domain_id WHERE a.id=r.audit_id AND d.owner_id=${ownerId})`;

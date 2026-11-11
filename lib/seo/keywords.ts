@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { PLAN_LIMITS, type PlanKey } from "@/lib/billing/limits";
 import type { Metric } from "./adapters/types";
+import { utcTimestamp } from "@/lib/sql-time";
 export const normalizedKeyword = (v: string) =>
   v.normalize("NFKC").trim().toLowerCase();
 export function isOpportunity(row: {
@@ -99,8 +100,8 @@ export async function writeKeywords(
       UPDATE seo_keywords k SET search_volume = v."searchVolume",
         volume_scale = v."volumeScale", volume_period = v."volumePeriod",
         competition = v.competition, competition_raw = v."competitionRaw",
-        volume_source = ${volumeSource}, metrics_updated_at = ${new Date()},
-        updated_at = ${new Date()}
+        volume_source = ${volumeSource}, metrics_updated_at = ${utcTimestamp(new Date())},
+        updated_at = ${utcTimestamp(new Date())}
       FROM jsonb_to_recordset(${JSON.stringify(rows)}::jsonb) AS v(
         id text, "searchVolume" integer, "volumeScale" text, "volumePeriod" text,
         competition double precision, "competitionRaw" text)

@@ -47,6 +47,7 @@ import { autoResume } from "./guard-resume";
 import { caps } from "./invariants";
 import type { LockDeps } from "./lock-mirror";
 import { todayCostKrw } from "./spend";
+import { utcTimestamp } from "@/lib/sql-time";
 
 export { kstDayStart } from "./guard-resume";
 export type { GuardAccountResult } from "./guard-cap";
@@ -181,7 +182,7 @@ async function isolate(account: AdAccount, now: Date, result: GuardAccountResult
  */
 async function recordSnapshot(account: AdAccount, now: Date, result: GuardAccountResult): Promise<void> {
   try {
-    await prisma.$executeRaw`UPDATE ad_accounts SET last_guard_at = (${now.toISOString()}::timestamptz AT TIME ZONE 'UTC'), last_spend_krw = ${result.todayCostKrw}, last_bizmoney_krw = ${result.bizmoneyKrw} WHERE id = ${account.id}`;
+    await prisma.$executeRaw`UPDATE ad_accounts SET last_guard_at = ${utcTimestamp(now)}, last_spend_krw = ${result.todayCostKrw}, last_bizmoney_krw = ${result.bizmoneyKrw} WHERE id = ${account.id}`;
   } catch (error) {
     console.error("[ads] guard snapshot write failed", { accountId: account.id, error: errorName(error) });
   }

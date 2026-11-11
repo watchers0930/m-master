@@ -1,6 +1,7 @@
 import { Prisma, type SeoTask } from "@prisma/client";
 import { checkpointSchema, type Checkpoint, type FrozenInput } from "./adapters/types";
 import { metricInput, normalizeMetricKeyword } from "./adapters/metric-contract";
+import { utcTimestamp } from "@/lib/sql-time";
 
 /** Owner lock required. Batch writes; audit creation order fences delayed workers. */
 export async function writeMetricCheckpoint(tx: Prisma.TransactionClient, task: SeoTask, raw: Checkpoint) {
@@ -34,7 +35,7 @@ export async function writeMetricCheckpoint(tx: Prisma.TransactionClient, task: 
       WHERE newer.operation=${task.operation} AND newer.status IN ('completed','partial')
       AND a.domain_id=${audit.domainId} AND a.market=${audit.market}
       AND newer.frozen_input @> jsonb_build_object('keywordIds', jsonb_build_array(k.id))
-      AND (a.created_at > ${audit.createdAt} OR (a.created_at=${audit.createdAt} AND a.id > ${audit.id})))`;
+      AND (a.created_at > ${utcTimestamp(audit.createdAt)} OR (a.created_at=${utcTimestamp(audit.createdAt)} AND a.id > ${audit.id})))`;
     const rows = JSON.stringify(data);
     if (task.operation === "kw_difficulty") await tx.$executeRaw`
       UPDATE seo_keywords k SET difficulty=v.difficulty FROM jsonb_to_recordset(${rows}::jsonb) AS v(id text,difficulty integer)
@@ -59,5 +60,5 @@ export async function writeMetricCheckpoint(tx: Prisma.TransactionClient, task: 
     FROM jsonb_to_recordset(${JSON.stringify(points)}::jsonb) AS v("keywordId" text,location integer,year integer,month integer,volume integer)
     ON CONFLICT (keyword_id,location,year,month) DO UPDATE SET volume=EXCLUDED.volume,audit_id=EXCLUDED.audit_id
     WHERE EXISTS (SELECT 1 FROM seo_audits old WHERE old.id=seo_demand_points.audit_id
-      AND (old.created_at < ${audit.createdAt} OR (old.created_at=${audit.createdAt} AND old.id <= ${audit.id})))`;
+      AND (old.created_at < ${utcTimestamp(audit.createdAt)} OR (old.created_at=${utcTimestamp(audit.createdAt)} AND old.id <= ${audit.id})))`;
 }

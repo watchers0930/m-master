@@ -6,6 +6,7 @@ import { ENGINE_IDS } from "@/lib/market/constants";
 import type { CitationItem, CompetitorScore, VisibilityDataResponse } from "@/types/visibility";
 import { citationHost } from "./normalize";
 import { encodeCursor } from "./cursor";
+import { utcTimestamp } from "@/lib/sql-time";
 const rate = (n: number, d: number) => d ? n / d : null;
 type Counts = { engine: string; day: string | null; valid: number; citationValid: number; mentioned: number; cited: number; unresolved: number; failed: number; latest: Date };
 export async function visibilityData(ownerId: string, filter: z.infer<typeof dataSchema>, db: Pick<Prisma.TransactionClient, "$queryRaw"> = prisma): Promise<VisibilityDataResponse> {
@@ -17,7 +18,7 @@ export async function visibilityData(ownerId: string, filter: z.infer<typeof dat
     LEFT JOIN domains d ON d.id=q.domain_id
     WHERE q.owner_id = ${ownerId}
       AND COALESCE(s.capture_config->>'market', q.market) = ${market}
-      AND s.captured_at >= ${from} AND s.captured_at <= ${to}
+      AND s.captured_at >= ${utcTimestamp(from)} AND s.captured_at <= ${utcTimestamp(to)}
       ${queryId ? Prisma.sql`AND q.id = ${queryId}` : Prisma.empty}
       ${domainId ? Prisma.sql`AND (CASE WHEN s.capture_config IS NULL THEN q.domain_id ELSE s.capture_config->>'domainId' END) = ${domainId}` : Prisma.empty}
       ${engine ? Prisma.sql`AND s.engine = ${engine}` : Prisma.empty}
@@ -54,7 +55,7 @@ export async function visibilityData(ownerId: string, filter: z.infer<typeof dat
         s.captured_domain AS domain
       FROM filtered s CROSS JOIN LATERAL jsonb_array_elements(s.citations) WITH ORDINALITY c(item, ordinality)
       WHERE s.status='ok'
-      ${citationCursor ? Prisma.sql`AND (s.captured_at, s.id, c.ordinality) > (${new Date(citationCursor.at)}, ${citationCursor.id}, ${citationCursor.offset})` : Prisma.empty}
+      ${citationCursor ? Prisma.sql`AND (s.captured_at, s.id, c.ordinality) > (${utcTimestamp(new Date(citationCursor.at))}, ${citationCursor.id}, ${citationCursor.offset})` : Prisma.empty}
       ORDER BY s.captured_at, s.id, c.ordinality LIMIT ${citationLimit + 1}`),
   ]);
   const engines = (engine ? [engine] : ENGINE_IDS).map((id) => {
