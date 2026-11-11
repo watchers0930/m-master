@@ -92,19 +92,20 @@ export const SUPERLATIVE_TERMS: readonly { term: string; pattern: RegExp }[] = [
 export const MATCH_SEPARATORS = new Set([".", ",", "-", "·", "•", "‧", "・", "_", "/", "~", "*", "+", "|", ":", ";", "^", "=", "'", "\"", "`"]);
 export const MATCH_SEPARATOR_KEEP_BETWEEN_DIGITS = new Set([".", ","]);
 
-/** 최상급 사전과 겹쳐도 주장 표현이 아닌 일반 명사. pattern 은 정규화된 형태에 적용하고, 원문에서도 띄어쓰기·부호·보이지 않는
- *  문자 없이 붙어 있을 때만 예외다('최.고가'·'최고 가성비'·'최상 층간'은 계속 잡는다). 이 범위 안의 매치만 무시하고
- *  같은 문구 안의 다른 최상급은 그대로 잡는다. '최초'는 사실 용어 예외가 없다(최초 주장 자체가 최상급). */
-export type SuperlativeException = { term: string; pattern: RegExp; basis: string; verifiedAt: string | null; source: string };
+/** 최상급 사전과 겹쳐도 주장 표현이 아닌 일반 명사. pattern 은 정규화된 형태(공백·부호·보이지 않는 문자 제거)에 적용한다.
+ *  contiguousOnly=true 면 원문에서도 띄어쓰기·부호·보이지 않는 문자 없이 붙어 있을 때만 예외다('최.고가'·'최고 가성비'·'최상 층간'은 계속 잡는다).
+ *  기존 예외(보장성·최고경영자)는 false — 2026-11-12 이전과 같이 정규화 형태만 본다('최고 경영자'도 통과).
+ *  이 범위 안의 매치만 무시하고 같은 문구 안의 다른 최상급은 그대로 잡는다. '최초'는 사실 용어 예외가 없다(최초 주장 자체가 최상급). */
+export type SuperlativeException = { term: string; pattern: RegExp; contiguousOnly: boolean; basis: string; verifiedAt: string | null; source: string };
 const OWNER_DECISION = "대장 결정 2026-11-12";
 export const SUPERLATIVE_EXCEPTIONS: readonly SuperlativeException[] = [
-  { term: "보장성", pattern: /보장성/g, basis: "보험 상품 분류(주장 아님)", verifiedAt: null, source: "설계 결정(오탐, 린터 도입 1761941)" },
-  { term: "최고경영자", pattern: /최고경영자/g, basis: "직함(주장 아님)", verifiedAt: null, source: "설계 결정(오탐, 린터 도입 1761941)" },
+  { term: "보장성", pattern: /보장성/g, contiguousOnly: false, basis: "보험 상품 분류(주장 아님)", verifiedAt: null, source: "설계 결정(오탐, 린터 도입 1761941)" },
+  { term: "최고경영자", pattern: /최고경영자/g, contiguousOnly: false, basis: "직함(주장 아님)", verifiedAt: null, source: "설계 결정(오탐, 린터 도입 1761941)" },
   // '최고가성비'·'최고가치'는 '최고+가성비/가치' 최상급이라 예외에서 뺀다
-  { term: "최고가", pattern: /최고가(?!성비|치)/g, basis: "부동산 실거래 최고 가격(사실 용어)", verifiedAt: null, source: OWNER_DECISION },
-  { term: "최상층", pattern: /최상층/g, basis: "건물 맨 위층(사실 용어)", verifiedAt: null, source: OWNER_DECISION },
+  { term: "최고가", pattern: /최고가(?!성비|치)/g, contiguousOnly: true, basis: "부동산 실거래 최고 가격(사실 용어)", verifiedAt: null, source: OWNER_DECISION },
+  { term: "최상층", pattern: /최상층/g, contiguousOnly: true, basis: "건물 맨 위층(사실 용어)", verifiedAt: null, source: OWNER_DECISION },
   // '수익·원금·확정 보장금액'은 수익 보장 주장이라 예외에서 뺀다
-  { term: "보장금액", pattern: /(?<!수익|원금|확정)보장금액/g, basis: "보험 보장(가입) 금액(사실 용어)", verifiedAt: null, source: OWNER_DECISION },
+  { term: "보장금액", pattern: /(?<!수익|원금|확정)보장금액/g, contiguousOnly: true, basis: "보험 보장(가입) 금액(사실 용어)", verifiedAt: null, source: OWNER_DECISION },
 ];
 
 /** 소재 문구 허용 문자(이 밖은 forbidden-char). 한글 음절·영문·숫자·공백·일반 문장부호. 자모 단독·전각·한자는 허용하지 않는다(설계 가정). */
