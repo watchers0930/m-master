@@ -17,7 +17,7 @@ import type { Caps } from "./invariants";
 import { checkPayload, lintPayload, lintProblems, shapeProblems, type Problem } from "./proposal-check";
 import {
   buildProposalMessages, calcChatKrw, estimateUsage, MAX_OUTPUT_TOKENS, MAX_PROMPT_KEYWORDS, MAX_REPAIR_CALLS, PROPOSAL_MODEL,
-  repairMessages, type ChatMessage,
+  repairMessages, type ChatMessage, type SeedSource,
 } from "./proposal-prompt";
 
 export { MAX_REPAIR_CALLS } from "./proposal-prompt";
@@ -28,6 +28,8 @@ export type GenerateInput = {
   kind: AdProposalKind;
   caps: Caps;
   seeds: readonly string[];
+  /** manual이면 프롬프트가 모든 그룹을 수동 씨앗 주제로 묶는다 */
+  seedSource: SeedSource;
   stats: readonly ProposalSourceKeyword[];
 };
 export type GenerateResult = {

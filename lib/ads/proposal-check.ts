@@ -1,7 +1,8 @@
 // lib/ads/proposal-check.ts — 제안 payload 서버 검사(생성 propose.ts·편집 proposal-review.ts 공용). 순수 함수(I/O 없음).
 // - checkPayload: 형태가 통과한 payload를 저장 가능한 값으로 만든다. 저장을 막는 위반은 problems로 돌려준다.
 //   · 개수: LLM 그룹 2~5(extend_group은 1)·소재 2~3, 편집 그룹 1~5(extend_group 1)·소재 1~3(삭제 허용). 키워드 1~20.
-//   · 입찰: invariants.ts checkBid(정수, 70 ≤ bid ≤ min(maxBid, 100000))만 쓴다. 범위 밖은 고치지 않고 위반이다.
+//   · 입찰: invariants.ts checkProposalBid(정수, 70 ≤ bid ≤ proposalBidCeiling = min(maxBid, ⌊하루 상한/100⌋×10) — checkBid 위에 천장만 낮춘 것)만 쓴다.
+//     범위 밖은 고치지 않고 위반이다. 생성(LLM·교정)·편집·승인 재검사가 모두 이 경로다.
 //   · 키워드: collapseKeyword 후 같은 그룹 내 중복(keywordDedupeKey)은 뒤의 것을 버린다.
 //     source='llm'이면 리서치 통계에 없는 키워드는 버리고(지어낸 키워드 금지) 키워드 문자열도 통계의 정규 표기로 바꾼다.
 //     source='edit'이면 대장이 직접 넣은 키워드도 받는다(근거는 통계에 있으면 그 값, 없으면 qc·compIdx null).
@@ -12,7 +13,7 @@ import type {
   AdProposalKind, ProposalEvidence, ProposalGroup, ProposalLintIssue, ProposalPayload, ProposalSourceKeyword,
 } from "@/types/ads";
 import { MAX_CREATIVES, MAX_GROUPS, type ProposalPayloadShape } from "@/schemas/ads-proposal";
-import { AdsInvariantError, checkBid, MIN_BID_KRW, type Caps } from "./invariants";
+import { AdsInvariantError, checkProposalBid, MIN_BID_KRW, proposalBidCeiling, type Caps } from "./invariants";
 import { collapseKeyword, keywordDedupeKey } from "./keyword-text";
 import { lintCreativeGroup, lintKeyword } from "./lint";
 
@@ -45,10 +46,10 @@ export function shapeProblems(error: ZodError): Problem[] {
 
 function bidProblem(value: unknown, caps: Caps, path: string, problems: Problem[]): number {
   try {
-    return checkBid(value, caps, path);
+    return checkProposalBid(value, caps, path);
   } catch (error) {
     if (!(error instanceof AdsInvariantError)) throw error;
-    problems.push({ path, rule: "bid-range", message: `입찰가는 ${MIN_BID_KRW}~${caps.maxBid} 사이 정수여야 합니다.` });
+    problems.push({ path, rule: "bid-range", message: `입찰가는 ${MIN_BID_KRW}~${proposalBidCeiling(caps)} 사이 정수여야 합니다.` });
     return NaN;
   }
 }

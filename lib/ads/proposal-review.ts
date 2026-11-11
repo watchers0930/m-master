@@ -2,9 +2,9 @@
 // 허용 전이: pending_review → approved | rejected. 편집은 pending_review에서만(4-1에서는 승인·반려된 제안을 다시 편집하지 않는다).
 // 순서(트랜잭션 하나): SELECT … FOR UPDATE(id AND owner_id) → 행 재조회(없으면 404) → expected_updated_at CAS(아니면 409 version_conflict,
 //   최신 updated_at 동봉) → 전이 검사(409 invalid_transition) → 검증 → updateMany(id, ownerId, updatedAt, status) count=1 확인 → 감사로그.
-// - 편집: 계정 상한으로 입찰을 다시 검사(invariants.checkBid — 범위 밖은 422 ads_invariant + field), 개수 검사, 근거는 통계로 덮어쓰고,
+// - 편집: 계정 상한으로 입찰을 다시 검사(invariants.checkProposalBid — 천장 min(maxBid, 하루 상한/10), 범위 밖은 422 ads_invariant + field), 개수 검사, 근거는 통계로 덮어쓰고,
 //   린트를 다시 돌려 lintResult를 바꾼다. 남은 위반은 저장되지만 승인을 막는다.
-// - 승인: 같은 잠금 안에서 저장된 payload의 입찰(현재 계정 상한)과 린트를 다시 계산한다. 위반 1건이라도 있으면 409 lint_issues_remain.
+// - 승인: 같은 잠금 안에서 저장된 payload의 입찰(현재 계정 상한 기준 같은 천장)과 린트를 다시 계산한다. 위반 1건이라도 있으면 409 lint_issues_remain.
 //   승인은 네이버를 부르지 않는다(적용은 Task 9).
 // - 같은 결정의 반복(이미 approved에 approve)은 content와 같이 변경 없이 현재 상태를 돌려준다(changed=false).
 import type { Prisma } from "@prisma/client";

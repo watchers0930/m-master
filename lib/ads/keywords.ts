@@ -3,9 +3,11 @@
 //   응답은 zod로 검증한다. { keywordList: [...] }와 최상위 배열 둘 다 받고, 빈 배열이면 빈 결과다.
 //   그 밖({}·null·빈 본문·목록 아닌 값)은 빈 결과가 아니라 ads_unexpected_response(502)다.
 //   배치 하나라도 실패하면 그 NaverAdsError를 그대로 전파한다(부분 결과를 돌려주지 않는다 — 조용히 누락된 통계로 제안하지 않게).
-//   결과: 정규화 키워드로 중복 제거(먼저 본 것 유지) → 공백뿐·특수문자 키워드 제외(네이버 3906) → (pcQc+mobileQc) 내림차순
-//   ("< 10"은 0으로 계산) → 키워드 코드단위 오름차순 → 상위 200.
-// - collectSeeds: 수동 > SEO 키워드(seo_keywords, 검색량 내림차순) > 최신 '완료' 컨설팅 리포트의 전략 입력 키워드, 정제·중복 제거 후 최대 25개.
+//   결과: 정규화 키워드로 중복 제거(먼저 본 것 유지) → 공백뿐·특수문자 키워드 제외(네이버 3906) → [relevantTo가 있으면] 수동 씨앗과
+//   관련 없는 키워드 제외(keyword-text.ts relevanceFilter — 검색량보다 관련도가 먼저) → (pcQc+mobileQc) 내림차순
+//   ("< 10"은 0으로 계산) → 키워드 코드단위 오름차순 → 상위 200. relevantTo가 없으면(도메인 풀 씨앗) 관련도 필터 없이 이전과 같다.
+// - collectSeeds: 유효한 수동 씨앗이 1개라도 있으면 수동 씨앗만(권위 — 2026-11-11 실운영 제안이 SEO 풀의 'AI'로 빗나간 사고).
+//   수동 씨앗이 없을 때만 도메인 풀: SEO 키워드(seo_keywords, 검색량 내림차순) > 최신 '완료' 컨설팅 리포트의 전략 입력 키워드, 정제·중복 제거 후 최대 25개.
 //   모든 조회는 ownerId AND domainId로 범위를 건다(다른 소유자의 도메인 id면 저장 출처에서 0건). 수동 씨앗은 호출자 본인의 입력이라 그대로 쓴다.
 //   전략 키워드: consultingStrategySchema(strategyJson)에는 키워드 필드가 없다. 전략은 리포트에 고정된 입력 스냅샷의
 //   structuredMetrics.keywords(v2 이상)로 생성되므로 그 keyword를 쓴다. v1 스냅샷·형태 불일치면 전략 출처는 0건.
@@ -15,7 +17,9 @@ import { prisma } from "@/lib/prisma";
 import type { NaverAdsClient } from "@/lib/external/naver-searchad";
 import { naverKeywordToolSchema, type NaverKeywordRow } from "@/schemas/ads";
 import { unexpectedNaverResponse } from "./http";
-import { collapseKeyword as collapse, isValidKeywordPhrase, isValidSeedText, keywordDedupeKey as dedupeKey, MAX_KEYWORD_LENGTH } from "./keyword-text";
+import {
+  collapseKeyword as collapse, isValidKeywordPhrase, isValidSeedText, keywordDedupeKey as dedupeKey, MAX_KEYWORD_LENGTH, relevanceFilter,
+} from "./keyword-text";
 
 export type KeywordStat = {
   keyword: string;
@@ -90,8 +94,11 @@ const volume = (k: KeywordStat) => (k.pcQc ?? 0) + (k.mobileQc ?? 0);
 const byVolume = (a: KeywordStat, b: KeywordStat) =>
   volume(b) - volume(a) || (a.keyword < b.keyword ? -1 : a.keyword > b.keyword ? 1 : 0);
 
-export async function researchKeywords(client: NaverAdsClient, seeds: readonly string[]): Promise<KeywordStat[]> {
+export type ResearchOptions = { /** 수동 씨앗 원문 — 있으면 이 씨앗과 관련 있는 키워드만 남긴다(순위·상한 전에) */ relevantTo?: readonly unknown[] };
+
+export async function researchKeywords(client: NaverAdsClient, seeds: readonly string[], options: ResearchOptions = {}): Promise<KeywordStat[]> {
   const hints = sanitizeSeeds(seeds).slice(0, MAX_SEEDS);
+  const relevant = options.relevantTo ? relevanceFilter(options.relevantTo) : () => true;
   const seen = new Set<string>();
   const stats: KeywordStat[] = [];
   for (let i = 0; i < hints.length; i += HINTS_PER_CALL) {
@@ -102,7 +109,7 @@ export async function researchKeywords(client: NaverAdsClient, seeds: readonly s
       const stat = toStat(row);
       if (!stat || seen.has(dedupeKey(stat.keyword))) continue;
       seen.add(dedupeKey(stat.keyword));
-      stats.push(stat);
+      if (relevant(stat.keyword)) stats.push(stat);
     }
   }
   return stats.sort(byVolume).slice(0, MAX_RESULTS);
@@ -132,10 +139,15 @@ async function strategySeeds(ownerId: string, domainId: string): Promise<string[
   return parsed.success ? parsed.data.map((k) => k.keyword) : [];
 }
 
-/** 제안 씨앗: 수동 > SEO > 최신 완료 컨설팅 전략, 정제·중복 제거 후 최대 25개. 앞 출처로 다 차면 뒤 출처는 조회하지 않는다. */
+/** 수동 씨앗 정제(최대 25개). 결과가 1개 이상이면 그 제안의 씨앗은 이것뿐이다. */
+export const manualSeeds = (manual: readonly unknown[]): string[] => sanitizeSeeds(manual.slice(0, 200)).slice(0, MAX_SEEDS);
+
+/** 제안 씨앗: 유효한 수동 씨앗이 있으면 그것만(도메인 출처는 조회하지 않는다). 없으면 SEO > 최신 완료 컨설팅 전략,
+ *  정제·중복 제거 후 최대 25개. 앞 출처로 다 차면 뒤 출처는 조회하지 않는다. */
 export async function collectSeeds(ownerId: string, domainId: string, manual: readonly unknown[]): Promise<string[]> {
-  let seeds = sanitizeSeeds(manual.slice(0, 200)).slice(0, MAX_SEEDS);
-  if (seeds.length < MAX_SEEDS) seeds = sanitizeSeeds([...seeds, ...(await seoSeeds(ownerId, domainId))]).slice(0, MAX_SEEDS);
+  const typed = manualSeeds(manual);
+  if (typed.length > 0) return typed;
+  let seeds = sanitizeSeeds(await seoSeeds(ownerId, domainId)).slice(0, MAX_SEEDS);
   if (seeds.length < MAX_SEEDS) seeds = sanitizeSeeds([...seeds, ...(await strategySeeds(ownerId, domainId))]).slice(0, MAX_SEEDS);
   return seeds;
 }

@@ -81,6 +81,17 @@ export function checkBid(v: unknown, c: Caps, field = "bidAmt"): number {
   return v;
 }
 
+/** 제안 입찰 천장(제안 품질 2026-11-11): 하루 상한으로 최소 MIN_DAILY_CLICKS번은 클릭되게 min(maxBid, ⌊하루 상한/10/10⌋×10), 70 미만 금지.
+ *  하루 1만 원이면 1,000원. 제안 생성(LLM·교정)·편집·승인 재검사가 모두 checkProposalBid 한 경로로 쓴다. 적용 직전 본문 검사는 checkBid(maxBid)다. */
+export const MIN_DAILY_CLICKS = 10;
+export function proposalBidCeiling(c: Caps): number {
+  return Math.max(MIN_BID_KRW, Math.min(c.maxBid, Math.floor(c.dailyCapKrw / MIN_DAILY_CLICKS / 10) * 10));
+}
+
+export function checkProposalBid(v: unknown, c: Caps, field = "bidAmt"): number {
+  return checkBid(v, { ...c, maxBid: proposalBidCeiling(c) }, field);
+}
+
 export function checkDailyBudget(v: unknown, c: Caps, field = "dailyBudget"): void {
   if (!isPosInt(v) || v > c.dailyCapKrw) fail(field);
 }
