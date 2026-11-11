@@ -1,5 +1,6 @@
 // lib/api/ads.ts — 광고 화면 API 래퍼(Task 12). 서버 계약 = app/api/ads/** + schemas/ads*.ts(strict — 모르는 필드를 보내지 않는다).
 // - 응답 봉투 {data}를 벗기고, 오류 {error:{code,message,...details}}는 AdsApiError로 옮긴다(키·본문은 오류에 싣지 않는다).
+//   details.naverCode(정수)가 있으면 문구 끝에 ' (네이버 코드 N)'을 붙인다.
 // - 변이(POST·PATCH·DELETE)는 브라우저 fetch가 Origin을 자동 첨부한다(서버 requireOrigin). 별도 CSRF 토큰 없음(코드베이스 표준).
 // - 키는 요청 본문에만 싣는다(URL·로그 없음). 모든 요청 cache: no-store.
 'use client';
@@ -36,12 +37,10 @@ async function send<T>(url: string, init: RequestInit = {}): Promise<T> {
   const body = (json ?? {}) as { data?: T; error?: ErrorBody };
   if (!res.ok || body.error || !('data' in body)) {
     const { code, message, ...details } = body.error ?? {};
-    throw new AdsApiError(
-      res.status,
-      typeof code === 'string' ? code : 'unknown',
-      typeof message === 'string' && message ? message : `요청 실패 (HTTP ${res.status})`,
-      details,
-    );
+    const base = typeof message === 'string' && message ? message : `요청 실패 (HTTP ${res.status})`;
+    // 네이버 오류 코드가 있으면 문구 끝에 붙인다(실운영 2026-11-11: 1002를 화면에서 바로 읽을 수 있게). 정수만 — 그 밖은 무시
+    const naver = Number.isSafeInteger(details.naverCode) ? ` (네이버 코드 ${details.naverCode})` : '';
+    throw new AdsApiError(res.status, typeof code === 'string' ? code : 'unknown', base + naver, details);
   }
   return body.data as T;
 }

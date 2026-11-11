@@ -18,7 +18,8 @@ import {
   accountDTO, listAccountDTOs, listCampaigns, loadOwnedAccount, notConnected, withAccountClient, type AdsDeps,
 } from "./account-core";
 import { AdsHttpError, unexpectedNaverResponse } from "./http";
-import { ensureSharedBudget } from "./shared-budget";
+import { DAILY_CAP_CEILING_KRW } from "./invariants";
+import { markCreatesReconciled, reuseSharedBudget } from "./shared-budget";
 
 export { markInvalidKey, type AdsDeps } from "./account-core";
 export { disconnectAccount } from "./disconnect";
@@ -69,20 +70,25 @@ export async function listAccounts(ownerId: string): Promise<AdAccountDTO[]> {
   return listAccountDTOs(ownerId, MAX_ACCOUNTS);
 }
 
-/** 연결: 검증 → 봉인 저장(같은 고객ID면 같은 행 갱신·재활성) → 공유예산 mq-cap 확인·생성 → SITE 채널 목록. */
+/** 연결: 검증 → 봉인 저장(같은 고객ID면 같은 행 갱신·재활성) → 기존 공유예산 mq-cap 확인(만들지 않음 — 첫 적용이 캠페인과 함께 만든다) → SITE 채널 목록. */
 export async function connectAccount(ownerId: string, input: AdsConnectInput, deps: AdsDeps = {}): Promise<AdAccountWithChannels> {
   assertAdsOwner(ownerId);
   const data = adsConnectSchema.parse(input);
   const client = await verifyNewKeys(data.customerId, data, deps);
   const sealed = await sealKeys(ownerId, data.customerId, data);
-  const verified = { ...sealed, status: "active", disconnectFromStatus: null, lastVerifiedAt: new Date(), label: data.label };
+  // 상한은 코드 상수로 명시한다(DB 기본값 100000에 기대지 않음 — 대장 결정 2026-11-11 하루 1만 원). 재연결(update)도 같은 값으로 덮는다
+  const verified = {
+    ...sealed, status: "active", disconnectFromStatus: null, lastVerifiedAt: new Date(), label: data.label,
+    dailyCapKrw: DAILY_CAP_CEILING_KRW, sharedBudgetKrw: DAILY_CAP_CEILING_KRW,
+  };
   const row = await prisma.adAccount.upsert({
     where: { ownerId_naverCustomerId: { ownerId, naverCustomerId: data.customerId } },
     create: { ownerId, naverCustomerId: data.customerId, ...verified },
     update: verified,
   });
-  const sharedBudgetId = await ensureSharedBudget(client, row);
+  const sharedBudgetId = await reuseSharedBudget(client, row); // 없으면 null(핫픽스 2026-11-11: 네이버는 캠페인 없는 공유예산 생성을 거부한다)
   if (sharedBudgetId !== row.sharedBudgetId) await prisma.adAccount.updateMany({ where: { id: row.id, ownerId }, data: { sharedBudgetId } });
+  if (sharedBudgetId) await markCreatesReconciled(row, sharedBudgetId); // 검증한 mq-cap으로 대조됨 → 불확실 생성 해소
   return { account: await accountDTO(ownerId, row.id), channels: await listSiteChannels(client) };
 }
 

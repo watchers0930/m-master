@@ -15,7 +15,7 @@ const FIXED_FAIL: Readonly<Record<string, string>> = {
   guard_locked: '오늘 하루 상한으로 감시가 멈춘 항목입니다. 내일 0시(KST)에 자동으로 다시 켜집니다.',
   ads_paused: '광고 실행이 비상 정지 상태입니다. 끄기와 조회만 할 수 있습니다.',
   ads_not_connected: '연결되지 않았거나 키가 무효인 광고 계정입니다. 계정 화면에서 키를 확인하세요.',
-  ads_account_not_ready: '광고 계정이 활성 상태이고 공유예산·비즈채널이 있어야 적용할 수 있습니다.',
+  ads_account_not_ready: '광고 계정이 활성 상태이고 비즈채널이 선택돼 있어야 적용할 수 있습니다.',
   target_adgroup_deleted: '확장할 광고그룹이 네이버에서 삭제됐습니다. 새 제안으로 진행하세요.',
   target_adgroup_missing: '확장할 광고그룹을 MINTEQ 기록에서 찾지 못했습니다.',
   internal_error: '처리 중 알 수 없는 오류로 멈췄습니다. 네이버 화면에서 생성된 항목이 있는지 확인하세요.',

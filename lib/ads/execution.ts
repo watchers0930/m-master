@@ -2,7 +2,8 @@
 // 감시(Task 11)의 모든 네이버 변이는 여기 함수로만 보낸다.
 // - 스위치: process.env.ADS_EXECUTION_ENABLED === 'true'일 때만 생성·켜기를 보낸다(fail-closed, 503 ads_paused).
 //   요청당 1번이 아니라 변이마다 보내기 직전에 읽는다 — 적용 도중 꺼지면 그 뒤 쓰기는 하나도 나가지 않는다.
-// - 끄기(userLock=true)는 스위치·계정 상태와 무관하게 허용한다(안전 방향). 공유예산 mq-cap 생성도 스위치와 무관(shared-budget.ts).
+// - 끄기(userLock=true)는 스위치·계정 상태와 무관하게 허용한다(안전 방향). 공유예산 mq-cap 생성·붙이기는 적용 안에서 하므로 스위치를 따른다
+//   (핫픽스 2026-11-11: 연결 시 생성 면제는 없어졌다 — createEntity·updateEntity).
 // - 생성·켜기는 보내기 직전에 계정 행을 다시 읽어 status==='active'를 요구한다(아니면 ads_not_connected) — 해제(disconnect)와의 경합 창을 닫는다.
 // - 원장 행의 ownerId·adAccountId는 계정 행에서 온다(입력값 금지). 모든 본문은 requests.ts 빌더로 만든다.
 import type { z } from "zod";
@@ -48,6 +49,14 @@ export async function createEntity<S extends z.ZodTypeAny>(
 ): Promise<z.infer<S>> {
   await assertWritable(account);
   return sendMutation(client, account, op, schema, idOf);
+}
+
+/** 켜기·끄기 외의 수정 PUT(1회, 예: 공유예산 붙이기 ?fields=sharedBudget). 스위치·계정 상태를 이 순간 확인한 뒤 원장을 거쳐 보낸다. */
+export async function updateEntity<S extends z.ZodTypeAny>(
+  client: NaverAdsClient, account: MutationAccount, op: Mutation & { method: "PUT" }, schema: S,
+): Promise<z.infer<S>> {
+  await assertWritable(account);
+  return sendMutation(client, account, op, schema);
 }
 
 export type LockWrite = { step: string; proposalId?: string; reason?: ResumeReason };

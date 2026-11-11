@@ -1,7 +1,8 @@
 // lib/ads/apply.ts — 승인된 제안을 네이버에 적용한다(설계서 §5.5-6). 단계 구현은 apply-steps.ts, 대조 조회는 reconcile.ts.
 // 상태 전이: approved | apply_failed → applying → applied | apply_failed. 그 밖은 409 invalid_transition.
-// 점유(claim, 트랜잭션 하나): SELECT … FOR UPDATE(id AND owner_id) → 재조회 → 전이 검사 → 계정 준비·상한·입찰·린트 재검증(설계서 §5.4-3:
+// 점유(claim, 트랜잭션 하나): SELECT … FOR UPDATE(id AND owner_id) → 재조회 → 전이 검사 → 계정 행 FOR UPDATE → 계정 준비·상한·입찰·린트 재검증(설계서 §5.4-3:
 //   승인 때 검사를 믿지 않는다) → extend_group 대상 그룹 소유 확인 → updateMany(id, ownerId, status, updatedAt) count=1 → applying.
+//   공유예산 없는 계정의 new_campaign은 같은 계정에 살아 있는 applying이 있으면 409 apply_in_progress(mq-cap 생성 단일화, 핫픽스 2026-11-11).
 //   updatedAt = 점유 토큰. 단계마다 토큰을 갱신(heartbeat, 같은 조건부 updateMany)하고, 토큰을 잃으면(다른 실행이 회수) 즉시 멈춘다.
 // 멈춘 applying(프로세스 사망) 회수: 토큰이 STALE_APPLY_MS(10분)보다 오래됐으면 새 적용이 점유한다(Task 5 해제와 같은 방식).
 //   근거: 단계 1개 = POST 1회 + GET 몇 회(각 시도 25초·전체 45초 상한)라 정상 실행은 단계마다 토큰을 몇 분 안에 갱신한다.
@@ -17,6 +18,7 @@ import { isEntityId } from "@/schemas/id";
 import type { AdApplyResultDTO, ProposalPayload } from "@/types/ads";
 import { assertAdsOwner } from "./access";
 import { notFound, withAccountClient, type AdsDeps } from "./account-core";
+import { ATTACH_STEP } from "./apply-budget";
 import { ApplyFailure, failCodeOf } from "./apply-errors";
 import { checkTarget, retryPendingPauses, targetIsPaused } from "./apply-inspect";
 import { stepAd, stepAdgroup, stepCampaign, stepKeyword, type ApplyCtx, type PriorOp } from "./apply-steps";
@@ -35,13 +37,13 @@ export type ApplyResult = AdApplyResultDTO; // 응답 DTO(types/ads.ts) — 화�
 
 const conflict = (code: "apply_in_progress" | "apply_conflict") =>
   new AdsHttpError(code, code === "apply_in_progress" ? "이미 적용이 진행 중입니다. 잠시 후 결과를 확인하세요." : "다른 곳에서 제안 상태가 바뀌었습니다. 최신 상태를 확인하세요.", 409);
-const notReady = () => new AdsHttpError("ads_account_not_ready", "광고 계정이 활성 상태이고 공유예산·비즈채널이 있어야 적용할 수 있습니다.", 409);
+const notReady = () => new AdsHttpError("ads_account_not_ready", "광고 계정이 활성 상태이고 비즈채널이 선택돼 있어야 적용할 수 있습니다.", 409);
 class LostClaim extends Error {}
 const nextToken = (previous: Date, now: () => Date) => new Date(Math.max(now().getTime(), previous.getTime() + 1));
 
 /** 승인 때와 같은 규칙을 현재 계정 상한으로 다시 검사한다(입찰 범위 → 422 ads_invariant, 남은 린트 → 409). */
 function recheck(row: AdProposal, account: AdAccount): void {
-  if (account.status !== "active" || !account.sharedBudgetId || !account.businessChannelId) throw notReady();
+  if (account.status !== "active" || !account.businessChannelId) throw notReady(); // 공유예산은 첫 적용이 만든다(apply-budget.ts)
   const payload = payloadOf(row);
   const checked = checkPayload(payload, { kind: kindOf(row), caps: caps(account), stats: sourceKeywordsOf(row), source: "edit" });
   const problem = checked.problems[0];
@@ -59,9 +61,15 @@ async function claim(ownerId: string, id: string, now: () => Date, deps: ApplyDe
     const stale = row.status === "applying" && row.updatedAt.getTime() < now().getTime() - STALE_APPLY_MS;
     if (row.status === "applying" && !stale) throw conflict("apply_in_progress");
     if (!stale && row.status !== "approved" && row.status !== "apply_failed") proposalConflict("invalid_transition");
+    // 계정 행도 잠근다(제안 → 계정 순서 고정). 공유예산 없는 계정의 new_campaign은 한 번에 하나만 — 두 적용이 mq-cap을 둘 만들지 않게
+    await tx.$queryRaw`SELECT id FROM ad_accounts WHERE id = ${row.adAccountId} AND owner_id = ${ownerId} FOR UPDATE`;
     const account = await tx.adAccount.findFirst({ where: { id: row.adAccountId, ownerId } });
     if (!account) throw notFound();
     recheck(row, account);
+    if (!account.sharedBudgetId && kindOf(row) === "new_campaign") {
+      const live = { gte: new Date(now().getTime() - STALE_APPLY_MS) };
+      if (await tx.adProposal.count({ where: { ownerId, adAccountId: account.id, status: "applying", updatedAt: live, NOT: { id } } })) throw conflict("apply_in_progress");
+    }
     if (kindOf(row) === "extend_group") {
       const target = row.targetAdgroupId
         ? await tx.adGroup.findFirst({ where: { ownerId, adAccountId: account.id, naverId: row.targetAdgroupId }, select: { id: true } }) : null;
@@ -76,10 +84,10 @@ async function claim(ownerId: string, id: string, now: () => Date, deps: ApplyDe
   });
 }
 
-/** 이 제안이 보낸 생성 POST의 단계별 최신 원장 행(재개 판단용). 소재 step은 '<식별자>#<그룹 id>:<slot>' — 첫 시도의 slot을 복원한다. */
+/** 이 제안이 보낸 생성 POST(+ 공유예산 붙이기 PUT)의 단계별 최신 원장 행(재개 판단용). 소재 step은 '<식별자>#<그룹 id>:<slot>' — 첫 시도의 slot을 복원한다. */
 async function priorOps(proposalId: string): Promise<Map<string, PriorOp>> {
   const rows = await prisma.adOperationLog.findMany({
-    where: { proposalId, method: "POST" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { step: true, status: true, naverId: true, createdAt: true },
+    where: { proposalId, OR: [{ method: "POST" }, { method: "PUT", step: ATTACH_STEP }] }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { step: true, status: true, naverId: true, createdAt: true },
   });
   return new Map(rows.map((r) => {
     const [identity, reserved] = r.step.split("#");

@@ -42,6 +42,8 @@ function noticeOf(a: AdSafetyAlertDTO): SafetyNotice {
         ? { message: `하루 상한에 도달해 캠페인을 껐지만 ${a.pauseFailed}개는 끄지 못했습니다 — ${ACT_NOW}.`, urgent: true }
         : { message: '하루 상한에 도달해 켜진 캠페인을 모두 껐습니다. 내일 0시(KST)에 감시가 다시 켭니다.', urgent: false };
     case 'ads.drift':
+      if (a.reason === 'shared_budget_missing') // 핫픽스 2026-11-11: 첫 적용의 공유예산 생성·붙이기가 끝나지 않음
+        return { message: '하루 상한 공유예산(mq-cap)이 아직 없습니다 — 지금은 캠페인별 하루 예산만 상한입니다. 적용 실패 사유를 확인하고 다시 적용하세요(그 전에는 캠페인을 켤 수 없습니다).', urgent: true };
       return { message: `네이버 설정이 MINTEQ 기록과 다릅니다${where ? `(${where})` : ''}${a.field ? ` · 항목 ${a.field}` : ''}${a.paused ? ' — 켜져 있어 껐습니다' : ''}. 네이버 화면에서 설정을 확인하세요.`, urgent: false };
     case 'ads.inspect_denied':
       return { message: `광고 검수가 반려됐습니다${where ? `(${where})` : ''}. 문구를 고친 새 제안으로 진행하세요.`, urgent: false };

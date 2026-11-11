@@ -1,58 +1,72 @@
-// lib/ads/shared-budget.ts — 계정 공유예산 `mq-cap` 확인·생성(설계서 §5.4: 상한 4중 강제의 네이버 쪽 1층).
-// - 멱등: 먼저 목록에서 찾는다(DB의 sharedBudgetId 우선, 없으면 이름 mq-cap, DELETED 제외). 둘 이상이면 고르지 않고 중단.
-// - 생성은 buildSharedBudget 본문으로 1회만 POST. 결과가 불확실(5xx·형태 불일치)하면 재전송하지 않고 이름으로 재조회한다.
-// - 재사용·생성 모두 단건 재조회 + verifyStored('sharedBudget')를 통과해야 쓴다. 상한을 넘게 바뀐 기존 예산은 조용히 쓰지 않는다.
-// - 비상 정지 스위치(ADS_EXECUTION_ENABLED)와 무관: 공유예산은 지출 상한을 '세우는' 쓰기다. 캠페인이 없거나 모두 꺼진 상태에서
-//   상한만 만들 뿐 노출·과금을 켜지 않는다(끄기와 같은 안전 방향). 계획 Task 13 Step 6(스위치 off에서 mq-cap 생성 확인)과 일치.
+// lib/ads/shared-budget.ts — 계정 공유예산 `mq-cap` 조회·대조(설계서 §5.4: 상한 4중 강제의 네이버 쪽 1층).
+// 핫픽스(2026-11-11, 실호출 400/1002 — 대장 승인 설계 A): 네이버는 공유예산을 같은 유형 캠페인 1개 이상(campaignList)과 함께만 만든다(#834).
+// - 연결(accounts.ts)은 더 이상 만들지 않는다. 이미 있는 mq-cap(캠페인 유형)이 재조회 + verifyStored('sharedBudget')를 통과하면 그 id만 쓴다
+//   (reuseSharedBudget). 없으면 null로 연결이 끝나고, 첫 적용이 캠페인과 함께 만든다(apply-budget.ts).
+// - 찾기: DB의 sharedBudgetId 우선, 없으면 이름 mq-cap, DELETED 제외. 둘 이상이면 고르지 않는다(호출자가 멈춤).
+// - 상한을 넘게 바뀐 기존 예산은 조용히 쓰지 않는다(연결 409 shared_budget_unsafe, 적용은 drift).
+import { z } from "zod";
 import type { AdAccount } from "@prisma/client";
 import type { NaverAdsClient } from "@/lib/external/naver-searchad";
-import { NaverAdsError } from "@/lib/external/naver-searchad";
-import { naverSharedBudgetCreatedSchema, naverSharedBudgetListSchema } from "@/schemas/ads";
+import { prisma } from "@/lib/prisma";
+import { naverSharedBudgetListSchema } from "@/schemas/ads";
 import { AdsHttpError, unexpectedNaverResponse } from "./http";
-import { sendMutation } from "./oplog";
-import { SHARED_BUDGET_NAME, buildSharedBudget, verifyStored, type CapAccount } from "./requests";
+import { SHARED_BUDGET_NAME, verifyStored, type CapAccount } from "./requests";
 
 export type BudgetAccount = CapAccount & Pick<AdAccount, "id" | "ownerId">;
+export type BudgetRead = { ok: true; dailyBudget: number } | { ok: false; field: string };
 
-async function findExisting(client: NaverAdsClient, preferredId: string | null): Promise<string | null> {
+/** 살아 있는 후보 id: preferredId가 살아 있으면 그것 하나, 아니면 이름 mq-cap인 것 전부(0·1·여럿 — 고르기는 호출자). */
+export async function sharedBudgetCandidates(client: Pick<NaverAdsClient, "get">, preferredId: string | null): Promise<string[]> {
   const parsed = naverSharedBudgetListSchema.safeParse(await client.get("/ncc/shared-budgets"));
   if (!parsed.success) throw unexpectedNaverResponse();
   const live = parsed.data.filter((b) => b.status !== "DELETED");
-  if (preferredId && live.some((b) => b.sharedBudgetId === preferredId)) return preferredId;
-  const named = live.filter((b) => b.name === SHARED_BUDGET_NAME);
-  if (named.length > 1)
+  if (preferredId && live.some((b) => b.sharedBudgetId === preferredId)) return [preferredId];
+  return live.filter((b) => b.name === SHARED_BUDGET_NAME).map((b) => b.sharedBudgetId);
+}
+
+const amountSchema = z.object({ dailyBudget: z.number().int() });
+
+/** 단건 재조회 + verifyStored('sharedBudget'). 통과하면 저장된 하루 금액(≤ 상한)을 돌려준다. */
+export async function readSharedBudget(client: Pick<NaverAdsClient, "get">, account: CapAccount, id: string): Promise<BudgetRead> {
+  const raw = await client.get(`/ncc/shared-budgets/${id}`);
+  const verdict = verifyStored("sharedBudget", { ...account, sharedBudgetId: id }, raw);
+  if (!verdict.ok) return verdict;
+  return { ok: true, dailyBudget: amountSchema.parse(raw).dailyBudget }; // verifyStored가 이미 정수·상한 이하를 확인했다
+}
+
+/** 연결: 이미 있는 mq-cap을 재사용(검증 통과한 것만). 없으면 null — 생성하지 않는다. DB 저장은 호출자가 한다. */
+export async function reuseSharedBudget(client: NaverAdsClient, account: BudgetAccount): Promise<string | null> {
+  const found = await sharedBudgetCandidates(client, account.sharedBudgetId);
+  if (found.length > 1)
     throw new AdsHttpError("shared_budget_ambiguous", `네이버에 '${SHARED_BUDGET_NAME}' 공유예산이 여러 개입니다. 하나만 남기고 다시 연결하세요.`, 409);
-  return named[0]?.sharedBudgetId ?? null;
-}
-
-async function create(client: NaverAdsClient, account: BudgetAccount): Promise<string> {
-  const body = buildSharedBudget({ ...account, sharedBudgetId: null });
-  try {
-    const created = await sendMutation(
-      client, account, { step: "shared_budget.create", method: "POST", path: "/ncc/shared-budgets", body },
-      naverSharedBudgetCreatedSchema, (r) => r.sharedBudgetId,
-    );
-    return created.sharedBudgetId;
-  } catch (error) {
-    if (!(error instanceof NaverAdsError) || error.reason !== "ads_uncertain") throw error;
-    // 반영 여부 불명: 재전송 금지, 이름으로 대조
-    const found = await findExisting(client, null);
-    if (found) return found;
-    throw new AdsHttpError(
-      "shared_budget_uncertain", "공유예산 생성 결과를 확인하지 못했습니다. 잠시 후 다시 연결하세요(중복 생성하지 않습니다).", 502,
-    );
-  }
-}
-
-/** 공유예산 id를 돌려준다(검증 통과한 것만). DB 저장은 호출자가 한다. */
-export async function ensureSharedBudget(client: NaverAdsClient, account: BudgetAccount): Promise<string> {
-  const id = (await findExisting(client, account.sharedBudgetId)) ?? (await create(client, account));
-  const stored = await client.get(`/ncc/shared-budgets/${id}`);
-  const verdict = verifyStored("sharedBudget", { ...account, sharedBudgetId: id }, stored);
+  const id = found[0];
+  if (!id) return null;
+  const verdict = await readSharedBudget(client, account, id);
   if (!verdict.ok)
     throw new AdsHttpError(
       "shared_budget_unsafe", "네이버 공유예산 설정이 MINTEQ 상한과 다릅니다. 네이버 화면에서 공유예산을 확인한 뒤 다시 연결하세요.", 409,
       { field: verdict.field },
     );
   return id;
+}
+
+// 계정 단위 '불확실한 생성' 원장 행(판정 round 1 I-1): 어느 제안·연결이 보냈든 결과를 모르는 POST /ncc/shared-budgets.
+// 이름 대조로 mq-cap을 찾아 계정에 저장하면 그 행들은 해소된 것으로 표시한다(status는 그대로, errorCode 'reconciled:<id>').
+const UNSURE_CREATE = { method: "POST", path: "/ncc/shared-budgets", status: { in: ["sent", "uncertain"] } };
+const RECONCILED = "reconciled:";
+
+/** 해소되지 않은 불확실 생성이 이 계정에 있는가 — 있으면 누구도 새로 만들지 않는다(재전송 금지). */
+export async function hasUnresolvedCreate(account: Pick<AdAccount, "id" | "ownerId">): Promise<boolean> {
+  const row = await prisma.adOperationLog.findFirst({
+    where: { adAccountId: account.id, ownerId: account.ownerId, ...UNSURE_CREATE, OR: [{ errorCode: null }, { NOT: { errorCode: { startsWith: RECONCILED } } }] },
+    select: { id: true },
+  });
+  return row !== null;
+}
+
+/** 검증한 mq-cap을 계정에 저장한 뒤 부른다: 그 전의 불확실 생성 행을 해소로 표시한다. */
+export async function markCreatesReconciled(account: Pick<AdAccount, "id" | "ownerId">, sharedBudgetId: string): Promise<void> {
+  await prisma.adOperationLog.updateMany({
+    where: { adAccountId: account.id, ownerId: account.ownerId, ...UNSURE_CREATE }, data: { errorCode: `${RECONCILED}${sharedBudgetId}` },
+  });
 }

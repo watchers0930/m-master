@@ -5,6 +5,8 @@
 // - 드리프트 = 상한 보장이 깨짐 → 그 캠페인이 켜져 있으면 guard로 끈다(알림만 하지 않는다). 꺼져 있으면 알림만(재개 차단은 clean 집합으로).
 //   공유예산이 어긋나면 모든 캠페인이 드리프트다. 형식 불일치(shape)도 드리프트로 본다(안전 방향).
 // - 조회 실패(네트워크·목록 불완전)는 '확인 못 함'이다: 끄지 않고, 알림하지 않고, clean에 넣지 않는다(→ 자동 재개 안 함).
+// - 공유예산 없음(핫픽스 2026-11-11 — 첫 적용이 캠페인과 함께 만든다): 캠페인은 붙이기 전 대조(campaignPreAttach — 자기 하루 예산 ≤ 상한)로 보고,
+//   미러 캠페인이 1개라도 있으면 ads.drift {reason:'shared_budget_missing'}(하루 1회, dedupeKey 같음). clean에 넣지 않는다(재개 없음). 캠페인이 없으면 알림 없음.
 // - 결과 clean = 이번 실행에서 공유예산·캠페인·모든 그룹이 검사를 통과한 캠페인 naverId. 자동 재개(guard-resume)는 여기 있는 것만 켠다.
 // - 알림 ads.drift: 엔티티마다 1건(dedupeKey naverId, 실행당 최대 10건): { at:'guard', entity, naverId, campaign, field, paused }.
 // - 마감(ctx.deadline)이 지나면 남은 캠페인은 '확인 못 함'(unchecked) — clean에 넣지 않으므로 재개되지 않는다.
@@ -24,15 +26,16 @@ import { verifyStored } from "./requests";
 export const SCAN_PAGE = 50;
 const MAX_ALERT_ITEMS = 10;
 const UNVERIFIED = Symbol("unverified");
+const MISSING = Symbol("missing"); // 계정에 공유예산 id가 없음(첫 적용이 만들기 전·만들다 실패) — 핫픽스 2026-11-11
 type DriftItem = { entity: string; naverId: string; campaign?: string; field: string; paused?: boolean };
 type CampaignCheck = { deleted: boolean; lit: boolean; known: boolean; item: DriftItem | null }; // known = 켜짐·꺼짐을 실제로 읽었다
 export type DriftScan = { clean: Set<string>; budgetOk: boolean };
 
 const groupRow = naverAdgroupSchema.passthrough(); // verifyStored가 원본 필드(aiAdsOptIn 등)를 다시 parse한다
 
-async function checkSharedBudget(ctx: GuardCtx): Promise<string | null | typeof UNVERIFIED> {
+async function checkSharedBudget(ctx: GuardCtx): Promise<string | null | typeof UNVERIFIED | typeof MISSING> {
   const id = ctx.account.sharedBudgetId;
-  if (!id) return "sharedBudgetId";
+  if (!id) return MISSING;
   let raw: unknown;
   try {
     raw = await ctx.client.get(`/ncc/shared-budgets/${id}`);
@@ -46,13 +49,14 @@ async function checkSharedBudget(ctx: GuardCtx): Promise<string | null | typeof 
 }
 
 /** 캠페인 + 모든 그룹을 새로 읽어 대조. 조회 실패는 던진다(호출자가 '확인 못 함'으로 처리). */
-async function checkCampaign(ctx: GuardCtx, naverId: string): Promise<CampaignCheck> {
+async function checkCampaign(ctx: GuardCtx, naverId: string, unbudgeted: boolean): Promise<CampaignCheck> {
   const raw = await readEntity(ctx.client, "campaign", naverId);
   const parsed = naverCampaignSchema.safeParse(raw);
   if (parsed.success && parsed.data.status === "DELETED") return { deleted: true, lit: false, known: true, item: null };
   const lit = parsed.success ? !isCampaignOff(parsed.data) : true; // 모르면 켜진 쪽으로 끈다(끄기는 무해) — 단 guard 표시는 안 한다(판정 I-1)
   const known = parsed.success;
-  const verdict = verifyStored("campaign", ctx.account, raw);
+  // 공유예산이 없는 계정: 캠페인 자기 하루 예산이 상한이다(붙이기 전 대조). 다른 공유예산에 붙어 있으면 드리프트.
+  const verdict = verifyStored(unbudgeted ? "campaignPreAttach" : "campaign", ctx.account, raw);
   if (!verdict.ok) return { deleted: false, lit, known, item: { entity: "campaign", naverId, campaign: naverId, field: verdict.field } };
   const groups = await listAll(ctx.client, "/ncc/adgroups", { nccCampaignId: naverId }, groupRow, (g) => g.nccAdgroupId, "guard.drift");
   for (const g of groups) {
@@ -99,19 +103,20 @@ export async function scanDrift(ctx: GuardCtx): Promise<DriftScan> {
   const clean = new Set<string>();
   const budget = await checkSharedBudget(ctx);
   if (typeof budget === "string") items.push({ entity: "sharedBudget", naverId: ctx.account.sharedBudgetId ?? "", field: budget });
+  const missing = budget === MISSING;
   const tally = { remaining: 0 };
-  let covered = 0;
+  let covered = 0, deleted = 0;
   for await (const row of eligibleRows(ctx, await liveCampaignIds(ctx), tally)) {
     covered++;
     let check: CampaignCheck;
     try {
-      check = await checkCampaign(ctx, row.naverId);
+      check = await checkCampaign(ctx, row.naverId, missing);
     } catch (error) {
       if (isAuthError(error)) throw error;
       console.error("[ads] guard drift check unverified", { accountId: ctx.account.id, error: errorName(error) });
       continue; // 확인 못 함: 끄지 않고 clean에도 넣지 않는다
     }
-    if (check.deleted) continue;
+    if (check.deleted) { deleted++; continue; }
     const item = check.item ?? (typeof budget === "string" ? { entity: "campaign", naverId: row.naverId, campaign: row.naverId, field: "sharedBudget" } : null);
     if (item === null) {
       if (budget === null) clean.add(row.naverId);
@@ -124,6 +129,9 @@ export async function scanDrift(ctx: GuardCtx): Promise<DriftScan> {
     ctx.result.unchecked += tally.remaining;
     await guardBlind(ctx, "scan_truncated", { covered, total: covered + tally.remaining });
   }
+  // 캠페인이 있는데 공유예산이 없다 = 네이버 쪽 계정 상한(1층)이 없음. 캠페인 하루 예산만 상한 → 알림(하루 1회). 캠페인이 없으면 정상(알림 없음).
+  // 확인 못 한 캠페인도 '있는' 것이다(목록에 있는 미러). 공유예산 없는 계정의 캠페인은 clean이 아니므로 자동 재개되지 않는다.
+  if (missing && covered - deleted + tally.remaining > 0) await guardAlert(ctx, "ads.drift", { at: "guard", reason: "shared_budget_missing" }, "shared_budget_missing");
   ctx.result.drift = items.length;
   // 엔티티마다 1건(dedupeKey = naverId, 판정 I-3). 같은 엔티티의 같은 날 반복은 1회. 한 실행의 알림 행 수는 MAX_ALERT_ITEMS로 제한.
   for (const item of items.slice(0, MAX_ALERT_ITEMS)) await guardAlert(ctx, "ads.drift", { at: "guard", ...item }, item.naverId);

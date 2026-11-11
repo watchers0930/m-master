@@ -11,7 +11,7 @@ import { queueAlert, type AlertPayload } from "./alerts";
 import { ApplyFailure } from "./apply-errors";
 import { ENTITY_SCHEMAS, pauseAndConfirm, readEntity, type EntityOf } from "./execution";
 import { unexpectedNaverResponse } from "./http";
-import { verifyStored, type LockKind } from "./requests";
+import { verifyStored, type LockKind, type StoredKind } from "./requests";
 
 export type InspectCtx = { client: NaverAdsClient; account: AdAccount; proposalId: string; step: string };
 export type Observed = { userLock: boolean; inspectStatus: string | null; drift: string | null; pauseFailed: boolean };
@@ -24,18 +24,29 @@ async function alert(ctx: InspectCtx, payload: AlertPayload, type: "ads.drift" |
   }
 }
 
+/** 반영 여부를 끝내 확인하지 못한 단계: 다시 보내지 않고 멈춘다. 대장이 네이버 화면에서 확인하도록 알린다(같은 날 1회). */
+export async function uncertainStop(ctx: Pick<InspectCtx, "account" | "proposalId">, step: string): Promise<never> {
+  try {
+    await queueAlert(ctx.account.id, "ads.drift", { reason: "uncertain", proposalId: ctx.proposalId, step }, { dedupeKey: `${ctx.proposalId}:${step}` }); // 엔티티 id가 아직 없다 → 단계별
+  } catch (error) {
+    console.error("[ads] uncertain alert queue failed", { type: error instanceof Error ? error.name : "unknown" });
+  }
+  throw new ApplyFailure(`uncertain:${step}`);
+}
+
 export async function readParsed<K extends LockKind>(client: Pick<NaverAdsClient, "get">, kind: K, naverId: string) {
   const raw = await readEntity(client, kind, naverId);
   const parsed = ENTITY_SCHEMAS[kind].safeParse(raw);
   return { raw, entity: parsed.success ? (parsed.data as EntityOf<K>) : null };
 }
 
-export async function inspect<K extends LockKind>(ctx: InspectCtx, kind: K, naverId: string): Promise<Observed> {
+/** stored: 상한 대조 종류(기본 = kind). 캠페인 생성 직후·공유예산 붙이기 전만 campaignPreAttach. */
+export async function inspect<K extends LockKind>(ctx: InspectCtx, kind: K, naverId: string, stored?: StoredKind): Promise<Observed> {
   const first = await readParsed(ctx.client, kind, naverId);
   let entity = first.entity;
   const verdict = entity === null ? { ok: false as const, field: "shape" }
     : kind === "ad" ? ((entity as EntityOf<"ad">).type === "TEXT_45" ? { ok: true as const } : { ok: false as const, field: "type" })
-      : verifyStored(kind as Exclude<LockKind, "ad">, ctx.account, first.raw);
+      : verifyStored(stored ?? (kind as Exclude<LockKind, "ad">), ctx.account, first.raw);
   const field = verdict.ok ? null : verdict.field;
   if (field !== null || entity?.userLock !== true) {
     let confirmed = false, after: EntityOf<K> | null = null;
@@ -58,13 +69,14 @@ export async function inspect<K extends LockKind>(ctx: InspectCtx, kind: K, nave
 const inspectOf = (e: unknown) => ((e as { inspectStatus?: string | null } | null)?.inspectStatus ?? null);
 
 /** 미러를 기록한 뒤 부른다. 끄기 실패가 드리프트보다 먼저다(켜진 엔티티가 남아 있다). */
-export async function stopIfUnsafe(ctx: InspectCtx, kind: LockKind, naverId: string, o: Observed): Promise<void> {
+/** detail: 알림에 덧붙일 내부 값(예: 공유예산 판정 사유). 키·본문은 넣지 않는다. */
+export async function stopIfUnsafe(ctx: InspectCtx, kind: LockKind, naverId: string, o: Observed, detail: AlertPayload = {}): Promise<void> {
   if (o.pauseFailed) {
-    await alert(ctx, { reason: "pause_failed", entity: kind, naverId, ...(o.drift ? { field: o.drift } : {}) }, "ads.pause_failed");
+    await alert(ctx, { reason: "pause_failed", entity: kind, naverId, ...(o.drift ? { field: o.drift } : {}), ...detail }, "ads.pause_failed");
     throw new ApplyFailure(`pause_failed:${ctx.step}`);
   }
   if (o.drift !== null) {
-    await alert(ctx, { entity: kind, naverId, field: o.drift });
+    await alert(ctx, { entity: kind, naverId, field: o.drift, ...detail });
     throw new ApplyFailure(`drift:${o.drift}`);
   }
 }

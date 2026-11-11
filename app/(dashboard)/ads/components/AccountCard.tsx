@@ -67,7 +67,7 @@ export function AccountCard({ account }: { account: AdAccountDTO }) {
     <Card title={`${account.label} · ${account.naverCustomerId}`} right={<span style={{ fontSize: 12, fontWeight: 700, color: account.connected && account.status === 'active' ? 'var(--green-700)' : 'var(--amber-700)' }}>{accountStatusText(account)}</span>}>
       <div style={subText}>
         하루 상한 {formatKrw(account.dailyCapKrw)} · 공유예산 {formatKrw(account.sharedBudgetKrw)} · 입찰 상한 {formatKrw(account.maxBidKrw)} ·
-        공유예산 {account.sharedBudgetId ? '연결됨' : '없음'} · 비즈채널 {account.businessChannelId ?? '선택 전'}
+        공유예산 {account.sharedBudgetId ? '연결됨' : '첫 적용 때 생성'} · 비즈채널 {account.businessChannelId ?? '선택 전'}
       </div>
       {leaving && !disconnect.isPending && <Notice view={leaving} tone="warn" />}
       {account.disconnectStuck && (

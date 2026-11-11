@@ -12,7 +12,7 @@ import { useOwnedDomains } from '@/hooks/useOwnedDomains';
 import type { AdAccountDTO, AdProposalKind } from '@/types/ads';
 import { Card, Notice, info, inputStyle, labelStyle, subText } from './ui';
 
-const ready = (a: AdAccountDTO) => a.connected && a.status === 'active' && !!a.businessChannelId && !!a.sharedBudgetId;
+const ready = (a: AdAccountDTO) => a.connected && a.status === 'active' && !!a.businessChannelId; // 공유예산은 첫 적용이 만든다
 
 export function ProposalCreateForm({ account }: { account: AdAccountDTO }) {
   const router = useRouter();
