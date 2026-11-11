@@ -7,7 +7,7 @@ import type { AdAccount } from "@prisma/client";
 
 export const MIN_BID_KRW = 70;
 export const MAX_BID_KRW = 100000; // 네이버 bidAmt 상한(키워드·그룹)
-export const DAILY_CAP_CEILING_KRW = 100000; // [대장 결정] 하루 10만 원(VAT 별도). 계정 값이 이보다 커도 거부
+export const DAILY_CAP_CEILING_KRW = 10000; // [대장 결정 2026-11-11] 하루 1만 원(VAT 별도). 계정 값이 이보다 커도 거부(잘라 쓰지 않음)
 export const NEUTRAL_BID_WEIGHT = 100; // 실효 입찰 = bidAmt × weight/100 ≤ maxBid 를 지키는 값
 
 export type CapAccount = Pick<
@@ -63,7 +63,8 @@ export function caps(account: unknown): Caps {
   const { dailyCapKrw, sharedBudgetKrw, maxBidKrw } = account;
   if (!isPosInt(dailyCapKrw) || dailyCapKrw > DAILY_CAP_CEILING_KRW) fail("dailyCapKrw");
   if (!isPosInt(sharedBudgetKrw)) fail("sharedBudgetKrw");
-  if (!isPosInt(maxBidKrw) || maxBidKrw < MIN_BID_KRW || maxBidKrw > MAX_BID_KRW) fail("maxBidKrw");
+  // 입찰 상한이 하루 상한보다 클 수 없다(클릭 1번이 하루 상한을 넘기지 않게)
+  if (!isPosInt(maxBidKrw) || maxBidKrw < MIN_BID_KRW || maxBidKrw > MAX_BID_KRW || maxBidKrw > dailyCapKrw) fail("maxBidKrw");
   return { dailyCapKrw, budget: Math.min(sharedBudgetKrw, dailyCapKrw), maxBid: maxBidKrw };
 }
 

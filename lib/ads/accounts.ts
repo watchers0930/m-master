@@ -18,6 +18,7 @@ import {
   accountDTO, listAccountDTOs, listCampaigns, loadOwnedAccount, notConnected, withAccountClient, type AdsDeps,
 } from "./account-core";
 import { AdsHttpError, unexpectedNaverResponse } from "./http";
+import { DAILY_CAP_CEILING_KRW } from "./invariants";
 import { reuseSharedBudget } from "./shared-budget";
 
 export { markInvalidKey, type AdsDeps } from "./account-core";
@@ -75,7 +76,11 @@ export async function connectAccount(ownerId: string, input: AdsConnectInput, de
   const data = adsConnectSchema.parse(input);
   const client = await verifyNewKeys(data.customerId, data, deps);
   const sealed = await sealKeys(ownerId, data.customerId, data);
-  const verified = { ...sealed, status: "active", disconnectFromStatus: null, lastVerifiedAt: new Date(), label: data.label };
+  // 상한은 코드 상수로 명시한다(DB 기본값 100000에 기대지 않음 — 대장 결정 2026-11-11 하루 1만 원). 재연결(update)도 같은 값으로 덮는다
+  const verified = {
+    ...sealed, status: "active", disconnectFromStatus: null, lastVerifiedAt: new Date(), label: data.label,
+    dailyCapKrw: DAILY_CAP_CEILING_KRW, sharedBudgetKrw: DAILY_CAP_CEILING_KRW,
+  };
   const row = await prisma.adAccount.upsert({
     where: { ownerId_naverCustomerId: { ownerId, naverCustomerId: data.customerId } },
     create: { ownerId, naverCustomerId: data.customerId, ...verified },
