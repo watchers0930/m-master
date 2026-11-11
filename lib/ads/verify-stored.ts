@@ -7,7 +7,8 @@ import {
   type Caps, type CapAccount, type CreateKind,
 } from "./invariants";
 
-export type StoredKind = Exclude<CreateKind, "ad">;
+// campaignPreAttach = 공유예산에 붙이기 전 캠페인(첫 적용 생성 직후). 붙인 뒤·켜기·감시는 campaign(연결 필수)으로만 대조한다.
+export type StoredKind = Exclude<CreateKind, "ad"> | "campaignPreAttach";
 export type VerifyResult = { ok: true } | { ok: false; field: string };
 
 const int = z.number().int();
@@ -15,6 +16,13 @@ const STORED_SCHEMAS = {
   // 공유예산 해제 시 네이버는 sharedBudgetId·sharedDailyBudget을 null로 준다 → 원인 필드명으로 판정
   campaign: z.object({
     sharedBudgetId: z.string().nullable(),
+    sharedDailyBudget: int.nullable().optional(),
+    useDailyBudget: z.boolean(),
+    dailyBudget: int,
+  }),
+  // 붙이기 전: 공유예산 필드는 없거나 null(미연결)이거나 계정의 공유예산이어야 한다. 상한은 캠페인 자기 하루 예산이 지킨다.
+  campaignPreAttach: z.object({
+    sharedBudgetId: z.string().nullable().optional(),
     sharedDailyBudget: int.nullable().optional(),
     useDailyBudget: z.boolean(),
     dailyBudget: int,
@@ -48,6 +56,13 @@ function checkCampaign(s: Parsed<"campaign">, a: CapAccount, c: Caps): void {
   checkDailyBudget(s.sharedDailyBudget, c, "sharedDailyBudget");
 }
 
+function checkPreAttach(s: Parsed<"campaignPreAttach">, a: CapAccount, c: Caps): void {
+  if (s.sharedBudgetId !== undefined && s.sharedBudgetId !== null && s.sharedBudgetId !== requireText(a.sharedBudgetId, "sharedBudgetId")) fail("sharedBudgetId");
+  if (s.useDailyBudget !== true) fail("useDailyBudget");
+  checkDailyBudget(s.dailyBudget, c);
+  if (s.sharedDailyBudget !== undefined && s.sharedDailyBudget !== null) checkDailyBudget(s.sharedDailyBudget, c, "sharedDailyBudget");
+}
+
 function checkAdgroup(s: Parsed<"adgroup">, c: Caps): void {
   if (s.aiAdsOptIn !== false) fail("aiAdsOptIn");
   if (s.useExpSearch !== false) fail("useExpSearch");
@@ -74,6 +89,10 @@ function checkStored(kind: StoredKind, a: CapAccount, c: Caps, stored: unknown):
     case "campaign": {
       const p = STORED_SCHEMAS.campaign.safeParse(stored);
       return p.success ? checkCampaign(p.data, a, c) : fail("shape");
+    }
+    case "campaignPreAttach": {
+      const p = STORED_SCHEMAS.campaignPreAttach.safeParse(stored);
+      return p.success ? checkPreAttach(p.data, a, c) : fail("shape");
     }
     case "adgroup": {
       const p = STORED_SCHEMAS.adgroup.safeParse(stored);

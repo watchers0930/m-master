@@ -1,5 +1,6 @@
 // lib/ads/invariants.ts — 상한 불변식 공용 검사(설계서 §5.4-2). 빌더(requests.ts)·적용(Task 6)·감시(Task 11)가 보내기 직전 모두 이걸 거친다.
 // - 생성 본문(sharedBudget·campaign·adgroup·keyword·ad)은 모든 안전 필드를 강제값과 대조한다. 생성은 항상 userLock=true.
+// - 공유예산은 첫 적용 때 캠페인과 함께 만든다(campaignList 1개, 핫픽스 2026-11-11). 그 뒤 캠페인은 sharedBudgetAttach 본문으로 붙인다.
 // - 끄기(pause)는 계정 상태와 무관하게 최소 본문 {id, userLock:true}만 본다 — 상한이 깨진 상태에서도 멈출 수 있어야 하므로.
 // - 켜기(resume)는 최소 본문 {id, userLock:false}만 통과. 누가 켤 수 있는지는 Task 11이 강제한다.
 import type { AdAccount } from "@prisma/client";
@@ -15,7 +16,8 @@ export type CapAccount = Pick<
 >;
 export type CreateKind = "sharedBudget" | "campaign" | "adgroup" | "keyword" | "ad";
 export type LockKind = "campaign" | "adgroup" | "keyword" | "ad";
-export type AdsRequestKind = CreateKind | "pause" | "resume";
+// sharedBudgetAttach = 기존 공유예산에 캠페인 붙이기(PUT /ncc/campaigns/{id}?fields=sharedBudget, #962 최소 본문)
+export type AdsRequestKind = CreateKind | "sharedBudgetAttach" | "pause" | "resume";
 
 export const LOCK_ID_FIELDS: Readonly<Record<LockKind, string>> = {
   campaign: "nccCampaignId",
@@ -24,9 +26,11 @@ export const LOCK_ID_FIELDS: Readonly<Record<LockKind, string>> = {
   ad: "nccAdId",
 };
 const ID_FIELD_SET = new Set(Object.values(LOCK_ID_FIELDS));
-const KINDS: readonly AdsRequestKind[] = ["sharedBudget", "campaign", "adgroup", "keyword", "ad", "pause", "resume"];
-// 공유예산에 다른 엔티티를 붙이는 숨김 필드(#hidden). 생성 본문에 있으면 거부.
-const SHARED_BUDGET_HIDDEN = ["adgroupList", "campaignList"] as const;
+const KINDS: readonly AdsRequestKind[] = ["sharedBudget", "sharedBudgetAttach", "campaign", "adgroup", "keyword", "ad", "pause", "resume"];
+export const SHARED_BUDGET_NAME = "mq-cap";
+// 공유예산 생성은 같은 유형 캠페인 1개 이상과 함께여야 한다(공식 답변 #834). campaignList 항목 = CampaignRequest의 이 4필드만(#828·#834).
+const CAMPAIGN_LIST_KEYS = ["nccCampaignId", "customerId", "name", "campaignTp"] as const;
+const ATTACH_KEYS = ["nccCampaignId", "customerId", "sharedBudgetId", "sharedDailyBudget", "sharedBudgetName"] as const;
 
 export class AdsInvariantError extends Error {
   readonly field: string;
@@ -109,6 +113,38 @@ function assertLockBody(body: Obj, userLock: boolean): void {
   if (ids === 0) fail("id");
 }
 
+function onlyKeys(body: Obj, allowed: readonly string[], prefix = ""): void {
+  for (const key of Object.keys(body)) if (!allowed.includes(key)) fail(`${prefix}${key}`);
+}
+
+// 생성 본문: ownerType CAMPAIGN · 빠른 소진(ADGROUP이면 이것만 허용, #962) · 우리 캠페인 정확히 1개 · 그룹 목록 금지
+function assertSharedBudget(body: Obj, a: CapAccount, c: Caps): void {
+  const customerId = customerIdOf(a);
+  if (body.customerId !== customerId) fail("customerId");
+  if (body.ownerType !== "CAMPAIGN") fail("ownerType");
+  if (body.deliveryMethod !== "ACCELERATED") fail("deliveryMethod");
+  if ("adgroupList" in body) fail("adgroupList");
+  const list = body.campaignList;
+  if (!Array.isArray(list) || list.length !== 1 || !isObj(list[0])) fail("campaignList");
+  const item = list[0];
+  onlyKeys(item, CAMPAIGN_LIST_KEYS, "campaignList.");
+  requireText(item.nccCampaignId, "campaignList.nccCampaignId");
+  requireText(item.name, "campaignList.name");
+  if (item.customerId !== customerId) fail("campaignList.customerId"); // 빠지면 네이버 3507(#834)
+  if (item.campaignTp !== "WEB_SITE") fail("campaignList.campaignTp");
+  checkDailyBudget(body.dailyBudget, c);
+}
+
+// 붙이기 본문: 정확히 5필드, 계정의 공유예산 id·이름, 금액은 상한 이하(호출자가 저장된 금액을 넘긴다)
+function assertAttach(body: Obj, a: CapAccount, c: Caps): void {
+  onlyKeys(body, ATTACH_KEYS);
+  requireText(body.nccCampaignId, "nccCampaignId");
+  if (body.customerId !== customerIdOf(a)) fail("customerId");
+  if (body.sharedBudgetId !== requireText(a.sharedBudgetId, "sharedBudgetId")) fail("sharedBudgetId");
+  if (body.sharedBudgetName !== SHARED_BUDGET_NAME) fail("sharedBudgetName");
+  checkDailyBudget(body.sharedDailyBudget, c, "sharedDailyBudget");
+}
+
 function assertAd(body: Obj): void {
   if (body.type !== "TEXT_45") fail("type");
   requireText(body.nccAdgroupId, "nccAdgroupId");
@@ -140,7 +176,7 @@ function assertAdgroup(body: Obj, a: CapAccount, c: Caps): void {
 
 /** 보내기 직전 본문 검사. 위반 시 AdsInvariantError(field). pause·resume·ad는 계정 상한과 무관하다(account 무시). */
 export function assertInvariants(kind: "ad" | "pause" | "resume", account: CapAccount | null, body: unknown): void;
-export function assertInvariants(kind: Exclude<CreateKind, "ad">, account: CapAccount, body: unknown): void;
+export function assertInvariants(kind: Exclude<CreateKind, "ad"> | "sharedBudgetAttach", account: CapAccount, body: unknown): void;
 export function assertInvariants(kind: AdsRequestKind, account: CapAccount | null, body: unknown): void {
   if (!KINDS.includes(kind)) fail("kind");
   if (kind === "pause" || kind === "resume" || kind === "ad") {
@@ -153,14 +189,13 @@ export function assertInvariants(kind: AdsRequestKind, account: CapAccount | nul
   const a = account as CapAccount;
   switch (kind) {
     case "sharedBudget":
-      if (body.customerId !== customerIdOf(a)) fail("customerId");
-      if (body.ownerType !== "CAMPAIGN") fail("ownerType");
-      for (const hidden of SHARED_BUDGET_HIDDEN) if (hidden in body) fail(hidden);
-      return checkDailyBudget(body.dailyBudget, c);
+      return assertSharedBudget(body, a, c);
+    case "sharedBudgetAttach":
+      return assertAttach(body, a, c);
     case "campaign":
       if (body.customerId !== customerIdOf(a)) fail("customerId");
       if (body.campaignTp !== "WEB_SITE") fail("campaignTp");
-      if (body.sharedBudgetId !== requireText(a.sharedBudgetId, "sharedBudgetId")) fail("sharedBudgetId");
+      if ("sharedBudgetId" in body) fail("sharedBudgetId"); // 생성은 공유예산 없이. 붙이기는 sharedBudgetAttach 한 경로뿐
       if (body.useDailyBudget !== true) fail("useDailyBudget");
       checkDailyBudget(body.dailyBudget, c);
       return checkCreateLock(body.userLock);

@@ -1,6 +1,6 @@
 // lib/ads/proposals.ts — AI 광고 제안 생성·조회(설계서 §5.5-3). 편집·승인·반려 상태기계는 proposal-review.ts.
 // - 모든 진입점: 허용목록(assertAdsOwner) + 세션 ownerId 범위. 남의 제안·계정·광고그룹 id는 404(IDOR).
-// - 생성 전제(설계서 §5.5-1 비즈채널): 계정이 active이고 비즈채널·공유예산이 있고 상한값이 유효해야 한다.
+// - 생성 전제(설계서 §5.5-1 비즈채널): 계정이 active이고 비즈채널이 있고 상한값이 유효해야 한다(공유예산은 첫 적용이 만든다 — 핫픽스 2026-11-11).
 //   아니면 409 ads_account_not_ready — 키워드 리서치·LLM 호출·비용 0.
 // - 월 예산 초과(isBudgetExceeded)면 429 budget_exceeded — 씨앗·리서치·LLM·비용 0. 별도 횟수 제한은 두지 않는다.
 // - 씨앗: domainId가 있으면 collectSeeds(수동 > SEO > 컨설팅 전략, 소유자·도메인 범위), 없으면 수동 씨앗만(정제 후 최대 25).
@@ -67,7 +67,7 @@ const notReady = () =>
   new AdsHttpError("ads_account_not_ready", "광고 계정이 연결·활성 상태이고 검수가 끝난 비즈채널이 선택돼 있어야 제안을 만들 수 있습니다.", 409);
 
 function readyCaps(account: Awaited<ReturnType<typeof loadOwnedAccount>>): Caps {
-  if (account.status !== "active" || !account.businessChannelId || !account.sharedBudgetId) throw notReady();
+  if (account.status !== "active" || !account.businessChannelId) throw notReady(); // 공유예산은 첫 적용이 캠페인과 함께 만든다(핫픽스 2026-11-11)
   try {
     return caps(account);
   } catch {

@@ -3,29 +3,31 @@
 // - 광고그룹은 입찰배수 100·컨텐츠 별도입찰 off·자동입찰 NONE도 명시한다(실효 입찰 ≤ maxBid).
 // - 호출자는 안전 필드를 약화할 수 없다: 강제값과 다른 값을 선언하면 AdsInvariantError(field). 일반 passthrough 없음.
 // - 캠페인 하루 예산도 공유예산과 별도로 항상 건다. 둘의 동시 적용 여부가 명세에 없어서(⚠️) 어느 쪽에도 의존하지 않기 위함.
+//   캠페인 생성 본문에는 sharedBudgetId가 없다(핫픽스 2026-11-11): 공유예산은 첫 캠페인과 함께 만들고(campaignList), 그 뒤 캠페인은 붙이기 본문으로 붙인다.
 // - 수정은 GET 응답을 통째로 되돌려 보내지 않는다. 끄기/켜기는 PUT ?fields=userLock + buildPause/buildResume 최소 본문.
 import {
-  LOCK_ID_FIELDS, NEUTRAL_BID_WEIGHT, assertInvariants, caps, checkBid, checkUrl, customerIdOf, fail, isObj, requireText,
-  type CapAccount, type LockKind, type Obj,
+  LOCK_ID_FIELDS, NEUTRAL_BID_WEIGHT, SHARED_BUDGET_NAME, assertInvariants, caps, checkBid, checkDailyBudget, checkUrl, customerIdOf, fail, isObj,
+  requireText, type CapAccount, type LockKind, type Obj,
 } from "./invariants";
 
 export {
-  AdsInvariantError, DAILY_CAP_CEILING_KRW, LOCK_ID_FIELDS, MAX_BID_KRW, MIN_BID_KRW, NEUTRAL_BID_WEIGHT, assertInvariants,
+  AdsInvariantError, DAILY_CAP_CEILING_KRW, LOCK_ID_FIELDS, MAX_BID_KRW, MIN_BID_KRW, NEUTRAL_BID_WEIGHT, SHARED_BUDGET_NAME, assertInvariants,
   type AdsRequestKind, type CapAccount, type CreateKind, type LockKind,
 } from "./invariants";
 export { verifyStored, type StoredKind, type VerifyResult } from "./verify-stored";
-
-export const SHARED_BUDGET_NAME = "mq-cap";
 // 안전 필드를 '같은 값으로' 명시만 할 수 있다. 다른 값·알 수 없는 키는 예외.
 export type SafetyDeclaration = Readonly<Record<string, unknown>>;
 export type ResumeReason = "owner_approved" | "guard_auto_resume";
 const RESUME_REASONS: readonly string[] = ["owner_approved", "guard_auto_resume"];
 
-export type SharedBudgetBody = { customerId: number; name: string; ownerType: "CAMPAIGN"; dailyBudget: number };
-export type CampaignBody = {
-  customerId: number; name: string; campaignTp: "WEB_SITE"; sharedBudgetId: string;
-  useDailyBudget: true; dailyBudget: number; userLock: true;
+export type SharedBudgetCampaign = { nccCampaignId: string; customerId: number; name: string; campaignTp: "WEB_SITE" };
+export type SharedBudgetBody = {
+  customerId: number; name: string; ownerType: "CAMPAIGN"; deliveryMethod: "ACCELERATED"; dailyBudget: number; campaignList: [SharedBudgetCampaign];
 };
+export type SharedBudgetAttachBody = {
+  nccCampaignId: string; customerId: number; sharedBudgetId: string; sharedDailyBudget: number; sharedBudgetName: string;
+};
+export type CampaignBody = { customerId: number; name: string; campaignTp: "WEB_SITE"; useDailyBudget: true; dailyBudget: number; userLock: true };
 export type AdgroupBody = {
   nccCampaignId: string; name: string; adgroupType: "WEB_SITE"; pcChannelId: string; mobileChannelId: string; bidAmt: number;
   pcNetworkBidWeight: 100; mobileNetworkBidWeight: 100; useCntsNetworkBidAmt: false; systemBiddingType: "NONE";
@@ -49,10 +51,31 @@ function declare(body: Obj, declared: SafetyDeclaration | undefined, allowed: re
   }
 }
 
-export function buildSharedBudget(account: CapAccount): SharedBudgetBody {
+/** 공유예산 mq-cap 생성 본문(POST /ncc/shared-budgets). 네이버는 같은 유형 캠페인 1개 이상과 deliveryMethod를 요구한다(#834·#962) — 첫 적용의 캠페인을 싣는다. */
+export function buildSharedBudget(account: CapAccount, campaign: { nccCampaignId: string; name: string }): SharedBudgetBody {
   const c = caps(account);
-  const body: SharedBudgetBody = { customerId: customerIdOf(account), name: SHARED_BUDGET_NAME, ownerType: "CAMPAIGN", dailyBudget: c.budget };
+  const customerId = customerIdOf(account);
+  if (!isObj(campaign)) fail("campaign");
+  const item: SharedBudgetCampaign = {
+    nccCampaignId: requireText(campaign.nccCampaignId, "nccCampaignId"), customerId, name: requireText(campaign.name, "name"), campaignTp: "WEB_SITE",
+  };
+  const body: SharedBudgetBody = {
+    customerId, name: SHARED_BUDGET_NAME, ownerType: "CAMPAIGN", deliveryMethod: "ACCELERATED", dailyBudget: c.budget, campaignList: [item],
+  };
   assertInvariants("sharedBudget", account, body);
+  return body;
+}
+
+/** 기존 공유예산(계정의 sharedBudgetId)에 캠페인 붙이기 본문(PUT /ncc/campaigns/{id}?fields=sharedBudget, #962 최소 본문).
+ *  금액은 재조회로 검증한 공유예산의 저장 금액(≤ 상한) — 대장이 낮춘 금액을 올리지 않는다. */
+export function buildSharedBudgetAttach(account: CapAccount, campaignId: string, sharedDailyBudget: number): SharedBudgetAttachBody {
+  const c = caps(account);
+  checkDailyBudget(sharedDailyBudget, c, "sharedDailyBudget");
+  const body: SharedBudgetAttachBody = {
+    nccCampaignId: requireText(campaignId, "nccCampaignId"), customerId: customerIdOf(account),
+    sharedBudgetId: requireText(account.sharedBudgetId, "sharedBudgetId"), sharedDailyBudget, sharedBudgetName: SHARED_BUDGET_NAME,
+  };
+  assertInvariants("sharedBudgetAttach", account, body);
   return body;
 }
 
@@ -62,12 +85,11 @@ export function buildCampaign(account: CapAccount, name: string, declared?: Safe
     customerId: customerIdOf(account),
     name: requireText(name, "name"),
     campaignTp: "WEB_SITE",
-    sharedBudgetId: requireText(account.sharedBudgetId, "sharedBudgetId"),
     useDailyBudget: true,
     dailyBudget: c.budget,
     userLock: true,
   };
-  declare(body, declared, ["sharedBudgetId", "useDailyBudget", "dailyBudget", "userLock"]);
+  declare(body, declared, ["useDailyBudget", "dailyBudget", "userLock"]);
   assertInvariants("campaign", account, body);
   return body;
 }

@@ -5,6 +5,7 @@
 //      0개면 다시 만들지 않는다(재전송 금지, 설계서 §5.3 — 어느 실행에서도, 시간이 지나도). uncertain:<step> + 알림 ads.drift(reason=uncertain).
 //   ④ 그 밖(원장 없음 = 보낸 적 없음, failed = 확정 거절)이면 POST 1회. 그 POST가 불확실하면 재전송하지 않고 목록 대조, 없으면 ③과 같이 멈춘다.
 // 대조·멈춤 규칙은 apply-inspect.ts(드리프트 → drift:<field>, 끄기 실패 → pause_failed:<step>). 멈추기 전에 미러를 먼저 남긴다.
+// 캠페인 단계는 생성·대조 뒤 공유예산 단계(apply-budget.ts: 첫 적용이면 캠페인과 함께 생성, 아니면 붙이기)를 거친다(핫픽스 2026-11-11).
 // 미러는 lockedBy='pending_launch', 관찰한 userLock으로 만든다. 이미 있으면 userLock·검수 상태만 갱신(lockedBy·lockVersion 무변경).
 // 소재 단계 식별자 = (proposalId, 그룹 인덱스, 소재 인덱스) → step 'ad:g{n}:c{i}', 미러 이름 mq-{id}-g{n}-c{i}(Task 9 판정 I-2).
 //   slot은 첫 시도에 정해 원장 step 접미사(#<그룹 id>:a{n})와 미러에 남긴다. 재개는 그 slot을 그대로 쓰고 현재 최대값으로 다시 계산하지 않는다.
@@ -14,9 +15,9 @@ import { NaverAdsError, type NaverAdsClient } from "@/lib/external/naver-searcha
 import { prisma } from "@/lib/prisma";
 import { NAVER_ID_RE, naverChannelSchema, naverKeywordCreatedSchema } from "@/schemas/ads";
 import type { ProposalCreative, ProposalKeyword } from "@/types/ads";
-import { queueAlert } from "./alerts";
 import { ApplyFailure } from "./apply-errors";
-import { inspect, stopIfUnsafe } from "./apply-inspect";
+import { stepSharedBudget } from "./apply-budget";
+import { inspect, stopIfUnsafe, uncertainStop } from "./apply-inspect";
 import { createEntity } from "./execution";
 import { unexpectedNaverResponse } from "./http";
 import { findAdgroups, findAds, findCampaigns, findKeywords } from "./reconcile";
@@ -33,16 +34,6 @@ async function adoptOne(e: Ensure): Promise<string | null> {
   const found = await e.find();
   if (found.length > 1) throw new ApplyFailure(`ambiguous:${e.step}`);
   return found[0] ?? null;
-}
-
-/** 반영 여부를 끝내 확인하지 못한 단계: 다시 보내지 않고 멈춘다. 대장이 네이버 화면에서 확인하도록 알린다(같은 날 1회). */
-async function uncertainStop(ctx: ApplyCtx, step: string): Promise<never> {
-  try {
-    await queueAlert(ctx.account.id, "ads.drift", { reason: "uncertain", proposalId: ctx.proposalId, step }, { dedupeKey: `${ctx.proposalId}:${step}` }); // 엔티티 id가 아직 없다 → 단계별
-  } catch (error) {
-    console.error("[ads] uncertain alert queue failed", { type: error instanceof Error ? error.name : "unknown" });
-  }
-  throw new ApplyFailure(`uncertain:${step}`);
 }
 
 async function ensureId(ctx: ApplyCtx, e: Ensure): Promise<string> {
@@ -76,9 +67,10 @@ export async function stepCampaign(ctx: ApplyCtx): Promise<string> {
     create: async () => (await createEntity(ctx.client, acct(ctx), { step: "campaign", method: "POST", path: "/ncc/campaigns", body: buildCampaign(ctx.account, name), proposalId: ctx.proposalId },
       idSchema("nccCampaignId"), (r) => String(r.nccCampaignId))).nccCampaignId as string,
   });
-  const o = await inspect(ctx, "campaign", id);
+  const o = await inspect(ctx, "campaign", id, "campaignPreAttach"); // 공유예산에 붙이기 전: 자기 하루 예산이 상한
   await prisma.adCampaign.upsert({ where: key(ctx, id), create: { ...base(ctx), naverId: id, name, userLock: o.userLock }, update: { userLock: o.userLock } });
   await stopIfUnsafe(ctx, "campaign", id, o);
+  await stepSharedBudget(ctx, id, name); // 공유예산 생성(첫 캠페인과 함께)·붙이기 → 연결 포함 재대조(apply-budget.ts)
   return id;
 }
 

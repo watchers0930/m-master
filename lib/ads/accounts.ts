@@ -18,7 +18,7 @@ import {
   accountDTO, listAccountDTOs, listCampaigns, loadOwnedAccount, notConnected, withAccountClient, type AdsDeps,
 } from "./account-core";
 import { AdsHttpError, unexpectedNaverResponse } from "./http";
-import { ensureSharedBudget } from "./shared-budget";
+import { reuseSharedBudget } from "./shared-budget";
 
 export { markInvalidKey, type AdsDeps } from "./account-core";
 export { disconnectAccount } from "./disconnect";
@@ -69,7 +69,7 @@ export async function listAccounts(ownerId: string): Promise<AdAccountDTO[]> {
   return listAccountDTOs(ownerId, MAX_ACCOUNTS);
 }
 
-/** 연결: 검증 → 봉인 저장(같은 고객ID면 같은 행 갱신·재활성) → 공유예산 mq-cap 확인·생성 → SITE 채널 목록. */
+/** 연결: 검증 → 봉인 저장(같은 고객ID면 같은 행 갱신·재활성) → 기존 공유예산 mq-cap 확인(만들지 않음 — 첫 적용이 캠페인과 함께 만든다) → SITE 채널 목록. */
 export async function connectAccount(ownerId: string, input: AdsConnectInput, deps: AdsDeps = {}): Promise<AdAccountWithChannels> {
   assertAdsOwner(ownerId);
   const data = adsConnectSchema.parse(input);
@@ -81,7 +81,7 @@ export async function connectAccount(ownerId: string, input: AdsConnectInput, de
     create: { ownerId, naverCustomerId: data.customerId, ...verified },
     update: verified,
   });
-  const sharedBudgetId = await ensureSharedBudget(client, row);
+  const sharedBudgetId = await reuseSharedBudget(client, row); // 없으면 null(핫픽스 2026-11-11: 네이버는 캠페인 없는 공유예산 생성을 거부한다)
   if (sharedBudgetId !== row.sharedBudgetId) await prisma.adAccount.updateMany({ where: { id: row.id, ownerId }, data: { sharedBudgetId } });
   return { account: await accountDTO(ownerId, row.id), channels: await listSiteChannels(client) };
 }

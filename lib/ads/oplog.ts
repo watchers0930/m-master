@@ -1,6 +1,6 @@
 // lib/ads/oplog.ts — 네이버 변이 원장(ad_operation_logs). 변이 1회 원칙을 추적한다(설계서 §5.3).
 // - 보내기 전에 'sent' 행을 먼저 쓴다(원장 기록 실패 시 보내지 않음 — fail-closed).
-// - 결과: ok | uncertain(5xx·타임아웃·성공 본문 형태 불일치) | failed(확정 거절). errorCode는 고정 사유만(키·본문 없음).
+// - 결과: ok | uncertain(5xx·타임아웃·성공 본문 형태 불일치) | failed(확정 거절). errorCode는 고정 사유 + 네이버 코드(정수)만 — '<사유>:<코드>'(키·본문 없음).
 // - 성공 본문은 호출자가 준 zod 스키마로 parse한다. 실패하면 쓰기가 반영됐는지 모르는 것이므로 uncertain으로 기록하고
 //   NaverAdsError('ads_uncertain')를 던진다 — 호출자는 재전송하지 말고 재조회로 대조한다.
 // - ownerId·adAccountId는 AdAccount 행에서 온다(입력값 금지).
@@ -36,7 +36,9 @@ export async function sendMutation<S extends z.ZodTypeAny>(
     raw = op.method === "POST" ? await client.post(op.path, op.body, op.query) : await client.put(op.path, op.body, op.query);
   } catch (error) {
     const reason = error instanceof NaverAdsError ? error.reason : "transport_error";
-    await finish(reason === "ads_uncertain" ? "uncertain" : "failed", { errorCode: reason });
+    // 네이버 오류 코드(정수)만 덧붙인다 — 본문·메시지는 남기지 않는다(실운영 2026-11-11: 'ads_rejected'만 남아 1002를 화면에서 읽어야 했다)
+    const code = error instanceof NaverAdsError && Number.isSafeInteger(error.naverCode) ? `:${error.naverCode}` : "";
+    await finish(reason === "ads_uncertain" ? "uncertain" : "failed", { errorCode: `${reason}${code}` });
     throw error;
   }
   const parsed = schema.safeParse(raw);
