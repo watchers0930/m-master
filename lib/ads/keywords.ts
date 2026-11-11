@@ -4,8 +4,9 @@
 //   그 밖({}·null·빈 본문·목록 아닌 값)은 빈 결과가 아니라 ads_unexpected_response(502)다.
 //   배치 하나라도 실패하면 그 NaverAdsError를 그대로 전파한다(부분 결과를 돌려주지 않는다 — 조용히 누락된 통계로 제안하지 않게).
 //   결과: 정규화 키워드로 중복 제거(먼저 본 것 유지) → 공백뿐·특수문자 키워드 제외(네이버 3906) → [relevantTo가 있으면] 수동 씨앗과
-//   관련 없는 키워드 제외(keyword-text.ts relevanceFilter — 검색량보다 관련도가 먼저) → (pcQc+mobileQc) 내림차순
-//   ("< 10"은 0으로 계산) → 키워드 코드단위 오름차순 → 상위 200. relevantTo가 없으면(도메인 풀 씨앗) 관련도 필터 없이 이전과 같다.
+//   관련 없는 키워드 제외(keyword-text.ts relevanceTier 0 — 검색량보다 관련도가 먼저) → 관련도 단계(씨앗 통째 포함 > 토큰 공유 > 한글 2글자) 내림차순
+//   → 단계 안에서 (pcQc+mobileQc) 내림차순("< 10"은 0으로 계산) → 키워드 코드단위 오름차순 → 상위 200.
+//   relevantTo가 없으면(도메인 풀 씨앗) 관련도 필터·단계 없이 이전과 같다.
 // - collectSeeds: 유효한 수동 씨앗이 1개라도 있으면 수동 씨앗만(권위 — 2026-11-11 실운영 제안이 SEO 풀의 'AI'로 빗나간 사고).
 //   수동 씨앗이 없을 때만 도메인 풀: SEO 키워드(seo_keywords, 검색량 내림차순) > 최신 '완료' 컨설팅 리포트의 전략 입력 키워드, 정제·중복 제거 후 최대 25개.
 //   모든 조회는 ownerId AND domainId로 범위를 건다(다른 소유자의 도메인 id면 저장 출처에서 0건). 수동 씨앗은 호출자 본인의 입력이라 그대로 쓴다.
@@ -18,7 +19,7 @@ import type { NaverAdsClient } from "@/lib/external/naver-searchad";
 import { naverKeywordToolSchema, type NaverKeywordRow } from "@/schemas/ads";
 import { unexpectedNaverResponse } from "./http";
 import {
-  collapseKeyword as collapse, isValidKeywordPhrase, isValidSeedText, keywordDedupeKey as dedupeKey, MAX_KEYWORD_LENGTH, relevanceFilter,
+  collapseKeyword as collapse, isValidKeywordPhrase, isValidSeedText, keywordDedupeKey as dedupeKey, MAX_KEYWORD_LENGTH, relevanceTier,
 } from "./keyword-text";
 
 export type KeywordStat = {
@@ -98,9 +99,9 @@ export type ResearchOptions = { /** 수동 씨앗 원문 — 있으면 이 씨�
 
 export async function researchKeywords(client: NaverAdsClient, seeds: readonly string[], options: ResearchOptions = {}): Promise<KeywordStat[]> {
   const hints = sanitizeSeeds(seeds).slice(0, MAX_SEEDS);
-  const relevant = options.relevantTo ? relevanceFilter(options.relevantTo) : () => true;
+  const tierOf = options.relevantTo ? relevanceTier(options.relevantTo) : () => 1;
   const seen = new Set<string>();
-  const stats: KeywordStat[] = [];
+  const stats: { stat: KeywordStat; tier: number }[] = [];
   for (let i = 0; i < hints.length; i += HINTS_PER_CALL) {
     const batch = hints.slice(i, i + HINTS_PER_CALL);
     const parsed = naverKeywordToolSchema.safeParse(await client.get("/keywordstool", { hintKeywords: batch.join(","), showDetail: 1 }));
@@ -109,10 +110,11 @@ export async function researchKeywords(client: NaverAdsClient, seeds: readonly s
       const stat = toStat(row);
       if (!stat || seen.has(dedupeKey(stat.keyword))) continue;
       seen.add(dedupeKey(stat.keyword));
-      if (relevant(stat.keyword)) stats.push(stat);
+      const tier = tierOf(stat.keyword);
+      if (tier > 0) stats.push({ stat, tier });
     }
   }
-  return stats.sort(byVolume).slice(0, MAX_RESULTS);
+  return stats.sort((a, b) => b.tier - a.tier || byVolume(a.stat, b.stat)).slice(0, MAX_RESULTS).map((s) => s.stat);
 }
 
 const strategyKeywordsSchema = z.array(z.object({ keyword: z.string() })).max(SEO_SEED_TAKE);
