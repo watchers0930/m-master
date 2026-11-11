@@ -1,5 +1,5 @@
 // schemas/ads-proposal.ts — AI 광고 제안 입력 검증(라우트 strict) + LLM 출력 형태(알 수 없는 필드는 버림).
-// - 형태만 본다. 입찰 범위(70 ≤ bid ≤ min(maxBid, 100000), 정수)는 lib/ads/invariants.ts checkBid 한 곳에서만 검사한다
+// - 형태만 본다. 입찰 범위(70 ≤ bid ≤ proposalBidCeiling, 정수)는 lib/ads/invariants.ts checkProposalBid(→checkBid) 한 곳에서만 검사한다
 //   (그래서 bidAmt는 여기서 unknown — 두 번째 입찰 검사를 만들지 않는다). 글자 수·표현은 린터(lib/ads/lint.ts) 몫이다.
 // - 개수: 그룹 ≤ 5, 그룹당 키워드 ≤ 20, 소재 ≤ 3. 종류별 하한(LLM 그룹 2~5·소재 2~3, extend_group 그룹 1)은 lib/ads/proposal-check.ts.
 import { z } from "zod";

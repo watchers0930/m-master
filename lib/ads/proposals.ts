@@ -3,7 +3,8 @@
 // - 생성 전제(설계서 §5.5-1 비즈채널): 계정이 active이고 비즈채널이 있고 상한값이 유효해야 한다(공유예산은 첫 적용이 만든다 — 핫픽스 2026-11-11).
 //   아니면 409 ads_account_not_ready — 키워드 리서치·LLM 호출·비용 0.
 // - 월 예산 초과(isBudgetExceeded)면 429 budget_exceeded — 씨앗·리서치·LLM·비용 0. 별도 횟수 제한은 두지 않는다.
-// - 씨앗: domainId가 있으면 collectSeeds(수동 > SEO > 컨설팅 전략, 소유자·도메인 범위), 없으면 수동 씨앗만(정제 후 최대 25).
+// - 씨앗: 유효한 수동 씨앗이 있으면 그것만(도메인이 있어도 SEO·전략 씨앗을 섞지 않는다) + 리서치 결과는 수동 씨앗과 관련 있는 것만
+//   (keywords.ts relevantTo). 수동 씨앗이 없고 domainId가 있으면 collectSeeds의 도메인 풀(SEO > 컨설팅 전략, 소유자·도메인 범위, 관련도 필터 없음).
 // - 제안 행의 ownerId는 계정 행에서 복사한다(입력에서 받지 않는다). 상태는 pending_review로 시작한다.
 // - DTO는 select로 필요한 컬럼만 읽는다. 계정 키·암호문은 어떤 경로로도 실리지 않는다.
 import type { Prisma } from "@prisma/client";
@@ -20,7 +21,7 @@ import { assertAdsOwner } from "./access";
 import { loadOwnedAccount, notFound, withAccountClient, type AdsDeps } from "./account-core";
 import { AdsHttpError } from "./http";
 import { caps, type Caps } from "./invariants";
-import { collectSeeds, MAX_SEEDS, researchKeywords, sanitizeSeeds } from "./keywords";
+import { collectSeeds, manualSeeds, researchKeywords } from "./keywords";
 import { generateProposal, type LlmClient } from "./propose";
 
 export type ProposalDeps = AdsDeps & { llm?: LlmClient };
@@ -99,12 +100,14 @@ export async function createProposal(ownerId: string, input: AdsProposalCreateIn
   // 월 예산(lib/cost/budget.ts, 콘텐츠 생성과 같은 기준·오류 형태) — 초과면 씨앗 수집·네이버 리서치·LLM 모두 하지 않는다
   if (await isBudgetExceeded(ownerId)) throw new AdsHttpError("budget_exceeded", "월 예산 한도 초과. 설정에서 한도를 조정하세요.", 429);
   const manual = data.seeds ?? [];
-  const seeds = data.domainId ? await collectSeeds(ownerId, data.domainId, manual) : sanitizeSeeds(manual).slice(0, MAX_SEEDS);
+  const seedSource = manualSeeds(manual).length > 0 ? "manual" : "domain";
+  const seeds = data.domainId ? await collectSeeds(ownerId, data.domainId, manual) : manualSeeds(manual);
   if (seeds.length === 0) throw new AdsHttpError("ads_no_seeds", "씨앗 키워드가 없습니다. 키워드를 입력하거나 도메인을 선택하세요.", 422);
   const llm = llmOf(deps);
-  const stats = await withAccountClient(account, deps, (client) => researchKeywords(client, seeds));
+  const research = seedSource === "manual" ? { relevantTo: manual } : {};
+  const stats = await withAccountClient(account, deps, (client) => researchKeywords(client, seeds, research));
   if (stats.length === 0) throw new AdsHttpError("ads_no_keywords", "키워드 도구가 쓸 수 있는 연관 키워드를 돌려주지 않았습니다. 씨앗을 바꿔 보세요.", 422);
-  const result = await generateProposal({ ownerId: account.ownerId, kind: data.kind, caps: accountCaps, seeds, stats }, llm);
+  const result = await generateProposal({ ownerId: account.ownerId, kind: data.kind, caps: accountCaps, seeds, seedSource, stats }, llm);
   const row = await prisma.adProposal.create({
     data: {
       ownerId: account.ownerId, adAccountId: account.id, kind: data.kind, targetAdgroupId: data.targetAdgroupId ?? null,
