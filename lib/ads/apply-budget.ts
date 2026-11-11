@@ -1,5 +1,7 @@
 // lib/ads/apply-budget.ts — 적용(new_campaign)의 공유예산 단계: 캠페인 생성·대조(apply-steps.stepCampaign) 직후에 부른다.
 // 핫픽스(2026-11-11 실호출 400/1002, 대장 승인 설계 A — 네이버 쪽 계정 상한 1층 유지):
+//   (판정 round 1 I-1) 생성 전 계정 단위로: 이름 mq-cap 대조(1개 + 검증 통과면 재사용 → 붙이기 PUT, 여럿·검증 실패면 drift:shared_budget + 알림),
+//   계정의 어떤 제안이든 생성 POST가 불확실(sent·uncertain)한 채 해소되지 않았으면 만들지 않는다(uncertain:shared_budget + 알림).
 //   b) 계정에 공유예산이 없으면 POST /ncc/shared-budgets(buildSharedBudget: 이 캠페인 1개를 campaignList로)로 만든다. 만들기 전에
 //      이름 mq-cap으로 찾고(다른 적용·이전 실행이 만든 것 재사용), 이 제안의 원장에 보낸 기록(sent·uncertain)이 있으면 재전송 없이 이름 대조만 한다
 //      — 없으면 uncertain:shared_budget. 찾은·만든 예산은 재조회 + verifyStored('sharedBudget') 통과 후에만 계정에 '아직 null일 때만' 저장한다.
@@ -14,31 +16,37 @@ import { NaverAdsError } from "@/lib/external/naver-searchad";
 import { prisma } from "@/lib/prisma";
 import { naverCampaignSchema, naverSharedBudgetCreatedSchema } from "@/schemas/ads";
 import { ApplyFailure } from "./apply-errors";
+import type { AlertPayload } from "./alerts";
 import { inspect, stopIfUnsafe, uncertainStop } from "./apply-inspect";
 import type { ApplyCtx } from "./apply-steps";
 import { createEntity, pauseAndConfirm, readEntity, updateEntity } from "./execution";
 import { unexpectedNaverResponse } from "./http";
 import { buildSharedBudget, buildSharedBudgetAttach } from "./requests";
-import { readSharedBudget, sharedBudgetCandidates } from "./shared-budget";
+import { hasUnresolvedCreate, markCreatesReconciled, readSharedBudget, sharedBudgetCandidates } from "./shared-budget";
 
 export const BUDGET_STEP = "shared_budget";
 export const ATTACH_STEP = "shared_budget.attach";
 const acct = (ctx: ApplyCtx) => ({ id: ctx.account.id, ownerId: ctx.account.ownerId });
 const linkSchema = z.object({ sharedBudgetId: z.string().nullable().optional() });
 
-async function adoptByName(ctx: ApplyCtx): Promise<string | null> {
+/** (a) 계정 단위 이름 대조(판정 round 1 I-1): mq-cap이 정확히 1개이고 verifyStored를 통과하면 그 id. 0개면 null.
+ *  둘 이상이거나 1개인데 상한과 다르면 고르지도 만들지도 않는다 → 캠페인 끄기 확인 + 알림 + drift:shared_budget. */
+async function reconcileByName(ctx: ApplyCtx, campaignId: string): Promise<string | null> {
   const found = await sharedBudgetCandidates(ctx.client, null);
-  if (found.length > 1) throw new ApplyFailure(`ambiguous:${BUDGET_STEP}`);
-  return found[0] ?? null;
+  if (found.length > 1) return budgetDrift(ctx, campaignId, BUDGET_STEP, { reason: "ambiguous", candidates: found.length });
+  const id = found[0];
+  if (!id) return null;
+  const read = await readSharedBudget(ctx.client, ctx.account, id);
+  return read.ok ? id : budgetDrift(ctx, campaignId, BUDGET_STEP, { reason: read.field, sharedBudgetId: id });
 }
 
-/** b) 계정에 공유예산이 없을 때: 원장 → 이름 재사용 → 생성(1회). 불확실은 재전송 없이 이름 대조, 끝내 없으면 멈춘다. */
+/** b) 계정에 공유예산이 없을 때: 이 제안의 생성 ok 기록 → 계정 단위 이름 대조 → 계정 단위 불확실 기록이면 멈춤 → 생성(1회). */
 async function obtainBudget(ctx: ApplyCtx, campaignId: string, campaignName: string): Promise<string> {
   const prior = ctx.prior.get(BUDGET_STEP);
   if (prior?.status === "ok" && prior.naverId) return prior.naverId;
-  if (prior && prior.status !== "failed") return (await adoptByName(ctx)) ?? uncertainStop(ctx, BUDGET_STEP);
-  const existing = await adoptByName(ctx);
+  const existing = await reconcileByName(ctx, campaignId);
   if (existing) return existing;
+  if ((prior && prior.status !== "failed") || (await hasUnresolvedCreate(ctx.account))) return uncertainStop(ctx, BUDGET_STEP); // 대조만, POST 없음
   try {
     const body = buildSharedBudget(ctx.account, { nccCampaignId: campaignId, name: campaignName });
     const made = await createEntity(ctx.client, acct(ctx), { step: BUDGET_STEP, method: "POST", path: "/ncc/shared-budgets", body, proposalId: ctx.proposalId },
@@ -46,7 +54,7 @@ async function obtainBudget(ctx: ApplyCtx, campaignId: string, campaignName: str
     return made.sharedBudgetId;
   } catch (error) {
     if (!(error instanceof NaverAdsError) || error.reason !== "ads_uncertain") throw error;
-    return (await adoptByName(ctx)) ?? uncertainStop(ctx, BUDGET_STEP); // 재전송 금지
+    return (await reconcileByName(ctx, campaignId)) ?? uncertainStop(ctx, BUDGET_STEP); // 재전송 금지
   }
 }
 
@@ -57,10 +65,11 @@ async function storeBudgetId(ctx: ApplyCtx, id: string): Promise<void> {
   if (count !== 1 && (await prisma.adAccount.findFirst({ where, select: { sharedBudgetId: true } }))?.sharedBudgetId !== id)
     throw new ApplyFailure(`ambiguous:${BUDGET_STEP}`);
   ctx.account = { ...ctx.account, sharedBudgetId: id };
+  await markCreatesReconciled(ctx.account, id); // 계정의 불확실 생성 행 → 해소(이 mq-cap으로 대조됨)
 }
 
 /** 공유예산이 상한과 다르면: 캠페인을 끄고(이미 꺼져 있어도 다시 확인) 미러에 사실대로 남긴 뒤 drift/pause_failed로 멈춘다. */
-async function budgetDrift(ctx: ApplyCtx, campaignId: string, field: string): Promise<never> {
+async function budgetDrift(ctx: ApplyCtx, campaignId: string, drift: string, detail: AlertPayload = {}): Promise<never> {
   let confirmed = false;
   try {
     confirmed = (await pauseAndConfirm(ctx.client, ctx.account, "campaign", campaignId, { step: `pause:${ctx.step}`, proposalId: ctx.proposalId })).confirmed;
@@ -68,13 +77,13 @@ async function budgetDrift(ctx: ApplyCtx, campaignId: string, field: string): Pr
     if (!(error instanceof NaverAdsError)) throw error;
   }
   await prisma.adCampaign.updateMany({ where: { adAccountId: ctx.account.id, naverId: campaignId }, data: { userLock: confirmed } });
-  await stopIfUnsafe(ctx, "campaign", campaignId, { userLock: confirmed, inspectStatus: null, drift: `sharedBudget.${field}`, pauseFailed: !confirmed });
-  throw new ApplyFailure(`drift:sharedBudget.${field}`); // stopIfUnsafe가 위에서 이미 던진다(타입용)
+  await stopIfUnsafe(ctx, "campaign", campaignId, { userLock: confirmed, inspectStatus: null, drift, pauseFailed: !confirmed }, detail);
+  throw new ApplyFailure(`drift:${drift}`); // stopIfUnsafe가 위에서 이미 던진다(타입용)
 }
 
 async function verifiedAmount(ctx: ApplyCtx, campaignId: string, id: string): Promise<number> {
   const read = await readSharedBudget(ctx.client, ctx.account, id);
-  return read.ok ? read.dailyBudget : budgetDrift(ctx, campaignId, read.field);
+  return read.ok ? read.dailyBudget : budgetDrift(ctx, campaignId, `sharedBudget.${read.field}`);
 }
 
 async function isLinked(ctx: ApplyCtx, campaignId: string): Promise<boolean> {

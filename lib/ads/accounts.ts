@@ -19,7 +19,7 @@ import {
 } from "./account-core";
 import { AdsHttpError, unexpectedNaverResponse } from "./http";
 import { DAILY_CAP_CEILING_KRW } from "./invariants";
-import { reuseSharedBudget } from "./shared-budget";
+import { markCreatesReconciled, reuseSharedBudget } from "./shared-budget";
 
 export { markInvalidKey, type AdsDeps } from "./account-core";
 export { disconnectAccount } from "./disconnect";
@@ -88,6 +88,7 @@ export async function connectAccount(ownerId: string, input: AdsConnectInput, de
   });
   const sharedBudgetId = await reuseSharedBudget(client, row); // 없으면 null(핫픽스 2026-11-11: 네이버는 캠페인 없는 공유예산 생성을 거부한다)
   if (sharedBudgetId !== row.sharedBudgetId) await prisma.adAccount.updateMany({ where: { id: row.id, ownerId }, data: { sharedBudgetId } });
+  if (sharedBudgetId) await markCreatesReconciled(row, sharedBudgetId); // 검증한 mq-cap으로 대조됨 → 불확실 생성 해소
   return { account: await accountDTO(ownerId, row.id), channels: await listSiteChannels(client) };
 }
 

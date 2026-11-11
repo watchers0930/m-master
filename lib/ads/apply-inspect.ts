@@ -69,13 +69,14 @@ export async function inspect<K extends LockKind>(ctx: InspectCtx, kind: K, nave
 const inspectOf = (e: unknown) => ((e as { inspectStatus?: string | null } | null)?.inspectStatus ?? null);
 
 /** 미러를 기록한 뒤 부른다. 끄기 실패가 드리프트보다 먼저다(켜진 엔티티가 남아 있다). */
-export async function stopIfUnsafe(ctx: InspectCtx, kind: LockKind, naverId: string, o: Observed): Promise<void> {
+/** detail: 알림에 덧붙일 내부 값(예: 공유예산 판정 사유). 키·본문은 넣지 않는다. */
+export async function stopIfUnsafe(ctx: InspectCtx, kind: LockKind, naverId: string, o: Observed, detail: AlertPayload = {}): Promise<void> {
   if (o.pauseFailed) {
-    await alert(ctx, { reason: "pause_failed", entity: kind, naverId, ...(o.drift ? { field: o.drift } : {}) }, "ads.pause_failed");
+    await alert(ctx, { reason: "pause_failed", entity: kind, naverId, ...(o.drift ? { field: o.drift } : {}), ...detail }, "ads.pause_failed");
     throw new ApplyFailure(`pause_failed:${ctx.step}`);
   }
   if (o.drift !== null) {
-    await alert(ctx, { entity: kind, naverId, field: o.drift });
+    await alert(ctx, { entity: kind, naverId, field: o.drift, ...detail });
     throw new ApplyFailure(`drift:${o.drift}`);
   }
 }

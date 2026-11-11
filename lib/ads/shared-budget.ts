@@ -7,6 +7,7 @@
 import { z } from "zod";
 import type { AdAccount } from "@prisma/client";
 import type { NaverAdsClient } from "@/lib/external/naver-searchad";
+import { prisma } from "@/lib/prisma";
 import { naverSharedBudgetListSchema } from "@/schemas/ads";
 import { AdsHttpError, unexpectedNaverResponse } from "./http";
 import { SHARED_BUDGET_NAME, verifyStored, type CapAccount } from "./requests";
@@ -47,4 +48,25 @@ export async function reuseSharedBudget(client: NaverAdsClient, account: BudgetA
       { field: verdict.field },
     );
   return id;
+}
+
+// 계정 단위 '불확실한 생성' 원장 행(판정 round 1 I-1): 어느 제안·연결이 보냈든 결과를 모르는 POST /ncc/shared-budgets.
+// 이름 대조로 mq-cap을 찾아 계정에 저장하면 그 행들은 해소된 것으로 표시한다(status는 그대로, errorCode 'reconciled:<id>').
+const UNSURE_CREATE = { method: "POST", path: "/ncc/shared-budgets", status: { in: ["sent", "uncertain"] } };
+const RECONCILED = "reconciled:";
+
+/** 해소되지 않은 불확실 생성이 이 계정에 있는가 — 있으면 누구도 새로 만들지 않는다(재전송 금지). */
+export async function hasUnresolvedCreate(account: Pick<AdAccount, "id" | "ownerId">): Promise<boolean> {
+  const row = await prisma.adOperationLog.findFirst({
+    where: { adAccountId: account.id, ownerId: account.ownerId, ...UNSURE_CREATE, OR: [{ errorCode: null }, { NOT: { errorCode: { startsWith: RECONCILED } } }] },
+    select: { id: true },
+  });
+  return row !== null;
+}
+
+/** 검증한 mq-cap을 계정에 저장한 뒤 부른다: 그 전의 불확실 생성 행을 해소로 표시한다. */
+export async function markCreatesReconciled(account: Pick<AdAccount, "id" | "ownerId">, sharedBudgetId: string): Promise<void> {
+  await prisma.adOperationLog.updateMany({
+    where: { adAccountId: account.id, ownerId: account.ownerId, ...UNSURE_CREATE }, data: { errorCode: `${RECONCILED}${sharedBudgetId}` },
+  });
 }
