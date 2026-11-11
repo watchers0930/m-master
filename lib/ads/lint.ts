@@ -113,7 +113,11 @@ function quote(text: string, spans: [number, number][], from: number, to: number
 function superlativeIssues(text: string, field: CopyField): LintIssue[] {
   const { norm, spans } = matchForm(text);
   const exempt: [number, number][] = [];
-  for (const re of SUPERLATIVE_EXCEPTIONS) for (const m of norm.matchAll(re)) exempt.push([m.index, m.index + m[0].length]);
+  // 예외는 원문에서도 붙어 있을 때만(정규화로 지운 공백·부호·보이지 않는 문자가 사이에 끼면 우회로 보고 예외 아님)
+  const contiguous = (from: number, to: number) => spans.slice(from, to - 1).every(([s, e], k) => spans[from + k + 1][0] === e || spans[from + k + 1][0] === s);
+  for (const { pattern } of SUPERLATIVE_EXCEPTIONS) for (const m of norm.matchAll(pattern)) {
+    if (contiguous(m.index, m.index + m[0].length)) exempt.push([m.index, m.index + m[0].length]);
+  }
   const out: LintIssue[] = [];
   for (const { pattern } of SUPERLATIVE_TERMS) {
     for (const m of norm.matchAll(pattern)) {
