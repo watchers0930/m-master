@@ -10,21 +10,24 @@
 // 실행 순서: (재개면) 끄기 실패로 켜진 채 남은 이 제안 엔티티를 먼저 끈다 → 캠페인 → 모든 그룹 → 모든 키워드 → 모든 소재(new_campaign).
 //   extend_group은 대상 그룹(소유·미러·삭제 아님, 그룹·캠페인이 네이버에서 꺼짐 — 아니면 점유 전 409 target_active)에 키워드·소재만 붙이고
 //   그룹 이름·입찰은 쓰지 않는다. 소재 slot은 첫 시도에 그 그룹의 미러·원장 예약 최대값 + 1로 정하고, 재개는 그 값을 다시 쓴다.
+// 판매 금지 키워드(실운영 2026-11-12): 쓰기 전에 제안 키워드 전체를 GET /ncc/managedKeyword로 한 번 조회한다(실패면 그대로 던져 POST 0으로 멈춤).
+//   판매 금지는 원장을 보기 전에 stepProhibitedKeyword(이미 만들어진 것만 이어 쓰고 없으면 건너뜀)로 보낸다. 건너뛴 키워드는 감사 로그·결과에 남긴다.
 // 쓰기마다 비상 정지 스위치·계정 active를 보내기 직전에 확인한다(execution.ts). 실패는 apply_failed + failCode(apply-errors.ts)로 남기고
 // 같은 제안을 다시 적용하면 이어서 진행한다(중복 생성 없음 — apply-steps.ts 머리말). 모르는 오류는 internal_error로 기록하고 다시 던진다.
 import type { AdAccount, AdProposal, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isEntityId } from "@/schemas/id";
-import type { AdApplyResultDTO, ProposalPayload } from "@/types/ads";
+import type { AdApplyResultDTO, ProposalKeyword, ProposalPayload } from "@/types/ads";
 import { assertAdsOwner } from "./access";
 import { notFound, withAccountClient, type AdsDeps } from "./account-core";
 import { ATTACH_STEP } from "./apply-budget";
 import { ApplyFailure, failCodeOf } from "./apply-errors";
 import { checkTarget, retryPendingPauses, targetIsPaused } from "./apply-inspect";
-import { stepAd, stepAdgroup, stepCampaign, stepKeyword, type ApplyCtx, type PriorOp } from "./apply-steps";
+import { stepAd, stepAdgroup, stepCampaign, stepKeyword, stepProhibitedKeyword, type ApplyCtx, type PriorOp } from "./apply-steps";
 import { assertExecutionEnabled } from "./execution";
 import { AdsHttpError } from "./http";
 import { caps } from "./invariants";
+import { prohibitedKey, sellProhibitedKeywords } from "./managed-keywords";
 import { checkPayload, lintPayload } from "./proposal-check";
 import { problemError, proposalConflict } from "./proposal-review";
 import { kindOf, payloadOf, sourceKeywordsOf } from "./proposals";
@@ -107,12 +110,18 @@ async function nextSlot(account: AdAccount, groupId: string): Promise<string> {
   return `a${max + 1}`;
 }
 
-async function run(ctx: ApplyCtx, row: AdProposal, payload: ProposalPayload): Promise<void> {
+async function run(ctx: ApplyCtx, row: AdProposal, payload: ProposalPayload, skipped: string[]): Promise<void> {
   await retryPendingPauses(ctx);
+  ctx.step = "managed_keywords";
+  const prohibited = await sellProhibitedKeywords(ctx.client, payload.groups.flatMap((g) => g.keywords.map((k) => k.keyword)));
+  const keyword = async (groupId: string, label: string, i: number, k: ProposalKeyword) => {
+    if (!prohibited.has(prohibitedKey(k.keyword))) return stepKeyword(ctx, groupId, label, i, k);
+    if (!(await stepProhibitedKeyword(ctx, groupId, label, i, k))) skipped.push(k.keyword);
+  };
   if (kindOf(row) === "extend_group") {
     const groupId = row.targetAdgroupId as string, g = payload.groups[0];
     await checkTarget(ctx, groupId);
-    for (const [i, k] of g.keywords.entries()) await stepKeyword(ctx, groupId, "g1", i, k);
+    for (const [i, k] of g.keywords.entries()) await keyword(groupId, "g1", i, k);
     for (const [i, c] of g.creatives.entries()) await stepAd(ctx, groupId, "g1", i, c, () => nextSlot(ctx.account, groupId));
     return;
   }
@@ -120,7 +129,7 @@ async function run(ctx: ApplyCtx, row: AdProposal, payload: ProposalPayload): Pr
   const groupIds: string[] = [];
   for (const [i, g] of payload.groups.entries()) groupIds.push(await stepAdgroup(ctx, campaignId, i + 1, g.bidAmt));
   for (const [gi, g] of payload.groups.entries())
-    for (const [i, k] of g.keywords.entries()) await stepKeyword(ctx, groupIds[gi], `g${gi + 1}`, i, k);
+    for (const [i, k] of g.keywords.entries()) await keyword(groupIds[gi], `g${gi + 1}`, i, k);
   for (const [gi, g] of payload.groups.entries())
     for (const [i, c] of g.creatives.entries()) await stepAd(ctx, groupIds[gi], `g${gi + 1}`, i, c, async () => `a${i + 1}`);
 }
@@ -163,15 +172,17 @@ export async function applyProposal(ownerId: string, id: string, deps: ApplyDeps
         where: where(), data: { status, failCode, updatedAt: nextToken(token, now), ...(status === "applied" ? { appliedAt: now() } : {}) },
       });
       if (count !== 1) throw conflict("apply_conflict");
-      await tx.auditLog.create({ data: { actor: ownerId, targetType: "ad_proposal", targetId: id, action: "ads.proposal_apply", payload: { status, failCode } } });
+      const audit = skipped.length ? { status, failCode, skippedKeywords: skipped } : { status, failCode };
+      await tx.auditLog.create({ data: { actor: ownerId, targetType: "ad_proposal", targetId: id, action: "ads.proposal_apply", payload: audit } });
     });
   // ctx.step은 단계마다 바뀐다(실패 코드 uncertain:<step>에 쓴다).
   const prior = await priorOps(id);
+  const skipped: string[] = [];
   let ctx: ApplyCtx | undefined;
   try {
     await withAccountClient(claimed.account, deps, (client) => {
       ctx = { client, account: claimed.account, proposalId: id, prior, now, heartbeat, step: "start" };
-      return run(ctx, claimed.row, payloadOf(claimed.row));
+      return run(ctx, claimed.row, payloadOf(claimed.row), skipped);
     });
   } catch (error) {
     if (error instanceof LostClaim) throw conflict("apply_conflict"); // 다른 실행이 회수했다 — 그쪽이 결과를 기록한다
@@ -179,8 +190,8 @@ export async function applyProposal(ownerId: string, id: string, deps: ApplyDeps
     await finish("apply_failed", failCode ?? "internal_error");
     if (failCode === null) throw error;
     if (!(error instanceof ApplyFailure)) console.error("[ads] apply failed", { proposalId: id, failCode });
-    return { status: "apply_failed", failCode };
+    return { status: "apply_failed", failCode, ...(skipped.length ? { skippedKeywords: skipped } : {}) };
   }
   await finish("applied", null);
-  return { status: "applied" };
+  return skipped.length ? { status: "applied", skippedKeywords: skipped } : { status: "applied" };
 }

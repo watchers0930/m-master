@@ -246,6 +246,7 @@ model AuditLog { // audit_log — 감사 로그 (INSERT only)
   payload    Json?
   createdAt  DateTime @default(now()) @map("created_at")
   @@index([action, createdAt])
+  @@index([targetType, targetId, action, createdAt]) // 대상별 최신 기록(광고 제안 상세의 판매 금지 건너뜀 — lib/ads/proposals.ts)
   @@map("audit_log")
 }
 

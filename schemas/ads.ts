@@ -89,6 +89,12 @@ export const naverAdSchema = z.object({
   nccAdId: naverId, nccAdgroupId: naverId, type: z.string(), userLock: z.boolean(), inspectStatus: optText, status: optText, ad: naverAdBody.optional(),
 });
 export const naverKeywordCreatedSchema = z.array(naverKeywordSchema).length(1);
+// GET /ncc/managedKeyword?keywords=a,b — 명세(ncc-heroes-ncc.json) ManagedKeyword.isSellProhibit = "Whether a sell prohibited keyword."
+// isRestricted(노출 제한)는 쓰지 않는다 — 실제와 다르게 온다는 보고(searchad-apidoc #1309). managedKeyword가 없거나 null이면 '모름'(판매 금지 아님으로 본다).
+export const naverManagedKeywordListSchema = z.array(z.object({
+  keyword: z.string(),
+  managedKeyword: z.object({ isSellProhibit: z.boolean() }).nullable().optional(),
+}));
 // GET /stats 응답. 금액은 유한한 0 이상 숫자만(문자열·음수·누락은 형식 오류 → '모름').
 export const naverStatsSchema = z.object({ data: z.array(z.object({ id: naverId, salesAmt: z.number().finite().nonnegative() })) });
 

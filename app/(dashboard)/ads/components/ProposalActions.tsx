@@ -40,7 +40,8 @@ export function ProposalActions({ proposal, draft, dirty, issueCount }: Props) {
     setNotice(null);
     apply.mutate(undefined, {
       onSuccess: (r) => {
-        if (r.status === 'applied') ok('적용했습니다. 모든 항목이 꺼진 상태입니다. 검수가 끝나면 아래에서 켜세요.');
+        const skipped = r.skippedKeywords?.length ? ` 네이버 판매 금지 키워드라 등록하지 않았습니다: ${r.skippedKeywords.join(', ')}.` : '';
+        if (r.status === 'applied') ok(`적용했습니다. 모든 항목이 꺼진 상태입니다. 검수가 끝나면 아래에서 켜세요.${skipped}`);
         else setNotice({ view: { message: failCodeMessage(r.failCode ?? null) ?? '적용하지 못했습니다.', urgent: isUrgentFailCode(r.failCode), reload: true }, ok: false });
       },
       onError: fail,

@@ -22,6 +22,7 @@ import { loadOwnedAccount, notFound, withAccountClient, type AdsDeps } from "./a
 import { AdsHttpError } from "./http";
 import { caps, proposalBidRange, type Caps } from "./invariants";
 import { collectSeeds, manualSeeds, researchKeywords } from "./keywords";
+import { dropSellProhibited } from "./managed-keywords";
 import { generateProposal, type LlmClient } from "./propose";
 
 export type ProposalDeps = AdsDeps & { llm?: LlmClient };
@@ -118,7 +119,8 @@ export async function createProposal(ownerId: string, input: AdsProposalCreateIn
   if (seeds.length === 0) throw new AdsHttpError("ads_no_seeds", "씨앗 키워드가 없습니다. 키워드를 입력하거나 도메인을 선택하세요.", 422);
   const llm = llmOf(deps);
   const research = seedSource === "manual" ? { relevantTo: manual } : {};
-  const stats = await withAccountClient(account, deps, (client) => researchKeywords(client, seeds, research));
+  // 판매 금지 키워드는 AI에 넘기지 않는다(편집도 이 통계 안에서만 되므로 함께 막힌다) — 실운영 2026-11-12
+  const stats = await withAccountClient(account, deps, async (client) => dropSellProhibited(client, await researchKeywords(client, seeds, research)));
   if (stats.length === 0) throw new AdsHttpError("ads_no_keywords", "키워드 도구가 쓸 수 있는 연관 키워드를 돌려주지 않았습니다. 씨앗을 바꿔 보세요.", 422);
   const result = await generateProposal({ ownerId: account.ownerId, kind: data.kind, caps: accountCaps, seeds, seedSource, stats }, llm);
   const row = await prisma.adProposal.create({
@@ -140,7 +142,19 @@ export async function getProposal(ownerId: string, id: string): Promise<AdPropos
   if (!isEntityId(id)) throw notFound();
   const row = await prisma.adProposal.findFirst({ where: { id, ownerId }, select: PROPOSAL_DETAIL_SELECT });
   if (!row) throw notFound();
-  return toProposalDTO(row);
+  const tried = row.status === "applied" || row.status === "apply_failed" || row.status === "applying";
+  return { ...toProposalDTO(row), skippedKeywords: tried ? await lastSkippedKeywords(ownerId, id, row.createdAt) : [] };
+}
+
+/** 마지막 적용 감사 로그의 판매 금지 건너뜀(apply.ts). 적용을 시도한 제안만 부르고, 인덱스(target_type, target_id, action, created_at)로
+ *  이 제안 행만 찾는다(codex MED-2, 20261112_audit_log_target_idx.sql). 생성 시각 하한은 인덱스 적용 전에도 범위를 좁힌다. */
+async function lastSkippedKeywords(ownerId: string, id: string, since: Date): Promise<string[]> {
+  const last = await prisma.auditLog.findFirst({
+    where: { action: "ads.proposal_apply", createdAt: { gte: since }, targetType: "ad_proposal", targetId: id, actor: ownerId },
+    orderBy: { createdAt: "desc" }, select: { payload: true },
+  });
+  const list = (last?.payload as { skippedKeywords?: unknown } | null)?.skippedKeywords;
+  return Array.isArray(list) ? list.filter((k): k is string => typeof k === "string") : [];
 }
 
 /** 최신순(createdAt desc, id desc) 키셋 페이지. 커서는 내 제안 id여야 한다(남의 id·없는 id는 400). */

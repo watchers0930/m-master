@@ -89,6 +89,8 @@ export type AdProposalDTO = AdProposalSummaryDTO & {
   lintResult: ProposalLintResult | null;
   sourceKeywords: ProposalSourceKeyword[];
   failCode: string | null;
+  /** 마지막 적용에서 판매 금지로 건너뛴 키워드(감사 로그 ads.proposal_apply). 상세 조회에서만 채운다. */
+  skippedKeywords?: string[];
   reviewedAt: string | null;
 };
 
@@ -117,7 +119,8 @@ export type ProposalEstimateDTO = {
 };
 
 // ── 적용·켜기/끄기 결과(Task 9 라우트 응답) ──
-export type AdApplyResultDTO = { status: "applied" | "apply_failed"; failCode?: string };
+/** skippedKeywords: 네이버 판매 금지라 보내지 않은 키워드(있을 때만, lib/ads/managed-keywords.ts). */
+export type AdApplyResultDTO = { status: "applied" | "apply_failed"; failCode?: string; skippedKeywords?: string[] };
 export type AdLockEntityType = "campaign" | "adgroup" | "keyword" | "ad";
 export type AdLockResultDTO = { type: AdLockEntityType; id: string; naverId: string; userLock: boolean; lockedBy: string | null; lockVersion: number };
 
