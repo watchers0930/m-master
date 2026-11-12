@@ -146,8 +146,8 @@ export async function getProposal(ownerId: string, id: string): Promise<AdPropos
   return { ...toProposalDTO(row), skippedKeywords: tried ? await lastSkippedKeywords(ownerId, id, row.createdAt) : [] };
 }
 
-/** 마지막 적용 감사 로그의 판매 금지 건너뜀(apply.ts). 적용을 시도한 제안만 부르고, 인덱스(action, createdAt)를 제안 생성 시각부터 범위로 탄다
- *  — 적용 기록 전체를 훑지 않게(codex MED-2). 소유자·제안 조건으로 이 제안 행만 본다. */
+/** 마지막 적용 감사 로그의 판매 금지 건너뜀(apply.ts). 적용을 시도한 제안만 부르고, 인덱스(target_type, target_id, action, created_at)로
+ *  이 제안 행만 찾는다(codex MED-2, 20261112_audit_log_target_idx.sql). 생성 시각 하한은 인덱스 적용 전에도 범위를 좁힌다. */
 async function lastSkippedKeywords(ownerId: string, id: string, since: Date): Promise<string[]> {
   const last = await prisma.auditLog.findFirst({
     where: { action: "ads.proposal_apply", createdAt: { gte: since }, targetType: "ad_proposal", targetId: id, actor: ownerId },
