@@ -20,6 +20,7 @@ import { stepSharedBudget } from "./apply-budget";
 import { inspect, stopIfUnsafe, uncertainStop } from "./apply-inspect";
 import { createEntity } from "./execution";
 import { unexpectedNaverResponse } from "./http";
+import { adgroupName, campaignName } from "./names";
 import { findAdgroups, findAds, findCampaigns, findKeywords } from "./reconcile";
 import { buildAdgroup, buildCampaign, buildKeyword, buildTextAd } from "./requests";
 
@@ -59,7 +60,7 @@ const mirroredIds = async (rows: Promise<{ naverId: string }[]>) => new Set((awa
 const acct = (ctx: ApplyCtx) => ({ id: ctx.account.id, ownerId: ctx.account.ownerId });
 
 export async function stepCampaign(ctx: ApplyCtx): Promise<string> {
-  const name = `mq-${ctx.proposalId}`;
+  const name = campaignName(ctx.proposalId);
   const id = await ensureId(ctx, {
     step: "campaign",
     mirror: async () => (await prisma.adCampaign.findFirst({ where: { adAccountId: ctx.account.id, proposalId: ctx.proposalId, name }, select: { naverId: true } }))?.naverId ?? null,
@@ -75,7 +76,7 @@ export async function stepCampaign(ctx: ApplyCtx): Promise<string> {
 }
 
 export async function stepAdgroup(ctx: ApplyCtx, campaignId: string, n: number, bidAmt: number): Promise<string> {
-  const name = `mq-${ctx.proposalId}-g${n}`, step = `adgroup:g${n}`;
+  const name = adgroupName(ctx.proposalId, n), step = `adgroup:g${n}`;
   const id = await ensureId(ctx, {
     step,
     mirror: async () => (await prisma.adGroup.findFirst({ where: { adAccountId: ctx.account.id, proposalId: ctx.proposalId, name }, select: { naverId: true } }))?.naverId ?? null,
