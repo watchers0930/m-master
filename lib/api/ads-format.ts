@@ -23,6 +23,7 @@ const FIXED_FAIL: Readonly<Record<string, string>> = {
   ads_forbidden: '이 광고 계정 리소스에 접근할 권한이 없습니다.',
   ads_rate_limited: '네이버 호출 한도에 걸렸습니다. 잠시 후 다시 적용하세요(이어서 진행합니다).',
   ads_unavailable: '네이버 광고 API에 연결하지 못했습니다. 잠시 후 다시 적용하세요(이어서 진행합니다).',
+  ads_unexpected_response: '네이버 응답 형식이 예상과 달라 멈췄습니다. 잠시 후 다시 적용하세요(이어서 진행합니다).',
 };
 
 /** 적용 실패 코드(AdProposal.failCode, 적용 응답 failCode) → 한국어. */

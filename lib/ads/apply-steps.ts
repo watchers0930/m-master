@@ -92,19 +92,37 @@ export async function stepAdgroup(ctx: ApplyCtx, campaignId: string, n: number, 
   return id;
 }
 
+const keywordEnsure = (ctx: ApplyCtx, groupId: string, step: string, k: ProposalKeyword): Ensure => ({
+  step,
+  mirror: async () => (await prisma.adKeyword.findFirst({ where: { adAccountId: ctx.account.id, proposalId: ctx.proposalId, parentNaverId: groupId, keyword: k.keyword }, select: { naverId: true } }))?.naverId ?? null,
+  find: async () => findKeywords(ctx.client, groupId, k.keyword, await mirroredIds(prisma.adKeyword.findMany({ where: { adAccountId: ctx.account.id, parentNaverId: groupId }, select: { naverId: true } })), step),
+  create: async () => {
+    const req = buildKeyword(ctx.account, groupId, k.keyword, k.bidAmt);
+    const made = await createEntity(ctx.client, acct(ctx), { step, method: "POST", path: "/ncc/keywords", query: req.query, body: req.body, proposalId: ctx.proposalId },
+      naverKeywordCreatedSchema, (r) => r[0].nccKeywordId);
+    return made[0].nccKeywordId;
+  },
+});
+
 export async function stepKeyword(ctx: ApplyCtx, groupId: string, label: string, i: number, k: ProposalKeyword): Promise<void> {
   const step = `keyword:${label}:k${i}`;
-  const id = await ensureId(ctx, {
-    step,
-    mirror: async () => (await prisma.adKeyword.findFirst({ where: { adAccountId: ctx.account.id, proposalId: ctx.proposalId, parentNaverId: groupId, keyword: k.keyword }, select: { naverId: true } }))?.naverId ?? null,
-    find: async () => findKeywords(ctx.client, groupId, k.keyword, await mirroredIds(prisma.adKeyword.findMany({ where: { adAccountId: ctx.account.id, parentNaverId: groupId }, select: { naverId: true } })), step),
-    create: async () => {
-      const req = buildKeyword(ctx.account, groupId, k.keyword, k.bidAmt);
-      const made = await createEntity(ctx.client, acct(ctx), { step, method: "POST", path: "/ncc/keywords", query: req.query, body: req.body, proposalId: ctx.proposalId },
-        naverKeywordCreatedSchema, (r) => r[0].nccKeywordId);
-      return made[0].nccKeywordId;
-    },
-  });
+  await recordKeyword(ctx, groupId, k, await ensureId(ctx, keywordEnsure(ctx, groupId, step, k)));
+}
+
+/** 판매 금지 키워드(managed-keywords.ts): 새로 보내지 않는다. 이미 만들어진 것(미러 → 원장 ok → 원장에 보낸 흔적이 있으면 목록 대조)만 이어 쓰고
+ *  true, 없으면 false(건너뜀). 원장 상태로 멈추지 않는다 — 판매 금지는 네이버가 등록하지 않는 확정 사실이라 '불확실'이 아니다(실운영 2026-11-12). */
+export async function stepProhibitedKeyword(ctx: ApplyCtx, groupId: string, label: string, i: number, k: ProposalKeyword): Promise<boolean> {
+  const step = `keyword:${label}:k${i}`, e = keywordEnsure(ctx, groupId, step, k);
+  ctx.step = step;
+  await ctx.heartbeat();
+  const prior = ctx.prior.get(step);
+  const id = (await e.mirror()) ?? (prior?.status === "ok" && prior.naverId ? prior.naverId : null) ?? (prior ? await adoptOne(e) : null);
+  if (!id) return false;
+  await recordKeyword(ctx, groupId, k, id);
+  return true;
+}
+
+async function recordKeyword(ctx: ApplyCtx, groupId: string, k: ProposalKeyword, id: string): Promise<void> {
   const o = await inspect(ctx, "keyword", id);
   const seen = { userLock: o.userLock, inspectStatus: o.inspectStatus };
   await prisma.adKeyword.upsert({

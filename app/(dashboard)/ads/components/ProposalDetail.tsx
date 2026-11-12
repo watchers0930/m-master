@@ -39,6 +39,9 @@ function Body({ proposal }: { proposal: AdProposalDTO }) {
           {proposal.targetAdgroupId ? ` · 대상 광고그룹 ${proposal.targetAdgroupId}` : ''}
         </div>
         {failMessage && <Notice view={{ message: `마지막 적용 실패: ${failMessage}`, urgent: isUrgentFailCode(proposal.failCode), reload: false }} />}
+        {applied && proposal.skippedKeywords?.length ? (
+          <Notice view={info(`네이버 판매 금지 키워드라 등록하지 않았습니다: ${proposal.skippedKeywords.join(', ')}. 나머지 키워드·소재는 그대로 적용됩니다.`)} tone="info" />
+        ) : null}
         {editable && issues.length > 0 && (
           <Notice view={info(`AI가 1회 교정한 뒤에도 남은 등록 기준 위반 ${issues.length}건이 있습니다. 표시된 칸을 고쳐 저장하면 다시 검사합니다. 위반이 0건이어야 승인할 수 있습니다.`)} tone="warn" />
         )}
