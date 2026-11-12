@@ -60,7 +60,7 @@ function toSummary(row: ProposalRow): AdProposalSummaryDTO {
   };
 }
 
-function bidRangeOf(account: ProposalDetailRow["adAccount"]): AdProposalDTO["bidRange"] {
+export function bidRangeOf(account: ProposalDetailRow["adAccount"]): AdProposalDTO["bidRange"] {
   try {
     return proposalBidRange(caps(account));
   } catch {

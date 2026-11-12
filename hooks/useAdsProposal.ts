@@ -4,7 +4,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AdsApiError, applyAdProposal, editAdProposal, getAdProposal, reviewAdProposal } from '@/lib/api/ads';
+import { AdsApiError, applyAdProposal, editAdProposal, getAdProposal, getAdProposalEstimate, reviewAdProposal } from '@/lib/api/ads';
 import { adsQueryKeys } from '@/hooks/adsQueryKeys';
 import type { ProposalPayload } from '@/types/ads';
 
@@ -39,4 +39,9 @@ export function useAdsProposalActions(id: string, accountId: string | null) {
     },
   });
   return { edit, review, apply };
+}
+
+/** 순위별 예상 입찰가(B4): 버튼을 눌렀을 때만 부른다(페이지 로드·포커스·재시도 없음 — 네이버 호출 한도 보호, 서버도 1분에 1번). */
+export function useAdsProposalEstimate(id: string) {
+  return useMutation({ mutationFn: () => getAdProposalEstimate(id), retry: false });
 }

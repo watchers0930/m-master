@@ -1,6 +1,6 @@
 // lib/api/ads-format.ts — 광고 화면 표시 규칙(순수 함수, Task 12). failCode·오류 코드 → 한국어, 금액·나이·전환 비용, 잠금·검수 표시, 씨앗 입력.
 // 문구 출처: task-12-carry.md(Task 5~11 판정). 서버가 이미 한국어 문구를 주는 오류는 그대로 쓰고, 화면 행동이 달라야 하는 것만 바꾼다.
-import type { AdChannelDTO, AdProposalStatus, ProposalLintIssue } from '@/types/ads';
+import type { AdChannelDTO, AdProposalStatus, EstimatePosition, ExpectedPosition, PositionBidTable, ProposalLintIssue } from '@/types/ads';
 
 /** 서버 schemas/ads-proposal.ts MAX_MANUAL_SEEDS·MAX_MANUAL_SEED_LENGTH와 같다(서버도 검사한다). */
 export const MAX_SEEDS = 25;
@@ -141,4 +141,26 @@ export function parseSeeds(text: string): { seeds: string[]; error: string | nul
   if (seeds.length > MAX_SEEDS) return { seeds, error: '씨앗 키워드는 25개 이하입니다.' };
   if (seeds.some((s) => s.length > MAX_SEED_LENGTH)) return { seeds, error: '씨앗 키워드는 40자 이하입니다.' };
   return { seeds, error: null };
+}
+
+// ── 순위별 예상 입찰가(B4) ──
+type BidRange = { min: number; max: number } | null;
+/** 입찰가가 서버 허용 범위(DTO bidRange.max)를 넘는가 — 화면의 '상한 초과' 판정은 모두 이 함수 하나로 한다(천장은 계산하지 않는다). */
+export const exceedsBidRange = (bid: number, range: BidRange) => range !== null && bid > range.max;
+
+/** '약 N위' · '6위 이하' · '확인 못 함'. */
+export const expectedPositionLabel = (p: ExpectedPosition) => (p === null ? '확인 못 함' : typeof p === 'number' ? `약 ${p}위` : p);
+
+/** 'PC 약 4위 · 모바일 약 3위'. */
+export const expectedSummary = (expected: { PC: ExpectedPosition; MOBILE: ExpectedPosition }) =>
+  `PC ${expectedPositionLabel(expected.PC)} · 모바일 ${expectedPositionLabel(expected.MOBILE)}`;
+
+const POSITIONS: readonly EstimatePosition[] = [1, 2, 3, 4, 5];
+/** '1위 1,350원(상한 초과) · 2위 900원 · 3위 —' — 네이버가 주지 않은 순위는 '—'. */
+export function positionBidsLabel(table: PositionBidTable, range: BidRange): string {
+  return POSITIONS.map((p) => {
+    const bid = table[p];
+    if (bid === undefined) return `${p}위 —`;
+    return `${p}위 ${formatKrw(bid)}${exceedsBidRange(bid, range) ? '(상한 초과)' : ''}`;
+  }).join(' · ');
 }

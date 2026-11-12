@@ -1,5 +1,5 @@
 // app/(dashboard)/ads/components/ProposalDetail.tsx
-// /ads/proposals/[id] 본문(Task 12): 제안 상태 · 남은 위반 안내 · 광고그룹 편집(검토 대기일 때만) · 결정·적용 · 만든 항목(검수·켜기/끄기).
+// /ads/proposals/[id] 본문(Task 12): 제안 상태 · 남은 위반 안내 · 예상 순위(B4, 버튼으로만) · 광고그룹 편집(검토 대기일 때만) · 결정·적용 · 만든 항목(검수·켜기/끄기).
 // 편집본(draft)은 서버 버전(updatedAt)이 바뀌면 새로 받는다(저장·충돌 재조회 후). 바꾼 뒤에는 위반 위치가 달라질 수 있어 저장 전엔 위반을 숨긴다.
 'use client';
 
@@ -11,6 +11,7 @@ import type { AdProposalDTO, ProposalGroup } from '@/types/ads';
 import { LockNoticeBanner, LockNoticesProvider } from './LockNotices';
 import { ProposalActions } from './ProposalActions';
 import { ProposalEntities } from './ProposalEntities';
+import { ProposalEstimate } from './ProposalEstimate';
 import { ProposalGroupEditor } from './ProposalGroupEditor';
 import { Card, Empty, Notice, info, subText } from './ui';
 
@@ -44,6 +45,7 @@ function Body({ proposal }: { proposal: AdProposalDTO }) {
         {dirty && <Notice view={info('바뀐 내용이 있습니다. 저장하면 등록 기준과 입찰 상한을 다시 검사합니다(그 전에는 위반 표시를 숨깁니다).')} tone="info" />}
         <ProposalActions proposal={proposal} draft={draft} dirty={dirty} issueCount={issues.length} />
       </Card>
+      <ProposalEstimate proposalId={proposal.id} dirty={dirty} />
       {draft.groups.map((g, i) => (
         <ProposalGroupEditor key={i} index={i} group={g} issues={dirty ? [] : issues} editable={editable} bidRange={proposal.bidRange} onChange={(next) => setGroup(i, next)} />
       ))}
