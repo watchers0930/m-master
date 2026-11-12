@@ -7,7 +7,7 @@
 // - 수정은 GET 응답을 통째로 되돌려 보내지 않는다. 끄기/켜기는 PUT ?fields=userLock + buildPause/buildResume 최소 본문.
 import {
   LOCK_ID_FIELDS, NEUTRAL_BID_WEIGHT, SHARED_BUDGET_NAME, assertInvariants, caps, checkBid, checkDailyBudget, checkUrl, customerIdOf, fail, isObj,
-  requireText, type CapAccount, type LockKind, type Obj,
+  requireName, requireText, type CapAccount, type LockKind, type Obj,
 } from "./invariants";
 
 export {
@@ -57,7 +57,7 @@ export function buildSharedBudget(account: CapAccount, campaign: { nccCampaignId
   const customerId = customerIdOf(account);
   if (!isObj(campaign)) fail("campaign");
   const item: SharedBudgetCampaign = {
-    nccCampaignId: requireText(campaign.nccCampaignId, "nccCampaignId"), customerId, name: requireText(campaign.name, "name"), campaignTp: "WEB_SITE",
+    nccCampaignId: requireText(campaign.nccCampaignId, "nccCampaignId"), customerId, name: requireName(campaign.name, "name"), campaignTp: "WEB_SITE",
   };
   const body: SharedBudgetBody = {
     customerId, name: SHARED_BUDGET_NAME, ownerType: "CAMPAIGN", deliveryMethod: "ACCELERATED", dailyBudget: c.budget, campaignList: [item],
@@ -83,7 +83,7 @@ export function buildCampaign(account: CapAccount, name: string, declared?: Safe
   const c = caps(account);
   const body: CampaignBody = {
     customerId: customerIdOf(account),
-    name: requireText(name, "name"),
+    name: requireName(name, "name"),
     campaignTp: "WEB_SITE",
     useDailyBudget: true,
     dailyBudget: c.budget,
@@ -99,7 +99,7 @@ export function buildAdgroup(account: CapAccount, campaignId: string, name: stri
   const channel = requireText(account.businessChannelId, "businessChannelId");
   const body: AdgroupBody = {
     nccCampaignId: requireText(campaignId, "nccCampaignId"),
-    name: requireText(name, "name"),
+    name: requireName(name, "name"),
     adgroupType: "WEB_SITE",
     pcChannelId: channel,
     mobileChannelId: channel,

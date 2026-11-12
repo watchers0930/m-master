@@ -712,7 +712,7 @@ model AdCampaign { // ad_campaigns — 네이버 캠페인 미러(이름 mq-{pro
   @@map("ad_campaigns")
 }
 
-model AdGroup { // ad_groups — 네이버 광고그룹 미러(이름 mq-{proposalId}-g{n})
+model AdGroup { // ad_groups — 네이버 광고그룹 미러(이름 {proposalId}-g{n} — 30자 한도, names.ts)
   id            String      @id @default(cuid())
   ownerId       String      @map("owner_id")
   adAccountId   String      @map("ad_account_id")

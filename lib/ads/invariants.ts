@@ -57,6 +57,16 @@ export function requireText(v: unknown, field: string): string {
   return v;
 }
 
+/** 네이버 캠페인·광고그룹 이름 한도. 실운영 2026-11-12: 28자 캠페인 통과·31자 그룹 400/3711(광고그룹 이름 길이).
+ *  넘으면 네이버를 부르기 전에 막는다 — 캠페인만 만들어지고 그룹에서 끊기는 반쪽 적용을 남기지 않게. */
+export const NAVER_NAME_MAX = 30;
+
+export function requireName(v: unknown, field: string): string {
+  const name = requireText(v, field);
+  if ([...name].length > NAVER_NAME_MAX) fail(field);
+  return name;
+}
+
 // 계정 상한값 자체도 검증한다(DB 값이 깨져도 상한이 풀리지 않게). 하루 예산 = min(공유예산 금액, 하루 상한).
 export function caps(account: unknown): Caps {
   if (!isObj(account)) fail("account");
