@@ -45,7 +45,7 @@ function Body({ proposal }: { proposal: AdProposalDTO }) {
         <ProposalActions proposal={proposal} draft={draft} dirty={dirty} issueCount={issues.length} />
       </Card>
       {draft.groups.map((g, i) => (
-        <ProposalGroupEditor key={i} index={i} group={g} issues={dirty ? [] : issues} editable={editable} onChange={(next) => setGroup(i, next)} />
+        <ProposalGroupEditor key={i} index={i} group={g} issues={dirty ? [] : issues} editable={editable} bidRange={proposal.bidRange} onChange={(next) => setGroup(i, next)} />
       ))}
       {applied && <ProposalEntities proposalId={proposal.id} accountId={proposal.accountId} />}
     </LockNoticesProvider>

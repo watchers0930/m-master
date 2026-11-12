@@ -4,6 +4,7 @@ import { MARKET_LOCATIONS } from "@/lib/market/constants";
 import { checkpointSchema, type FrozenInput } from "@/lib/seo/adapters/types";
 import { METRIC_OPERATIONS } from "@/lib/seo/adapters/metric-contract";
 import { snapshotHash } from "./hash";
+import { utcTimestamp } from "@/lib/sql-time";
 /** Stored sources only, called inside the input collector's repeatable-read transaction. */
 export async function readStructuredInput(tx: Prisma.TransactionClient, ownerId: string, domainId: string, snapshot: ConsultingSnapshot) {
   const location = MARKET_LOCATIONS[snapshot.market].location_code;
@@ -26,7 +27,7 @@ export async function readStructuredInput(tx: Prisma.TransactionClient, ownerId:
       WHERE k.id IN (${Prisma.join(keywords.map(k=>k.id))}) AND k.domain_id=${domainId}
         AND t.owner_id=${ownerId} AND d.owner_id=${ownerId} AND a.domain_id=${domainId} AND a.market=${snapshot.market}
         AND t.operation IN (${Prisma.join([...METRIC_OPERATIONS])}) AND t.status IN ('completed','partial')
-        AND a.created_at<=${to} AND t.result_checkpoint->>'observedAt'<=${snapshot.range.to}
+        AND a.created_at<=${utcTimestamp(to)} AND t.result_checkpoint->>'observedAt'<=${snapshot.range.to}
         AND t.frozen_input->>'location'=${String(location)} AND t.frozen_input->>'market'=${snapshot.market}
     ), latest AS (
       SELECT DISTINCT ON (keyword_id, operation) * FROM candidates
@@ -81,7 +82,7 @@ export async function readStructuredInput(tx: Prisma.TransactionClient, ownerId:
       JOIN seo_audits a ON a.id=r.audit_id JOIN domains d ON d.id=a.domain_id
       JOIN seo_keywords k ON k.id=r.keyword_id JOIN domains kd ON kd.id=k.domain_id
       WHERE r.domain_id=${domainId} AND r.market=${snapshot.market} AND r.engine='google' AND r.source='serp'
-        AND r.keyword_id IN (${Prisma.join(keywords.map(k=>k.id))}) AND r.captured_at<=${to}
+        AND r.keyword_id IN (${Prisma.join(keywords.map(k=>k.id))}) AND r.captured_at<=${utcTimestamp(to)}
         AND d.owner_id=${ownerId} AND kd.owner_id=${ownerId}
       ORDER BY r.keyword_id, r.captured_at DESC, r.id ASC) latest
     ORDER BY captured_at DESC, id ASC LIMIT 50`);

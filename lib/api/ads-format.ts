@@ -83,6 +83,9 @@ export function errorView(error: unknown): ErrorView {
 // ── 금액·지표 ──
 export const formatKrw = (n: number | null | undefined) => (typeof n === 'number' ? `${n.toLocaleString('ko-KR')}원` : '확인 못 함');
 export const formatCount = (n: number) => n.toLocaleString('ko-KR');
+/** 제안 입찰 허용 범위(서버 DTO bidRange). 화면은 계산하지 않고 받은 값만 보여 준다. */
+export const bidRangeLabel = (range: { min: number; max: number } | null) =>
+  (range ? `허용 ${formatCount(range.min)}~${formatCount(range.max)}원` : '허용 범위 확인 못 함');
 
 export function snapshotAgeLabel(ageMinutes: number | null): string {
   if (ageMinutes === null) return '감시 기록 없음';

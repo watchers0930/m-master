@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import type { Observation } from "./adapters/types";
+import { utcTimestamp } from "@/lib/sql-time";
 export async function saveRankings(
   tx: Prisma.TransactionClient,
   domainId: string,
@@ -44,7 +45,7 @@ export async function saveRankings(
   await tx.$executeRaw`
     UPDATE seo_keywords k SET rank = r.rank, rank_status = r.status,
       rank_source = 'serp', rank_observed_at = r.captured_at,
-      updated_at = ${new Date()}
+      updated_at = ${utcTimestamp(new Date())}
     FROM seo_rankings r
     WHERE r.keyword_id = k.id AND r.audit_id = ${auditId}
       AND r.domain_id = ${domainId} AND k.domain_id = ${domainId}

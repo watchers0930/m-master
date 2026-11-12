@@ -1,11 +1,12 @@
 // app/(dashboard)/ads/components/ProposalGroupEditor.tsx
 // 제안의 광고그룹 1개 편집(Task 12): 그룹 이름·기본 입찰, 키워드(문구·입찰·삭제, 근거 표시), 소재(제목·설명·삭제).
 // 린트 위반은 해당 칸 바로 아래에 표시한다. 저장하면 서버가 린트·입찰 상한을 다시 검사한다(화면은 검사하지 않는다).
+// 입찰 칸 옆에 서버가 보낸 허용 범위(DTO bidRange — invariants.ts 천장 함수)를 보여 주고 max 로 건다(공식은 복제하지 않는다).
 // 개수 하한(키워드 ≥ 1, 소재 ≥ 1)은 서버 스키마와 같게 삭제 버튼을 잠근다.
 'use client';
 
-import type { ProposalGroup, ProposalLintIssue } from '@/types/ads';
-import { formatCount, issuesFor } from '@/lib/api/ads-format';
+import type { AdProposalDTO, ProposalGroup, ProposalLintIssue } from '@/types/ads';
+import { bidRangeLabel, formatCount, issuesFor } from '@/lib/api/ads-format';
 import { inputStyle, labelStyle, subText, tableStyle, tdStyle, thStyle } from './ui';
 
 function Issues({ list }: { list: ProposalLintIssue[] }) {
@@ -18,9 +19,14 @@ function Issues({ list }: { list: ProposalLintIssue[] }) {
 }
 
 const num = (v: string) => (v === '' ? 0 : Number(v));
+type BidRange = AdProposalDTO['bidRange'];
 
-export function ProposalGroupEditor({ index, group, issues, editable, onChange }: {
-  index: number; group: ProposalGroup; issues: ProposalLintIssue[]; editable: boolean; onChange: (g: ProposalGroup) => void;
+function BidRangeHint({ range }: { range: BidRange }) {
+  return <span style={{ fontSize: 12, color: 'var(--sub)', whiteSpace: 'nowrap' }}>{bidRangeLabel(range)}</span>;
+}
+
+export function ProposalGroupEditor({ index, group, issues, editable, bidRange, onChange }: {
+  index: number; group: ProposalGroup; issues: ProposalLintIssue[]; editable: boolean; bidRange: BidRange; onChange: (g: ProposalGroup) => void;
 }) {
   const setKeyword = (k: number, patch: Partial<ProposalGroup['keywords'][number]>) =>
     onChange({ ...group, keywords: group.keywords.map((x, i) => (i === k ? { ...x, ...patch } : x)) });
@@ -37,7 +43,10 @@ export function ProposalGroupEditor({ index, group, issues, editable, onChange }
         </label>
         <label style={labelStyle}>
           그룹 기본 입찰(원)
-          <input type="number" min={70} step={10} value={group.bidAmt} disabled={!editable} onChange={(e) => onChange({ ...group, bidAmt: num(e.target.value) })} style={inputStyle} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <input type="number" min={bidRange?.min ?? 70} max={bidRange?.max} step={10} value={group.bidAmt} disabled={!editable} onChange={(e) => onChange({ ...group, bidAmt: num(e.target.value) })} style={inputStyle} />
+            <BidRangeHint range={bidRange} />
+          </div>
         </label>
         <span style={{ ...subText, color: groupIssues > 0 ? '#b91c1c' : 'var(--sub)' }}>이 그룹 위반 {groupIssues}건</span>
       </div>
@@ -54,8 +63,11 @@ export function ProposalGroupEditor({ index, group, issues, editable, onChange }
                   <input value={k.keyword} maxLength={100} disabled={!editable} onChange={(e) => setKeyword(i, { keyword: e.target.value })} style={inputStyle} />
                   <Issues list={issuesFor(issues, index, 'keyword', i)} />
                 </td>
-                <td style={{ ...tdStyle, width: 110 }}>
-                  <input type="number" min={70} step={10} value={k.bidAmt} disabled={!editable} onChange={(e) => setKeyword(i, { bidAmt: num(e.target.value) })} style={inputStyle} />
+                <td style={{ ...tdStyle, width: 130 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <input type="number" min={bidRange?.min ?? 70} max={bidRange?.max} step={10} value={k.bidAmt} disabled={!editable} onChange={(e) => setKeyword(i, { bidAmt: num(e.target.value) })} style={inputStyle} />
+                    <BidRangeHint range={bidRange} />
+                  </div>
                 </td>
                 <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                   {k.evidence.lt10 ? '10 미만' : k.evidence.qc === null ? '—' : formatCount(k.evidence.qc)} · {k.evidence.compIdx ?? '—'}

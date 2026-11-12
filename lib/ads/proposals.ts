@@ -20,7 +20,7 @@ import { isEntityId } from "@/schemas/id";
 import { assertAdsOwner } from "./access";
 import { loadOwnedAccount, notFound, withAccountClient, type AdsDeps } from "./account-core";
 import { AdsHttpError } from "./http";
-import { caps, type Caps } from "./invariants";
+import { caps, proposalBidRange, type Caps } from "./invariants";
 import { collectSeeds, manualSeeds, researchKeywords } from "./keywords";
 import { generateProposal, type LlmClient } from "./propose";
 
@@ -31,6 +31,11 @@ export const PROPOSAL_SELECT = {
   sourceKeywords: true, costKrw: true, failCode: true, reviewedAt: true, createdAt: true, updatedAt: true,
 } satisfies Prisma.AdProposalSelect;
 type ProposalRow = Prisma.AdProposalGetPayload<{ select: typeof PROPOSAL_SELECT }>;
+/** 상세 DTO 전용: 입찰 범위 계산에 계정 상한 3칸만 더 읽는다(목록은 읽지 않는다). */
+export const PROPOSAL_DETAIL_SELECT = {
+  ...PROPOSAL_SELECT, adAccount: { select: { dailyCapKrw: true, sharedBudgetKrw: true, maxBidKrw: true } },
+} satisfies Prisma.AdProposalSelect;
+type ProposalDetailRow = Prisma.AdProposalGetPayload<{ select: typeof PROPOSAL_DETAIL_SELECT }>;
 
 // 저장 값은 이 모듈·proposal-review.ts만 쓴다(형태 검사 후 저장). 읽을 때는 배열 여부만 방어한다.
 export const payloadOf = (row: { payload: Prisma.JsonValue }): ProposalPayload => {
@@ -55,9 +60,17 @@ function toSummary(row: ProposalRow): AdProposalSummaryDTO {
   };
 }
 
-export function toProposalDTO(row: ProposalRow): AdProposalDTO {
+function bidRangeOf(account: ProposalDetailRow["adAccount"]): AdProposalDTO["bidRange"] {
+  try {
+    return proposalBidRange(caps(account));
+  } catch {
+    return null; // 상한값이 깨진 계정 — 화면은 범위를 모른다고 표시하고, 저장·승인은 서버가 422로 막는다
+  }
+}
+
+export function toProposalDTO(row: ProposalDetailRow): AdProposalDTO {
   return {
-    ...toSummary(row), payload: payloadOf(row), lintResult: lintOf(row), sourceKeywords: sourceKeywordsOf(row),
+    ...toSummary(row), bidRange: bidRangeOf(row.adAccount), payload: payloadOf(row), lintResult: lintOf(row), sourceKeywords: sourceKeywordsOf(row),
     failCode: row.failCode, reviewedAt: row.reviewedAt?.toISOString() ?? null,
   };
 }
@@ -117,7 +130,7 @@ export async function createProposal(ownerId: string, input: AdsProposalCreateIn
       sourceKeywords: result.sourceKeywords as unknown as Prisma.InputJsonValue,
       costKrw: result.costKrw,
     },
-    select: PROPOSAL_SELECT,
+    select: PROPOSAL_DETAIL_SELECT,
   });
   return toProposalDTO(row);
 }
@@ -125,7 +138,7 @@ export async function createProposal(ownerId: string, input: AdsProposalCreateIn
 export async function getProposal(ownerId: string, id: string): Promise<AdProposalDTO> {
   assertAdsOwner(ownerId);
   if (!isEntityId(id)) throw notFound();
-  const row = await prisma.adProposal.findFirst({ where: { id, ownerId }, select: PROPOSAL_SELECT });
+  const row = await prisma.adProposal.findFirst({ where: { id, ownerId }, select: PROPOSAL_DETAIL_SELECT });
   if (!row) throw notFound();
   return toProposalDTO(row);
 }

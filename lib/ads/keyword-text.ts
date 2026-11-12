@@ -31,15 +31,26 @@ function addPairs(token: string, into: Set<string>): Set<string> {
   return into;
 }
 
-/** 수동 씨앗(원문 — 공백으로 토큰을 나누기 위해 정제 전 값을 받는다. 문자열이 아니거나 허용 문자 밖 토큰은 무시) → 관련도 판정 함수. */
-export function relevanceFilter(seeds: readonly unknown[]): (keyword: string) => boolean {
-  const tokens = new Set<string>(), pairs = new Set<string>();
+/** 관련도 단계(B3, 2026-11-12): 0 = 관련 없음(제외 — 포함 판정은 위 ①·②와 같다). 남은 것은 일치 강도로
+ *  3 = 수동 씨앗 하나를 통째로 포함(공백 무시·소문자 정규화), 2 = 씨앗 토큰 하나를 통째로 공유, 1 = 한글 2글자만 겹침.
+ *  씨앗(원문 — 공백으로 토큰을 나누기 위해 정제 전 값을 받는다. 문자열이 아니거나 허용 문자 밖 토큰은 무시). */
+export function relevanceTier(seeds: readonly unknown[]): (keyword: string) => 0 | 1 | 2 | 3 {
+  const tokens = new Set<string>(), pairs = new Set<string>(), wholes = new Set<string>();
   for (const seed of seeds) {
     if (typeof seed !== "string") continue;
-    for (const token of tokensOf(seed)) {
+    const seedTokens = tokensOf(seed);
+    if (seedTokens.length) wholes.add(seedTokens.join(""));
+    for (const token of seedTokens) {
       tokens.add(token);
       addPairs(token, pairs);
     }
   }
-  return (keyword) => tokensOf(keyword).some((token) => tokens.has(token) || [...addPairs(token, new Set())].some((p) => pairs.has(p)));
+  return (keyword) => {
+    const kwTokens = tokensOf(keyword);
+    const sharesToken = kwTokens.some((token) => tokens.has(token));
+    if (!sharesToken && !kwTokens.some((token) => [...addPairs(token, new Set())].some((p) => pairs.has(p)))) return 0;
+    const joined = kwTokens.join("");
+    if ([...wholes].some((whole) => joined.includes(whole))) return 3;
+    return sharesToken ? 2 : 1;
+  };
 }

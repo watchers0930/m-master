@@ -24,9 +24,9 @@ import { checkTarget, retryPendingPauses, targetIsPaused } from "./apply-inspect
 import { stepAd, stepAdgroup, stepCampaign, stepKeyword, type ApplyCtx, type PriorOp } from "./apply-steps";
 import { assertExecutionEnabled } from "./execution";
 import { AdsHttpError } from "./http";
-import { AdsInvariantError, caps } from "./invariants";
+import { caps } from "./invariants";
 import { checkPayload, lintPayload } from "./proposal-check";
-import { proposalConflict } from "./proposal-review";
+import { problemError, proposalConflict } from "./proposal-review";
 import { kindOf, payloadOf, sourceKeywordsOf } from "./proposals";
 
 type Tx = Prisma.TransactionClient;
@@ -47,7 +47,7 @@ function recheck(row: AdProposal, account: AdAccount): void {
   const payload = payloadOf(row);
   const checked = checkPayload(payload, { kind: kindOf(row), caps: caps(account), stats: sourceKeywordsOf(row), source: "edit" });
   const problem = checked.problems[0];
-  if (problem) throw problem.rule === "bid-range" ? new AdsInvariantError(problem.path) : new AdsHttpError("proposal_invalid", problem.message, 422, { field: problem.path });
+  if (problem) throw problemError(problem);
   const remaining = lintPayload(payload).length;
   if (remaining > 0) proposalConflict("lint_issues_remain", undefined, { lintIssueCount: remaining });
 }

@@ -15,9 +15,9 @@ import type { AdProposalDTO } from "@/types/ads";
 import { assertAdsOwner } from "./access";
 import { notFound } from "./account-core";
 import { AdsHttpError } from "./http";
-import { AdsInvariantError, caps } from "./invariants";
+import { caps } from "./invariants";
 import { checkPayload, lintPayload, type Problem } from "./proposal-check";
-import { kindOf, lintResultOf, payloadOf, PROPOSAL_SELECT, sourceKeywordsOf, toProposalDTO } from "./proposals";
+import { kindOf, lintResultOf, payloadOf, PROPOSAL_DETAIL_SELECT, sourceKeywordsOf, toProposalDTO } from "./proposals";
 
 type Tx = Prisma.TransactionClient;
 type LockedRow = Awaited<ReturnType<typeof lockProposal>>;
@@ -50,9 +50,9 @@ async function accountCaps(tx: Tx, ownerId: string, accountId: string) {
   return caps(account); // 계정 상한값이 깨져 있으면 AdsInvariantError(422) — 상한이 풀린 채로 저장·승인하지 않는다
 }
 
-function problemError(p: Problem): Error {
-  if (p.rule === "bid-range") return new AdsInvariantError(p.path);
-  return new AdsHttpError("proposal_invalid", p.message, 422, { field: p.path });
+/** 저장·승인·적용 재검사 공용: 입찰 범위 위반은 422 ads_invariant(코드·field 유지) + 범위 숫자가 든 메시지, 그 밖은 422 proposal_invalid. */
+export function problemError(p: Problem): Error {
+  return new AdsHttpError(p.rule === "bid-range" ? "ads_invariant" : "proposal_invalid", p.message, 422, { field: p.path });
 }
 
 async function audit(tx: Tx, ownerId: string, id: string, action: string, payload: Prisma.InputJsonValue) {
@@ -60,7 +60,7 @@ async function audit(tx: Tx, ownerId: string, id: string, action: string, payloa
 }
 
 const readBack = async (tx: Tx, ownerId: string, id: string) =>
-  toProposalDTO(await tx.adProposal.findFirstOrThrow({ where: { id, ownerId }, select: PROPOSAL_SELECT }));
+  toProposalDTO(await tx.adProposal.findFirstOrThrow({ where: { id, ownerId }, select: PROPOSAL_DETAIL_SELECT }));
 
 export async function editProposal(ownerId: string, id: string, input: AdsProposalEditInput, deps: ReviewDeps = {}): Promise<AdProposalDTO> {
   assertAdsOwner(ownerId);

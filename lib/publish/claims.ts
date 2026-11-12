@@ -7,6 +7,7 @@ import { isPublishable, type PublishTarget, type PublishContext } from './eligib
 import type { Channel } from '@/types/db';
 import { getNaverCafeCreds } from '@/lib/channel-credentials';
 import { loadCredentials } from './errors';
+import { UTC_NOW } from '@/lib/sql-time';
 export type TargetRef = { type: 'content' | 'idea_job'; id: string };
 export type ClaimInput = { ownerId: string; channel: Channel; destinationKey?: string; trigger: 'manual' | 'schedule' | 'worker'; dailyLimit?: boolean;
   /** 예약 슬롯 발행: 같은 트랜잭션에서 슬롯을 잠그고 scheduled·도래를 재확인(slot-mutation 과 직렬화) */ slotId?: string };
@@ -60,7 +61,7 @@ export async function claimPublish(ref: TargetRef, input: ClaimInput) {
       }
       if (ctx.slotId) {
         const due = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM schedule_slots WHERE id = ${ctx.slotId} AND owner_id = ${ctx.ownerId}
-          AND content_id = ${ref.id} AND channel = ${ctx.channel} AND status = 'scheduled' AND scheduled_at <= now() FOR UPDATE`;
+          AND content_id = ${ref.id} AND channel = ${ctx.channel} AND status = 'scheduled' AND scheduled_at <= ${UTC_NOW} FOR UPDATE`;
         if (!due.length) return { ok: false as const, reason: 'not_due' as const };
       }
       const target = await loadTarget(tx, ref, ctx.ownerId);

@@ -88,6 +88,11 @@ export function proposalBidCeiling(c: Caps): number {
   return Math.max(MIN_BID_KRW, Math.min(c.maxBid, Math.floor(c.dailyCapKrw / MIN_DAILY_CLICKS / 10) * 10));
 }
 
+/** 화면·메시지용 제안 입찰 범위(같은 천장 함수). 클라이언트는 이 값을 DTO(bidRange)로 받는다 — 공식을 복제하지 않는다. */
+export function proposalBidRange(c: Caps): { min: number; max: number } {
+  return { min: MIN_BID_KRW, max: proposalBidCeiling(c) };
+}
+
 export function checkProposalBid(v: unknown, c: Caps, field = "bidAmt"): number {
   return checkBid(v, { ...c, maxBid: proposalBidCeiling(c) }, field);
 }

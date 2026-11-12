@@ -13,7 +13,7 @@ import type {
   AdProposalKind, ProposalEvidence, ProposalGroup, ProposalLintIssue, ProposalPayload, ProposalSourceKeyword,
 } from "@/types/ads";
 import { MAX_CREATIVES, MAX_GROUPS, type ProposalPayloadShape } from "@/schemas/ads-proposal";
-import { AdsInvariantError, checkProposalBid, MIN_BID_KRW, proposalBidCeiling, type Caps } from "./invariants";
+import { AdsInvariantError, checkProposalBid, proposalBidRange, type Caps } from "./invariants";
 import { collapseKeyword, keywordDedupeKey } from "./keyword-text";
 import { lintCreativeGroup, lintKeyword } from "./lint";
 
@@ -49,7 +49,8 @@ function bidProblem(value: unknown, caps: Caps, path: string, problems: Problem[
     return checkProposalBid(value, caps, path);
   } catch (error) {
     if (!(error instanceof AdsInvariantError)) throw error;
-    problems.push({ path, rule: "bid-range", message: `입찰가는 ${MIN_BID_KRW}~${proposalBidCeiling(caps)} 사이 정수여야 합니다.` });
+    const { min, max } = proposalBidRange(caps);
+    problems.push({ path, rule: "bid-range", message: `입찰가는 ${min.toLocaleString("ko-KR")}~${max.toLocaleString("ko-KR")}원 사이 정수여야 합니다.` });
     return NaN;
   }
 }

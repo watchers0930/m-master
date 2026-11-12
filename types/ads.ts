@@ -83,6 +83,8 @@ export type AdProposalSummaryDTO = {
 };
 
 export type AdProposalDTO = AdProposalSummaryDTO & {
+  /** 제안 입찰 허용 범위(서버 lib/ads/invariants.ts proposalBidRange — 현재 계정 상한 기준). 계정 상한값이 깨져 있으면 null. */
+  bidRange: { min: number; max: number } | null;
   payload: ProposalPayload;
   lintResult: ProposalLintResult | null;
   sourceKeywords: ProposalSourceKeyword[];
