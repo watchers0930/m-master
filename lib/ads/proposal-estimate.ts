@@ -1,4 +1,4 @@
-// lib/ads/proposal-estimate.ts — 저장된 제안의 키워드별 예상 순위(B4, GET /api/ads/proposals/[id]/estimate).
+// lib/ads/proposal-estimate.ts — 저장된 제안의 키워드별 예상 순위(B4, POST /api/ads/proposals/[id]/estimate — 본문 없음).
 // - 접근: 허용목록(assertAdsOwner) + 세션 ownerId 범위. 남의 제안·형식이 틀린 id는 404(IDOR) — 네이버 호출 0.
 // - 키워드·입찰가는 저장된 제안 payload에서만 온다(클라이언트 입력 없음). 계정은 제안의 계정, 클라이언트는 clientForAccount(withAccountClient).
 // - 읽기 전용: 비상 정지 스위치·원장·execution.ts와 무관하다(판정 2). 키 무효(401)는 기존대로 계정을 invalid_key로 바꾼다.

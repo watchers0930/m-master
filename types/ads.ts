@@ -94,7 +94,7 @@ export type AdProposalDTO = AdProposalSummaryDTO & {
 
 export type AdProposalPage = { items: AdProposalSummaryDTO[]; nextCursor: string | null };
 
-// ── 순위별 예상 입찰가(B4, GET /api/ads/proposals/[id]/estimate) ──
+// ── 순위별 예상 입찰가(B4, POST /api/ads/proposals/[id]/estimate — 본문 없음) ──
 export type EstimateDevice = "PC" | "MOBILE";
 export type EstimatePosition = 1 | 2 | 3 | 4 | 5;
 /** 순위 → 네이버 예상 입찰가(원). 네이버가 돌려주지 않은 순위는 빠진다. */
