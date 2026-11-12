@@ -72,6 +72,11 @@ export function errorView(error: unknown): ErrorView {
     }
     case 'drift':
       return view(`${serverMessage || '네이버 설정이 MINTEQ 상한과 다릅니다.'}${typeof details.field === 'string' ? ` (항목: ${details.field})` : ''}`, false, true);
+    case 'ads_estimate_cooldown': { // 예상 순위 1분 제한(B4) — 서버 retryAfterSec(양의 정수)로 남은 초를 보여 준다
+      const n = details.retryAfterSec;
+      if (typeof n === 'number' && Number.isSafeInteger(n) && n > 0) return view(`${n}초 후 다시 조회할 수 있습니다(같은 제안은 1분에 한 번).`);
+      break;
+    }
     case 'ads_invariant':
     case 'proposal_invalid':
       return view(`${serverMessage || '입력값이 규칙에 맞지 않습니다.'}${typeof details.field === 'string' ? ` (위치: ${details.field})` : ''}`);

@@ -76,6 +76,8 @@ export async function estimatePositionBids(
 /**
  * 내 입찰가로 예상되는 순위: table[p] ≤ bid 인 가장 좋은(작은) p. 빠진 순위는 건너뛴다.
  * 어느 순위에도 못 미치면 5위 값이 있을 때만 '6위 이하'(그보다 낮다고 확인됨), 5위 값이 없으면 null(판단 못 함).
+ * 비단조 표(네이버 추정 오차로 예: 2위 400원 < 3위 600원)도 정렬·보정하지 않는다 — 1위부터 차례로 보고 처음으로 table[p] ≤ bid 인
+ * p를 돌려준다(위 예에서 입찰 500원 → 2위). 표를 고치지 않고 네이버 추정값 그대로 해석한다.
  */
 export function expectedPosition(bid: number, table: PositionBidTable): ExpectedPosition {
   for (const p of ESTIMATE_POSITIONS) {
