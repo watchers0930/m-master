@@ -106,3 +106,13 @@ export const naverStatsDetailSchema = z.object({
 // GET /ncc/keywords?ids=…, /ncc/ads?ids=… (명세: 배열)
 export const naverKeywordListSchema = z.array(naverKeywordSchema);
 export const naverAdListSchema = z.array(naverAdSchema);
+
+// ── 순위별 예상 입찰가(B4) ── POST /estimate/average-position-bid/keyword 응답(공식 naver/searchad-apidoc java-sample model/estimate).
+// 바깥은 { estimate: [...] } 여야 한다(아니면 형식 오류). 항목은 따로 하나씩 parse해 틀린 항목만 버린다(호출 전체를 깨지 않음).
+// 입찰가는 양의 정수만(0·음수·소수·문자열은 의미 없는 값으로 보고 버린다).
+export const naverPositionBidResponseSchema = z.object({ estimate: z.array(z.unknown()) });
+export const naverPositionBidItemSchema = z.object({
+  keyword: z.string().min(1),
+  position: z.number().int().min(1).max(5),
+  bid: z.number().int().positive(),
+});

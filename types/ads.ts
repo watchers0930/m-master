@@ -94,6 +94,28 @@ export type AdProposalDTO = AdProposalSummaryDTO & {
 
 export type AdProposalPage = { items: AdProposalSummaryDTO[]; nextCursor: string | null };
 
+// ── 순위별 예상 입찰가(B4, POST /api/ads/proposals/[id]/estimate — 본문 없음) ──
+export type EstimateDevice = "PC" | "MOBILE";
+export type EstimatePosition = 1 | 2 | 3 | 4 | 5;
+/** 순위 → 네이버 예상 입찰가(원). 네이버가 돌려주지 않은 순위는 빠진다. */
+export type PositionBidTable = Partial<Record<EstimatePosition, number>>;
+/** 내 입찰가로 예상되는 순위. null = 표가 비어 판단할 수 없음(5위 값이 없는데 모든 순위보다 낮을 때 포함). */
+export type ExpectedPosition = EstimatePosition | "6위 이하" | null;
+export type ProposalEstimateRowDTO = {
+  keyword: string;
+  bid: number;
+  PC: PositionBidTable;
+  MOBILE: PositionBidTable;
+  expected: Record<EstimateDevice, ExpectedPosition>;
+};
+export type ProposalEstimateDTO = {
+  fetchedAt: string;
+  devices: EstimateDevice[];
+  /** 제안 상세와 같은 값(invariants.ts proposalBidRange). 상한 초과 표시는 이 값으로만 한다. */
+  bidRange: { min: number; max: number } | null;
+  rows: ProposalEstimateRowDTO[];
+};
+
 // ── 적용·켜기/끄기 결과(Task 9 라우트 응답) ──
 export type AdApplyResultDTO = { status: "applied" | "apply_failed"; failCode?: string };
 export type AdLockEntityType = "campaign" | "adgroup" | "keyword" | "ad";

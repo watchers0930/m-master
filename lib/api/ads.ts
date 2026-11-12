@@ -7,7 +7,7 @@
 
 import type {
   AdAccountDTO, AdAccountWithChannels, AdApplyResultDTO, AdLockEntityType, AdLockResultDTO, AdOverviewDTO,
-  AdProposalDTO, AdProposalKind, AdProposalPage, AdProposalStatus, ProposalPayload,
+  AdProposalDTO, AdProposalKind, AdProposalPage, AdProposalStatus, ProposalEstimateDTO, ProposalPayload,
 } from '@/types/ads';
 
 export class AdsApiError extends Error {
@@ -85,6 +85,8 @@ export function reviewAdProposal(id: string, decision: 'approve' | 'reject', exp
   const body = { decision, expected_updated_at: expectedUpdatedAt, ...(trimmed ? { reason: trimmed } : {}) };
   return send<AdProposalDTO>(`/api/ads/proposals/${seg(id)}/review`, jsonInit('POST', body));
 }
+/** 순위별 예상 입찰가(네이버 쓰기 없음, 버튼을 눌렀을 때만). POST 본문 없음 — 키워드는 서버가 저장된 제안에서 읽는다. */
+export const getAdProposalEstimate = (id: string) => send<ProposalEstimateDTO>(`/api/ads/proposals/${seg(id)}/estimate`, { method: 'POST' });
 export const applyAdProposal = (id: string) => send<AdApplyResultDTO>(`/api/ads/proposals/${seg(id)}/apply`, { method: 'POST' });
 
 // ── 켜기·끄기(끄기는 서버가 버전과 무관하게 이기지만 스키마상 버전은 늘 보낸다) ──
