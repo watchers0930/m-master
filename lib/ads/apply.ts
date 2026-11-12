@@ -27,8 +27,7 @@ import { stepAd, stepAdgroup, stepCampaign, stepKeyword, stepProhibitedKeyword, 
 import { assertExecutionEnabled } from "./execution";
 import { AdsHttpError } from "./http";
 import { caps } from "./invariants";
-import { keywordDedupeKey } from "./keyword-text";
-import { sellProhibitedKeywords } from "./managed-keywords";
+import { prohibitedKey, sellProhibitedKeywords } from "./managed-keywords";
 import { checkPayload, lintPayload } from "./proposal-check";
 import { problemError, proposalConflict } from "./proposal-review";
 import { kindOf, payloadOf, sourceKeywordsOf } from "./proposals";
@@ -116,7 +115,7 @@ async function run(ctx: ApplyCtx, row: AdProposal, payload: ProposalPayload, ski
   ctx.step = "managed_keywords";
   const prohibited = await sellProhibitedKeywords(ctx.client, payload.groups.flatMap((g) => g.keywords.map((k) => k.keyword)));
   const keyword = async (groupId: string, label: string, i: number, k: ProposalKeyword) => {
-    if (!prohibited.has(keywordDedupeKey(k.keyword))) return stepKeyword(ctx, groupId, label, i, k);
+    if (!prohibited.has(prohibitedKey(k.keyword))) return stepKeyword(ctx, groupId, label, i, k);
     if (!(await stepProhibitedKeyword(ctx, groupId, label, i, k))) skipped.push(k.keyword);
   };
   if (kindOf(row) === "extend_group") {

@@ -142,13 +142,16 @@ export async function getProposal(ownerId: string, id: string): Promise<AdPropos
   if (!isEntityId(id)) throw notFound();
   const row = await prisma.adProposal.findFirst({ where: { id, ownerId }, select: PROPOSAL_DETAIL_SELECT });
   if (!row) throw notFound();
-  return { ...toProposalDTO(row), skippedKeywords: await lastSkippedKeywords(ownerId, id) };
+  const tried = row.status === "applied" || row.status === "apply_failed" || row.status === "applying";
+  return { ...toProposalDTO(row), skippedKeywords: tried ? await lastSkippedKeywords(ownerId, id, row.createdAt) : [] };
 }
 
-/** 마지막 적용 감사 로그의 판매 금지 건너뜀(apply.ts). 인덱스(action, createdAt)를 타고 이 제안·소유자 행만 본다. */
-async function lastSkippedKeywords(ownerId: string, id: string): Promise<string[]> {
+/** 마지막 적용 감사 로그의 판매 금지 건너뜀(apply.ts). 적용을 시도한 제안만 부르고, 인덱스(action, createdAt)를 제안 생성 시각부터 범위로 탄다
+ *  — 적용 기록 전체를 훑지 않게(codex MED-2). 소유자·제안 조건으로 이 제안 행만 본다. */
+async function lastSkippedKeywords(ownerId: string, id: string, since: Date): Promise<string[]> {
   const last = await prisma.auditLog.findFirst({
-    where: { action: "ads.proposal_apply", targetType: "ad_proposal", targetId: id, actor: ownerId }, orderBy: { createdAt: "desc" }, select: { payload: true },
+    where: { action: "ads.proposal_apply", createdAt: { gte: since }, targetType: "ad_proposal", targetId: id, actor: ownerId },
+    orderBy: { createdAt: "desc" }, select: { payload: true },
   });
   const list = (last?.payload as { skippedKeywords?: unknown } | null)?.skippedKeywords;
   return Array.isArray(list) ? list.filter((k): k is string => typeof k === "string") : [];
