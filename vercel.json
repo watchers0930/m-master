@@ -9,6 +9,8 @@
     { "path": "/api/cron/schedule-publish", "schedule": "*/15 * * * *" },
     { "path": "/api/cron/ads-guard", "schedule": "*/30 * * * *" },
     { "path": "/api/cron/ads-inspect", "schedule": "*/30 * * * *" },
-    { "path": "/api/cron/ads-stats", "schedule": "0 21 * * *" }
+    { "path": "/api/cron/ads-stats", "schedule": "0 21 * * *" },
+    { "path": "/api/cron/ops-report", "schedule": "0 23 * * *" },
+    { "path": "/api/cron/ops-report", "schedule": "30 23 * * *" }
   ]
 }
