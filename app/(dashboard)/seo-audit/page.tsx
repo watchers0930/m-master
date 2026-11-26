@@ -160,6 +160,7 @@ function SeoAuditContent() {
             market={market}
             canWrite={canWrite}
             resumable={resumable}
+            selectedAuditId={activeAuditId}
             onAudit={handleAuditResult}
           />
 

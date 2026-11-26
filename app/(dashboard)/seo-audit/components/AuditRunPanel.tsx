@@ -5,14 +5,16 @@
 // runKey 는 '입력이 같은 불확실한 재시도'에는 재사용하고, 확인된 실행 이후에만 새로 발급해
 // 응답 유실 후 재클릭이 중복 유료 실행이 되지 않게 한다(설계 §5.4·§11, 리뷰 지적 1).
 // 쓰기 권한(canWrite)·시장(naver=ko-KR 한정)은 UI 선제 가드이고, 서버가 최종 강제한다.
+// 실행·재개를 누른 진단은 화면이 열려 있는 동안 자동으로 이어간다(hooks/use-auto-resume.ts — 15분 크론 대기 없이 수 분 안에 완료).
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Market } from '@/types/visibility';
 import type { SeoAuditDTO, SeoEngine, AuditMode } from '@/types/seo';
 import { ENGINE_LABELS, MODE_LABELS, SEO_ENGINES } from '../constants';
 import { SeoApiError, type RunAuditBody } from '../api';
 import { useRunAudit, useResumeAudit } from '../hooks/use-seo-audit';
+import { useAutoResume } from '../hooks/use-auto-resume';
 
 interface Props {
   domainId: string;
@@ -20,6 +22,8 @@ interface Props {
   canWrite: boolean;
   /** 진행 중/부분 완료로 재개 가능한 현재 실행(없으면 null) */
   resumable: SeoAuditDTO | null;
+  /** 화면이 지금 보여 주는 진단 id(이력 선택 즉시 바뀜) — 자동 진행·늦은 재개 응답이 선택을 덮어쓰지 않게 */
+  selectedAuditId: string | null;
   /** 실행/재개 결과 반영 — page 가 활성 auditId 를 추적한다 */
   onAudit: (audit: SeoAuditDTO) => void;
 }
@@ -41,9 +45,10 @@ function parsePaths(raw: string): string[] {
     .slice(0, 5);
 }
 
-export function AuditRunPanel({ domainId, market, canWrite, resumable, onAudit }: Props) {
+export function AuditRunPanel({ domainId, market, canWrite, resumable, selectedAuditId, onAudit }: Props) {
   const runM = useRunAudit();
   const resumeM = useResumeAudit(domainId);
+  const auto = useAutoResume(resumeM.mutateAsync, onAudit);
   const [mode, setMode] = useState<AuditMode>('instant');
   const [engines, setEngines] = useState<SeoEngine[]>(['google']);
   const [pathsText, setPathsText] = useState('');
@@ -54,7 +59,13 @@ export function AuditRunPanel({ domainId, market, canWrite, resumable, onAudit }
   const attemptRef = useRef<{ signature: string; runKey: string } | null>(null);
 
   const naverAllowed = market === 'ko-KR';
-  const busy = runM.isPending || resumeM.isPending;
+  const busy = runM.isPending || resumeM.isPending || auto.running;
+  // 대장이 다른 진단(이력)을 고르면 자동 진행을 멈춘다 — 응답이 선택을 다시 덮어쓰지 않게(codex MED).
+  // 기준은 선택 id(즉시 바뀜)다. 상세 조회로 채워지는 resumable을 쓰면 새 진단 직후(상세 도착 전) 바로 멈췄다(codex 2차 MED).
+  const selectedRef = useRef(selectedAuditId);
+  selectedRef.current = selectedAuditId;
+  const autoId = auto.auditId, stopAuto = auto.stop;
+  useEffect(() => { if (autoId && selectedAuditId !== autoId) stopAuto('manual'); }, [autoId, selectedAuditId, stopAuto]);
 
   const toggleEngine = (en: SeoEngine) => {
     if (en === 'naver' && !naverAllowed) return;
@@ -82,6 +93,7 @@ export function AuditRunPanel({ domainId, market, canWrite, resumable, onAudit }
       const audit = await runM.mutateAsync(body);
       attemptRef.current = null; // 확인된 실행 → 다음 클릭은 새 실행(새 키)
       onAudit(audit);
+      auto.start(audit); // 남은 작업이 있으면 자동으로 이어간다
     } catch (err) {
       // 실패/유실 → attemptRef 보존해 같은 입력 재시도 시 같은 키로 재조회되게 둔다.
       setError(msgOf(err));
@@ -93,7 +105,9 @@ export function AuditRunPanel({ domainId, market, canWrite, resumable, onAudit }
     setError(null);
     try {
       const audit = await resumeM.mutateAsync(resumable.id);
+      if (selectedRef.current !== audit.id) return; // 기다리는 사이 다른 진단을 골랐으면 선택을 되돌리지 않는다(codex 2차 MED)
       onAudit(audit);
+      auto.start(audit);
     } catch (err) {
       setError(msgOf(err));
     }
@@ -205,6 +219,18 @@ export function AuditRunPanel({ domainId, market, canWrite, resumable, onAudit }
         </div>
 
         {error && <p role="alert" style={{ fontSize: 11.5, color: '#dc2626' }}>{error}</p>}
+        {auto.running && (
+          <div role="status" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', fontSize: 12, color: 'var(--sub)' }}>
+            <span>남은 작업을 자동으로 이어서 진행하고 있습니다. 화면을 닫으면 이미 보낸 작업의 결과만 받아 오니, 다시 열어 '진행 중 실행 재개'를 눌러 주세요.</span>
+            <button type="button" className="btn btn-ghost" onClick={() => auto.stop()}>자동 진행 멈추기</button>
+          </div>
+        )}
+        {!auto.running && auto.stoppedReason === 'timeout' && (
+          <p role="status" style={{ fontSize: 12, color: 'var(--sub)' }}>15분이 지나 자동 진행을 멈췄습니다. '진행 중 실행 재개'를 누르면 다시 이어갑니다.</p>
+        )}
+        {!auto.running && auto.stoppedReason === 'error' && auto.error && (
+          <p role="alert" style={{ fontSize: 11.5, color: '#dc2626' }}>자동 진행을 멈췄습니다: {auto.error}</p>
+        )}
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button
