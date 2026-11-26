@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { PLAN_LIMITS, type PlanKey } from "@/lib/billing/limits";
 import { capture } from "./track";
-import { kstDate, periodRange } from "./run-key";
+import { kstDate, periodRange, retryDelayMs } from "./run-key";
 import type { Frequency } from "@/types/visibility";
 import { CAPTURE_LEASE_MS, expireUnrecoverablePending } from "./pending";
 import { ENGINE_IDS } from "@/lib/market/constants";
@@ -98,7 +98,7 @@ export async function captureBatch(input: {
         data: {
           lastCheckedAt: checkedAt,
           attemptFailures: retry ? failures : 0,
-          nextAttemptAt: retry ? new Date(checkedAt.getTime() + Math.min(86400000, 60000 * 2 ** (failures - 1))) : null,
+          nextAttemptAt: retry ? new Date(checkedAt.getTime() + retryDelayMs(failures)) : null,
         },
       });
     };
