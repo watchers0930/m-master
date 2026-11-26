@@ -5,13 +5,16 @@ export const ENGINE_IDS: EngineId[] = [
   "ai_overviews",
   "perplexity",
   "gemini",
+  "naver_ai_briefing",
 ];
+/** 네이버 AI 브리핑은 한국 시장 전용(SerpApi naver 엔진은 지역 파라미터가 없다). */
+const GLOBAL_ENGINES = ENGINE_IDS.filter((id) => id !== "naver_ai_briefing");
 export const MARKET_ENGINES: Record<Market, EngineId[]> = {
   "ko-KR": [...ENGINE_IDS],
-  "en-US": [...ENGINE_IDS],
-  "en-GB": [...ENGINE_IDS],
-  "en-CA": [...ENGINE_IDS],
-  "en-AU": [...ENGINE_IDS],
+  "en-US": [...GLOBAL_ENGINES],
+  "en-GB": [...GLOBAL_ENGINES],
+  "en-CA": [...GLOBAL_ENGINES],
+  "en-AU": [...GLOBAL_ENGINES],
 };
 export const MARKET_LOCATIONS: Record<
   Market,

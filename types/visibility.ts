@@ -1,7 +1,7 @@
 export const MARKETS = ["ko-KR", "en-US", "en-GB", "en-CA", "en-AU"] as const;
 export type Market = (typeof MARKETS)[number];
 export const DEFAULT_MARKET: Market = "ko-KR";
-export type EngineId = "chatgpt" | "ai_overviews" | "perplexity" | "gemini";
+export type EngineId = "chatgpt" | "ai_overviews" | "perplexity" | "gemini" | "naver_ai_briefing";
 export type Frequency = "daily" | "weekly";
 export type SnapshotStatus = "ok" | "no_result" | "failed" | "pending";
 export type Subject = "brand" | "competitor" | "domain";

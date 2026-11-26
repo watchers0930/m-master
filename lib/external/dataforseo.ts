@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { VendorError } from "./vendor-error";
 export interface RunContext {
   ownerId: string;
   deadline?: number;
@@ -25,15 +26,7 @@ const envelopeSchema = z.object({
   tasks: z.array(taskSchema).nullable(),
 });
 export type VendorEnvelope = z.infer<typeof envelopeSchema>;
-export class DataForSeoError extends Error {
-  constructor(
-    public reason: string,
-    public costKrw = 0,
-    public taskId?: string,
-  ) {
-    super(reason);
-  }
-}
+export class DataForSeoError extends VendorError {}
 function responseCost(result: VendorEnvelope): number {
   return usdToKrw(
     Math.max(

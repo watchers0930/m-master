@@ -24,13 +24,7 @@ export function normalizeHost(input: string): string {
     throw new Error("invalid_host");
   return host;
 }
-export function normalizeText(text: string): string {
-  return text
-    .normalize("NFKC")
-    .toLocaleLowerCase()
-    .replace(/\s+/gu, " ")
-    .trim();
-}
+export { normalizeText } from "./text";
 export function citationHost(url: string): string | null {
   try {
     const parsed = new URL(url);

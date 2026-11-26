@@ -4,6 +4,12 @@ import { VisibilityError } from "./http";
 import { expireUnrecoverablePending } from "./pending";
 // Conservative reservation for every in-flight paid engine and its optional judge.
 export const CAPTURE_RESERVE_KRW = 1000;
+/** 무료 엔진(네이버 AI 브리핑 — SerpApi 무료 요금제, 원화 비용 0)은 판정 모델(gpt-4o-mini) 비용만 예약한다. */
+export const FREE_CAPTURE_RESERVE_KRW = 50;
+const FREE_ENGINES = ["naver_ai_briefing"];
+export function captureReserveKrw(engine: string): number {
+  return FREE_ENGINES.includes(engine) ? FREE_CAPTURE_RESERVE_KRW : CAPTURE_RESERVE_KRW;
+}
 export function monthStartKst(now = new Date()) {
   const local = new Date(now.getTime() + 9 * 3600000);
   return new Date(
@@ -73,9 +79,12 @@ export async function pendingReservedKrw(
   tx: Prisma.TransactionClient,
   ownerId: string,
 ) {
-  const [geo, seo, consulting] = await Promise.all([
+  const [geo, geoFree, seo, consulting] = await Promise.all([
     tx.visibilitySnapshot.count({
       where: { query: { ownerId }, status: "pending" },
+    }),
+    tx.visibilitySnapshot.count({
+      where: { query: { ownerId }, status: "pending", engine: { in: FREE_ENGINES } },
     }),
     tx.seoTask.aggregate({
       where: {
@@ -89,5 +98,10 @@ export async function pendingReservedKrw(
       _sum: { reservedKrw: true },
     }),
   ]);
-  return (consulting._sum.reservedKrw ?? 0) + geo * CAPTURE_RESERVE_KRW + (seo._sum.reservedKrw ?? 0);
+  return (
+    (consulting._sum.reservedKrw ?? 0) +
+    (geo - geoFree) * CAPTURE_RESERVE_KRW +
+    geoFree * FREE_CAPTURE_RESERVE_KRW +
+    (seo._sum.reservedKrw ?? 0)
+  );
 }

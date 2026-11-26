@@ -6,11 +6,12 @@ import type {
   VisibilityDataResponse,
   CompetitorScore,
 } from "@/types/visibility";
-import { ENGINE_IDS } from "@/lib/market/constants";
+import { MARKET_ENGINES } from "@/lib/market/constants";
 import { citationHost } from "./normalize";
 export interface ScoreSnapshot {
   engine: string;
   status: string;
+  failReason?: string | null;
   capturedAt: Date;
   citations: Citation[];
   domain: string | null;
@@ -40,7 +41,7 @@ export function score(
   filters: VisibilityDataResponse["filters"],
   engine?: EngineId,
 ): VisibilityDataResponse {
-  const engines: EngineScore[] = (engine ? [engine] : ENGINE_IDS).map((id) => {
+  const engines: EngineScore[] = (engine ? [engine] : MARKET_ENGINES[filters.market]).map((id) => {
     const rows = snapshots.filter((s) => s.engine === id),
       valid = rows.filter((s) => snapshotFacts(s).mentionValid),
       citationValid = rows.filter((s) => snapshotFacts(s).citationValid);
@@ -58,7 +59,7 @@ export function score(
       citationRate: rate(citedCount, citationValid.length),
       unresolvableCount: rows.filter(
         (s) =>
-          (s.status === "ok" && !snapshotFacts(s).mentionValid) ||
+          (s.status === "ok" && !snapshotFacts(s).mentionValid && s.failReason !== "branded_query") ||
           s.status === "pending",
       ).length,
       failedCount: rows.filter(

@@ -1,0 +1,788 @@
+{
+ "capturedAt": "2026-11-26",
+ "note": "SerpApi 실응답(무료 호출) 축약본 — 키·요청 URL 없음",
+ "inline": {
+  "query": "등기부등본 보는법",
+  "naver": {
+   "search_metadata": {
+    "status": "Success"
+   },
+   "search_parameters": {
+    "query": "등기부등본 보는법",
+    "engine": "naver",
+    "device": "desktop"
+   },
+   "ai_briefing": {
+    "markdown": "등기부등본(정식 명칭: 등기사항증명서)은 부동산의 주소, 면적, 소유권 및 소유권과 관련된 권리 사항 등을 기록하여 관리하는 공적 장부입니다. 이를 통해 집주인이 누구인지, 집에 설정된 빚은 얼마인지 등의 이력을 확인할 수 있습니다. [1] [2]\n\n### 등기부등본 구성 요소 및 확인 사항\n\n등기부등본은 크게 세 가지 부분으로 나뉘며, 각 부분에서 확인해야 할 핵심 내용은 다음과 같습니다.\n\n- 표제부: 건물의 기본 정보 확인\n - 건물의 주소, 동·호수, 면적, 용도\n - 아파트·다세대주택의 경우 대지권 설정 여부\n- 갑구: 소유권 및 권리 제한 사항 확인\n - 현재 소유자가 계약 상대방(임대인)과 일치하는지 여부\n - 압류, 가압류, 가등기, 신탁등기 등 권리 제한 사항\n - 임차권등기명령 기록 여부 (보증금 미반환 이력 확인)\n- 을구: 소유권 외의 권리(빚) 확인\n - 근저당권 설정 금액(채권최고액) 확인\n - 전세권 등 기타 권리 관계 [1] [2] [3] [4]\n\n### 안전한 계약을 위한 주의사항\n\n- 매매가 대비 근저당권과 전세보증금의 합계가 통상 매매가의 70%를 넘는다면 위험 신호로 간주할 수 있습니다.\n- 계약 시점뿐만 아니라 잔금 지급 직전에도 등기부등본을 재열람하여 새로운 권리 변동이 없는지 반드시 확인해야 합니다.\n- 대리인과 계약할 경우 위임장과 인감증명서를 철저히 확인하여 실제 소유주의 의사를 검증해야 합니다. [1] [2] [3] [4] [5]\n\n### 발급 방법 및 편의 서비스\n\n- 온라인: 대법원 인터넷등기소를 통해 발급 및 열람 가능\n- 오프라인: 등기소 방문 또는 무인발급기 이용\n- AI 분석 서비스: 최근에는 AI를 활용해 복잡한 등기 용어를 일상 언어로 풀어서 설명해 주는 부동산 분석 서비스도 출시되었습니다. [1] [3] [4] [5] [6]",
+    "text_blocks": [
+     {
+      "type": "paragraph",
+      "snippet": "등기부등본(정식 명칭: 등기사항증명서)은 부동산의 주소, 면적, 소유권 및 소유권과 관련된 권리 사항 등을 기록하여 관리하는 공적 장부입니다. 이를 통해 집주인이 누구인지, 집에 설정된 빚은 얼마인지 등의 이력을 확인할 수 있습니다.",
+      "reference_indexes": [
+       1,
+       2
+      ]
+     },
+     {
+      "type": "header",
+      "level": 3,
+      "snippet": "등기부등본 구성 요소 및 확인 사항"
+     },
+     {
+      "type": "paragraph",
+      "snippet": "등기부등본은 크게 세 가지 부분으로 나뉘며, 각 부분에서 확인해야 할 핵심 내용은 다음과 같습니다."
+     },
+     {
+      "type": "list",
+      "list_type": "unordered",
+      "list": [
+       {
+        "snippet": "표제부: 건물의 기본 정보 확인"
+       },
+       {
+        "snippet": "건물의 주소, 동·호수, 면적, 용도"
+       },
+       {
+        "snippet": "아파트·다세대주택의 경우 대지권 설정 여부"
+       },
+       {
+        "snippet": "갑구: 소유권 및 권리 제한 사항 확인"
+       },
+       {
+        "snippet": "현재 소유자가 계약 상대방(임대인)과 일치하는지 여부"
+       },
+       {
+        "snippet": "압류, 가압류, 가등기, 신탁등기 등 권리 제한 사항"
+       },
+       {
+        "snippet": "임차권등기명령 기록 여부 (보증금 미반환 이력 확인)"
+       },
+       {
+        "snippet": "을구: 소유권 외의 권리(빚) 확인"
+       },
+       {
+        "snippet": "근저당권 설정 금액(채권최고액) 확인"
+       },
+       {
+        "snippet": "전세권 등 기타 권리 관계",
+        "reference_indexes": [
+         1,
+         2,
+         3,
+         4
+        ]
+       }
+      ]
+     },
+     {
+      "type": "header",
+      "level": 3,
+      "snippet": "안전한 계약을 위한 주의사항"
+     },
+     {
+      "type": "list",
+      "list_type": "unordered",
+      "list": [
+       {
+        "snippet": "매매가 대비 근저당권과 전세보증금의 합계가 통상 매매가의 70%를 넘는다면 위험 신호로 간주할 수 있습니다."
+       },
+       {
+        "snippet": "계약 시점뿐만 아니라 잔금 지급 직전에도 등기부등본을 재열람하여 새로운 권리 변동이 없는지 반드시 확인해야 합니다."
+       },
+       {
+        "snippet": "대리인과 계약할 경우 위임장과 인감증명서를 철저히 확인하여 실제 소유주의 의사를 검증해야 합니다.",
+        "reference_indexes": [
+         1,
+         2,
+         3,
+         4,
+         5
+        ]
+       }
+      ]
+     },
+     {
+      "type": "header",
+      "level": 3,
+      "snippet": "발급 방법 및 편의 서비스"
+     },
+     {
+      "type": "list",
+      "list_type": "unordered",
+      "list": [
+       {
+        "snippet": "온라인: 대법원 인터넷등기소를 통해 발급 및 열람 가능"
+       },
+       {
+        "snippet": "오프라인: 등기소 방문 또는 무인발급기 이용"
+       },
+       {
+        "snippet": "AI 분석 서비스: 최근에는 AI를 활용해 복잡한 등기 용어를 일상 언어로 풀어서 설명해 주는 부동산 분석 서비스도 출시되었습니다.",
+        "reference_indexes": [
+         1,
+         3,
+         4,
+         5,
+         6
+        ]
+       }
+      ]
+     }
+    ],
+    "references": [
+     {
+      "index": 1,
+      "title": "내가 살 집이 안전한 집인지 미리 알 수 있다고요?",
+      "snippet": "해당 서류 또한 누구나 등기소에 방문하거나 대법원 인터넷등기소를 통한 온라인 발급(열람)으로 확인할 수 있기에 본인이 직접 확인해 보는 것이 가장 정확할 것입니다. 등기부등본 또한",
+      "link": "https://www.seoulhousing.kr/board/18072600002881/SYS220418-05593535/view",
+      "source": "서울주거상담",
+      "source_icon": "https://www.seoulhousing.kr/assets/favicon.ico",
+      "date": "1990-01-01T00:00:00+09:00"
+     },
+     {
+      "index": 2,
+      "title": "[AJU+MONEY] 등기부등본 처음 본다면?…초보 세입자 위한 5분 가이드",
+      "snippet": "표제부는 집 정보, 갑구는 소유권, 을구는 담보대출 확인 근저당권 없어도 안심 금물…선순위 보증금·체납 세금 살펴야 아주경제=이은별 기자 star@ajunews.com 등기부등본 ",
+      "link": "https://www.ajunews.com/view/20261118080251783",
+      "source": "news",
+      "source_icon": "https://mimgnews.pstatic.net/image/upload/office_logo/5090/2024/05/31/logo_5090_18_20240531133821.png",
+      "date": "2026-11-22T10:48:00+09:00"
+     },
+     {
+      "index": 3,
+      "title": "[혼삶 체험기] 집 보는 법도 배울 수 있다?…공인중개사와 함께한 '집 보기 수업'",
+      "snippet": "눈에 띄는 공간만 둘러보지 말고 수납장 안쪽이나 가구 주변까지 살펴봐야 한다는 것이다. 반려동물을 키운다면 입주 가능 여부와 퇴거 시 추가 비용 발생 조건도 미리 확인하는 편이 좋",
+      "link": "http://www.dailypop.kr/news/articleView.html?idxno=104694",
+      "source": "news",
+      "source_icon": "https://mimgnews.pstatic.net/image/upload/office_logo/5516/2024/05/30/logo_5516_18_20240530183831.png",
+      "date": "2026-11-18T17:50:00+09:00"
+     },
+     {
+      "index": 4,
+      "title": "전세 계약 전 등기부등본 확인법과 체크리스트",
+      "snippet": "국토교통부에 따르면 매년 9월부터 11월 사이 전월세 거래량이 눈에 띄게 늘어나는데, 이 시기에 급하게 계약을 서두르다 서류 확인을 소홀히 해 피해를 보는 사례가 반복해서 발생한다",
+      "link": "https://www.gokorea.kr/news/articleView.html?idxno=882886",
+      "source": "news",
+      "source_icon": "https://mimgnews.pstatic.net/image/upload/office_logo/5264/2025/01/06/logo_5264_18_20250106124112.jpg",
+      "date": "2026-10-28T13:00:00+09:00"
+     },
+     {
+      "index": 5,
+      "title": "한통 &quot;등기부등본 33개 언어로 쉽게 푼다&quot;…국내 첫 AI 다국어 부동산 분석 출시",
+      "snippet": "부동산 AI 기업 한통(대표 이소영)이 한국어를 비롯해 아시아·미주·유럽·중동권 등 전 세계 33개 언어를 지원하는 AI 부동산 분석 서비스를 국내 최초로 출시했다고 24일 밝혔다",
+      "link": "https://n.news.naver.com/mnews/article/014/0005609011?sid=101",
+      "source": "news",
+      "source_icon": "https://mimgnews.pstatic.net/image/upload/office_logo/014/2025/03/07/logo_014_100_20250307145643.png",
+      "date": "2026-11-24T15:31:00+09:00"
+     },
+     {
+      "index": 6,
+      "title": "&quot;등기부등본 모르면 당한다&quot;…대전시, '꿈돌이 전세사기 숏폼' 만든다",
+      "snippet": "전세사기 수법이 갈수록 교묘해지는 가운데 대전시가 청년층을 겨냥한 '초단기 예방 콘텐츠' 제작에 나섰다. 어렵고 복잡한 부동산 계약 정보를 딱 1분 안에 압축해 사회초년생들이 계약",
+      "link": "https://www.newspim.com/news/view/20260513000361",
+      "source": "news",
+      "source_icon": "https://mimgnews.pstatic.net/image/upload/office_logo/5002/2024/05/30/logo_5002_18_20240530160715.png",
+      "date": "2026-05-13T10:01:00+09:00"
+     }
+    ]
+   },
+   "web_results": [
+    {
+     "position": 1,
+     "title": "등기부등본 열람하기",
+     "source_icon": "https://search.pstatic.net/sunny?src=https%3A%2F%2Fslgodung.scourt.go.kr%2Fimg%2Ffavicon.ico&type=f30_30_png_expire24",
+     "source": "인터넷등기소",
+     "link": "http://www.iros.go.kr/pos1/jsp/help2/jsp/001001003001.jsp",
+     "related_results": [
+      {
+       "position": 1,
+       "title": "www.iros.go.kr›pos1",
+       "link": "http://www.iros.go.kr/pos1/jsp/help2/jsp/001001003001.jsp"
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "deferred": {
+  "query": "부동산 권리분석 앱 추천",
+  "naver": {
+   "search_metadata": {
+    "status": "Success"
+   },
+   "search_parameters": {
+    "query": "부동산 권리분석 앱 추천",
+    "engine": "naver",
+    "device": "desktop"
+   },
+   "ai_briefing": {
+    "serpapi_link": "https://serpapi.com/search.json?engine=naver_ai_overview&query=%EB%B6%80%EB%8F%99%EC%82%B0+%EA%B6%8C%EB%A6%AC%EB%B6%84%EC%84%9D+%EC%95%B1+%EC%B6%94%EC%B2%9C"
+   },
+   "web_results": [
+    {
+     "position": 1,
+     "title": "세이프홈즈 - 전월세·상가·매매 안심등기 앱",
+     "source_icon": "https://search.pstatic.net/sunny?src=https%3A%2F%2Fapps.apple.com%2Fassets%2Ffavicon%2Ffavicon-32.png&type=f30_30_png_expire24",
+     "source": "App Store",
+     "link": "https://apps.apple.com/kr/app/%EC%84%B8%EC%9D%B4%ED%94%84%ED%99%88%EC%A6%88-%EC%A0%84%EC%9B%94%EC%84%B8-%EC%83%81%EA%B0%80-%EB%A7%A4%EB%A7%A4-%EC%95%88%EC%8B%AC%EB%93%B1%EA%B8%B0/id1631931223",
+     "snippet": "App Store에서 세이프홈즈의 세이프홈즈 - 전월세·상가·매매 안심등기 앱을 다운로드하십시오. 스크린샷, 평가 및 리뷰, 사용자 팁 및 세이프홈즈 - 전월세·상가·매매 안심등기 앱과 비슷한 다른 앱을 볼 수 있습니다.",
+     "thumbnail": "https://search.pstatic.net/sunny?src=https%3A%2F%2Fis1-ssl.mzstatic.com%2Fimage%2Fthumb%2FPurpleSource221%2Fv4%2F50%2Fce%2F1f%2F50ce1fc2-8b8b-ff3e-7350-2b8053495160%2FPlaceholder.mill%2F1200x630wa.jpg&type=fff208_208_ar",
+     "related_results": [
+      {
+       "position": 1,
+       "title": "apps.apple.com›인기 차트›라이프스타일",
+       "link": "https://apps.apple.com/kr/app/%EC%84%B8%EC%9D%B4%ED%94%84%ED%99%88%EC%A6%88-%EC%A0%84%EC%9B%94%EC%84%B8-%EC%83%81%EA%B0%80-%EB%A7%A4%EB%A7%A4-%EC%95%88%EC%8B%AC%EB%93%B1%EA%B8%B0/id1631931223"
+      }
+     ]
+    }
+   ]
+  },
+  "overview": {
+   "markdown": "부동산 권리분석을 돕는 앱으로는 전월세 및 매매 계약 전 위험 요소를 점검하는 서비스와 법원 경매 물건 분석에 특화된 앱들이 있습니다.\n\n### 부동산 권리분석 및 계약 안전 점검 앱\n*   세이프홈즈는 전·월세, 상가·오피스, 부동산 매매 계약 전 등기·권리관계, 보증금, 영업 가능성 등을 종합적으로 확인해 주는 AI 지킴이 기능을 제공합니다.[1]\n*   경기 안심부동산은 주택 주소와 보증금 등을 입력하면 AI가 등기부등본, 건축물 정보, 시세 등을 분석하여 계약 전 권리분석 보고서를 제공합니다.[3]\n*   체크팀 앱은 부동산 권리분석, 전세보증금 진단, 부동산 경매 시뮬레이션 등 다양한 분석 보고서를 제공하며 등기변경 알림 기능도 갖추고 있습니다.[2]\n\n### 부동산 경매 분석 전문 앱\n*   경매는 요이땅은 여러 AI가 물건을 교차 검증하여 인수해야 할 권리와 적정 입찰가 범위를 한 장의 리포트로 정리해 주는 경매 분석 앱입니다.[8]\n*   시온랩과 같은 솔루션은 등기부등본 파싱과 배당 계산을 AI로 자동화하고, 과거 실거래 데이터를 기반으로 낙찰가 예측을 지원합니다.[9]\n*   이지헬퍼는 임장지도 앱으로, 현장에서 주변 실거래가 조회, 임장 점검 항목 체크, 광역 실거래가 통계 확인 등을 지원합니다.[6]\n\n### 기타 부동산 정보 플랫폼\n*   대법원 법원경매정보는 모든 사설 사이트 데이터의 원천이 되는 100% 공식 사이트로, 매각물건명세서 등을 무료로 열람할 수 있습니다.[4]\n*   리치고와 같은 빅데이터 앱은 공인중개사가 매수·매도 타이밍 상담 시 주택구매부담지수나 전세가율 추이 등 수치 기반의 분석 자료로 활용할 수 있습니다.[5]",
+   "references": [
+    {
+     "index": 1,
+     "title": "세이프홈즈 - 전월세·상가·매매 안심등기 앱",
+     "snippet": "이 집, 계약해도 될까요? 이 상가에서 내가 하려는 영업이 가능할까요? 이 부동산, 사기 전에 무엇을 확인해야 할까요? 세이프홈즈 안심등기는 전·월세, 상가오피스, 부동산 매매 계",
+     "link": "https://apps.apple.com/kr/app/%EC%84%B8%EC%9D%B4%ED%94%84%ED%99%88%EC%A6%88-%EC%A0%84%EC%9B%94%EC%84%B8-%EC%83%81%EA%B0%80-%EB%A7%A4%EB%A7%A4-%EC%95%88%EC%8B%AC%EB%93%B1%EA%B8%B0/id1631931223",
+     "source": "App Store",
+     "source_icon": "https://apps.apple.com/assets/favicon/favicon-32.png"
+    },
+    {
+     "index": 2,
+     "title": "체크팀 앱 - App Store",
+     "snippet": "1. 부동산 권리분석 누구나 간단하게 목적에 맞는 부동산 권리분석 보고서를 확인할 수 있습니다. (1) 권리분석 종류 - 부동산 담보대출 분석 - 전세보증금 진단 - 부동산경매 시",
+     "link": "https://apps.apple.com/kr/app/%EC%B2%B4%ED%81%AC%ED%8C%80/id1578403569",
+     "source": "App Store",
+     "source_icon": "https://apps.apple.com/assets/favicon/favicon-32.png"
+    },
+    {
+     "index": 3,
+     "title": "경기안심부동산 앱 사용법 총정리! 전세·월세 계약 전 꼭 확인해야 할 사항!",
+     "snippet": "AI가 분석하는 전세 계약 안전망 경기 안심부동산은 경기도가 전세사기 예방과 안전한 부동산 거래를 위해 도입한 AI 기반 부동산 권리분석 서비스에요. 기존에는 임차인이 등기사항전부",
+     "link": "https://blog.naver.com/land4555/224477067747",
+     "source": "네이버 블로그",
+     "source_icon": "https://blogpfthumb-phinf.pstatic.net/MjAyNTA3MDNfMTQ1/MDAxNzUxNTM3MDE0MzI0.QYZ2lovv2ym5UT-qspR0onZGl76m01zZAstKYR6f_iIg.iUDlFoy4qa53eCyboTYSyBbDuo2XV8JaKSk5Pt0Jjt0g.JPEG/%25EC%25A0%259C%25EB%25AA%25A9%25EC%259D%2584_%25EC%259E%2585%25EB%25A0%25A5%25ED%2595%25B4%25EC%25A3%25BC%25EC%2584%25B8%25EC%259A%2594_-001_%25284%2529.jpg/%25EC%25A0%259C%25EB%25AA%25A9%25EC%259D%2584%2B%25EC%259E%2585%25EB%25A0%25A5%25ED%2595%25B4%25EC%25A3%25BC%25EC%2584%25B8%25EC%259A%2594_-001%2B%25284%2529.jpg",
+     "date": "2026-11-16T09:00:00+09:00"
+    },
+    {
+     "index": 4,
+     "title": "무료 경매 사이트 비교",
+     "snippet": "[부동산 재테크] 무료 법원경매 사이트 및 앱 10선 총정리 경매 입문 시 매달 들어가는 유료 사이트 구독료를 아끼면서도 알짜 물건과 권리분석을 확인할 수 있는 무료 플랫폼 전체 ",
+     "link": "https://blog.naver.com/lebon12/224409172040",
+     "source": "네이버 블로그",
+     "source_icon": "https://blogpfthumb-phinf.pstatic.net/data13/2006/1/19/156/Mypic-4385.jpg",
+     "date": "2026-09-12T10:57:00+09:00"
+    },
+    {
+     "index": 5,
+     "title": "부동산 빅데이터 앱 '리치고(Richgo)' 완벽 분석! 스마트한 공인중개사의 실무 브리핑 활용법",
+     "snippet": "3. 개업공인중개사를 위한 실무 업무 활용 전략 리치고는 단순 개인 투자용 앱에 그치지 않고, 개업공인중개사가 전문성을 강화하고 고객 계약 성사율을 높이는 강력한 '디지털 브리핑 ",
+     "link": "https://blog.naver.com/kohkh0626/224463402564",
+     "source": "네이버 블로그",
+     "source_icon": "https://blogpfthumb-phinf.pstatic.net/MjAyNTEyMTJfMTAw/MDAxNzY1NTAyNDg5NTU2.RDVexhEpa0qPrOWXCtDu0gSDIATNstnzAtSHDo-EMzYg.At9p7eq1MRyOvViZNo7FQMpmDHjv9QQjxLP88QeSPtIg.PNG/%25EC%25A6%259D%25EB%25AA%2585%25EC%2582%25AC%25EC%25A7%2584%2528%25EC%2582%25AC%25EB%25B3%25B5%2529.png/%25EC%25A6%259D%25EB%25AA%2585%25EC%2582%25AC%25EC%25A7%2584%2528%25EC%2582%25AC%25EB%25B3%25B5%2529.png",
+     "date": "2026-11-04T10:30:00+09:00"
+    },
+    {
+     "index": 6,
+     "title": "모바일 앱 - 이지헬퍼",
+     "snippet": "📱 이지헬퍼 모바일 앱 현장에서도 경매 분석을 이어가세요. PC와 모바일을 함께 사용하면 더 강력합니다. 부놈헬퍼 플러스 NEW 부놈헬퍼 연 구독제 임장지도 앱 임장이 바뀝니다, ",
+     "link": "https://easyhelper.kr/mobile_app",
+     "source": "이지헬퍼",
+     "source_icon": "https://easyhelper.kr/favicon.png?v=1.3.70"
+    },
+    {
+     "index": 8,
+     "title": "경매는 요이땅 - AI 부동산 법원경매 분석",
+     "snippet": "■ 경매는 요이땅 부동산 법원경매, 권리분석 보고서가 어렵고 적정 입찰가를 몰라 망설이셨나요? 요이땅은 여러 AI가 같은 물건을 각각 분석하고 서로 교차검증해, 인수해야 할 권리와",
+     "link": "https://play.google.com/store/apps/details?id=co.kr.yoiddang.app",
+     "source": "Google Play",
+     "source_icon": "https://www.gstatic.com/android/market_images/web/favicon_v3.ico"
+    },
+    {
+     "index": 9,
+     "title": "부동산 경매 권리분석·입찰 관리 프로그램 구축 사례 | SION.LAB",
+     "snippet": "사례 본문 기준으로 권리분석은 건당 3~4시간에서 20분 내외로 줄었으며, 추천 가격은 검토 범위이고 최종 입찰 판단은 사용자가 합니다. RESULT 권리분석 시간 90% 절감: ",
+     "link": "https://www.sionlab.co.kr/works/auction-analysis",
+     "source": "sionlab.co.kr",
+     "source_icon": "https://www.sionlab.co.kr/favicon.ico?603d046c9a6fdfbb",
+     "date": "2026-02-09T09:00:00+09:00"
+    }
+   ],
+   "text_blocks": [
+    {
+     "type": "paragraph",
+     "snippet": "부동산 권리분석을 돕는 앱으로는 전월세 및 매매 계약 전 위험 요소를 점검하는 서비스와 법원 경매 물건 분석에 특화된 앱들이 있습니다."
+    },
+    {
+     "type": "header",
+     "level": 3,
+     "snippet": "부동산 권리분석 및 계약 안전 점검 앱"
+    },
+    {
+     "type": "list",
+     "list_type": "unordered",
+     "list": [
+      {
+       "snippet": "세이프홈즈는 전·월세, 상가·오피스, 부동산 매매 계약 전 등기·권리관계, 보증금, 영업 가능성 등을 종합적으로 확인해 주는 AI 지킴이 기능을 제공합니다.",
+       "reference_indexes": [
+        1
+       ]
+      },
+      {
+       "snippet": "경기 안심부동산은 주택 주소와 보증금 등을 입력하면 AI가 등기부등본, 건축물 정보, 시세 등을 분석하여 계약 전 권리분석 보고서를 제공합니다.",
+       "reference_indexes": [
+        3
+       ]
+      },
+      {
+       "snippet": "체크팀 앱은 부동산 권리분석, 전세보증금 진단, 부동산 경매 시뮬레이션 등 다양한 분석 보고서를 제공하며 등기변경 알림 기능도 갖추고 있습니다.",
+       "reference_indexes": [
+        2
+       ]
+      }
+     ]
+    },
+    {
+     "type": "header",
+     "level": 3,
+     "snippet": "부동산 경매 분석 전문 앱"
+    },
+    {
+     "type": "list",
+     "list_type": "unordered",
+     "list": [
+      {
+       "snippet": "경매는 요이땅은 여러 AI가 물건을 교차 검증하여 인수해야 할 권리와 적정 입찰가 범위를 한 장의 리포트로 정리해 주는 경매 분석 앱입니다.",
+       "reference_indexes": [
+        8
+       ]
+      },
+      {
+       "snippet": "시온랩과 같은 솔루션은 등기부등본 파싱과 배당 계산을 AI로 자동화하고, 과거 실거래 데이터를 기반으로 낙찰가 예측을 지원합니다.",
+       "reference_indexes": [
+        9
+       ]
+      },
+      {
+       "snippet": "이지헬퍼는 임장지도 앱으로, 현장에서 주변 실거래가 조회, 임장 점검 항목 체크, 광역 실거래가 통계 확인 등을 지원합니다.",
+       "reference_indexes": [
+        6
+       ]
+      }
+     ]
+    },
+    {
+     "type": "header",
+     "level": 3,
+     "snippet": "기타 부동산 정보 플랫폼"
+    },
+    {
+     "type": "list",
+     "list_type": "unordered",
+     "list": [
+      {
+       "snippet": "대법원 법원경매정보는 모든 사설 사이트 데이터의 원천이 되는 100% 공식 사이트로, 매각물건명세서 등을 무료로 열람할 수 있습니다.",
+       "reference_indexes": [
+        4
+       ]
+      },
+      {
+       "snippet": "리치고와 같은 빅데이터 앱은 공인중개사가 매수·매도 타이밍 상담 시 주택구매부담지수나 전세가율 추이 등 수치 기반의 분석 자료로 활용할 수 있습니다.",
+       "reference_indexes": [
+        5
+       ]
+      }
+     ]
+    }
+   ],
+   "search_metadata": {
+    "status": "Success"
+   }
+  }
+ },
+ "absent": {
+  "query": "전세사기대응",
+  "naver": {
+   "search_metadata": {
+    "status": "Success"
+   },
+   "search_parameters": {
+    "query": "전세사기대응",
+    "engine": "naver",
+    "device": "desktop"
+   },
+   "web_results": [
+    {
+     "position": 1,
+     "title": "생활법령 포털 | 찾기쉬운 생활법령",
+     "source_icon": "https://search.pstatic.net/sunny?src=https%3A%2F%2Fwww.easylaw.go.kr%2Ffavicon.ico&type=f30_30_png_expire24",
+     "source": "찾기쉬운 생활법령정보",
+     "link": "http://easylaw.go.kr/CSP/CnpClsMain.laf?csmSeq=1972&ccfNo=3&cciNo=3&cnpClsNo=2",
+     "snippet": "주택임대차는 임대인이 임차인에게 해당 주택을 사용ㆍ수익하게 하고 임차인이 이에 대해 차임을 지급할 것을 약정하는 것을 말하는데, 우리 법은 「주택임대차보호법」에 따라 임차인에 대하여 특별한 보호를 하고 있습니다. 「주택임대차보호법」은 대항력의 부여, 존속기간의 보장, 우선변제권의 인정 등 경제적 약자인 임차인을 보호하기 위한 규정들을 두고 있으며, 주거....",
+     "thumbnail": "https://search.pstatic.net/sunny?src=https%3A%2F%2Fwww.easylaw.go.kr%2FCSP%2Ftemplate%2Fcb8c1feb606540cd96986ed5ba24debd.jpg&type=fff208_208_ar",
+     "related_results": [
+      {
+       "position": 1,
+       "title": "easylaw.go.kr",
+       "link": "http://easylaw.go.kr/CSP/CnpClsMain.laf?csmSeq=1972&ccfNo=3&cciNo=3&cnpClsNo=2"
+      }
+     ]
+    }
+   ]
+  },
+  "overview": {
+   "markdown": "전세사기 대응을 위해서는 초기 단계에서부터 자신의 권리 상태를 정확히 파악하고, 법적 절차를 체계적으로 밟아나가는 것이 중요합니다.\n\n### 전세사기 대응을 위한 필수 확인 사항 및 조치[2] [5]\n\n| 구분 | 주요 확인/조치 사항 | 목적 |\n|---|---|---|\n| 권리 확인 | 등기부등본 확인, 전입신고 및 확정일자 날짜 확인 | 담보 및 압류 상태 파악, 임차인의 대항력 및 우선변제권 확보 |\n| 증거 확보 | 집주인과의 문자·통화 내용 등 증거 보관 | 사기죄 성립 여부 검토 및 민사 소송 시 자료 활용 |\n| 법적 조치 | 임차권등기명령 신청, 내용증명 발송 | 이사 시에도 기존 지위 유지, 반환 요구 사실 명확히 남기기 |\n\n### 전세사기 대응 절차의 이해\n\n*   전세사기 상황에서 가장 먼저 해야 할 일은 사기 여부를 판단하기보다 보증금을 지킬 수 있는 조치를 순서대로 밟아나가는 것입니다.[5]\n*   형사고소는 가해자의 책임을 묻는 절차이며, 보증금 회수는 기본적으로 민사 절차를 통해 진행해야 합니다.[4] [5]\n*   보증보험이 거절되거나 소송이 막막할 경우, 임차권등기, 보증금반환소송, 가압류를 함께 검토하는 것이 현실적인 대응 순서입니다.[7]\n*   깡통전세는 보증금과 대출금의 총합이 집값의 80%를 넘는 등 임대인의 자력이 부족한 경우 발생할 수 있습니다.[6]",
+   "references": [
+    {
+     "index": 6,
+     "title": "집 고를 때 < 유형별사례 및 대처방안 < 전세사기예방센터",
+     "snippet": "집 고를 때 집 고를 때 생길 수 있는 전세사기 유형 및 대처방법을 알아보자 깡통전세 사기 보증금 돌려줄 돈이 없어! 한동안 이슈가 되었던 ‘대구 깡통전세사기 사건’을 아시나요? ",
+     "link": "https://www.khug.or.kr/jeonse/web/s02/s020201.jsp",
+     "source": "주택도시보증공사",
+     "source_icon": "https://www.khug.or.kr/favicon.ico"
+    },
+    {
+     "index": 2,
+     "title": "[서울광역청년센터 X (사)온율] 청년들이 가장 많이 물어본 '전세사기 대응 교육' 핵심 QnA 총정리!",
+     "snippet": "서울광역청년센터는 (사)온율과 협력하여 전세사기 피해로 어려움을 겪고 있거나 대응이 필요한 청년들을 위해 「전세사기 대응 교육」을 진행했습니다. 실제 피해 청년들의 FGI(표적집단",
+     "link": "https://blog.naver.com/official_smyc/224302678507",
+     "source": "네이버 블로그",
+     "source_icon": "https://blogpfthumb-phinf.pstatic.net/MjAyNDAxMDVfOTcg/MDAxNzA0NDIyMDI2NDc1.zTB6D3IhbhJlbMphOdjRA3GUrKGhwbEaAOAuCltSPmAg.EIGDE66DBbaTjz8Z8FKhahT1sc2kkqavt_oGGraTeDYg.PNG.sygcyouth/%25EC%2584%259C%25EC%259A%25B8%25EA%25B4%2591%25EC%2597%25AD%25EC%25B2%25AD%25EB%2585%2584%25EC%2584%25BC%25ED%2584%25B0_%25EB%25A1%259C%25EA%25B3%25A0_%25EC%25A0%2595%25EB%25B0%25A9%25ED%2598%2595.png/%25EC%2584%259C%25EC%259A%25B8%25EA%25B4%2591%25EC%2597%25AD%25EC%25B2%25AD%25EB%2585%2584%25EC%2584%25BC%25ED%2584%25B0%2B%25EB%25A1%259C%25EA%25B3%25A0_%25EC%25A0%2595%25EB%25B0%25A9%25ED%2598%2595.png",
+     "date": "2026-06-01T14:17:00+09:00"
+    },
+    {
+     "index": 4,
+     "title": "전세사기, 보증금 못 받고 이사해야 한다면 임차권등기부터 하셔야 합니다",
+     "snippet": "내 보증금이 지금 어떤 순위에 서 있고, 전세사기 피해로 대응할 수 있는 상태인가 하는 점입니다. 아직 소송까지 마음을 정하지 않으셨어도 괜찮습니다. 임대차계약서와 확정일자를 확인",
+     "link": "https://blog.naver.com/ontracksign/224487925148",
+     "source": "네이버 블로그",
+     "source_icon": "https://blogpfthumb-phinf.pstatic.net/MjAyNTA3MDhfNDQg/MDAxNzUxOTU3MzUxMDU4.9R-yEno6TEV1dRB5lJP7YPsXqfXVrnTKe0OsY4pOq_Eg.cNjUWTB8TTqaJc2s10tdwX0_qCb3aYLwDWN90AoXZrog.JPEG/%25EB%25B6%2580%25EB%258F%2599%25EC%2582%25B0%25EB%25B3%2580%25ED%2598%25B8%25EC%2582%25AC.jpg/%25EB%25B6%2580%25EB%258F%2599%25EC%2582%25B0%25EB%25B3%2580%25ED%2598%25B8%25EC%2582%25AC.jpg",
+     "date": "2026-11-25T19:00:00+09:00"
+    },
+    {
+     "index": 5,
+     "title": "부동산전세사기변호사가 가장 먼저 확인하는 3가지",
+     "snippet": "내 전세금이 과연 사기인지, 어떻게 대응해야 하는지 막막하고 불안한 마음이 드실 것입니다. 사실 이런 상황에서 가장 먼저 해야 할 일은 '사기냐 아니냐'를 따지는 것이 아니라, 보",
+     "link": "https://blog.naver.com/hstyle2003/224475831356",
+     "source": "네이버 블로그",
+     "source_icon": "https://blogpfthumb-phinf.pstatic.net/MjAyNTA3MTBfMjY2/MDAxNzUyMTEzMzgwNTQ3.CGbwWuKkHJEjecDcx_KCt6R6dMiU8y1dq5f2K4sQtW8g.F6HXmPiN5AL_-D2y7ajU9smGfd7WMqzvC8lQHwtQzT4g.JPEG/26.jpg/26.jpg",
+     "date": "2026-11-13T18:10:00+09:00"
+    },
+    {
+     "index": 7,
+     "title": "전세사기 보증보험 거절 시 대응 순서",
+     "snippet": "보증보험이 안 될 때 가장 먼저 확인해야 할 것 전세사기 상황에서 감정적으로 대응하면 오히려 불리해지기 쉽습니다. 가장 먼저 해야 할 일은 내 보증금이 회수될 자리가 실제로 있는지",
+     "link": "https://sim.legal/blog/lease-fraud/lease-fraud-no-insurance-recovery-strategy",
+     "source": "법무법인 심",
+     "source_icon": "https://sim.legal/favicon.ico",
+     "date": "2026-09-11T01:23:00+09:00"
+    }
+   ],
+   "text_blocks": [
+    {
+     "type": "paragraph",
+     "snippet": "전세사기 대응을 위해서는 초기 단계에서부터 자신의 권리 상태를 정확히 파악하고, 법적 절차를 체계적으로 밟아나가는 것이 중요합니다."
+    },
+    {
+     "type": "header",
+     "level": 3,
+     "snippet": "전세사기 대응을 위한 필수 확인 사항 및 조치",
+     "reference_indexes": [
+      2,
+      5
+     ]
+    },
+    {
+     "type": "table",
+     "table": [
+      [
+       "구분",
+       "주요 확인/조치 사항",
+       "목적"
+      ],
+      [
+       "권리 확인",
+       "등기부등본 확인, 전입신고 및 확정일자 날짜 확인",
+       "담보 및 압류 상태 파악, 임차인의 대항력 및 우선변제권 확보"
+      ],
+      [
+       "증거 확보",
+       "집주인과의 문자·통화 내용 등 증거 보관",
+       "사기죄 성립 여부 검토 및 민사 소송 시 자료 활용"
+      ],
+      [
+       "법적 조치",
+       "임차권등기명령 신청, 내용증명 발송",
+       "이사 시에도 기존 지위 유지, 반환 요구 사실 명확히 남기기"
+      ]
+     ],
+     "formatted": [
+      {
+       "구분": "권리 확인",
+       "주요_확인_조치_사항": "등기부등본 확인, 전입신고 및 확정일자 날짜 확인",
+       "목적": "담보 및 압류 상태 파악, 임차인의 대항력 및 우선변제권 확보"
+      },
+      {
+       "구분": "증거 확보",
+       "주요_확인_조치_사항": "집주인과의 문자·통화 내용 등 증거 보관",
+       "목적": "사기죄 성립 여부 검토 및 민사 소송 시 자료 활용"
+      },
+      {
+       "구분": "법적 조치",
+       "주요_확인_조치_사항": "임차권등기명령 신청, 내용증명 발송",
+       "목적": "이사 시에도 기존 지위 유지, 반환 요구 사실 명확히 남기기"
+      }
+     ]
+    },
+    {
+     "type": "header",
+     "level": 3,
+     "snippet": "전세사기 대응 절차의 이해"
+    },
+    {
+     "type": "list",
+     "list_type": "unordered",
+     "list": [
+      {
+       "snippet": "전세사기 상황에서 가장 먼저 해야 할 일은 사기 여부를 판단하기보다 보증금을 지킬 수 있는 조치를 순서대로 밟아나가는 것입니다.",
+       "reference_indexes": [
+        5
+       ]
+      },
+      {
+       "snippet": "형사고소는 가해자의 책임을 묻는 절차이며, 보증금 회수는 기본적으로 민사 절차를 통해 진행해야 합니다.",
+       "reference_indexes": [
+        4,
+        5
+       ]
+      },
+      {
+       "snippet": "보증보험이 거절되거나 소송이 막막할 경우, 임차권등기, 보증금반환소송, 가압류를 함께 검토하는 것이 현실적인 대응 순서입니다.",
+       "reference_indexes": [
+        7
+       ]
+      },
+      {
+       "snippet": "깡통전세는 보증금과 대출금의 총합이 집값의 80%를 넘는 등 임대인의 자력이 부족한 경우 발생할 수 있습니다.",
+       "reference_indexes": [
+        6
+       ]
+      }
+     ]
+    }
+   ],
+   "search_metadata": {
+    "status": "Success"
+   }
+  }
+ },
+ "echo": {
+  "query": "베스트라 등기부 분석",
+  "overview": {
+   "markdown": "베스트라 등기부 분석은 해당 부동산의 권리 관계를 파악하는 과정이며, 경매 물건의 경우 등기부상 권리(가압류, 근저당 등)와 임차인의 대항력 유무가 중요합니다.\n\n### 등기부 분석 시 주요 확인 사항\n*   가압류나 가처분 등 소유권 제한 표시가 등기부 갑구에 있는지 확인해야 하며, 이는 담보대출이나 거래 시 영향을 줄 수 있습니다.[1]\n*   경매 물건의 경우, 말소기준권리보다 앞서는 권리나 임차인은 매수인이 인수할 수 있으므로 권리 분석이 필수적입니다.[7] [5]\n*   등기부 현황에는 소유권, 근저당권, 가압류, 압류 등의 권리 종류, 권리자, 채권금액 등이 순위별로 기재되어 있습니다.[2] [3]\n*   임차인의 경우, 전입일자와 확정일자를 통해 대항력 및 우선변제권을 갖추는지 확인해야 하며, 배당에서 전액 변제되지 않으면 잔액을 매수인이 인수할 수 있습니다.[8]\n\n### 권리 관계 비교[7] [3]\n| 구분 | 권리 종류 | 권리자 | 채권금액 | 말소 여부 |\n| :--- | :--- | :--- | :--- | :--- |\n| 예시 1 | 근저당권 | 주OOOOOOO | 96,000,000원 | 말소기준 |\n| 예시 2 | 가압류 | 대OOOOOO | 740,856,010원 | 말소 |\n| 예시 3 | 소유권이전청구권가등기 | 유OO | - | 인수됨 |\n\n### 등기부 분석 시 유의사항\n*   가처분이 있는 부동산의 경우, 다툼이 끝날 때까지 기다리거나 거래를 재고하는 것이 안전할 수 있습니다.[1]\n*   경매 물건의 경우, 매각물건명세서와 현황조사서를 통해 점유 관계, 임차인, 매수인이 떠안는 권리 등을 입찰 전에 반드시 확인해야 합니다.[5] [10]\n*   가등기가 담보가등기인지 순위보전가등기인지에 따라 매수인에게 인수되는지 여부가 달라지므로 확인이 필요합니다.[7]",
+   "references": [
+    {
+     "index": 7,
+     "title": "2025 13385",
+     "snippet": "임차인수 : 0명 / 보증금합계 : 0 / 월세합계 : 0원 등기부 현황(집합) 등기(집합) 순위 접수일자 권리종류 권리자 채권금액 말소 비고 1 2006-08-01 (60707)",
+     "link": "https://www.xn--b20bu5cuwtpue8ui.com/auction/landview.html?product_id=1151397",
+     "source": "더낙찰옥션",
+     "source_icon": "https://www.xn--b20bu5cuwtpue8ui.com/images/pwa/thenak-192.png"
+    },
+    {
+     "index": 1,
+     "title": "등기부 갑구에 가압류·가처분이 있으면 담보대출은 어떻게 될까?",
+     "snippet": "담보대출을 알아보려고 등기부등본을 떼어 봤더니 갑구에 가압류라는 줄이 있습니다. 예전에 거래처와 금전 문제로 다툼이 있었던 기억이 납니다. 이 줄이 대출에 어떤 영향을 줄까요? 가",
+     "link": "https://blog.naver.com/switchon_fin/224463543545",
+     "source": "네이버 블로그",
+     "source_icon": "https://blogpfthumb-phinf.pstatic.net/MjAyNjEwMTVfMTA5/MDAxNzkyMDQyNjA5MjMx.wBtSY-DboMj1iNNY72xr9nnZ_WCINyVi5WBrC7Sagbwg.OdgSdYoBXnT5tbvEf_4JHJbIMHmbyIyVDl_AfWzBhc8g.PNG/%25EC%2598%25A4%25EB%25A0%258C%25EC%25A7%2580_%25EB%25A7%2588%25EC%258A%25A4%25EC%25BD%2594%25ED%258A%25B8%25EC%2599%2580_%25EC%2595%2584%25EC%259D%25B4%25EB%2594%2594%25EC%2596%25B4_%25EC%2586%258C%25ED%2592%2588%25EB%2593%25A4.png/%BF%C0%B7%BB%C1%F6+%B8%B6%BD%BA%C4%DA%C6%AE%BF%CD+%BE%C6%C0%CC%B5%F0%BE%EE+%BC%D2%C7%B0%B5%E9.png",
+     "date": "2026-11-05T16:00:00+09:00"
+    },
+    {
+     "index": 2,
+     "title": "2025 20651",
+     "snippet": "모의입찰 매각물건현황 감정평가 2025.02.04 · 건축년도(사용승인) 2002.04.11 매각물건명세서 구분 (목록) 소재지 용도/구조/면적 감정가(원) 비고 대지권(1) 고현",
+     "link": "https://www.bossauction.co.kr/auction/landview.html?product_id=1041708",
+     "source": "대장옥션",
+     "source_icon": "https://www.bossauction.co.kr/images/pwa/boss-192.png"
+    },
+    {
+     "index": 3,
+     "title": "서울특별시 양천구 목동 231-93 삼성베스트빌 제3층 제301호 다세대(빌라) 경매 | 서울남부지방법원 2025타경13385",
+     "snippet": "임차인수 : 0명 / 보증금합계 : 0 / 월세합계 : 0원 등기부 현황(집합) 등기(집합) 순위 접수일자 권리종류 권리자 채권금액 말소 비고 1 2006-08-01 (60707)",
+     "link": "https://www.act1.co.kr/auction/landview.html?product_id=1151397",
+     "source": "더원경매",
+     "source_icon": "https://www.act1.co.kr/images/pwa/theone-192.png"
+    },
+    {
+     "index": 5,
+     "title": "법원경매 2025타경13385 | 양천구 목동 231-93 다세대,빌라",
+     "snippet": "목록 주소 구조/용도/대지권 비고 대지권 서울특별시 양천구 목동 231-93 258분의 29.24 29.24㎡ (8.85평) 건물 서울특별시 양천구 목동 231-93 삼성베스트빌 ",
+     "link": "https://busyman.co.kr/content/viewdata.php?idx=1539886",
+     "source": "여의주경매법인",
+     "source_icon": "https://busyman.co.kr/favicon.ico",
+     "date": "2026-11-25T00:00:00+09:00"
+    },
+    {
+     "index": 8,
+     "title": "2025 104102",
+     "snippet": "40,000,000원 증액 등기부 현황(집합) 등기(집합) 순위 접수일자 권리종류 권리자 채권금액 말소 비고 1 2009-07-28 (48980) 소유권보존 최OO 이전 보존 2 ",
+     "link": "https://www.bossauction.co.kr/auction/landview.html?product_id=1117127",
+     "source": "대장옥션",
+     "source_icon": "https://www.bossauction.co.kr/images/pwa/boss-192.png"
+    },
+    {
+     "index": 10,
+     "title": "법원경매 2025타경311 | 서초구 서초동 1603-71 다세대,빌라",
+     "snippet": "땅콩 이 땅의 용도지역·공시지가·건축 가능성을 지도에서 바로 확인하세요 › 유찰 2025타경311 서울중앙지방법원 4계 다세대,빌라 서울특별시 서초구 서초동 1603-71 서초동베",
+     "link": "https://busyman.co.kr/content/viewdata.php?idx=1510723",
+     "source": "여의주경매법인",
+     "source_icon": "https://busyman.co.kr/favicon.ico",
+     "date": "2026-11-25T00:00:00+09:00"
+    }
+   ],
+   "text_blocks": [
+    {
+     "type": "paragraph",
+     "snippet": "베스트라 등기부 분석은 해당 부동산의 권리 관계를 파악하는 과정이며, 경매 물건의 경우 등기부상 권리(가압류, 근저당 등)와 임차인의 대항력 유무가 중요합니다."
+    },
+    {
+     "type": "header",
+     "level": 3,
+     "snippet": "등기부 분석 시 주요 확인 사항"
+    },
+    {
+     "type": "list",
+     "list_type": "unordered",
+     "list": [
+      {
+       "snippet": "가압류나 가처분 등 소유권 제한 표시가 등기부 갑구에 있는지 확인해야 하며, 이는 담보대출이나 거래 시 영향을 줄 수 있습니다.",
+       "reference_indexes": [
+        1
+       ]
+      },
+      {
+       "snippet": "경매 물건의 경우, 말소기준권리보다 앞서는 권리나 임차인은 매수인이 인수할 수 있으므로 권리 분석이 필수적입니다.",
+       "reference_indexes": [
+        5,
+        7
+       ]
+      },
+      {
+       "snippet": "등기부 현황에는 소유권, 근저당권, 가압류, 압류 등의 권리 종류, 권리자, 채권금액 등이 순위별로 기재되어 있습니다.",
+       "reference_indexes": [
+        2,
+        3
+       ]
+      },
+      {
+       "snippet": "임차인의 경우, 전입일자와 확정일자를 통해 대항력 및 우선변제권을 갖추는지 확인해야 하며, 배당에서 전액 변제되지 않으면 잔액을 매수인이 인수할 수 있습니다.",
+       "reference_indexes": [
+        8
+       ]
+      }
+     ]
+    },
+    {
+     "type": "header",
+     "level": 3,
+     "snippet": "권리 관계 비교",
+     "reference_indexes": [
+      3,
+      7
+     ]
+    },
+    {
+     "type": "table",
+     "table": [
+      [
+       "구분",
+       "권리 종류",
+       "권리자",
+       "채권금액",
+       "말소 여부"
+      ],
+      [
+       "예시 1",
+       "근저당권",
+       "주OOOOOOO",
+       "96,000,000원",
+       "말소기준"
+      ],
+      [
+       "예시 2",
+       "가압류",
+       "대OOOOOO",
+       "740,856,010원",
+       "말소"
+      ],
+      [
+       "예시 3",
+       "소유권이전청구권가등기",
+       "유OO",
+       "-",
+       "인수됨"
+      ]
+     ],
+     "formatted": [
+      {
+       "구분": "예시 1",
+       "권리_종류": "근저당권",
+       "권리자": "주OOOOOOO",
+       "채권금액": "96,000,000원",
+       "말소_여부": "말소기준"
+      },
+      {
+       "구분": "예시 2",
+       "권리_종류": "가압류",
+       "권리자": "대OOOOOO",
+       "채권금액": "740,856,010원",
+       "말소_여부": "말소"
+      },
+      {
+       "구분": "예시 3",
+       "권리_종류": "소유권이전청구권가등기",
+       "권리자": "유OO",
+       "채권금액": "-",
+       "말소_여부": "인수됨"
+      }
+     ]
+    },
+    {
+     "type": "header",
+     "level": 3,
+     "snippet": "등기부 분석 시 유의사항"
+    },
+    {
+     "type": "list",
+     "list_type": "unordered",
+     "list": [
+      {
+       "snippet": "가처분이 있는 부동산의 경우, 다툼이 끝날 때까지 기다리거나 거래를 재고하는 것이 안전할 수 있습니다.",
+       "reference_indexes": [
+        1
+       ]
+      },
+      {
+       "snippet": "경매 물건의 경우, 매각물건명세서와 현황조사서를 통해 점유 관계, 임차인, 매수인이 떠안는 권리 등을 입찰 전에 반드시 확인해야 합니다.",
+       "reference_indexes": [
+        5,
+        10
+       ]
+      },
+      {
+       "snippet": "가등기가 담보가등기인지 순위보전가등기인지에 따라 매수인에게 인수되는지 여부가 달라지므로 확인이 필요합니다.",
+       "reference_indexes": [
+        7
+       ]
+      }
+     ]
+    }
+   ],
+   "search_metadata": {
+    "status": "Success"
+   }
+  }
+ }
+}

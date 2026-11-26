@@ -6,10 +6,10 @@ import { getEngine } from "./engines";
 import { normalizeVendor } from "./engines/parse";
 import { detect } from "./detect";
 import { lockOwner, requireVisibility } from "./queries";
-import { checkCaptureBudget, type OwnerConfig } from "./budget";
+import { captureReserveKrw, checkCaptureBudget, type OwnerConfig } from "./budget";
 import { VisibilityError, notFound } from "./http";
 import { runKey } from "./run-key";
-import { DataForSeoError } from "@/lib/external/dataforseo";
+import { VendorError } from "@/lib/external/vendor-error";
 import { trackCost } from "@/lib/cost/tracker";
 import { logAudit } from "@/lib/audit/logger";
 import type {
@@ -171,7 +171,7 @@ export async function capture(
         });
         if (existing) continue;
         try {
-          await checkCaptureBudget(tx, ownerId, config);
+          await checkCaptureBudget(tx, ownerId, config, captureReserveKrw(engine));
         } catch (error) {
           if (recovering && error instanceof VisibilityError && error.code === "rate_limited") continue;
           throw error;
@@ -301,6 +301,7 @@ export async function capture(
               result.status === "ok"
                 ? await detect({
                     ownerId,
+                    query: config.query,
                     answerText: result.answerText,
                     citations: result.citations,
                     domain: config.domain,
@@ -364,7 +365,7 @@ export async function capture(
             };
           } catch (error) {
             const reason =
-              error instanceof DataForSeoError
+              error instanceof VendorError
                 ? error.reason
                 : "capture_persistence_failed";
             const pending =
@@ -374,7 +375,7 @@ export async function capture(
                 "submission_uncertain",
                 "vendor_unavailable",
               ].includes(reason) ||
-              !(error instanceof DataForSeoError);
+              !(error instanceof VendorError);
             const status = pending ? "pending" : "failed";
             await prisma.visibilitySnapshot
               .updateMany({

@@ -1,6 +1,6 @@
 // app/(dashboard)/visibility/components/QueryFormModal.tsx
 // 질문 생성·수정 폼 모달. 클라이언트 검증은 UX 보조이고, 최종 검증은 서버(zod)가 수행.
-// 설계 §3.4 입력 상한을 화면에서 미리 안내: query 1~1000 / brand 1~20 / competitor 0~20 / engine 1~4.
+// 설계 §3.4 입력 상한을 화면에서 미리 안내: query 1~1000 / brand 1~20 / competitor 0~20 / engine 1~5(시장별 지원 엔진만).
 // 접근성(MED7): role=dialog·aria-modal·제목 연결·초기 포커스·포커스 트랩·Escape·포커스 복원,
 //   필드 id/htmlFor, 엔진 버튼 aria-pressed.
 // 저장 중(MED8): 배경·×·Escape 등 모든 닫기 경로를 차단하고 필드를 비활성화해
@@ -13,6 +13,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { VisibilityQueryDTO, EngineId, Market, Frequency } from '@/types/visibility';
 import { MARKETS } from '@/types/visibility';
 import { ALL_ENGINES, ENGINE_LABELS, MARKET_LABELS, FREQUENCY_LABELS } from '../constants';
+import { MARKET_ENGINES } from '@/lib/market/constants';
+import { aliasInQuestion, normalizeText } from '@/lib/visibility/text';
 import { VisibilityApiError, type CreateQueryBody } from '../api';
 import { useDomains, useCreateDomain } from '../hooks/use-domains';
 
@@ -58,7 +60,9 @@ export function QueryFormModal({ initial, defaultMarket, submitting, errorMessag
   const [frequency, setFrequency] = useState<Frequency>(initial?.frequency ?? 'weekly');
   const [brandRaw, setBrandRaw] = useState((initial?.brandAliases ?? []).join(', '));
   const [competitorRaw, setCompetitorRaw] = useState((initial?.competitorAliases ?? []).join(', '));
-  const [engines, setEngines] = useState<EngineId[]>(initial?.engines ?? [...ALL_ENGINES]);
+  const [engines, setEngines] = useState<EngineId[]>(() =>
+    (initial?.engines ?? [...ALL_ENGINES]).filter((en) => MARKET_ENGINES[initial?.market ?? defaultMarket].includes(en)),
+  );
 
   // 도메인: 모달이 열린 동안에만 조회(지연 로딩) + 인라인 등록
   const domainsQuery = useDomains();
@@ -69,8 +73,17 @@ export function QueryFormModal({ initial, defaultMarket, submitting, errorMessag
   const [newBusinessType, setNewBusinessType] = useState('');
   const [domainErr, setDomainErr] = useState<string | null>(null);
 
+  // 시장을 바꾸면 그 시장이 지원하지 않는 엔진(예: 해외 시장의 네이버)은 선택에서 빠진다(상태에서도 제거) — 서버도 같은 기준으로 거부.
+  const availableEngines = MARKET_ENGINES[market];
+  const selectedEngines = useMemo(() => engines.filter((en) => availableEngines.includes(en)), [engines, availableEngines]);
+
   const brandAliases = useMemo(() => parseAliases(brandRaw), [brandRaw]);
   const competitorAliases = useMemo(() => parseAliases(competitorRaw), [competitorRaw]);
+  // 서버 판정(lib/visibility/detect.ts)과 같은 함수로 판단한다
+  const brandInQuery = useMemo(() => {
+    const q = normalizeText(query);
+    return brandAliases.some((a) => aliasInQuestion(q, normalizeText(a)));
+  }, [query, brandAliases]);
 
   const errors = useMemo(() => {
     const e: string[] = [];
@@ -80,9 +93,9 @@ export function QueryFormModal({ initial, defaultMarket, submitting, errorMessag
     if (brandAliases.some((a) => a.length > 100)) e.push('브랜드 별칭은 각 100자 이하여야 합니다');
     if (competitorAliases.length > 20) e.push('경쟁사 별칭은 최대 20개입니다');
     if (competitorAliases.some((a) => a.length > 100)) e.push('경쟁사 별칭은 각 100자 이하여야 합니다');
-    if (engines.length < 1 || engines.length > 4) e.push('엔진은 1~4개 선택해야 합니다');
+    if (selectedEngines.length < 1 || selectedEngines.length > 5) e.push('엔진은 1~5개 선택해야 합니다');
     return e;
-  }, [query, brandAliases, competitorAliases, engines]);
+  }, [query, brandAliases, competitorAliases, selectedEngines]);
 
   const toggleEngine = (en: EngineId) =>
     setEngines((prev) => (prev.includes(en) ? prev.filter((x) => x !== en) : [...prev, en]));
@@ -93,7 +106,7 @@ export function QueryFormModal({ initial, defaultMarket, submitting, errorMessag
       query: query.trim(),
       market,
       domainId: domainId || null,
-      engines,
+      engines: selectedEngines,
       brandAliases,
       competitorAliases,
       frequency,
@@ -182,12 +195,19 @@ export function QueryFormModal({ initial, defaultMarket, submitting, errorMessag
             <label style={lbl} htmlFor="qfm-query">추적 질문</label>
             <textarea id="qfm-query" ref={queryRef} style={{ ...field, minHeight: 60, resize: 'vertical' }} value={query} maxLength={1000} disabled={submitting} placeholder="예) 서울 강남 교정치과 추천" onChange={(e) => setQuery(e.target.value)} />
             <p style={hint}>{query.trim().length}/1000자</p>
+            {brandInQuery && (
+              <p style={{ ...hint, color: 'var(--amber-700)' }}>질문에 브랜드 이름이 들어 있어 이 질문은 언급률 집계에서 빠지고 인용률만 집계됩니다(답변이 질문을 따라 쓴 것과 실제 언급을 구분할 수 없음)</p>
+            )}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={lbl} htmlFor="qfm-market">시장</label>
-              <select id="qfm-market" style={field} value={market} disabled={submitting} onChange={(e) => setMarket(e.target.value as Market)}>
+              <select id="qfm-market" style={field} value={market} disabled={submitting} onChange={(e) => {
+                const next = e.target.value as Market;
+                setMarket(next);
+                setEngines((prev) => prev.filter((en) => MARKET_ENGINES[next].includes(en)));
+              }}>
                 {MARKETS.map((m) => <option key={m} value={m}>{MARKET_LABELS[m]}</option>)}
               </select>
             </div>
@@ -266,8 +286,8 @@ export function QueryFormModal({ initial, defaultMarket, submitting, errorMessag
           <div>
             <span style={lbl} id="qfm-engines-label">추적 엔진</span>
             <div role="group" aria-labelledby="qfm-engines-label" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {ALL_ENGINES.map((en) => {
-                const on = engines.includes(en);
+              {ALL_ENGINES.filter((en) => availableEngines.includes(en)).map((en) => {
+                const on = selectedEngines.includes(en);
                 return (
                   <button
                     key={en}
@@ -287,7 +307,7 @@ export function QueryFormModal({ initial, defaultMarket, submitting, errorMessag
                 );
               })}
             </div>
-            <p style={hint}>{engines.length}개 선택 (1~4개)</p>
+            <p style={hint}>{selectedEngines.length}개 선택 (1~5개)</p>
           </div>
 
           {errors.length > 0 && (
