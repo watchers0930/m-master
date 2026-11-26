@@ -13,7 +13,7 @@
 // - payload 규칙은 alert-format.ts 머리말 참고(비밀값 금지).
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { EmailError, emailConfigured, isDeliverableEmail, sendEmail, type EmailTransport } from "@/lib/notify/email";
+import { EmailError, emailConfigured, recipientsFrom, sendEmail, type EmailTransport } from "@/lib/notify/email";
 import { formatAlertEmail, isAdAlertType, validateAlertPayload, type AdAlertType, type AlertPayload } from "./alert-format";
 
 export { ALERT_TYPES, type AdAlertType, type AlertPayload } from "./alert-format";
@@ -67,15 +67,7 @@ export async function queueAlert(accountId: string, type: AdAlertType, payload: 
 
 /** ADS_ALERT_EMAILS → 유효 주소 목록(순서 유지, 중복 제거, 최대 10개). 없거나 전부 무효면 []. */
 export function alertRecipients(): string[] {
-  const seen = new Set<string>(), out: string[] = [];
-  for (const raw of (process.env.ADS_ALERT_EMAILS ?? "").split(",")) {
-    const addr = raw.trim();
-    if (!isDeliverableEmail(addr) || seen.has(addr.toLowerCase())) continue;
-    seen.add(addr.toLowerCase());
-    out.push(addr);
-    if (out.length === MAX_ALERT_RECIPIENTS) break;
-  }
-  return out;
+  return recipientsFrom(process.env.ADS_ALERT_EMAILS, MAX_ALERT_RECIPIENTS);
 }
 
 function failureCode(error: unknown): string {

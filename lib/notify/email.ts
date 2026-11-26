@@ -62,6 +62,19 @@ function truncate(value: string, max: number): string {
 }
 
 /** 발송 설정이 갖춰졌는지(값 자체는 돌려주지 않는다). */
+/** 쉼표 구분 수신자 문자열 → 유효 주소(순서 유지·대소문자 무시 중복 제거·최대 max개). 무효 항목은 버린다. */
+export function recipientsFrom(raw: string | undefined, max: number): string[] {
+  const seen = new Set<string>(), out: string[] = [];
+  for (const item of (raw ?? "").split(",")) {
+    const addr = item.trim();
+    if (!isDeliverableEmail(addr) || seen.has(addr.toLowerCase())) continue;
+    seen.add(addr.toLowerCase());
+    out.push(addr);
+    if (out.length === max) break;
+  }
+  return out;
+}
+
 export function emailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY?.trim() && process.env.ADS_ALERT_FROM?.trim());
 }

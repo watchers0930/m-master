@@ -136,6 +136,17 @@ export class DataForSeoClient {
     this.assertSuccess(result);
     return result as T;
   }
+  /** 계정 잔액(USD) — appendix/user_data는 과금 없는 조회다(운영 아침 보고서). */
+  async balanceUsd(deadline?: number): Promise<number> {
+    const result = await this.request("appendix/user_data", undefined, deadline);
+    this.assertSuccess(result);
+    const parsed = z
+      .object({ money: z.object({ balance: z.number() }).passthrough() })
+      .passthrough()
+      .safeParse(result.tasks?.[0]?.result?.[0]);
+    if (!parsed.success) throw new DataForSeoError("vendor_invalid_response");
+    return parsed.data.money.balance;
+  }
   private assertSuccess(result: VendorEnvelope) {
     const task = result.tasks?.find((t) => t.status_code !== 20000) ?? result.tasks?.[0];
     if (result.status_code !== 20000 || !result.tasks?.length || result.tasks.some((t) => t.status_code !== 20000)) {

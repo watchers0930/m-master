@@ -7,17 +7,26 @@ import { z } from "zod";
 import { verifyCronSecret } from "@/lib/cron/auth";
 import { jsonError, jsonOk, queryParams, VisibilityError } from "@/lib/visibility/http";
 import { toAdsHttpError } from "./http";
+import { assessResult, cronName, outcomeOf, recordCronRun } from "@/lib/cron/heartbeat";
 
 const noParams = z.object({}).strict();
 
 export async function adsCronRequest(request: NextRequest | Request, work: () => Promise<unknown>): Promise<Response> {
   let response: Response;
+  let authed = false;
   try {
     if (!verifyCronSecret(request as NextRequest)) throw new VisibilityError("unauthorized", "인증이 필요합니다.", 401);
+    authed = true;
     noParams.parse(queryParams(request));
-    response = jsonOk(await work());
+    const result = await work();
+    const assessed = assessResult(result);
+    await recordCronRun(cronName(request), assessed.outcome, assessed.code);
+    response = jsonOk(result);
   } catch (error) {
-    response = jsonError(toAdsHttpError(error));
+    const mapped = toAdsHttpError(error);
+    // 기록 사유는 변환 전 오류에서(변환하면 일반 오류가 모두 internal_error가 된다 — codex LOW).
+    if (authed) { const o = outcomeOf(error); await recordCronRun(cronName(request), o.outcome, o.code); }
+    response = jsonError(mapped);
   }
   response.headers.set("Cache-Control", "no-store");
   return response;
