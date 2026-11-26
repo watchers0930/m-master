@@ -1,6 +1,7 @@
 // lib/ops/report/checks/ads.ts — 네이버 검색광고: 지출 감시 생존, 비즈머니, 어제 성과(기록 유무 구분), 미발송 알림, 실제 노출 경로.
 // - '노출 가능' = 켜진 캠페인 → 그 아래 켜진 그룹 → 그 그룹의 켜지고 심사 통과한 키워드와 소재가 함께 있는 경로가 하나라도 있을 때
 //   (항목별 개수만 보면 서로 다른 그룹의 키워드·소재로 '노출 가능' 오판 — codex MED). 2026-11-26 캠페인만 켜져 노출 0이던 사례가 출발점.
+// - 확장소재 있는 그룹 수(MINTEQ 등록분, ad_extensions)도 한 줄로 보인다(판정 단계는 바꾸지 않는다).
 // - 심사 동기화·성과 수집 크론의 생존은 checks/crons.ts가 본다(여기서는 성과 행이 없으면 '0'이 아니라 '기록 없음').
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -14,6 +15,7 @@ export const MAX_ACCOUNTS = 100;
 type Account = { id: string; label: string; status: string; last_guard_at: Date | null; last_bizmoney_krw: number | null };
 type State = {
   c_on: number; c_total: number; g_on: number; g_total: number; k_on: number; k_total: number; r_on: number; r_total: number; serving: boolean;
+  g_ext: number;
 };
 type Perf = { rows: number; cost: number; clk: number; ccnt: number; imp: number };
 
@@ -48,6 +50,8 @@ export async function checkAds({ now }: CheckContext, db: Pick<Prisma.Transactio
         (SELECT count(*) FROM ad_keywords WHERE ad_account_id = ${a.id})::int AS k_total,
         (SELECT count(*) FILTER (WHERE NOT user_lock) FROM ad_creatives WHERE ad_account_id = ${a.id})::int AS r_on,
         (SELECT count(*) FROM ad_creatives WHERE ad_account_id = ${a.id})::int AS r_total,
+        (SELECT count(*) FROM ad_groups g WHERE g.ad_account_id = ${a.id} AND EXISTS (
+          SELECT 1 FROM ad_extensions e WHERE e.ad_account_id = g.ad_account_id AND e.parent_naver_id = g.naver_id AND e.status = 'created'))::int AS g_ext,
         EXISTS (
           SELECT 1 FROM ad_campaigns c JOIN ad_groups g ON g.ad_account_id = c.ad_account_id AND g.parent_naver_id = c.naver_id
           WHERE c.ad_account_id = ${a.id} AND NOT c.user_lock AND NOT g.user_lock
@@ -62,6 +66,9 @@ export async function checkAds({ now }: CheckContext, db: Pick<Prisma.Transactio
         (s.serving ? "노출 가능" : anyOn ? "⚠️일부만 켜짐(노출 경로 없음)" : "모두 꺼짐"),
     );
     if (anyOn && !s.serving) raise("warn");
+    // 확장소재(3.6단계): MINTEQ가 만든 것(ad_extensions)만 센다 — 네이버 화면에서 직접 만든 것은 빠진다. 노출 중인데 0이면 안내만(장애 아님).
+    if (s.g_total > 0)
+      lines.push(`${head} 확장소재 있는 그룹 ${s.g_ext}/${s.g_total}(MINTEQ 등록 기준)${s.serving && s.g_ext === 0 ? " · 추가제목·서브링크를 붙이면 광고가 더 크게 보입니다" : ""}`);
 
     const [p] = await db.$queryRaw<Perf[]>`
       SELECT count(*)::int AS rows, coalesce(sum(cost_krw),0)::int AS cost, coalesce(sum(clk_cnt),0)::int AS clk,

@@ -12,8 +12,10 @@ export const adsQueryKeys = {
   proposals: (q: Omit<AdsProposalListQuery, 'cursor'>) => ['ads', 'proposals', q] as const,
   proposalsAll: ['ads', 'proposals'] as const,
   proposal: (id: string) => ['ads', 'proposal', id] as const,
+  /** 광고그룹 확장소재 현황(네이버 조회 1회) — 펼쳤을 때만 */
+  extensions: (groupId: string) => ['ads', 'extensions', groupId] as const,
 };
 
-/** 계정 변경 후: 모든 광고 캐시를 다시 읽는다. 비즈채널 목록(네이버 조회)은 제외 — 대장이 버튼으로만 다시 부른다(중복 호출 방지). */
+/** 계정 변경 후: 모든 광고 캐시를 다시 읽는다. 비즈채널 목록·확장소재 현황(네이버 조회)은 제외 — 대장이 버튼으로만 다시 부른다(중복 호출 방지). */
 export const invalidateAds = (qc: QueryClient) =>
-  qc.invalidateQueries({ queryKey: adsQueryKeys.all, predicate: (q) => q.queryKey[1] !== 'account-channels' });
+  qc.invalidateQueries({ queryKey: adsQueryKeys.all, predicate: (q) => q.queryKey[1] !== 'account-channels' && q.queryKey[1] !== 'extensions' });

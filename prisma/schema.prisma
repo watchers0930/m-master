@@ -653,6 +653,7 @@ model AdAccount { // ad_accounts — 네이버 검색광고 계정 연결(키는
   groups       AdGroup[]
   keywords     AdKeyword[]
   creatives    AdCreative[]
+  extensions   AdExtension[]
   performance  AdPerformanceDaily[]
   operationLogs AdOperationLog[]
   alerts       AdAlert[]
@@ -794,6 +795,32 @@ model AdCreative { // ad_creatives — 네이버 소재 미러(TEXT_45만, slot 
   @@map("ad_creatives")
 }
 
+model AdExtension { // ad_extensions — MINTEQ가 만든 확장소재 미러(텍스트 3종 HEADLINE·DESCRIPTION·SUB_LINKS, lib/ads/extensions/apply.ts)
+  // 켜기·끄기 관리 대상이 아니다(잠금 컬럼 없음): 확장소재는 자체 비용이 없고 그룹·캠페인이 꺼져 있으면 노출되지 않는다.
+  // 행 = 생성 점유: (계정, 그룹, 유형)마다 MINTEQ 것은 1개. status creating → created. naverId는 생성이 확인된 뒤 채운다.
+  id            String    @id @default(cuid())
+  ownerId       String    @map("owner_id")
+  adAccountId   String    @map("ad_account_id")
+  parentNaverId String    @map("parent_naver_id") // nccAdgroupId(ownerId)
+  type          String // HEADLINE | DESCRIPTION | SUB_LINKS
+  content       Json // 네이버 adExtension 본문 그대로({headline}·{description}·[{name, final}])
+  status        String    @default("creating") // creating | created
+  naverId       String?   @map("naver_id") // nccAdExtensionId
+  inspectStatus String?   @map("inspect_status")
+  userLock      Boolean?  @map("user_lock")
+  claimedAt     DateTime  @default(now()) @map("claimed_at") // 생성 점유 시각(10분 지나면 죽은 실행으로 보고 다시 잡는다)
+  lastSyncedAt  DateTime? @map("last_synced_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  owner         User      @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  adAccount     AdAccount @relation(fields: [adAccountId], references: [id], onDelete: Restrict)
+
+  @@unique([adAccountId, parentNaverId, type])
+  @@unique([adAccountId, naverId])
+  @@index([ownerId, adAccountId])
+  @@map("ad_extensions")
+}
+
 model AdPerformanceDaily { // ad_performance_daily — 일별 성과(KST 날짜, 최근 7일 재수집 upsert)
   id          String    @id @default(cuid())
   ownerId     String    @map("owner_id")
@@ -886,6 +913,7 @@ model User { // users — 사용자 (멀티테넌시 핵심)
   adGroups           AdGroup[]
   adKeywords         AdKeyword[]
   adCreatives        AdCreative[]
+  adExtensions       AdExtension[]
   adPerformance      AdPerformanceDaily[]
   adOperationLogs    AdOperationLog[]
   adAlerts           AdAlert[]

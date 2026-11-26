@@ -6,7 +6,7 @@
 'use client';
 
 import type {
-  AdAccountDTO, AdAccountWithChannels, AdApplyResultDTO, AdLockEntityType, AdLockResultDTO, AdOverviewDTO,
+  AdAccountDTO, AdAccountWithChannels, AdApplyResultDTO, AdExtensionApplyDTO, AdExtensionDraftBody, AdExtensionDraftDTO, AdGroupExtensionsDTO, AdLockEntityType, AdLockResultDTO, AdOverviewDTO,
   AdProposalDTO, AdProposalKind, AdProposalPage, AdProposalStatus, ProposalEstimateDTO, ProposalPayload,
 } from '@/types/ads';
 
@@ -92,3 +92,11 @@ export const applyAdProposal = (id: string) => send<AdApplyResultDTO>(`/api/ads/
 // ── 켜기·끄기(끄기는 서버가 버전과 무관하게 이기지만 스키마상 버전은 늘 보낸다) ──
 export const setAdLock = (type: AdLockEntityType, id: string, locked: boolean, expectedLockVersion: number) =>
   send<AdLockResultDTO>(`/api/ads/entities/${seg(type)}/${seg(id)}/lock`, jsonInit('POST', { locked, expected_lock_version: expectedLockVersion }));
+
+// ── 확장소재(3.6단계) ──
+export const getGroupExtensions = (groupId: string) => send<AdGroupExtensionsDTO>(`/api/ads/groups/${seg(groupId)}/extensions`);
+export const draftGroupExtensions = (groupId: string) => send<AdExtensionDraftDTO>(`/api/ads/groups/${seg(groupId)}/extensions/draft`, { method: 'POST' });
+export const applyGroupExtensions = (groupId: string, body: AdExtensionDraftBody) =>
+  send<AdExtensionApplyDTO>(`/api/ads/groups/${seg(groupId)}/extensions`, jsonInit('POST', body));
+export const releaseGroupExtension = (groupId: string, type: string) =>
+  send<{ result: 'adopted' | 'released' }>(`/api/ads/groups/${seg(groupId)}/extensions?type=${seg(type)}`, { method: 'DELETE' });

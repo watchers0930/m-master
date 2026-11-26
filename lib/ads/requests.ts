@@ -170,3 +170,16 @@ export function buildResume(kind: LockKind, naverId: string, reason: ResumeReaso
   assertInvariants("resume", null, body);
   return body;
 }
+
+export type AdExtensionBody = { ownerId: string; type: string; pcChannelId: string; mobileChannelId: string; userLock: false; adExtension: unknown };
+const EXTENSION_TYPES: readonly string[] = ["HEADLINE", "DESCRIPTION", "SUB_LINKS"];
+
+/** 확장소재 생성(POST /ncc/ad-extensions, 실측 2026-11-26 형태). 소유자 = 광고그룹, 채널 = 선택한 비즈채널.
+ *  userLock=false: 확장소재는 자체 비용이 없고 그룹이 꺼져 있으면 노출되지 않는다(네이버는 생성 때 userLock을 무시하고 켠다 — 실측).
+ *  문구 규칙(글자 수·기호·서브링크 도메인)은 extensions/rules.ts 린터 책임. */
+export function buildAdExtension(account: Pick<CapAccount, "businessChannelId">, adgroupId: string, type: string, adExtension: unknown): AdExtensionBody {
+  if (!EXTENSION_TYPES.includes(type)) fail("type");
+  if (adExtension === null || typeof adExtension !== "object") fail("adExtension");
+  const channel = requireText(account.businessChannelId, "businessChannelId");
+  return { ownerId: requireText(adgroupId, "ownerId"), type, pcChannelId: channel, mobileChannelId: channel, userLock: false, adExtension };
+}

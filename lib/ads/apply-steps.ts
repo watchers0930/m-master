@@ -13,13 +13,13 @@ import type { AdAccount } from "@prisma/client";
 import { z } from "zod";
 import { NaverAdsError, type NaverAdsClient } from "@/lib/external/naver-searchad";
 import { prisma } from "@/lib/prisma";
-import { NAVER_ID_RE, naverChannelSchema, naverKeywordCreatedSchema } from "@/schemas/ads";
+import { NAVER_ID_RE, naverKeywordCreatedSchema } from "@/schemas/ads";
 import type { ProposalCreative, ProposalKeyword } from "@/types/ads";
 import { ApplyFailure } from "./apply-errors";
 import { stepSharedBudget } from "./apply-budget";
 import { inspect, stopIfUnsafe, uncertainStop } from "./apply-inspect";
 import { createEntity } from "./execution";
-import { unexpectedNaverResponse } from "./http";
+import { readLandingUrl } from "./landing";
 import { adgroupName, campaignName } from "./names";
 import { findAdgroups, findAds, findCampaigns, findKeywords } from "./reconcile";
 import { buildAdgroup, buildCampaign, buildKeyword, buildTextAd } from "./requests";
@@ -131,13 +131,9 @@ async function recordKeyword(ctx: ApplyCtx, groupId: string, k: ProposalKeyword,
   await stopIfUnsafe(ctx, "keyword", id, o);
 }
 
-/** 소재 최종 URL = 선택한 비즈채널(사이트)의 channelKey. ⚠️ 스킴 없는 값이면 https://를 붙인다(실측 전 가정). 적용 1회에 1번만 읽는다. */
+/** 소재 최종 URL = 선택한 비즈채널(사이트)의 channelKey(landing.ts). 적용 1회에 1번만 읽는다. */
 async function landingUrl(ctx: ApplyCtx): Promise<string> {
-  if (ctx.landingUrl) return ctx.landingUrl;
-  const parsed = naverChannelSchema.safeParse(await ctx.client.get(`/ncc/channels/${ctx.account.businessChannelId}`));
-  if (!parsed.success || !parsed.data.channelKey) throw unexpectedNaverResponse();
-  const raw = parsed.data.channelKey.trim();
-  ctx.landingUrl = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  ctx.landingUrl ??= await readLandingUrl(ctx.client, ctx.account.businessChannelId as string);
   return ctx.landingUrl;
 }
 

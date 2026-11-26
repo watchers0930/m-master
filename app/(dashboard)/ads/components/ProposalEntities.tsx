@@ -1,6 +1,7 @@
 // app/(dashboard)/ads/components/ProposalEntities.tsx
 // 적용으로 만든 네이버 항목(Task 12): 캠페인·광고그룹·키워드·소재별 검수 상태 · 켜짐 상태(lockedBy) · 켜기·끄기.
 // 데이터는 계정 개요(DB 미러)에서 이 제안의 것만 고른다 — 네이버를 부르지 않는다. 검수는 30분마다 동기화된다.
+// '제안 전체 켜기'(LaunchAllButton)는 꺼진 항목을 소재 → 키워드 → 그룹 → 캠페인 순으로 같은 켜기 API로 켠다.
 // 켜기 전제(서버가 강제): 비상 정지 해제 · 오늘 비용 < 상한 · 검수 승인(키워드·소재) · 네이버 설정 대조. 감시가 오늘 끈 항목은 내일 0시에 자동 재개.
 'use client';
 
@@ -8,6 +9,7 @@ import { errorView, inspectLabel, isInspectPassed } from '@/lib/api/ads-format';
 import { alertBadges } from '@/lib/api/ads-safety';
 import { useAdsOverview } from '@/hooks/useAdsOverview';
 import type { AdLockEntityType, AdMirrorBaseDTO } from '@/types/ads';
+import { LaunchAllButton } from './LaunchAllButton';
 import { LockButton } from './LockButton';
 import { AlertTags, Card, Empty, LockBadge, Notice, subText, tableStyle, tdStyle, thStyle } from './ui';
 
@@ -27,7 +29,12 @@ export function ProposalEntities({ proposalId, accountId }: { proposalId: string
     ...mine(o.ads).map((r) => ({ type: 'ad' as const, kind: '소재', label: `${r.headline} / ${r.description}`, row: r, needsInspect: true })),
   ];
   return (
-    <Card title="네이버에 만든 항목" right={<span style={subText}>{rows.length}개 · 검수는 30분마다 동기화</span>} bodyStyle={{ padding: 0, gap: 0 }}>
+    <Card title="네이버에 만든 항목" right={
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <span style={subText}>{rows.length}개 · 검수는 30분마다 동기화</span>
+        <LaunchAllButton overview={o} proposalId={proposalId} accountId={accountId} />
+      </div>
+    } bodyStyle={{ padding: 0, gap: 0 }}>
       {rows.length === 0 ? <Empty>아직 만든 항목이 없습니다.</Empty> : (
         <div style={{ overflowX: 'auto' }}>
           <table style={tableStyle}>

@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { errorView, failCodeMessage, isUrgentFailCode, proposalStatusLabel } from '@/lib/api/ads-format';
 import { useAdsProposal } from '@/hooks/useAdsProposal';
 import type { AdProposalDTO, ProposalGroup } from '@/types/ads';
+import { ExtensionsCard } from './ExtensionsCard';
 import { LockNoticeBanner, LockNoticesProvider } from './LockNotices';
 import { ProposalActions } from './ProposalActions';
 import { ProposalEntities } from './ProposalEntities';
@@ -53,6 +54,7 @@ function Body({ proposal }: { proposal: AdProposalDTO }) {
         <ProposalGroupEditor key={i} index={i} group={g} issues={dirty ? [] : issues} editable={editable} bidRange={proposal.bidRange} onChange={(next) => setGroup(i, next)} />
       ))}
       {applied && <ProposalEntities proposalId={proposal.id} accountId={proposal.accountId} />}
+      {proposal.status === 'applied' && <ExtensionsCard proposalId={proposal.id} accountId={proposal.accountId} />}
     </LockNoticesProvider>
   );
 }

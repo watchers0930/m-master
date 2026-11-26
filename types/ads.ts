@@ -163,3 +163,17 @@ export type AdOverviewDTO = {
   /** since7·since30 = 창의 첫 KST 날짜(오늘 포함 7일·30일). daily = 30일 창의 날짜별 합계(행 있는 날만, 오름차순). */
   performance: { since7: string; since30: string; campaigns: AdCampaignPerfDTO[]; daily: AdDailyPerfDTO[]; totals7: AdPerfTotals; totals30: AdPerfTotals };
 };
+
+// ── 확장소재(3.6단계, lib/ads/extensions) ──
+export type AdExtensionType = 'HEADLINE' | 'DESCRIPTION' | 'SUB_LINKS' | (string & {});
+/** 네이버에 지금 있는 확장소재 1개. mine = MINTEQ가 만든 것(ad_extensions 미러). summary = 화면용 한 줄 요약. */
+export type AdExtensionDTO = { naverId: string; type: AdExtensionType; mine: boolean; summary: string; inspectStatus: string | null; status: string | null };
+/** MINTEQ 등록이 끝나지 않은 유형(creating). stale = 10분 넘음 → 대장이 '풀기'로 네이버를 다시 확인할 수 있다. */
+export type AdExtensionPendingDTO = { type: string; stale: boolean };
+export type AdGroupExtensionsDTO = { groupId: string; groupNaverId: string; extensions: AdExtensionDTO[]; pending: AdExtensionPendingDTO[] };
+export type AdSubLinkDraft = { name: string; url: string };
+export type AdExtensionDraftBody = { headline?: string; promo?: string; subLinks?: AdSubLinkDraft[] };
+export type AdExtensionIssueDTO = { target: 'headline' | 'promo' | 'subLinks'; index: number | null; rule: string; message: string };
+export type AdExtensionDraftDTO = { draft: AdExtensionDraftBody; issues: AdExtensionIssueDTO[]; pages: { url: string; title: string | null }[]; landingHost: string; costKrw: number };
+export type AdExtensionOutcomeDTO = { type: 'HEADLINE' | 'DESCRIPTION' | 'SUB_LINKS'; result: 'created' | 'exists' | 'limit' | 'rejected'; naverId: string | null; naverCode?: number };
+export type AdExtensionApplyDTO = { outcomes: AdExtensionOutcomeDTO[] };
