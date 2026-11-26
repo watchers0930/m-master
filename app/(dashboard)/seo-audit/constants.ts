@@ -89,7 +89,7 @@ export const OPERATION_LABELS: Record<string, string> = {
   onpage_instant: '기술 감사(즉시)',
   onpage_crawl: '기술 감사(크롤)',
   labs_ranked: '키워드 발견',
-  keywords_for_site: '사이트 키워드·수요',
+  keywords_for_site: '키워드 발견·수요',
   naver_volume: '네이버 수요',
   serp_google: 'Google 순위',
   serp_naver: '네이버 순위',

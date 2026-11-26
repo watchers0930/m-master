@@ -14,6 +14,7 @@ import type { SeoAuditDTO, SeoKeywordDTO } from '@/types/seo';
 import { ENGINE_LABELS, RANK_STATUS_META, formatDate, formatPercent, formatVolume, isStale } from '../constants';
 import { SeoApiError } from '../api';
 import { useResearchKeywords } from '../hooks/use-seo-keywords';
+import { canonicalSeeds, parseSeedKeywords, seedListIssue, SEED_LIMIT } from '@/lib/seo/seed-keywords';
 import { useRefreshRankings } from '../hooks/use-seo-rankings';
 
 const MAX_COMBO = 10; // 설계 §5.2: 실제 조합(키워드×엔진) 최대 10
@@ -73,14 +74,12 @@ export function KeywordOpportunities({ domainId, keywords, loading, error, hasMo
 
   const handleResearch = async () => {
     if (!canWrite || busy) return;
-    const list = researchText
-      .split(/[\n,]/)
-      .map((s) => s.normalize('NFKC').trim())
-      .filter(Boolean)
-      .slice(0, 50);
+    const list = parseSeedKeywords(researchText);
+    const seedIssue = seedListIssue(list);
+    if (seedIssue) return setActionMsg({ text: seedIssue, ok: false });
     setActionMsg(null);
 
-    const signature = JSON.stringify({ domainId, list });
+    const signature = JSON.stringify({ domainId, list: canonicalSeeds(list) }); // 서버와 같은 기준(중복·순서 무시)
     let runKey: string;
     if (researchAttempt.current?.signature === signature) {
       runKey = researchAttempt.current.runKey;
@@ -144,8 +143,8 @@ export function KeywordOpportunities({ domainId, keywords, loading, error, hasMo
             value={researchText}
             onChange={(e) => setResearchText(e.target.value)}
             disabled={busy}
-            aria-label="리서치할 키워드 (쉼표/줄바꿈 구분, 최대 50, 비우면 사이트 기반 자동 발견)"
-            placeholder="리서치할 키워드 (비우면 사이트 기반 자동 발견 · 쉼표 구분, 최대 50)"
+            aria-label={`주제 키워드 (쉼표 구분, 최대 ${SEED_LIMIT}개 — 넣으면 관련 검색어를, 비우면 사이트 첫 화면 기준으로 찾습니다)`}
+            placeholder={`주제 키워드 (예: 전세사기, 근저당확인 · 최대 ${SEED_LIMIT}개 · 비우면 사이트 기준)`}
             style={{ flex: 1, minWidth: 220, height: 32, borderRadius: 7, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 12, padding: '0 10px', fontFamily: 'inherit' }}
           />
           <button type="button" className="btn btn-primary" style={{ padding: '6px 11px', opacity: canWrite ? 1 : 0.5 }} disabled={!canWrite || busy} title={canWrite ? '외부 수집 비용이 발생합니다' : 'Starter 플랜부터 사용할 수 있습니다'} onClick={handleResearch}>

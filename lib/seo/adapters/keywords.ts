@@ -1,6 +1,7 @@
 import type { VendorEnvelope } from "@/lib/external/dataforseo";
 import { MARKET_LOCATIONS } from "@/lib/market/constants";
 import { citationHost } from "@/lib/visibility/normalize";
+import { SEED_LIMIT } from "../seed-keywords";
 import {
   array,
   object,
@@ -28,6 +29,21 @@ export function keywordsRequest(operation: string, input: FrozenInput) {
       ],
       units: 100,
     };
+  // 주제(씨앗) 키워드가 있으면 그 키워드와 관련된 검색어를, 없으면 첫 화면 기준 사이트 키워드를 찾는다(같은 단가 $0.09, 2026-11-26 실측).
+  // 첫 화면이 주제와 다른 내용(예: AI 소개)이면 사이트 기준 결과가 무관한 키워드로 채워져 자동 순위 비용이 엉뚱한 곳에 쓰였다.
+  if (operation === "keywords_for_site" && input.keywords?.length)
+    return {
+      path: "keywords_data/google_ads/keywords_for_keywords/live",
+      body: [
+        {
+          keywords: input.keywords.slice(0, SEED_LIMIT),
+          location_code,
+          language_code,
+          sort_by: "search_volume",
+        },
+      ],
+      units: 1,
+    };
   return {
     path: "keywords_data/google_ads/keywords_for_site/live",
     body: [{ target: input.host, location_code, language_code }],
@@ -46,9 +62,11 @@ export function parseKeywords(
       : results;
   const metrics: Metric[] = [],
     observations: Observation[] = [];
-  const wanted = input.keywords?.length
-    ? new Set(input.keywords.map((v) => v.normalize("NFKC").toLowerCase()))
-    : null;
+  // 네이버 볼륨만 요청한 키워드로 거른다. 구글 광고 키워드는 씨앗을 넣어 받은 관련 검색어 전체가 결과다.
+  const wanted =
+    operation === "naver_volume" && input.keywords?.length
+      ? new Set(input.keywords.map((v) => v.normalize("NFKC").toLowerCase()))
+      : null;
   for (const value of rows.slice(0, 100)) {
     const row = object(value),
       data = operation === "labs_ranked" ? object(row.keyword_data) : row;

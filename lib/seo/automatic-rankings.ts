@@ -6,6 +6,7 @@ import { checkSeoFeature } from "@/lib/billing/limits";
 import { checkSeoBudget } from "./budget";
 import { rankPlans, taskData, type Config } from "./plan";
 import { releaseKeywordReservations } from "./reservations";
+import { CANDIDATE_POOL, seedKeywordScope, uniqueVariants } from "./seed-scope";
 
 /**
  * 전체 진단의 연구(키워드) 태스크가 끝나면, 상위 키워드로 순위(SERP) 태스크를 1회 예약한다.
@@ -30,17 +31,21 @@ export async function scheduleAutomaticRankings(ownerId: string, id: string) {
     if (research) return;
     try {
       checkSeoFeature(plan);
-      const candidates = await tx.seoKeyword.findMany({
-        where: {
-          domainId: audit.domainId,
-          market: audit.market,
-          engine: "google",
-          lastAuditId: id,
-        },
-        select: { id: true },
-        orderBy: [{ searchVolume: "desc" }, { id: "asc" }],
-        take: Math.floor(10 / config.engines.length),
-      });
+      const candidates = uniqueVariants(
+        await tx.seoKeyword.findMany({
+          where: {
+            domainId: audit.domainId,
+            market: audit.market,
+            engine: "google",
+            lastAuditId: id,
+            ...(await seedKeywordScope(tx, id, config)),
+          },
+          select: { id: true, normalizedKeyword: true, searchVolume: true },
+          orderBy: [{ searchVolume: { sort: "desc", nulls: "last" } }, { id: "asc" }], // Postgres desc는 null이 먼저 — 검색량 모르는 키워드가 앞서지 않게
+          take: CANDIDATE_POOL,
+        }),
+        Math.floor(10 / config.engines.length),
+      );
       const frozen = {
         ...config,
         autoRankings: false,

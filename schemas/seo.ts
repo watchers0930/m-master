@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { marketSchema } from "@/lib/market/schema";
+import { SEED_LIMIT, seedKeywordIssue } from "@/lib/seo/seed-keywords";
 export const idSchema = z.string().cuid();
 export const seoEngineSchema = z.enum(["google", "naver"]);
 const engines = z
@@ -34,24 +35,29 @@ export const pathSchema = z
       return false;
     }
   });
+export const keywordSchema = z
+  .string()
+  .transform((v) => v.normalize("NFKC").trim())
+  .pipe(z.string().min(1).max(200));
+// 주제(씨앗) 키워드: 공급자 keywords_for_keywords 계약(lib/seo/seed-keywords.ts).
+export const seedKeywordsSchema = z
+  .array(keywordSchema.superRefine((v, ctx) => {
+    const issue = seedKeywordIssue(v);
+    if (issue) ctx.addIssue({ code: "custom", message: issue });
+  }))
+  .transform((v) => [...new Map(v.map((k) => [k.toLowerCase(), k])).values()])
+  .pipe(z.array(z.string()).max(SEED_LIMIT));
 export const auditSchema = z.strictObject({
   ...base,
   mode: z.enum(["instant", "crawl"]).default("instant"),
   paths: z.array(pathSchema).min(1).max(5).optional(),
   engines: engines.optional(),
   keywordIds: ids.optional(),
+  keywords: seedKeywordsSchema.optional(),
 });
-export const keywordSchema = z
-  .string()
-  .transform((v) => v.normalize("NFKC").trim())
-  .pipe(z.string().min(1).max(200));
 export const researchSchema = z.strictObject({
   ...base,
-  keywords: z
-    .array(keywordSchema)
-    .max(50)
-    .transform((v) => [...new Map(v.map((k) => [k.toLowerCase(), k])).values()])
-    .optional(),
+  keywords: seedKeywordsSchema.optional(),
 });
 export const rankingSchema = z
   .strictObject({ ...base, keywordIds: ids, engines })

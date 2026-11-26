@@ -54,6 +54,7 @@ export interface RunAuditBody {
   paths?: string[]; // 선택, 1~5개, '/'로 시작
   engines?: SeoEngine[]; // 선택, 1~2개, 중복 금지(naver는 ko-KR만)
   keywordIds?: string[]; // 선택, ≤10개, 해당 Domain·market 소속
+  keywords?: string[]; // 선택, 주제(씨앗) 키워드 ≤20개 — 키워드 발견의 기준
 }
 
 export async function runAudit(body: RunAuditBody): Promise<SeoAuditDTO> {
@@ -111,7 +112,7 @@ export async function listKeywords(p: ListKeywordsParams): Promise<Paginated<Seo
 export interface ResearchKeywordsBody {
   domainId: string;
   runKey: string;
-  keywords?: string[]; // 각 1~200자, 최대 50·중복 제거
+  keywords?: string[]; // 주제(씨앗) 키워드 — 각 80자·10단어 이하, 최대 20·중복 제거(lib/seo/seed-keywords.ts)
 }
 
 export async function researchKeywords(body: ResearchKeywordsBody): Promise<SeoAuditDTO> {

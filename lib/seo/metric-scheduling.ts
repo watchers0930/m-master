@@ -7,6 +7,7 @@ import { MARKET_LOCATIONS } from "@/lib/market/constants";
 import { taskPlan, taskData, type Config, type TaskPlan } from "./plan";
 import { METRIC_OPERATIONS, metricUnits, NEW_METRIC_KEYWORD_CAP } from "./adapters/metric-contract";
 import { checkSeoBudget } from "./budget";
+import { CANDIDATE_POOL, seedKeywordScope, uniqueVariants } from "./seed-scope";
 
 /** Reserve once after discovery, serialized with all owner spending. No vendor I/O. */
 export async function scheduleMetricTasks(ownerId: string, id: string) {
@@ -19,10 +20,11 @@ export async function scheduleMetricTasks(ownerId: string, id: string) {
     if (config.metricScheduling !== "waiting") return;
     if (await tx.seoTask.count({where: {auditId: id, operation: {in: ["labs_ranked", "keywords_for_site"]},
       status: {in: ["pending", "claimed", "submitted"]}}})) return;
-    const candidates = await tx.seoKeyword.findMany({where: {domainId: audit.domainId, market: audit.market,
-      engine: "google", reservationOnly: false, lastAuditId: id, domain: {ownerId}},
-      select: {id: true, normalizedKeyword: true},
-      orderBy: [{searchVolume: {sort: "desc", nulls: "last"}}, {id: "asc"}], take: NEW_METRIC_KEYWORD_CAP});
+    // 씨앗 진단은 이번 발견 결과만, 띄어쓰기 변형은 하나만(lib/seo/seed-scope.ts — 자동 순위와 같은 규칙).
+    const candidates = uniqueVariants(await tx.seoKeyword.findMany({where: {domainId: audit.domainId, market: audit.market,
+      engine: "google", reservationOnly: false, lastAuditId: id, domain: {ownerId}, ...(await seedKeywordScope(tx, id, config))},
+      select: {id: true, normalizedKeyword: true, searchVolume: true},
+      orderBy: [{searchVolume: {sort: "desc", nulls: "last"}}, {id: "asc"}], take: CANDIDATE_POOL}), NEW_METRIC_KEYWORD_CAP);
     const location = MARKET_LOCATIONS[config.market];
     const end = new Date(Date.UTC(audit.createdAt.getUTCFullYear(), audit.createdAt.getUTCMonth(), 0));
     const start = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - 11, 1));

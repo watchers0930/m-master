@@ -15,6 +15,7 @@ import { ENGINE_LABELS, MODE_LABELS, SEO_ENGINES } from '../constants';
 import { SeoApiError, type RunAuditBody } from '../api';
 import { useRunAudit, useResumeAudit } from '../hooks/use-seo-audit';
 import { useAutoResume } from '../hooks/use-auto-resume';
+import { canonicalSeeds, parseSeedKeywords, seedListIssue, SEED_LIMIT } from '@/lib/seo/seed-keywords';
 
 interface Props {
   domainId: string;
@@ -52,6 +53,7 @@ export function AuditRunPanel({ domainId, market, canWrite, resumable, selectedA
   const [mode, setMode] = useState<AuditMode>('instant');
   const [engines, setEngines] = useState<SeoEngine[]>(['google']);
   const [pathsText, setPathsText] = useState('');
+  const [keywordsText, setKeywordsText] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   // 멱등 재시도용: 직전 시도의 입력 서명과 runKey. 같은 입력의 불확실한 재시도엔 같은 키를,
@@ -79,9 +81,13 @@ export function AuditRunPanel({ domainId, market, canWrite, resumable, selectedA
     const body: RunAuditBody = { domainId, runKey: '', mode };
     if (paths.length) body.paths = paths;
     if (engines.length) body.engines = engines;
+    const keywords = parseSeedKeywords(keywordsText);
+    const seedIssue = seedListIssue(keywords);
+    if (seedIssue) return setError(seedIssue);
+    if (keywords.length) body.keywords = keywords;
 
     // 입력 서명이 직전 시도와 같으면(=결과 불확실한 재시도) 같은 runKey 재사용, 아니면 새로 발급.
-    const signature = JSON.stringify({ domainId, mode, paths, engines });
+    const signature = JSON.stringify({ domainId, mode, paths, engines, keywords: canonicalSeeds(keywords) }); // 서버와 같은 기준(중복·순서 무시)
     if (attemptRef.current?.signature === signature) {
       body.runKey = attemptRef.current.runKey;
     } else {
@@ -192,6 +198,20 @@ export function AuditRunPanel({ domainId, market, canWrite, resumable, selectedA
             <p style={{ fontSize: 12, color: 'var(--sub)', marginTop: 6 }}>네이버 순위는 한국(ko-KR) 시장에서만 수집됩니다.</p>
           )}
         </div>
+
+        {/* 주제 키워드(선택) — 넣으면 사이트 첫 화면 대신 이 주제의 관련 검색어로 수요·자동 순위를 잡는다 */}
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontSize: 12, color: 'var(--sub)', fontWeight: 600 }}>주제 키워드 (선택 · 최대 {SEED_LIMIT}개, 쉼표/줄바꿈 구분)</span>
+          <textarea
+            value={keywordsText}
+            onChange={(e) => setKeywordsText(e.target.value)}
+            disabled={busy}
+            rows={2}
+            placeholder="예: 전세사기, 근저당확인, 등기부등본분석"
+            style={{ borderRadius: 7, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: 12, padding: '7px 10px', fontFamily: 'inherit', resize: 'vertical' }}
+          />
+          <span style={{ fontSize: 12, color: 'var(--sub)' }}>넣으면 이 주제와 관련된 검색어를 찾아 순위를 봅니다. 비우면 사이트 첫 화면 내용 기준으로 찾습니다(첫 화면이 주제와 다르면 엉뚱한 키워드가 나올 수 있습니다).</span>
+        </label>
 
         {/* 대표 경로(선택) */}
         <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
