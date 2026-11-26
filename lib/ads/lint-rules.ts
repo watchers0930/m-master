@@ -29,6 +29,22 @@ export const LINT_RULES = {
     id: "description-length", description: "설명 글자 수 초과", basis: "NFC 정규화 후 코드포인트 수(공백 포함, 전각 1자). 네이버 계산 방식 미확인",
     verifiedAt: null, source: "설계 가정", limit: 45,
   },
+  extHeadlineLength: {
+    id: "ext-headline-length", description: "추가제목 글자 수 초과", basis: "추가제목 1~15자(NFC 코드포인트, 공백 포함)",
+    verifiedAt: "2026-11-26", source: "네이버 검색광고 대량관리 도움말 ads.naver.com/help/faq/1422", limit: 15,
+  },
+  promoLength: {
+    id: "promo-length", description: "홍보문구 글자 수 초과", basis: "홍보문구(DESCRIPTION) 1~14자. 실측 2026-11-26: 26자 → 400/1010 maxLength 14",
+    verifiedAt: "2026-11-26", source: "ads.naver.com/help/faq/1422 · faq/1134 + 실측", limit: 14,
+  },
+  linkNameLength: {
+    id: "link-name-length", description: "서브링크 이름 글자 수 초과", basis: "서브링크 링크명 6자 이내",
+    verifiedAt: "2026-11-26", source: "네이버 서브링크 등록 기준 ads.naver.com/adguide/1223", limit: 6,
+  },
+  extensionChar: {
+    id: "extension-char", description: "확장소재에 쓸 수 없는 기호", basis: "실측 2026-11-26: '·'가 든 홍보문구가 400/1010 '/description' pattern 위반(문구의 다른 문자는 한글·영문·공백뿐)",
+    verifiedAt: "2026-11-26", source: "실측(시험 등록 후 삭제)",
+  },
   superlative: {
     id: "superlative", description: "최상급·보장 표현", basis: "근거 없는 최상급·보장 표현은 검수 반려 대상(표시광고법 취지)",
     verifiedAt: null, source: UNVERIFIED_GUIDE,
@@ -109,6 +125,8 @@ export const SUPERLATIVE_EXCEPTIONS: readonly SuperlativeException[] = [
 ];
 
 /** 소재 문구 허용 문자(이 밖은 forbidden-char). 한글 음절·영문·숫자·공백·일반 문장부호. 자모 단독·전각·한자는 허용하지 않는다(설계 가정). */
+/** 확장소재 문구에서 추가로 막는 문자(LINT_RULES.extensionChar 근거). */
+export const EXTENSION_FORBIDDEN_CHARS: ReadonlySet<string> = new Set(["·"]);
 export const ALLOWED_COPY_CHAR = /^[가-힣A-Za-z0-9 .,!?'"()[\]\-/&%~:;+·#@_“”‘’]$/;
 
 type CodeRange = readonly [number, number];

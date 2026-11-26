@@ -90,7 +90,8 @@ function readyCaps(account: Awaited<ReturnType<typeof loadOwnedAccount>>): Caps 
   }
 }
 
-function llmOf(deps: ProposalDeps): LlmClient {
+/** 테스트는 deps.llm, 운영은 공용 OpenAI 클라이언트(확장소재 초안도 같이 쓴다). */
+export function llmOf(deps: { llm?: LlmClient }): LlmClient {
   if (deps.llm) return deps.llm;
   try {
     return getClient();

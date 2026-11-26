@@ -2,35 +2,41 @@
 // - lintCreative({headline, description}): 소재 1건. 입력 검사 → 필수 → 글자 수(NFC 코드포인트) → 문자 종류 → 최상급·보장 표현.
 // - lintCreativeGroup(creatives[]): 같은 광고그룹의 소재 목록. 각 소재의 lintCreative 결과에 중복(3822)을 더해 같은 순서로 돌려준다.
 //   중복은 NFC·trim·연속 공백 1칸·소문자로 접은 (제목, 설명) 쌍이 앞 소재와 같을 때, 뒤에 나온 소재에 붙인다.
+// - lintExtensionText(value, field): 확장소재 문구(추가제목 15·홍보문구 14·링크 이름 6자, '·' 금지 — 실측). 소재와 같은 엔진.
 // - lintKeyword(keyword): Task 6과 같은 정규화·허용 문자(keyword-text.ts 단일 출처)로 3906 대상을 거른다.
 // 메시지는 사용자에게 보이는 한국어다. 제어·보이지 않는 문자는 원문 대신 U+XXXX로만 표기한다.
 import { collapseKeyword, isValidKeywordPhrase } from "./keyword-text";
 import {
-  ALLOWED_COPY_CHAR, EMOJI_CHAR, FORBIDDEN_KEYWORDS, isControlChar, MATCH_SEPARATOR_KEEP_BETWEEN_DIGITS, MATCH_SEPARATORS, isZeroWidthChar, LINT_RULES, SUPERLATIVE_EXCEPTIONS, SUPERLATIVE_TERMS, type LintRule,
+  ALLOWED_COPY_CHAR, EMOJI_CHAR, EXTENSION_FORBIDDEN_CHARS, FORBIDDEN_KEYWORDS, isControlChar, MATCH_SEPARATOR_KEEP_BETWEEN_DIGITS, MATCH_SEPARATORS, isZeroWidthChar, LINT_RULES, SUPERLATIVE_EXCEPTIONS, SUPERLATIVE_TERMS, type LintRule,
 } from "./lint-rules";
 
 export type LintField = "headline" | "description" | "keyword";
-export type LintIssue = { rule: string; field: LintField; message: string };
+/** 확장소재 문구(lib/ads/extensions/rules.ts): 추가제목·홍보문구·서브링크 이름 */
+export type ExtensionField = "extHeadline" | "promo" | "linkName";
+type AnyField = LintField | ExtensionField;
+export type LintIssue<F extends AnyField = LintField> = { rule: string; field: F; message: string };
 export type CreativeInput = { headline: unknown; description: unknown };
-type CopyField = "headline" | "description";
+type CopyField = "headline" | "description" | ExtensionField;
 
-const SUBJECT: Record<LintField, string> = { headline: "제목이", description: "설명이", keyword: "키워드가" };
-const TOPIC: Record<LintField, string> = { headline: "제목은", description: "설명은", keyword: "키워드는" };
-const AT: Record<LintField, string> = { headline: "제목에", description: "설명에", keyword: "키워드에" };
+const SUBJECT: Record<AnyField, string> = { headline: "제목이", description: "설명이", keyword: "키워드가", extHeadline: "추가제목이", promo: "홍보문구가", linkName: "링크 이름이" };
+const TOPIC: Record<AnyField, string> = { headline: "제목은", description: "설명은", keyword: "키워드는", extHeadline: "추가제목은", promo: "홍보문구는", linkName: "링크 이름은" };
+const AT: Record<AnyField, string> = { headline: "제목에", description: "설명에", keyword: "키워드에", extHeadline: "추가제목에", promo: "홍보문구에", linkName: "링크 이름에" };
 const LENGTH_RULE: Record<CopyField, LintRule & { limit: number }> = {
   headline: LINT_RULES.headlineLength, description: LINT_RULES.descriptionLength,
+  extHeadline: LINT_RULES.extHeadlineLength, promo: LINT_RULES.promoLength, linkName: LINT_RULES.linkNameLength,
 };
+const isExtension = (field: CopyField): field is ExtensionField => field === "extHeadline" || field === "promo" || field === "linkName";
 const MAX_LISTED = 5;
 const VARIATION_SELECTOR = /^[\uFE0E\uFE0F]$/;
 const PRINTABLE = /^[\p{L}\p{N}\p{P}\p{S}]$/u;
 const FULLWIDTH_START = 0xff01, FULLWIDTH_END = 0xff5e, FULLWIDTH_OFFSET = 0xfee0;
 
-const issue = (rule: LintRule, field: LintField, message: string): LintIssue => ({ rule: rule.id, field, message });
+const issue = <F extends AnyField>(rule: LintRule, field: F, message: string): LintIssue<F> => ({ rule: rule.id, field, message });
 const codeLabel = (ch: string) => `U+${(ch.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0")}`;
 const isInvisible = (ch: string) => isControlChar(ch) || isZeroWidthChar(ch);
 
 /** 문자열이 아니거나 비정상적으로 길면 위반 1건, 아니면 NFC 문자열. */
-function readText(value: unknown, field: LintField): { text: string } | { issue: LintIssue } {
+function readText<F extends AnyField>(value: unknown, field: F): { text: string } | { issue: LintIssue<F> } {
   if (typeof value !== "string") return { issue: issue(LINT_RULES.inputType, field, `${SUBJECT[field]} 문자열이 아닙니다.`) };
   const max = LINT_RULES.inputTooLong.limit;
   if (value.length > max) return { issue: issue(LINT_RULES.inputTooLong, field, `${SUBJECT[field]} 너무 깁니다(최대 ${max}자).`) };
@@ -38,8 +44,8 @@ function readText(value: unknown, field: LintField): { text: string } | { issue:
 }
 
 /** 제어문자·보이지 않는 문자·이모지·허용 목록 밖 문자. 규칙마다 1건, 문자 목록은 최대 5개. */
-function charIssues(text: string, field: CopyField): LintIssue[] {
-  const control = new Set<string>(), zeroWidth = new Set<string>(), forbidden = new Set<string>();
+function charIssues<F extends CopyField>(text: string, field: F): LintIssue<F>[] {
+  const control = new Set<string>(), zeroWidth = new Set<string>(), forbidden = new Set<string>(), extension = new Set<string>();
   let emoji = false, prevEmoji = false;
   for (const ch of text) {
     const isEmoji = EMOJI_CHAR.test(ch);
@@ -48,14 +54,16 @@ function charIssues(text: string, field: CopyField): LintIssue[] {
     else if (isZeroWidthChar(ch)) zeroWidth.add(codeLabel(ch));
     else if (isEmoji) emoji = true;
     else if (!ALLOWED_COPY_CHAR.test(ch)) forbidden.add(PRINTABLE.test(ch) ? ch : codeLabel(ch));
+    else if (isExtension(field) && EXTENSION_FORBIDDEN_CHARS.has(ch)) extension.add(ch);
     prevEmoji = isEmoji;
   }
   const list = (set: Set<string>) => [...set].slice(0, MAX_LISTED).join(", ");
-  const out: LintIssue[] = [];
+  const out: LintIssue<F>[] = [];
   if (control.size) out.push(issue(LINT_RULES.controlChar, field, `${AT[field]} 제어문자(줄바꿈·탭 등)가 있습니다: ${list(control)}`));
   if (zeroWidth.size) out.push(issue(LINT_RULES.zeroWidthChar, field, `${AT[field]} 보이지 않는 문자가 있습니다: ${list(zeroWidth)}`));
   if (emoji) out.push(issue(LINT_RULES.emoji, field, `${AT[field]} 이모지·그림문자는 쓸 수 없습니다.`));
   if (forbidden.size) out.push(issue(LINT_RULES.forbiddenChar, field, `${AT[field]} 쓸 수 없는 특수문자가 있습니다: ${list(forbidden)}`));
+  if (extension.size) out.push(issue(LINT_RULES.extensionChar, field, `${AT[field]} 확장소재에 쓸 수 없는 기호가 있습니다: ${list(extension)}`));
   return out;
 }
 
@@ -110,7 +118,7 @@ function quote(text: string, spans: [number, number][], from: number, to: number
   return Array.from(text.slice(spans[from][0], spans[to - 1][1])).filter((ch) => !isInvisible(ch)).join("");
 }
 
-function superlativeIssues(text: string, field: CopyField): LintIssue[] {
+function superlativeIssues<F extends CopyField>(text: string, field: F): LintIssue<F>[] {
   const { norm, spans } = matchForm(text);
   const exempt: [number, number][] = [];
   // contiguousOnly 예외는 원문에서도 붙어 있을 때만(정규화로 지운 공백·부호·보이지 않는 문자가 사이에 끼면 우회로 보고 예외 아님)
@@ -118,7 +126,7 @@ function superlativeIssues(text: string, field: CopyField): LintIssue[] {
   for (const { pattern, contiguousOnly } of SUPERLATIVE_EXCEPTIONS) for (const m of norm.matchAll(pattern)) {
     if (!contiguousOnly || contiguous(m.index, m.index + m[0].length)) exempt.push([m.index, m.index + m[0].length]);
   }
-  const out: LintIssue[] = [];
+  const out: LintIssue<F>[] = [];
   for (const { pattern } of SUPERLATIVE_TERMS) {
     for (const m of norm.matchAll(pattern)) {
       const from = m.index, to = m.index + m[0].length;
@@ -131,16 +139,21 @@ function superlativeIssues(text: string, field: CopyField): LintIssue[] {
   return out;
 }
 
-function lintCopyField(value: unknown, field: CopyField): LintIssue[] {
+function lintCopyField<F extends CopyField>(value: unknown, field: F): LintIssue<F>[] {
   const read = readText(value, field);
   if ("issue" in read) return [read.issue];
   const { text } = read;
   if (!text.trim()) return [issue(LINT_RULES.required, field, `${SUBJECT[field]} 비어 있습니다.`)];
-  const out: LintIssue[] = [];
+  const out: LintIssue<F>[] = [];
   const rule = LENGTH_RULE[field];
   const length = Array.from(text).length;
   if (length > rule.limit) out.push(issue(rule, field, `${TOPIC[field]} ${rule.limit}자 이하여야 합니다(현재 ${length}자).`));
   return [...out, ...charIssues(text, field), ...superlativeIssues(text, field)];
+}
+
+/** 확장소재 문구 1개(필수 → 글자 수 → 문자 종류(확장소재 금지 기호 포함) → 최상급·보장 표현). 소재와 같은 엔진이다. */
+export function lintExtensionText(value: unknown, field: ExtensionField): LintIssue<ExtensionField>[] {
+  return lintCopyField(value, field);
 }
 
 export function lintCreative(creative: CreativeInput): LintIssue[] {

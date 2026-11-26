@@ -60,27 +60,34 @@ function evaluate(text: string, input: GenerateInput, stats: readonly ProposalSo
 const problemsOf = (c: Candidate): Problem[] => (c.payload === null ? c.problems : lintProblems(c.lintIssues));
 const needsRepair = (c: Candidate) => c.payload === null || c.lintIssues.length > 0;
 
+/** JSON 한 개를 요청하는 LLM 호출 1회(제안·확장소재 초안 공용). 호출 직후(검증 전) 비용 원장(kind 'ads', strict)에 기록한다.
+ *  장애(throw)는 503 ads_llm_unavailable(사용량을 모르므로 원장 없음). SDK 재시도는 끈다(중복 과금 방지). */
+export async function askJson(llm: LlmClient, ownerId: string, body: ChatMessage[], maxTokens = MAX_OUTPUT_TOKENS): Promise<{ text: string; krw: number }> {
+  let response: OpenAI.Chat.Completions.ChatCompletion;
+  try {
+    response = await llm.chat.completions.create(
+      { model: PROPOSAL_MODEL, messages: body, response_format: { type: "json_object" }, temperature: 0.2, max_tokens: maxTokens },
+      { timeout: LLM_TIMEOUT_MS, maxRetries: 0 },
+    );
+  } catch (error) {
+    console.error("[ads] proposal LLM call failed", { type: error instanceof Error ? error.name : "unknown" });
+    throw new AdsHttpError("ads_llm_unavailable", "AI 제안 생성을 호출하지 못했습니다. 잠시 후 다시 시도하세요.", 503);
+  }
+  const usage = response.usage ? toChatUsage(response.usage) : estimateUsage(body);
+  const krw = calcChatKrw(usage);
+  await trackCost({ ownerId, kind: "ads", tokensIn: usage.prompt_tokens, tokensOut: usage.completion_tokens, krw }, { strict: true });
+  const content = response.choices?.[0]?.message?.content;
+  return { text: typeof content === "string" ? content : "", krw };
+}
+
 export async function generateProposal(input: GenerateInput, llm: LlmClient): Promise<GenerateResult> {
   const stats = input.stats.slice(0, MAX_PROMPT_KEYWORDS);
   const messages = buildProposalMessages({ ...input, stats });
   let costKrw = 0;
   const ask = async (body: ChatMessage[]): Promise<string> => {
-    let response: OpenAI.Chat.Completions.ChatCompletion;
-    try {
-      response = await llm.chat.completions.create(
-        { model: PROPOSAL_MODEL, messages: body, response_format: { type: "json_object" }, temperature: 0.2, max_tokens: MAX_OUTPUT_TOKENS },
-        { timeout: LLM_TIMEOUT_MS, maxRetries: 0 },
-      );
-    } catch (error) {
-      console.error("[ads] proposal LLM call failed", { type: error instanceof Error ? error.name : "unknown" });
-      throw new AdsHttpError("ads_llm_unavailable", "AI 제안 생성을 호출하지 못했습니다. 잠시 후 다시 시도하세요.", 503);
-    }
-    const usage = response.usage ? toChatUsage(response.usage) : estimateUsage(body);
-    const krw = calcChatKrw(usage);
-    await trackCost({ ownerId: input.ownerId, kind: "ads", tokensIn: usage.prompt_tokens, tokensOut: usage.completion_tokens, krw }, { strict: true });
-    costKrw += krw;
-    const content = response.choices?.[0]?.message?.content;
-    return typeof content === "string" ? content : "";
+    const r = await askJson(llm, input.ownerId, body);
+    costKrw += r.krw;
+    return r.text;
   };
 
   let text = await ask(messages);
