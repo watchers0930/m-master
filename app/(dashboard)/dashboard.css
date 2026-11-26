@@ -112,6 +112,9 @@ a { text-decoration: none; color: inherit; }
 
 /* ── 카드 공통 ── */
 .card { background: var(--surface); border-radius: 10px; border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; }
+/* 세로 스크롤 영역(.content) 바로 아래 카드는 줄어들지 않는다 — overflow:hidden 카드가 내용이 길 때 2px로 찌그러져 아래 카드가 잘리던 결함(2026-11-26 광고 제안 상세, 웨일 실측).
+   남은 높이를 채우는 카드는 인라인 flex:1로 이 규칙보다 우선한다(scheduler). */
+.content > .card { flex-shrink: 0; }
 .card-head { padding: 13px 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
 .card-title { font-size: 13px; font-weight: 700; color: var(--text); flex: 1; }
 
