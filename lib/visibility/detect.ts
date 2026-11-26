@@ -2,7 +2,10 @@ import { z } from "zod";
 import OpenAI from "openai";
 import type { Citation, Subject, Sentiment } from "@/types/visibility";
 import { normalizeText, normalizeHost, citationHost } from "./normalize";
+import { aliasInQuestion } from "./text";
 import { trackCost } from "@/lib/cost/tracker";
+/** 질문에 든 별칭이 있어 언급 판정을 정책상 제외한 스냅샷 사유(판정 실패와 구분). */
+export const BRANDED_QUERY = "branded_query";
 export interface DetectedMention {
   subject: Subject;
   label: string;
@@ -19,6 +22,12 @@ export interface DetectionInput {
   brandAliases: string[];
   competitorAliases: string[];
   ownerId: string;
+  /**
+   * 추적 질문. 질문에 든 별칭은 답변에 나와도 '질문 되풀이'인지 '실제 언급'인지 글자로도 판정 모델로도 구분할 수 없다
+   * (2026-11-26 실측: gpt-4o-mini 3/3 오판, 구절 제거 규칙은 실제 추천까지 지움 — codex 반례). → 판정 불가로 두어
+   * 언급률 집계에서 뺀다(맞다/틀리다로 세지 않음). 인용(자사 도메인)은 그대로 집계된다.
+   */
+  query?: string;
   beforeJudge?: () => Promise<void>;
 }
 const judgmentSchema = z.object({
@@ -112,12 +121,16 @@ export async function detect(
 ): Promise<{ mentions: DetectedMention[]; failReason?: string }> {
   const mentions: DetectedMention[] = [];
   const text = normalizeText(input.answerText);
+  const question = input.query ? normalizeText(input.query) : "";
+  const inQuestion = (alias: string) => aliasInQuestion(question, alias);
+  let branded = false;
   let failed = false;
   const ambiguous = [
     ...new Set([...input.brandAliases, ...input.competitorAliases]),
   ].filter((label) => {
     const alias = normalizeText(label);
     return (
+      !inQuestion(alias) &&
       text.includes(alias) &&
       (alias.length <= 2 || commonWords.has(alias) || !hasBoundary(text, alias))
     );
@@ -145,7 +158,11 @@ export async function detect(
       let mentioned = found,
         resolvable = true,
         sentiment: Sentiment | null = null;
-      if (found && (alias.length <= 2 || commonWords.has(alias) || !boundary)) {
+      if (inQuestion(alias)) {
+        mentioned = false;
+        resolvable = false;
+        branded = true;
+      } else if (found && (alias.length <= 2 || commonWords.has(alias) || !boundary)) {
         const judgment = judgments.get(label);
         if (judgment) {
           mentioned = judgment.mentioned;
@@ -187,8 +204,13 @@ export async function detect(
     sentiment: null,
     resolvable: !!ownHost,
   });
+  // 실제 판정 실패가 우선. 'branded_query'는 정책상 제외라 판정불가 집계에서 빠진다(data.ts).
   return {
     mentions,
-    ...(failed ? { failReason: "judgment_unavailable" } : {}),
+    ...(failed
+      ? { failReason: "judgment_unavailable" }
+      : branded
+        ? { failReason: BRANDED_QUERY }
+        : {}),
   };
 }

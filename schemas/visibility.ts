@@ -6,7 +6,7 @@ export const idSchema = z.string().cuid();
 export const enginesSchema = z
   .array(engineSchema)
   .min(1)
-  .max(4)
+  .max(5)
   .refine(
     (v) => new Set(v).size === v.length,
     "엔진 중복은 허용되지 않습니다.",

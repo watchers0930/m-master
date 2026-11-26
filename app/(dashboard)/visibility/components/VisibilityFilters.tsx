@@ -5,6 +5,7 @@
 import { MARKETS, type EngineId, type Market } from '@/types/visibility';
 import type { VisibilityQueryDTO } from '@/types/visibility';
 import { ALL_ENGINES, ENGINE_LABELS, MARKET_LABELS } from '../constants';
+import { MARKET_ENGINES } from '@/lib/market/constants';
 
 export interface FiltersState {
   market: Market;
@@ -40,7 +41,11 @@ export function VisibilityFilters({ value, queries, onChange }: Props) {
     <div className="card" style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', gap: 12, padding: '12px 16px' }}>
       <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <span style={labelStyle}>시장</span>
-        <select style={selectStyle} value={value.market} onChange={(e) => set({ market: e.target.value as Market })}>
+        <select style={selectStyle} value={value.market} onChange={(e) => {
+          const market = e.target.value as Market;
+          // 바꾼 시장이 지원하지 않는 엔진이 선택돼 있으면 '전체 엔진'으로 되돌린다
+          set({ market, ...(value.engine && !MARKET_ENGINES[market].includes(value.engine) ? { engine: null } : {}) });
+        }}>
           {MARKETS.map((m) => (
             <option key={m} value={m}>{MARKET_LABELS[m]}</option>
           ))}
@@ -69,7 +74,7 @@ export function VisibilityFilters({ value, queries, onChange }: Props) {
           onChange={(e) => set({ engine: (e.target.value || null) as EngineId | null })}
         >
           <option value="">전체 엔진</option>
-          {ALL_ENGINES.map((en) => (
+          {ALL_ENGINES.filter((en) => MARKET_ENGINES[value.market].includes(en)).map((en) => (
             <option key={en} value={en}>{ENGINE_LABELS[en]}</option>
           ))}
         </select>

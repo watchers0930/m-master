@@ -4,7 +4,10 @@ export function sanitizeVendorResponse(value: unknown): unknown {
     process.env.DATAFORSEO_LOGIN,
     process.env.DATAFORSEO_PASSWORD,
     process.env.OPENAI_API_KEY,
-  ].filter((v): v is string => !!v);
+    process.env.SERPAPI_API_KEY,
+  ]
+    .map((v) => v?.trim())
+    .filter((v): v is string => !!v);
   const scrub = (node: unknown): unknown => {
     if (typeof node === "string")
       return secrets.reduce(

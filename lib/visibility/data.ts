@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import type { dataSchema } from "@/schemas/visibility";
-import { ENGINE_IDS } from "@/lib/market/constants";
+import { MARKET_ENGINES } from "@/lib/market/constants";
 import type { CitationItem, CompetitorScore, VisibilityDataResponse } from "@/types/visibility";
 import { citationHost } from "./normalize";
 import { encodeCursor } from "./cursor";
@@ -25,7 +25,7 @@ export async function visibilityData(ownerId: string, filter: z.infer<typeof dat
   )`;
   const [counts, competitors, page] = await Promise.all([
     db.$queryRaw<Counts[]>(Prisma.sql`${base}, facts AS (
-      SELECT s.id, s.engine, s.captured_at, s.status,
+      SELECT s.id, s.engine, s.captured_at, s.status, s.fail_reason,
         s.status = 'ok' AND EXISTS (SELECT 1 FROM visibility_mentions m WHERE m.snapshot_id=s.id AND m.subject='brand')
           AND NOT EXISTS (SELECT 1 FROM visibility_mentions m WHERE m.snapshot_id=s.id AND m.subject='brand' AND NOT m.resolvable) AS valid,
         s.status = 'ok' AND EXISTS (SELECT 1 FROM visibility_mentions m WHERE m.snapshot_id=s.id AND m.subject='domain' AND m.resolvable) AS cv,
@@ -37,7 +37,7 @@ export async function visibilityData(ownerId: string, filter: z.infer<typeof dat
       (count(*) FILTER (WHERE cv))::int AS "citationValid",
       (count(*) FILTER (WHERE valid AND mentioned))::int AS mentioned,
       (count(*) FILTER (WHERE cv AND cited))::int AS cited,
-      (count(*) FILTER (WHERE (status='ok' AND NOT valid) OR status='pending'))::int AS unresolved,
+      (count(*) FILTER (WHERE (status='ok' AND NOT valid AND fail_reason IS DISTINCT FROM 'branded_query') OR status='pending'))::int AS unresolved,
       (count(*) FILTER (WHERE status IN ('failed','no_result')))::int AS failed,
       max(captured_at) AS latest
     FROM facts GROUP BY GROUPING SETS ((engine), (engine, to_char(captured_at, 'YYYY-MM-DD')))`),
@@ -58,7 +58,8 @@ export async function visibilityData(ownerId: string, filter: z.infer<typeof dat
       ${citationCursor ? Prisma.sql`AND (s.captured_at, s.id, c.ordinality) > (${utcTimestamp(new Date(citationCursor.at))}, ${citationCursor.id}, ${citationCursor.offset})` : Prisma.empty}
       ORDER BY s.captured_at, s.id, c.ordinality LIMIT ${citationLimit + 1}`),
   ]);
-  const engines = (engine ? [engine] : ENGINE_IDS).map((id) => {
+  // 시장이 지원하는 엔진만 행으로 만든다(해외 시장에 네이버 빈 행 없음)
+  const engines = (engine ? [engine] : MARKET_ENGINES[market]).map((id) => {
     const r = counts.find((r) => r.engine === id && r.day === null);
     const valid = r?.valid ?? 0, cv = r?.citationValid ?? 0, mentioned = r?.mentioned ?? 0, cited = r?.cited ?? 0;
     return { engine: id, validSamples: valid, citationValidSamples: cv, mentionedCount: mentioned, citedCount: cited,

@@ -6,4 +6,5 @@ export const engineSchema = z.enum([
   "ai_overviews",
   "perplexity",
   "gemini",
+  "naver_ai_briefing",
 ]);

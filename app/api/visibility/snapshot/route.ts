@@ -2,6 +2,7 @@ import { authenticated, jsonOk, VisibilityError } from "@/lib/visibility/http";
 import { snapshotSchema } from "@/schemas/visibility";
 import { capture } from "@/lib/visibility/track";
 import { VENDOR_PAYMENT_REQUIRED_MESSAGE } from "@/lib/external/dataforseo";
+import { BRANDED_QUERY } from "@/lib/visibility/detect";
 export const maxDuration = 300;
 export async function POST(request: Request) {
   return authenticated(async (ownerId) => {
@@ -34,6 +35,8 @@ export async function POST(request: Request) {
               failReason:
                 result.status === "pending"
                   ? "수집 결과를 확인 중입니다. 잠시 후 다시 확인하세요."
+                  : result.failReason === BRANDED_QUERY
+                    ? "질문에 브랜드 이름이 있어 언급률 집계에서 제외했습니다(인용은 집계)."
                   : unpaid(result)
                     ? VENDOR_PAYMENT_REQUIRED_MESSAGE
                     : "일시적으로 수집 또는 판정을 완료하지 못했습니다.",

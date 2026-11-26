@@ -7,14 +7,15 @@ import type { EngineId, Market, Frequency, SnapshotStatus } from '@/types/visibi
 /** 기본 시장 (설계 §4.1 DEFAULT_MARKET 은 lib/market 소유 → UI 는 로컬 기본값만 사용) */
 export const DEFAULT_MARKET: Market = 'ko-KR';
 
-/** 전 시장 공통 4엔진 (설계 §0: 전 시장 4엔진). 선택 UI 기본 노출용. */
-export const ALL_ENGINES: EngineId[] = ['chatgpt', 'ai_overviews', 'perplexity', 'gemini'];
+/** 전체 엔진(필터 표시용). 시장별 실제 지원 범위는 서버 MARKET_ENGINES — 네이버 AI 브리핑은 ko-KR 전용. */
+export const ALL_ENGINES: EngineId[] = ['chatgpt', 'ai_overviews', 'perplexity', 'gemini', 'naver_ai_briefing'];
 
 export const ENGINE_LABELS: Record<EngineId, string> = {
   chatgpt: 'ChatGPT',
   ai_overviews: 'AI Overviews',
   perplexity: 'Perplexity',
   gemini: 'Gemini',
+  naver_ai_briefing: '네이버 AI 브리핑',
 };
 
 /** 엔진별 포인트 색 (대시보드 네이비 톤 계열 + 구분) */
@@ -23,6 +24,7 @@ export const ENGINE_COLORS: Record<EngineId, string> = {
   ai_overviews: '#2a7d5f',
   perplexity: '#6f8fd0',
   gemini: '#b45309',
+  naver_ai_briefing: '#03a94d',
 };
 
 export const MARKET_LABELS: Record<Market, string> = {
