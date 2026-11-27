@@ -187,6 +187,42 @@ export async function resumeAudit(ownerId: string, id: string) {
   await processAudit(ownerId, id);
   return getAudit(ownerId, id);
 }
+/**
+ * 이번 요청에서 처리할 작업(최대 2개). collectOnly면 수거 작업만.
+ * - 수거 작업(공급자에 이미 보냈거나 결과가 저장된 것, 무과금 — tasks.ts claimInTransaction의 예산 검사 제외 조건과 같다)과
+ *   새로 보낼 작업을 따로 고른다. 수거 작업이 있으면 한 자리는 반드시 수거에 준다 — 예산에 거절되는 미전송 작업이
+ *   두 자리를 차지해 이미 낸 돈의 결과 수거를 영원히 막지 않게(codex 2차 MED).
+ * - 각 종류 안에서는 가장 오래 손대지 않은 작업부터(updatedAt). 생성 시각 순이면 결과를 기다리는 작업이 매번 다시 뽑혀
+ *   안 보낸 작업이 차례를 못 받았다(2026-11-27 운영: 순위 10개 중 2개가 20분간 미전송). 집힐 때마다 updatedAt이 갱신돼 번갈아 돈다.
+ */
+export async function nextTasks(ownerId: string, id: string, collectOnly: boolean) {
+  const base = {
+    auditId: id,
+    ownerId,
+    status: { in: ["pending", "claimed", "submitted"] },
+    OR: [{ leaseUntil: null }, { leaseUntil: { lte: new Date() } }],
+  };
+  const order = [{ updatedAt: "asc" as const }, { createdAt: "asc" as const }, { id: "asc" as const }];
+  const collect = (
+    await prisma.seoTask.findMany({
+      where: { ...base, AND: [{ OR: [{ vendorTaskId: { not: null } }, { resultCheckpoint: { not: Prisma.DbNull } }] }] },
+      select: { id: true },
+      orderBy: order,
+      take: 2,
+    })
+  ).map((t) => ({ ...t, collect: true }));
+  if (collectOnly) return collect;
+  const submit = (
+    await prisma.seoTask.findMany({
+      where: { ...base, vendorTaskId: null, resultCheckpoint: { equals: Prisma.DbNull } },
+      select: { id: true },
+      orderBy: order,
+      take: 2,
+    })
+  ).map((t) => ({ ...t, collect: false }));
+  // 두 종류가 다 있으면 하나씩(2개 상한), 한 종류뿐이면 그 종류에서 2개
+  return collect.length && submit.length ? [collect[0], submit[0]] : [...collect, ...submit];
+}
 export async function processAudit(
   ownerId: string,
   id: string,
@@ -208,25 +244,24 @@ export async function processAudit(
   // Processing result-only tasks also consumes a slot, keeping I/O bounded.
   // collectOnly restricts work to already-submitted tasks (vendorTaskId present):
   // task_get reconciliation never bills, and no never-submitted task is posted.
-  const candidates = await prisma.seoTask.findMany({
-    where: {
-      auditId: id,
-      ownerId,
-      status: { in: ["pending", "claimed", "submitted"] },
-      OR: [{ leaseUntil: null }, { leaseUntil: { lte: new Date() } }],
-      ...(options.collectOnly ? { AND: [{ OR: [
-        { vendorTaskId: { not: null } }, { resultCheckpoint: { not: Prisma.DbNull } },
-      ] }] } : {}),
-    },
-    select: { id: true },
-    orderBy: { createdAt: "asc" },
-    take: 2,
-  });
-  const claims = await claimTasks(
-    ownerId,
-    candidates.map((candidate) => candidate.id),
-  );
+  const candidates = await nextTasks(ownerId, id, options.collectOnly ?? false);
+  // 이미 보낸 작업(결과 수거, 무과금)을 먼저 집는다. 새 제출이 예산·단가 검사에 걸려 claimTasks 트랜잭션이 통째로
+  // 되돌려져도, 이미 낸 돈의 결과는 받고 나서 오류를 알린다(codex MED — 막힌 미전송 작업이 수거를 붙잡지 않게).
+  const sent = candidates.filter((c) => c.collect), unsent = candidates.filter((c) => !c.collect);
+  const claims = await claimTasks(ownerId, sent.map((c) => c.id));
+  let refused: unknown = null;
+  if (unsent.length)
+    try {
+      claims.push(...(await claimTasks(ownerId, unsent.map((c) => c.id))));
+    } catch (error) {
+      if (!claims.length) throw error;
+      refused = error;
+    }
   await Promise.all(claims.map((task) => executeTask(task)));
+  if (refused) {
+    await synthesize(ownerId, id);
+    throw refused;
+  }
   // collectOnly never executes a new paid POST; it may finish reservation scheduling (budget holds).
   if (options.collectOnly) {
     await scheduleMetricTasks(ownerId, id);
